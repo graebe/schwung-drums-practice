@@ -1,0 +1,112 @@
+{
+  "title": "Drums Practice",
+  "children": [
+    {
+      "title": "Overview",
+      "lines": [
+        "Read the chart, play the",
+        "pad, watch your timing.",
+        "",
+        "The bar at the bottom is",
+        "your error: zero in the",
+        "middle, early left, late",
+        "right. Narrow is good."
+      ]
+    },
+    {
+      "title": "Playing",
+      "lines": [
+        "PLAY   listen, unscored",
+        "REC    practise, scored",
+        "MENU   the drill list",
+        "BACK   up, then out",
+        "JOG    move / pick",
+        "SHIFT+click  settings"
+      ]
+    },
+    {
+      "title": "Knobs",
+      "lines": [
+        "1  tempo, 40-240",
+        "2  read ahead",
+        "3  loop length",
+        "4  kit layout",
+        "",
+        "Changing tempo or loop",
+        "rebuilds the drill."
+      ]
+    },
+    {
+      "title": "The pads",
+      "lines": [
+        "Left half is your left",
+        "hand, right half your",
+        "right. Each voice owns a",
+        "block; any pad in it",
+        "counts.",
+        "",
+        "sticking  one surface",
+        "kit4      the rock kit",
+        "kit8      the whole kit"
+      ]
+    },
+    {
+      "title": "Colours",
+      "lines": [
+        "green   you got it",
+        "amber   right drum but",
+        "        the WRONG HAND",
+        "red     you missed it",
+        "yellow  your finger",
+        "violet  what is coming"
+      ]
+    },
+    {
+      "title": "Scoring",
+      "lines": [
+        "Four things, counted",
+        "apart, because each is",
+        "fixed differently:",
+        "",
+        "timing   mean and spread",
+        "drum     hit or miss",
+        "hand     sticking error",
+        "dynamic  accent / ghost"
+      ]
+    },
+    {
+      "title": "The Ladder",
+      "lines": [
+        "Play N bars clean and",
+        "the tempo goes up. Fail",
+        "and it stops.",
+        "",
+        "Your score is the top",
+        "clean tempo, kept per",
+        "drill and plotted."
+      ]
+    },
+    {
+      "title": "Latency",
+      "lines": [
+        "If every hit reads late",
+        "by the same amount, that",
+        "is your rig, not you.",
+        "",
+        "Settings > Latency takes",
+        "it off every reading."
+      ]
+    },
+    {
+      "title": "Sound",
+      "lines": [
+        "The module has its own",
+        "kit and click. Nothing",
+        "to set up.",
+        "",
+        "MIDI out can send to a",
+        "track or USB instead."
+      ]
+    }
+  ]
+}

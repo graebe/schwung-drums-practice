@@ -1,0 +1,73 @@
+{
+  "id": "flam-accent",
+  "name": "Flam accent",
+  "bpm": 76,
+  "timeSig": [
+    4,
+    4
+  ],
+  "loopBars": 1,
+  "sticking": "strict",
+  "events": [
+    {
+      "beat": 0.0,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R",
+      "dyn": "accent"
+    },
+    {
+      "beat": 0.333333,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 0.666667,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 0.833333,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R",
+      "dyn": "ghost"
+    },
+    {
+      "beat": 1.0,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L",
+      "dyn": "accent"
+    },
+    {
+      "beat": 1.333333,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 1.666667,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 3.833333,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L",
+      "dyn": "ghost"
+    }
+  ]
+}

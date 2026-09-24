@@ -1,0 +1,67 @@
+{
+  "id": "jazz-ride",
+  "name": "Jazz ride",
+  "bpm": 132,
+  "timeSig": [
+    12,
+    8
+  ],
+  "loopBars": 1,
+  "sticking": "off",
+  "events": [
+    {
+      "beat": 0.0,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 0.0,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 1.0,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 3.0,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 4.0,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 4.5,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 4.5,
+      "voices": [
+        "HH"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "id": "five-stroke-roll",
+  "name": "Five stroke roll",
+  "bpm": 76,
+  "timeSig": [
+    4,
+    4
+  ],
+  "loopBars": 1,
+  "sticking": "strict",
+  "events": [
+    {
+      "beat": 0.0,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 0.25,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 0.5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 0.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 1.0,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R",
+      "dyn": "accent"
+    },
+    {
+      "beat": 1.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 2.0,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 2.25,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 2.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L",
+      "dyn": "accent"
+    }
+  ]
+}

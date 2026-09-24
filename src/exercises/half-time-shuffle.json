@@ -1,0 +1,74 @@
+{
+  "id": "half-time-shuffle",
+  "name": "Half-time shuffle",
+  "bpm": 84,
+  "timeSig": [
+    12,
+    8
+  ],
+  "loopBars": 1,
+  "sticking": "off",
+  "events": [
+    {
+      "beat": 0.0,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 0.0,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 1.0,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 3.0,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 3.0,
+      "voices": [
+        "SN"
+      ],
+      "dyn": "accent"
+    },
+    {
+      "beat": 4.0,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 4.5,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 5.5,
+      "voices": [
+        "HH"
+      ]
+    }
+  ]
+}

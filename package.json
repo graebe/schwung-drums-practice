@@ -1,0 +1,15 @@
+{
+  "name": "schwung-drums-practice",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "npm run test:js && npm run test:dsp && npm run test:rust && npm run test:package",
+    "test:js": "node --test tests/*.test.mjs",
+    "test:dsp": "sh tests/dsp/run.sh",
+    "test:package": "sh tests/package/run.sh",
+    "test:rust": "cd dsp && cargo test --no-default-features",
+    "build": "sh scripts/build.sh",
+    "preview": "node tools/preview.mjs"
+  }
+}

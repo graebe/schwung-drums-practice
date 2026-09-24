@@ -1,0 +1,19 @@
+[package]
+name = "drums"
+version = "0.1.0"
+edition = "2021"
+authors = ["Torben Gräber"]
+license = "MIT"
+description = "The Drums Practice built-in kit and click, as a Schwung DSP plugin."
+
+[lib]
+name = "drums"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["rt"]
+rt = ["schwung-plugin/rt"]
+
+[dependencies]
+schwung-plugin = { path = "../schwung-plugin", default-features = false }
+libm = "0.2"

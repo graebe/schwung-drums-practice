@@ -1,0 +1,87 @@
+{
+  "id": "shuffle",
+  "name": "Shuffle",
+  "bpm": 88,
+  "timeSig": [
+    12,
+    8
+  ],
+  "loopBars": 1,
+  "sticking": "off",
+  "events": [
+    {
+      "beat": 0.0,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 0.0,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 1.0,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "SN"
+      ],
+      "dyn": "accent"
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 3.0,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 3.0,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 4.0,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 4.5,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 4.5,
+      "voices": [
+        "SN"
+      ],
+      "dyn": "accent"
+    },
+    {
+      "beat": 5.5,
+      "voices": [
+        "HH"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+    "id": "drums-practice",
+    "name": "Drums Practice",
+    "abbrev": "DRM",
+    "version": "0.1.0",
+    "description": "Rhythm trainer: read the chart, play the kit, see your timing.",
+    "author": "graebe",
+    "license": "MIT",
+    "ui": "ui.js",
+    "api_version": 2,
+    "component_type": "tool",
+    "tool_config": { "interactive": true, "skip_file_browser": true, "overtake": true },
+    "capabilities": { "midi_in": true, "midi_out": true, "audio_out": true },
+    "dsp": "dsp.so"
+}

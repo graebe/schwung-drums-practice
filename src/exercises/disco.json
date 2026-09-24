@@ -1,0 +1,87 @@
+{
+  "id": "disco",
+  "name": "Disco",
+  "bpm": 118,
+  "timeSig": [
+    4,
+    4
+  ],
+  "loopBars": 1,
+  "sticking": "off",
+  "events": [
+    {
+      "beat": 0.0,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 0.0,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 1.0,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 1.0,
+      "voices": [
+        "HO"
+      ]
+    },
+    {
+      "beat": 1.0,
+      "voices": [
+        "SN"
+      ],
+      "dyn": "accent"
+    },
+    {
+      "beat": 1.0,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 2.0,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 2.0,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 3.0,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 3.0,
+      "voices": [
+        "HO"
+      ]
+    },
+    {
+      "beat": 3.0,
+      "voices": [
+        "SN"
+      ],
+      "dyn": "accent"
+    },
+    {
+      "beat": 3.0,
+      "voices": [
+        "KK"
+      ]
+    }
+  ]
+}

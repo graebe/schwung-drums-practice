@@ -1,0 +1,125 @@
+{
+  "id": "bossa-nova",
+  "name": "Bossa nova",
+  "bpm": 120,
+  "timeSig": [
+    4,
+    4
+  ],
+  "loopBars": 1,
+  "sticking": "off",
+  "events": [
+    {
+      "beat": 0.0,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 0.0,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 0.5,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 0.5,
+      "voices": [
+        "SN"
+      ],
+      "dyn": "ghost"
+    },
+    {
+      "beat": 0.75,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 1.0,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "SN"
+      ],
+      "dyn": "ghost"
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 2.0,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 2.0,
+      "voices": [
+        "SN"
+      ],
+      "dyn": "ghost"
+    },
+    {
+      "beat": 2.0,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 2.75,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 3.0,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 3.0,
+      "voices": [
+        "SN"
+      ],
+      "dyn": "ghost"
+    },
+    {
+      "beat": 3.5,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 3.5,
+      "voices": [
+        "KK"
+      ]
+    }
+  ]
+}

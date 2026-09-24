@@ -1,0 +1,77 @@
+{
+  "id": "drag",
+  "name": "Drag",
+  "bpm": 70,
+  "timeSig": [
+    4,
+    4
+  ],
+  "loopBars": 1,
+  "sticking": "strict",
+  "events": [
+    {
+      "beat": 0.0,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R",
+      "dyn": "accent"
+    },
+    {
+      "beat": 0.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R",
+      "dyn": "ghost"
+    },
+    {
+      "beat": 1.0,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L",
+      "dyn": "accent"
+    },
+    {
+      "beat": 1.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L",
+      "dyn": "ghost"
+    },
+    {
+      "beat": 2.0,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R",
+      "dyn": "accent"
+    },
+    {
+      "beat": 2.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R",
+      "dyn": "ghost"
+    },
+    {
+      "beat": 3.0,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L",
+      "dyn": "accent"
+    },
+    {
+      "beat": 3.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L",
+      "dyn": "ghost"
+    }
+  ]
+}

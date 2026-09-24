@@ -1,0 +1,184 @@
+{
+  "exercises": [
+    {
+      "id": "single-stroke-roll",
+      "name": "Single stroke roll",
+      "file": "single-stroke-roll.json",
+      "group": "rudiment"
+    },
+    {
+      "id": "double-stroke-roll",
+      "name": "Double stroke roll",
+      "file": "double-stroke-roll.json",
+      "group": "rudiment"
+    },
+    {
+      "id": "single-paradiddle",
+      "name": "Single paradiddle",
+      "file": "single-paradiddle.json",
+      "group": "rudiment"
+    },
+    {
+      "id": "double-paradiddle",
+      "name": "Double paradiddle",
+      "file": "double-paradiddle.json",
+      "group": "rudiment"
+    },
+    {
+      "id": "triple-paradiddle",
+      "name": "Triple paradiddle",
+      "file": "triple-paradiddle.json",
+      "group": "rudiment"
+    },
+    {
+      "id": "paradiddle-diddle",
+      "name": "Paradiddle-diddle",
+      "file": "paradiddle-diddle.json",
+      "group": "rudiment"
+    },
+    {
+      "id": "flam",
+      "name": "Flam",
+      "file": "flam.json",
+      "group": "rudiment"
+    },
+    {
+      "id": "flam-tap",
+      "name": "Flam tap",
+      "file": "flam-tap.json",
+      "group": "rudiment"
+    },
+    {
+      "id": "flam-accent",
+      "name": "Flam accent",
+      "file": "flam-accent.json",
+      "group": "rudiment"
+    },
+    {
+      "id": "drag",
+      "name": "Drag",
+      "file": "drag.json",
+      "group": "rudiment"
+    },
+    {
+      "id": "drag-tap",
+      "name": "Drag tap",
+      "file": "drag-tap.json",
+      "group": "rudiment"
+    },
+    {
+      "id": "single-ratamacue",
+      "name": "Single ratamacue",
+      "file": "single-ratamacue.json",
+      "group": "rudiment"
+    },
+    {
+      "id": "double-ratamacue",
+      "name": "Double ratamacue",
+      "file": "double-ratamacue.json",
+      "group": "rudiment"
+    },
+    {
+      "id": "five-stroke-roll",
+      "name": "Five stroke roll",
+      "file": "five-stroke-roll.json",
+      "group": "rudiment"
+    },
+    {
+      "id": "seven-stroke-roll",
+      "name": "Seven stroke roll",
+      "file": "seven-stroke-roll.json",
+      "group": "rudiment"
+    },
+    {
+      "id": "nine-stroke-roll",
+      "name": "Nine stroke roll",
+      "file": "nine-stroke-roll.json",
+      "group": "rudiment"
+    },
+    {
+      "id": "rock-backbeat",
+      "name": "Rock backbeat",
+      "file": "rock-backbeat.json",
+      "group": "groove"
+    },
+    {
+      "id": "straight-eights",
+      "name": "Straight eights",
+      "file": "straight-eights.json",
+      "group": "groove"
+    },
+    {
+      "id": "sixteenth-funk",
+      "name": "Sixteenth funk",
+      "file": "sixteenth-funk.json",
+      "group": "groove"
+    },
+    {
+      "id": "shuffle",
+      "name": "Shuffle",
+      "file": "shuffle.json",
+      "group": "groove"
+    },
+    {
+      "id": "half-time-shuffle",
+      "name": "Half-time shuffle",
+      "file": "half-time-shuffle.json",
+      "group": "groove"
+    },
+    {
+      "id": "bossa-nova",
+      "name": "Bossa nova",
+      "file": "bossa-nova.json",
+      "group": "groove"
+    },
+    {
+      "id": "samba",
+      "name": "Samba",
+      "file": "samba.json",
+      "group": "groove"
+    },
+    {
+      "id": "reggae-one-drop",
+      "name": "Reggae one-drop",
+      "file": "reggae-one-drop.json",
+      "group": "groove"
+    },
+    {
+      "id": "jazz-ride",
+      "name": "Jazz ride",
+      "file": "jazz-ride.json",
+      "group": "groove"
+    },
+    {
+      "id": "disco",
+      "name": "Disco",
+      "file": "disco.json",
+      "group": "groove"
+    },
+    {
+      "id": "motown",
+      "name": "Motown",
+      "file": "motown.json",
+      "group": "groove"
+    },
+    {
+      "id": "second-line",
+      "name": "Second line",
+      "file": "second-line.json",
+      "group": "groove"
+    },
+    {
+      "id": "afrobeat",
+      "name": "Afrobeat",
+      "file": "afrobeat.json",
+      "group": "groove"
+    },
+    {
+      "id": "boom-bap",
+      "name": "Boom bap",
+      "file": "boom-bap.json",
+      "group": "groove"
+    }
+  ]
+}
