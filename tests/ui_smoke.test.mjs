@@ -950,6 +950,60 @@ test('a rhythm prompt is spread over time, not dumped in one frame', async () =>
     `${notes} notes arrived in ${framesWithSound} frames — some were dumped together`);
 });
 
+test('the host may ask to unload as often as it likes; we tear down once', async () => {
+  /*
+   * A device log of a real unload has the host calling onUnload 53 times in
+   * 150ms. Each pass used to force 32 CC messages into a ring that holds about
+   * 64 and is shared with Move's own output and the LED queue, and to rewrite
+   * the stats and settings files — roughly 1700 messages and 53 writes at the
+   * moment control goes back to Move.
+   */
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(6);
+
+  const midiBefore = log.midi.length;
+  const ledsBefore = log.leds.length;
+  const writesBefore = Object.keys(log.writes).length;
+  globalThis.onUnload();
+  const midiOnce = log.midi.length - midiBefore;
+  const ledsOnce = log.leds.length - ledsBefore;
+  assert.ok(midiOnce > 0, 'the first unload sent no all-notes-off at all');
+  assert.ok(ledsOnce >= 32, 'the first unload left the pads lit');
+
+  for (let i = 0; i < 52; i++) globalThis.onUnload();
+  assert.equal(log.midi.length - midiBefore, midiOnce,
+    'a repeated unload flooded the MIDI ring again');
+  assert.equal(log.leds.length - ledsBefore, ledsOnce,
+    'a repeated unload repainted every pad again');
+  assert.ok(Object.keys(log.writes).length >= writesBefore,
+    'sanity: writes are tracked by path');
+  /* Still never asks the host to exit, however many times it is called. */
+  assert.equal(log.exited || 0, 0);
+});
+
+test('opening again after a close is not left latched shut', async () => {
+  /*
+   * `exited` stops tick() dead, so if it survived into a second load the
+   * module would come up and never draw. ui.js is re-evaluated per load today,
+   * which is the only reason this has never bitten; init() clears it so that
+   * stays true if shadow_ui ever reuses a context.
+   */
+  const { screen } = await loadUi();
+  globalThis.init();
+  ticks(4);
+  globalThis.onUnload();
+  /*
+   * Asserted on the SCREEN, not on the LED log: init() paints pads directly,
+   * so an LED-based check passes even when tick() is latched shut and nothing
+   * is ever drawn — which is the whole failure being guarded against.
+   */
+  screen.pixels.fill(0);
+  globalThis.init();
+  ticks(8);
+  assert.ok(screen.pixels.some((v) => v !== 0), 'the module drew nothing after reopening');
+});
+
 test('leaving a quiz silences whatever it was still playing', async () => {
   const idx = DRILLS.findIndex((d) => d.kind === 'groove');
   const { log } = await loadUi();

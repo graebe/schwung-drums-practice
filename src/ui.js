@@ -1126,6 +1126,15 @@ globalThis.init = function init() {
 };
 
 function initInner() {
+  /*
+   * Cleared here as well as declared, because `exited` is a latch that stops
+   * tick() dead. If shadow_ui ever reuses one JS context across two loads of
+   * this module, a module opened after being closed would come up already
+   * latched and never draw. It does not today — ui.js is re-evaluated per load
+   * — which is the only reason this has never been visible.
+   */
+  exited = false;
+  pendingExitAt = 0;
   const loaded = SET.loadSettings(readFile(SETTINGS_PATH));
   settings = loaded.settings;
   if (loaded.changed) saveSettings();
@@ -1454,6 +1463,26 @@ globalThis.onResume = function onResume() {
  * ringing kit.
  */
 globalThis.onUnload = function onUnload() {
+  /*
+   * ONCE, however many times we are asked.
+   *
+   * A device log of a real unload shows the host calling this 53 times in
+   * 150ms — every 2.8ms, far faster than the tick. The module asks to leave
+   * exactly once (closeModule guards on pendingExitAt||exited, serviceExit
+   * calls host_exit_module once, and tickInner returns early once `exited`),
+   * so the repetition is the host's and not something this side can stop.
+   *
+   * What it CAN stop is doing the whole teardown 53 times. Each pass forces 32
+   * CC messages into a ring that holds about 64 and drains 31 per audio block
+   * — and that ring is shared with Move's own output, the LED queue and the
+   * shadow UI. Flooding it with ~1700 messages at the exact moment control
+   * goes back to Move is a poor way to say goodbye. Each pass also rewrote the
+   * stats and settings files.
+   */
+  if (exited) {
+    pendingExitAt = 0;
+    return;
+  }
   pendingExitAt = 0;
   exited = true;
   guard('unload:panic', () => dspSet('panic', '1'));
