@@ -17,13 +17,11 @@
  * penalty of its own — the way a typing test treats a typo.
  */
 
-import { rng } from './generator.mjs';
+import { rng } from './rng.mjs';
 import { VOICE_IDS } from './kit.mjs';
 import { voiceChoices, subdivChoices, grooveChoices, shuffle,
          voiceLabel, subdivLabel, SUBDIV_ORDER } from './choices.mjs';
 
-export const KINDS = ['voice', 'subdiv', 'groove'];
-export const MODES = ['guess', 'hear', 'pick'];
 export const MAX_HINTS = 2;
 
 /*
@@ -117,6 +115,13 @@ function score(quiz, right, nowMs) {
  */
 export function pressVoice(quiz, voice, nowMs = 0) {
   if (quiz.mode === 'pick') return 'ignored';
+  /*
+   * Once it is answered, further presses do nothing until the next prompt
+   * arrives. A voice sits on several pads, so a flurry across the grid would
+   * otherwise score the same answer two or three times — and the round would
+   * finish having asked a third of the questions it claimed to.
+   */
+  if (quiz.revealed) return 'ignored';
   const right = voice === quiz.prompt;
   score(quiz, right, nowMs);
   if (right) {
@@ -140,6 +145,7 @@ export function moveChoice(quiz, delta) {
 
 export function pickChoice(quiz, nowMs = 0) {
   if (quiz.mode !== 'pick' || !quiz.options.length) return 'ignored';
+  if (quiz.revealed) return 'ignored';
   const right = quiz.options[quiz.choice] === quiz.prompt;
   score(quiz, right, nowMs);
   if (right) {

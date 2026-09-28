@@ -1,6 +1,90 @@
 {
   "exercises": [
     {
+      "id": "rock-backbeat",
+      "name": "Rock backbeat",
+      "file": "rock-backbeat.json",
+      "group": "groove"
+    },
+    {
+      "id": "straight-eights",
+      "name": "Straight eights",
+      "file": "straight-eights.json",
+      "group": "groove"
+    },
+    {
+      "id": "sixteenth-funk",
+      "name": "Sixteenth funk",
+      "file": "sixteenth-funk.json",
+      "group": "groove"
+    },
+    {
+      "id": "shuffle",
+      "name": "Shuffle",
+      "file": "shuffle.json",
+      "group": "groove"
+    },
+    {
+      "id": "half-time-shuffle",
+      "name": "Half-time shuffle",
+      "file": "half-time-shuffle.json",
+      "group": "groove"
+    },
+    {
+      "id": "bossa-nova",
+      "name": "Bossa nova",
+      "file": "bossa-nova.json",
+      "group": "groove"
+    },
+    {
+      "id": "samba",
+      "name": "Samba",
+      "file": "samba.json",
+      "group": "groove"
+    },
+    {
+      "id": "reggae-one-drop",
+      "name": "Reggae one-drop",
+      "file": "reggae-one-drop.json",
+      "group": "groove"
+    },
+    {
+      "id": "jazz-ride",
+      "name": "Jazz ride",
+      "file": "jazz-ride.json",
+      "group": "groove"
+    },
+    {
+      "id": "disco",
+      "name": "Disco",
+      "file": "disco.json",
+      "group": "groove"
+    },
+    {
+      "id": "motown",
+      "name": "Motown",
+      "file": "motown.json",
+      "group": "groove"
+    },
+    {
+      "id": "second-line",
+      "name": "Second line",
+      "file": "second-line.json",
+      "group": "groove"
+    },
+    {
+      "id": "afrobeat",
+      "name": "Afrobeat",
+      "file": "afrobeat.json",
+      "group": "groove"
+    },
+    {
+      "id": "boom-bap",
+      "name": "Boom bap",
+      "file": "boom-bap.json",
+      "group": "groove"
+    },
+    {
       "id": "single-stroke-roll",
       "name": "Single stroke roll",
       "file": "single-stroke-roll.json",
@@ -95,90 +179,6 @@
       "name": "Nine stroke roll",
       "file": "nine-stroke-roll.json",
       "group": "rudiment"
-    },
-    {
-      "id": "rock-backbeat",
-      "name": "Rock backbeat",
-      "file": "rock-backbeat.json",
-      "group": "groove"
-    },
-    {
-      "id": "straight-eights",
-      "name": "Straight eights",
-      "file": "straight-eights.json",
-      "group": "groove"
-    },
-    {
-      "id": "sixteenth-funk",
-      "name": "Sixteenth funk",
-      "file": "sixteenth-funk.json",
-      "group": "groove"
-    },
-    {
-      "id": "shuffle",
-      "name": "Shuffle",
-      "file": "shuffle.json",
-      "group": "groove"
-    },
-    {
-      "id": "half-time-shuffle",
-      "name": "Half-time shuffle",
-      "file": "half-time-shuffle.json",
-      "group": "groove"
-    },
-    {
-      "id": "bossa-nova",
-      "name": "Bossa nova",
-      "file": "bossa-nova.json",
-      "group": "groove"
-    },
-    {
-      "id": "samba",
-      "name": "Samba",
-      "file": "samba.json",
-      "group": "groove"
-    },
-    {
-      "id": "reggae-one-drop",
-      "name": "Reggae one-drop",
-      "file": "reggae-one-drop.json",
-      "group": "groove"
-    },
-    {
-      "id": "jazz-ride",
-      "name": "Jazz ride",
-      "file": "jazz-ride.json",
-      "group": "groove"
-    },
-    {
-      "id": "disco",
-      "name": "Disco",
-      "file": "disco.json",
-      "group": "groove"
-    },
-    {
-      "id": "motown",
-      "name": "Motown",
-      "file": "motown.json",
-      "group": "groove"
-    },
-    {
-      "id": "second-line",
-      "name": "Second line",
-      "file": "second-line.json",
-      "group": "groove"
-    },
-    {
-      "id": "afrobeat",
-      "name": "Afrobeat",
-      "file": "afrobeat.json",
-      "group": "groove"
-    },
-    {
-      "id": "boom-bap",
-      "name": "Boom bap",
-      "file": "boom-bap.json",
-      "group": "groove"
     }
   ]
 }

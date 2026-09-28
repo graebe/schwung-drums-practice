@@ -60,10 +60,6 @@ export function voiceIndex(id) {
   return VOICE_IDS.indexOf(id);
 }
 
-export function voiceAt(index) {
-  return VOICES[index] || null;
-}
-
 /* Sort voice ids into staff order, top to bottom. Used everywhere a stack of
  * simultaneous hits is drawn or named, so the order never depends on the
  * order they happened to be written in. */

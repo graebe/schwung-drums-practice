@@ -13,6 +13,7 @@ import * as L from '../src/layout.mjs';
 import * as SR from '../src/staff_render.mjs';
 import * as GR from '../src/grid_render.mjs';
 import { drawReadingView, timingX } from '../src/view.mjs';
+import { rulerBars } from '../src/chart.mjs';
 import { createRun, ensureEntries, judgeHit, expireMissed } from '../src/scoring.mjs';
 import { subdivisionDrill, grooveVariation } from '../src/generator.mjs';
 import { voiceById, VOICES } from '../src/kit.mjs';
@@ -23,7 +24,7 @@ const yOf = (id) => diatonicToY(voiceById(id).diatonic);
 
 function frame(chart, opts = {}) {
   const run = createRun(chart, {
-    looping: opts.looping !== false,
+    repeats: opts.repeats === undefined ? 0 : opts.repeats,
     sticking: opts.sticking || chart.sticking || 'off',
   });
   ensureEntries(run, (opts.songBeats || 0) + 8);
@@ -35,7 +36,7 @@ function frame(chart, opts = {}) {
     pxPerBeat: opts.px || L.PX_PER_BEAT_DEFAULT,
     view: opts.view || 'staff',
     title: opts.title || chart.name,
-    bpm: chart.bpm, looping: opts.looping !== false,
+    bpm: chart.bpm, repeats: opts.repeats === undefined ? 0 : opts.repeats,
     dynamics: opts.dynamics !== false,
   });
   return { ctx, run };
@@ -253,7 +254,8 @@ test('the timing cloud sits where the hits were', () => {
   const t = createTiming();
   for (let i = 0; i < 8; i++) pushOffset(t, 'SN', -80, i);
   drawReadingView(ctx, {
-    run: { timing: t, entries: [], markers: [], windows: { goodMs: 60 }, sticking: 'off' },
+    run: { timing: t, entries: [], markers: [], windows: { goodMs: 60 }, sticking: 'off',
+           endBeat: Infinity },
     chart: { timeSig: [4, 4], events: [], bpm: 90 },
     songBeats: 0, pxPerBeat: 32, view: 'grid', title: 't', bpm: 90, looping: true,
   });
@@ -271,6 +273,125 @@ test('the hit line marks now, and thickens on the beat', () => {
   assert.equal(countOn(thin, L.HIT_X, L.HIT_LINE_TOP_Y, 2, h), h);
   assert.equal(countOn(thick, L.HIT_X, L.HIT_LINE_TOP_Y, 2, h), h * 2);
 });
+
+/* ---- The bar ruler ------------------------------------------------------ */
+/*
+ * The lane under the chart. Before this it was reserved for a sticking and
+ * left blank for every groove — nine rows under a rule dividing nothing from
+ * nothing, which is a quarter of the useful height of the screen.
+ */
+
+const rowLit = (ctx, y) => countOn(ctx, 0, y, L.SCREEN_W, 1);
+
+test('a tick marks every visible bar line, at the bar line own x', () => {
+  const chart = grooveVariation(1, 'rock');
+  const { ctx } = frame(chart, { view: 'grid', songBeats: 5.2, repeats: 4 });
+  const bars = rulerBars(chart, 5.2, L.PX_PER_BEAT_DEFAULT, Infinity);
+  const onScreen = bars.filter((b) => b.x >= 0 && b.x < L.SCREEN_W);
+  assert.ok(onScreen.length >= 1, 'no bar line was on screen to test with');
+  for (const b of onScreen) {
+    assert.ok(isOn(ctx, Math.round(b.x), L.UNDER_TICK_Y),
+      `no tick under bar ${b.bar} at x${Math.round(b.x)}`);
+  }
+});
+
+test('a groove gets bar numbers in the lane; a sticking drill keeps its hands', () => {
+  const chart = grooveVariation(1, 'rock');
+  const groove = frame(chart, { view: 'grid', songBeats: 5.2, repeats: 4, sticking: 'off' }).ctx;
+  /* The number sits at the left edge, where the clamp holds it. */
+  assert.ok(countOn(groove, 0, L.UNDER_LANE_Y, 12, L.TEXT_H) > 0,
+    'no bar number at the left of the lane');
+
+  const drill = subdivisionDrill(2);
+  const stuck = frame(drill, { view: 'grid', songBeats: 5.2, repeats: 4, sticking: 'alternate' }).ctx;
+  assert.equal(countOn(stuck, 0, L.UNDER_LANE_Y, 12, L.TEXT_H), 0,
+    'a bar number was drawn over the sticking, which is where the downbeat hand goes');
+  assert.ok(countOn(stuck, 0, L.UNDER_LANE_Y, L.SCREEN_W, L.TEXT_H) > 0,
+    'the sticking lane lost its hands');
+});
+
+test('the bar number is on screen for the whole of a bar, not just near the line', () => {
+  /*
+   * At 32px/beat a 4/4 bar is 128px — the entire screen — so an unclamped
+   * number shows for a fraction of each bar and is missing for the rest. A
+   * readout that blinks out is one you learn to stop reading.
+   */
+  const chart = grooveVariation(1, 'rock');
+  for (let i = 0; i < 8; i++) {
+    const beats = 4 + i * 0.5;
+    const { ctx } = frame(chart, { view: 'grid', songBeats: beats, repeats: 8 });
+    assert.ok(countOn(ctx, 0, L.UNDER_LANE_Y, L.SCREEN_W, L.TEXT_H) > 0,
+      `no bar number anywhere in the lane at beat ${beats}`);
+  }
+});
+
+test('the bar number yields rather than running into the next tick', () => {
+  const chart = grooveVariation(1, 'rock');
+  for (let i = 0; i < 16; i++) {
+    const beats = 4 + i * 0.25;
+    const { ctx } = frame(chart, { view: 'grid', songBeats: beats, repeats: 8 });
+    for (const b of rulerBars(chart, beats, L.PX_PER_BEAT_DEFAULT, Infinity)) {
+      const x = Math.round(b.x);
+      if (x < 1 || x >= L.SCREEN_W) continue;
+      /* The column just left of a tick belongs to the tick, not to digits. */
+      assert.equal(countOn(ctx, x - 1, L.UNDER_LANE_Y, 1, L.TEXT_H), 0,
+        `a digit touches the tick for bar ${b.bar} at beat ${beats}`);
+    }
+  }
+});
+
+test('the running view leaves no dead band', () => {
+  /*
+   * THE ASSERTION THAT WOULD HAVE CAUGHT THIS. The old layout left three dead
+   * bands: rows 9-13 and 41-46 as margin around lanes capped at 9px, and 48-56
+   * as a sticking lane reserved for grooves that have no sticking. Twenty
+   * blank rows of sixty-four, and no single test knew.
+   *
+   * The budget applies where the layout CHOOSES its geometry. The grid sizes
+   * its own lanes, so its whole height is fair game. The staff's band is fixed
+   * by the notation — rows 41-45 are the down-beam budget and a drill that
+   * beams upward genuinely does not use them — so only the lane under it, the
+   * part this change is about, is measured there.
+   */
+  const worstRun = (ctx, from, to) => {
+    let run = 0;
+    let worst = 0;
+    let at = -1;
+    for (let y = from; y < to; y++) {
+      run = rowLit(ctx, y) === 0 ? run + 1 : 0;
+      if (run > worst) { worst = run; at = y - run + 1; }
+    }
+    return { worst, at };
+  };
+
+  const groove = grooveVariation(1, 'rock');
+  const drill = subdivisionDrill(2);
+
+  /*
+   * A groove fills its band. This is the case the user hit, and the one the
+   * old cap wasted: three lanes of nine in a band of thirty-six.
+   *
+   * A ONE-LANE drill is exempt and stays exempt. A drum-machine view of a
+   * single drum has one row of content, and no cap can conjure a second; the
+   * air around it is the drill being what it is, not the layout misjudging.
+   * That is also why the rudiments default to the staff.
+   */
+  const g = worstRun(frame(groove, { view: 'grid', songBeats: 5.2, repeats: 8 }).ctx,
+                     L.HEADER_RULE_Y + 1, L.TIMING_BAR_Y);
+  assert.ok(g.worst <= 3, `a groove in grid view: ${g.worst} blank rows from y${g.at}`);
+
+  /* The lane under the chart carries something in every drill and every view.
+   * Reserved-and-blank is exactly what it used to be. */
+  for (const [name, chart] of [['a groove', groove], ['a one-voice drill', drill]]) {
+    for (const view of ['grid', 'staff']) {
+      const ctx = frame(chart, { view, songBeats: 5.2, repeats: 8 }).ctx;
+      const u = worstRun(ctx, L.UNDER_RULE_Y, L.TIMING_BAR_Y);
+      assert.ok(u.worst <= 2,
+        `${name}, ${view}: the lane under the chart is ${u.worst} blank rows from y${u.at}`);
+    }
+  }
+});
+
 
 /* ---- The grid ----------------------------------------------------------- */
 
@@ -338,4 +459,156 @@ test('the played marker and the notehead are the same glyph', () => {
       assert.equal(isOn(marker, x, y), isOn(head, x, y), `differ at ${x},${y}`);
     }
   }
+});
+
+/* ---- drum tab ----------------------------------------------------------- */
+
+test('a cymbal is an x and a drum is a blob — told apart at a glance', () => {
+  const lane = GR.lanes(['HH'])[0];
+  const cym = createScreen();
+  const drum = createScreen();
+  GR.drawCell(cym, 60, lane, 'pending', 'x', 'normal');
+  GR.drawCell(drum, 60, lane, 'pending', 'note', 'normal');
+  /* The x is hollow through its middle row; the blob is solid. */
+  assert.ok(!isOn(cym, 60, lane.mid - 2), 'the x has no gap at its top');
+  assert.ok(isOn(drum, 60, lane.mid - 2), 'the blob is not filled');
+  assert.ok(countOn(drum, 56, lane.mid - 3, 9, 7) > countOn(cym, 56, lane.mid - 3, 9, 7),
+    'a drum should read heavier than a cymbal');
+});
+
+test('a grid hit OPENS, exactly as the notehead does', () => {
+  const lane = GR.lanes(['SN'])[0];
+  const pending = createScreen();
+  const hit = createScreen();
+  GR.drawCell(pending, 60, lane, 'pending', 'note', 'normal');
+  GR.drawCell(hit, 60, lane, 'hit', 'note', 'normal');
+  assert.ok(isOn(pending, 60, lane.mid), 'a pending drum is solid');
+  assert.ok(!isOn(hit, 60, lane.mid), 'a hit drum must open into a ring');
+});
+
+test('a missed cell is struck through and still reads as its voice', () => {
+  const lane = GR.lanes(['KK'])[0];
+  const missed = createScreen();
+  const pending = createScreen();
+  GR.drawCell(missed, 60, lane, 'missed', 'note', 'normal');
+  GR.drawCell(pending, 60, lane, 'pending', 'note', 'normal');
+  assert.ok(countOn(missed, 52, lane.top, 17, lane.h) > countOn(pending, 52, lane.top, 17, lane.h),
+    'a miss must ADD a mark, not replace the glyph');
+});
+
+test('the tab carries dynamics by weight: ghost < normal < accent', () => {
+  const lane = GR.lanes(['SN'])[0];
+  /* The glyph's horizontal EXTENT, not a row count: an x is two diagonals
+   * meeting at a single pixel, so its middle row is one pixel wide whatever
+   * size it is drawn at. */
+  const width = (dyn, head) => {
+    const ctx = createScreen();
+    GR.drawCell(ctx, 60, lane, 'pending', head, dyn);
+    let lo = 99;
+    let hi = -1;
+    for (let x = 50; x < 71; x++) {
+      if (countOn(ctx, x, lane.top, 1, lane.h) > 0) {
+        if (x < lo) lo = x;
+        if (x > hi) hi = x;
+      }
+    }
+    return hi < 0 ? 0 : hi - lo + 1;
+  };
+  for (const head of ['note', 'x']) {
+    const g = width('ghost', head);
+    const n = width('normal', head);
+    const a = width('accent', head);
+    assert.ok(g < n && n < a, `${head}: ${g}/${n}/${a} are not three steps`);
+    assert.ok(g >= 1, 'a ghost note must still be a mark, not an absence');
+  }
+});
+
+test('cell widths stay odd, so a hit sits centred on its beat', () => {
+  for (const laneH of [4, 6, 9]) {
+    for (const dyn of ['ghost', 'normal', 'accent']) {
+      const w = GR.cellWidth(dyn, laneH);
+      assert.equal(w % 2, 1, `${dyn} at lane height ${laneH} is ${w}px — even`);
+      assert.ok(w >= 1 && w <= 7);
+    }
+  }
+});
+
+test('the header rule doubles as a progress bar, and endless leaves it alone', () => {
+  const chart = subdivisionDrill('eighths', { bpm: 90 });
+  const half = frame({ ...chart, repeats: 4 }, { repeats: 4, songBeats: 8 }).ctx;
+  const none = frame(chart, { repeats: 0, songBeats: 8 }).ctx;
+  const y = L.HEADER_RULE_Y - 1;
+  const filled = countOn(half, 0, y, L.SCREEN_W, 1);
+  assert.ok(filled > 40 && filled < 90, `progress bar is ${filled}px of 128 at the half-way mark`);
+  assert.equal(countOn(none, 0, y, L.SCREEN_W, 1), 0, 'there is no fraction of forever');
+});
+
+test('the grid is what you see first', async () => {
+  const { DEFAULTS } = await import('../src/settings_def.mjs');
+  assert.equal(DEFAULTS.view, 'grid');
+});
+
+/* ---- the ready overlay -------------------------------------------------- */
+
+import { drawReady, READY_BOX } from '../src/view.mjs';
+import { drawScrubGlyph, SCRUB_W, SCRUB_H } from '../src/glyphs.mjs';
+
+function readyFrame(opts = {}) {
+  const chart = subdivisionDrill('eighths', { bpm: 90 });
+  const run = createRun(chart, { repeats: 8 });
+  ensureEntries(run, 32);
+  const ctx = createScreen();
+  const text = [];
+  const orig = ctx.text.bind(ctx);
+  ctx.text = (x, y, s, v) => { text.push(s); orig(x, y, s, v); };
+  drawReady(ctx, {
+    run, chart, songBeats: opts.songBeats || 0, pxPerBeat: 32, view: 'grid',
+    title: chart.name, bpm: chart.bpm, dynamics: true, ...opts,
+  });
+  return { ctx, text };
+}
+
+test('the ready box holds three controls, and names all three', () => {
+  const { text } = readyFrame();
+  const joined = text.join('|');
+  for (const word of ['PLAY', 'REC', 'SCRUB']) {
+    assert.ok(joined.includes(word), `no ${word} row: ${joined}`);
+  }
+});
+
+test('the box is over the chart at home and gone once you scrub', () => {
+  /* It covers exactly the music you are scrubbing through, so keeping it up
+   * would defeat the scrubbing. */
+  const home = readyFrame({ songBeats: 0 });
+  const away = readyFrame({ songBeats: 4 });
+  assert.ok(home.text.join('|').includes('SCRUB'));
+  assert.ok(!away.text.join('|').includes('SCRUB'), 'the box stayed up');
+  const b = READY_BOX;
+  assert.ok(countOn(home.ctx, b.x, b.y, b.w, 1) > b.w / 2, 'the box has no top edge');
+  assert.ok(countOn(away.ctx, b.x, b.y, b.w, 1) < b.w / 2, 'the box outline survived');
+});
+
+test('a warning takes the scrub row, being rarer and more urgent', () => {
+  const { text } = readyFrame({ warning: 'no pad for HF' });
+  const joined = text.join('|');
+  assert.ok(joined.includes('no pad for HF'));
+  assert.ok(!joined.includes('SCRUB'), 'the warning and the hint both claimed the row');
+  assert.ok(joined.includes('PLAY') && joined.includes('REC'));
+});
+
+test('the scrub glyph is a BROKEN ring, not a closed one', () => {
+  /*
+   * Closing it and marking the head with one pixel reads as a plain "C" at
+   * this size — an arrow needs a wedge and somewhere to point, so the bottom
+   * arc is cut short to give it one.
+   */
+  const ctx = createScreen();
+  drawScrubGlyph(ctx, 20, 20);
+  const rightEdge = countOn(ctx, 20 + SCRUB_W - 2, 20, 2, SCRUB_H);
+  const leftEdge = countOn(ctx, 20, 20, 2, SCRUB_H);
+  assert.ok(leftEdge > rightEdge, 'the ring is not open on its right');
+  assert.ok(countOn(ctx, 20, 20, SCRUB_W, SCRUB_H) > 18, 'the glyph is too faint to read');
+  /* And it is wider than the two buttons, which is what makes it read as a
+   * knob rather than a third button. */
+  assert.ok(SCRUB_W > 7);
 });

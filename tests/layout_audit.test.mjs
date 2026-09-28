@@ -10,14 +10,18 @@ import * as L from '../src/layout.mjs';
 import { VOICES } from '../src/kit.mjs';
 import { diatonicToY } from '../src/notation.mjs';
 import { lanes } from '../src/grid_render.mjs';
+import { READY_BOX } from '../src/view.mjs';
 
 test('the bands run top to bottom without overlapping', () => {
   const bands = [
     ['header', 0, L.HEADER_H - 1],
     ['rule', L.HEADER_RULE_Y, L.HEADER_RULE_Y],
     ['chart', L.STAFF_AREA_TOP_Y, L.STAFF_AREA_BOTTOM_Y],
-    ['name rule', L.NAME_RULE_Y, L.NAME_RULE_Y],
-    ['sticking', L.NAME_LANE_Y, L.NAME_LANE_Y + L.TEXT_H - 1],
+    ['under rule', L.UNDER_RULE_Y, L.UNDER_RULE_Y],
+    /* The ticks hang off the rule into the top of the lane, deliberately: a
+     * tick with a gap above it reads as a stray mark rather than as a
+     * graduation. They must still not reach the text row. */
+    ['under lane', L.UNDER_LANE_Y, L.UNDER_LANE_Y + L.TEXT_H - 1],
     ['timing', L.TIMING_BAR_Y, L.TIMING_BAR_Y + L.TIMING_BAR_H - 1],
   ];
   for (let i = 1; i < bands.length; i++) {
@@ -26,6 +30,16 @@ test('the bands run top to bottom without overlapping', () => {
   }
   const last = bands[bands.length - 1];
   assert.ok(last[2] < L.SCREEN_H, `${last[0]} runs off the bottom`);
+});
+
+test('the bar ticks graduate the rule and stay inside the lane', () => {
+  assert.equal(L.UNDER_TICK_Y, L.UNDER_RULE_Y + 1, 'a tick must touch the rule it graduates');
+  /* A tick is two rows and the text row starts on its second, which is fine
+   * VERTICALLY — they are separated horizontally, and the render test measures
+   * that. What must not happen is a tick reaching the timing bar. */
+  assert.ok(L.UNDER_TICK_Y + L.UNDER_TICK_H <= L.UNDER_LANE_Y + L.TEXT_H,
+    'the ticks run out of the lane');
+  assert.ok(L.UNDER_TICK_Y + L.UNDER_TICK_H < L.TIMING_BAR_Y, 'the ticks reach the timing bar');
 });
 
 test('the whole kit fits between the beams', () => {
@@ -104,6 +118,28 @@ test('grid lanes fit their band for every plausible voice count', () => {
   }
 });
 
+test('grid lanes FILL their band, not just fit inside it', () => {
+  /*
+   * Fitting was all the audit asked for, and a cap of 9 fitted three lanes
+   * into 36 rows by using 27 of them and splitting the rest into margin above
+   * and below — which read on the device as a chart that had failed to draw.
+   * Two lanes and up must now leave at most a row and a half either side.
+   */
+  const avail = L.GRID_BOTTOM_Y - L.GRID_TOP_Y + 1;
+  for (let n = 2; n <= 9; n++) {
+    const list = lanes(new Array(n).fill(0).map((_, i) => `v${i}`));
+    const used = list[n - 1].top + list[n - 1].h - list[0].top;
+    /*
+     * Short of the band by less than one lane — that is, no row is left over
+     * that could have been given to EVERY lane. Lanes stay a uniform height
+     * (cellWidth reads it, so an odd lane one row taller would draw its cells
+     * a size bigger than its neighbours), which is why the remainder of the
+     * division is allowed to go unused and nothing more.
+     */
+    assert.ok(avail - used < n, `${n} lanes use ${used} of ${avail} rows`);
+  }
+});
+
 test('the grid label column leaves room for a two-letter name', () => {
   assert.ok(L.GRID_LEFT_X - L.GRID_LABEL_X >= 12, 'two chars is 11px plus a gap');
 });
@@ -123,4 +159,22 @@ test('no result row runs past where the host stops plotting', () => {
 test('the per-voice table stops before it falls off the screen', () => {
   const lastRow = L.VOICE_TABLE_Y + 16 + (L.VOICE_TABLE_MAX_ROWS - 1) * L.VOICE_TABLE_ROW_H;
   assert.ok(lastRow < L.SCREEN_H, 'the table is allowed more rows than fit');
+});
+
+test('the ready box fits, in both of its states', () => {
+  /*
+   * At an earlier geometry the third row landed on screen row 51 — outside a
+   * box ending at 46, and across the sticking rule at 47. An overflow has to
+   * fail here rather than ship.
+   */
+  const b = READY_BOX;
+  assert.ok(b.x >= 0 && b.x + b.w <= L.SCREEN_W, 'the box runs off the side');
+  assert.ok(b.y > L.HEADER_RULE_Y, 'the box covers the header');
+  assert.ok(b.y + b.h <= L.UNDER_RULE_Y, 'the box crosses the under-lane rule');
+  /* Three rows at +4 / +13 / +22, each a line of text tall. */
+  for (const dy of [4, 13, 22]) {
+    assert.ok(b.y + dy + L.TEXT_H <= b.y + b.h, `the row at +${dy} ends outside the box`);
+  }
+  /* And it leaves the timing bar alone. */
+  assert.ok(b.y + b.h < L.TIMING_BAR_Y);
 });

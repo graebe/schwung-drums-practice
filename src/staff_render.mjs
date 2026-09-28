@@ -11,36 +11,10 @@
  */
 
 import * as L from './layout.mjs';
+import { blit, rowsToRuns, drawRing, drawX, CIRCLE_RUNS } from './glyphs.mjs';
 import { ledgerYs, diatonicToY } from './notation.mjs';
 import { voiceById, sortVoices } from './kit.mjs';
 import * as B from './beam.mjs';
-
-/* [dx, dy, width] horizontal runs — blitted with fillRect, never per-pixel
- * (~45 runs is ~22us against ~125us for 255 set_pixel calls). */
-export function rowsToRuns(rows) {
-  const runs = [];
-  for (let y = 0; y < rows.length; y++) {
-    const row = rows[y];
-    let x = 0;
-    while (x < row.length) {
-      if (row[x] === '#') {
-        const start = x;
-        while (x < row.length && row[x] === '#') x++;
-        runs.push([start, y, x - start]);
-      } else {
-        x++;
-      }
-    }
-  }
-  return runs;
-}
-
-function blit(ctx, runs, x, y) {
-  for (let i = 0; i < runs.length; i++) {
-    const r = runs[i];
-    ctx.fillRect(x + r[0], y + r[1], r[2], 1, 1);
-  }
-}
 
 /* ---- Percussion clef ---------------------------------------------------- */
 /*
@@ -85,39 +59,9 @@ export function drawBarLine(ctx, x) {
  * would have to reproduce its rasterisation exactly or the rendering tests
  * would be asserting a shape the Move never draws.
  */
-const RING_RUNS = rowsToRuns([
-  '.###.',
-  '#...#',
-  '#...#',
-  '#...#',
-  '.###.',
-]);
-
-/* The ring around a cymbal struck differently — a crash, or an open hat. */
-const CIRCLE_RUNS = rowsToRuns([
-  '..###..',
-  '.#...#.',
-  '#.....#',
-  '#.....#',
-  '#.....#',
-  '.#...#.',
-  '..###..',
-]);
-
-function drawRing(ctx, cx, cy) {
-  const half = L.RING >> 1;
-  blit(ctx, RING_RUNS, cx - half, cy - half);
-}
-
 /* Where a pad actually went down: same ring, placed at the true time. */
 export function drawPlayedMarker(ctx, x, y) {
   drawRing(ctx, Math.round(x), y);
-}
-
-function drawX(ctx, cx, cy, w = L.XHEAD) {
-  const r = Math.max(1, w >> 1);
-  ctx.line(cx - r, cy - r, cx + r, cy + r, 1);
-  ctx.line(cx - r, cy + r, cx + r, cy - r, 1);
 }
 
 /*
@@ -223,15 +167,6 @@ export function drawBeam(ctx, x0, x1, up, count) {
   const w = Math.max(1, b - a + 1);
   for (let i = 0; i < count; i++) {
     ctx.fillRect(a + (up ? 2 : -2), beamY(up, i), w, L.BEAM_H, 1);
-  }
-}
-
-/* A note whose beams have no neighbour to join gets a stub, not a flag: a
- * flag at this size is three indistinguishable pixels. */
-export function drawBeamStub(ctx, x, up, count) {
-  const cx = Math.round(x);
-  for (let i = 0; i < count; i++) {
-    ctx.fillRect(cx + (up ? 2 : -2 - L.BEAM_STUB_W + 1), beamY(up, i), L.BEAM_STUB_W, L.BEAM_H, 1);
   }
 }
 
@@ -344,19 +279,8 @@ export function drawSticking(ctx, x, hand, ok = true, limitPx = 12) {
   const w = ctx.textWidth(hand);
   if (w > limitPx) return;
   const cx = Math.round(x) - (w >> 1);
-  ctx.text(cx, L.NAME_LANE_Y, hand, 1);
-  if (!ok) ctx.drawRect(cx - 2, L.NAME_LANE_Y - 1, w + 4, L.TEXT_H, 1);
-}
-
-/* ---- Labels ------------------------------------------------------------- */
-export function drawLabel(ctx, x, label, limitPx) {
-  if (!label) return;
-  let text = label;
-  while (text.length > 0 && ctx.textWidth(text) > limitPx) {
-    text = text.slice(0, -1);
-  }
-  if (!text) return;
-  ctx.text(Math.round(x) - (ctx.textWidth(text) >> 1), L.NAME_LANE_Y, text, 1);
+  ctx.text(cx, L.UNDER_LANE_Y, hand, 1);
+  if (!ok) ctx.drawRect(cx - 2, L.UNDER_LANE_Y - 1, w + 4, L.TEXT_H, 1);
 }
 
 export { sortVoices };
@@ -389,14 +313,6 @@ const BIG_W = 3;
 const BIG_H = 5;
 const BIG_GAP = 1;
 
-export function bigDigitWidth(scale) {
-  return BIG_W * scale;
-}
-
-export function bigDigitHeight(scale) {
-  return BIG_H * scale;
-}
-
 export function bigTextWidth(text, scale) {
   if (!text.length) return 0;
   return text.length * BIG_W * scale + (text.length - 1) * BIG_GAP * scale;
@@ -414,23 +330,5 @@ export function drawBigText(ctx, x, y, text, scale) {
       }
     }
     cx += (BIG_W + BIG_GAP) * scale;
-  }
-}
-
-/* A filled right-pointing triangle — the transport symbol. "PLAY" as a word
- * is ambiguous at an instrument; the symbol is only ever the button. */
-export function drawPlayGlyph(ctx, x, y, h) {
-  const height = h | 1;
-  const half = (height - 1) >> 1;
-  for (let row = 0; row < height; row++) {
-    ctx.fillRect(x, y + row, half + 1 - Math.abs(row - half), 1, 1);
-  }
-}
-
-export function drawRecordGlyph(ctx, x, y, d) {
-  const r = d >> 1;
-  for (let row = -r; row <= r; row++) {
-    const w = Math.round(Math.sqrt(r * r - row * row)) * 2 + 1;
-    ctx.fillRect(x + r - (w >> 1), y + r + row, w, 1, 1);
   }
 }

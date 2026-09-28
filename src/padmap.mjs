@@ -35,19 +35,34 @@ export const RIGHT = 'R';
 
 /*
  * Layouts, written top row first because that is how they sit under your
- * hands and how the staff reads. `.` is a pad with no voice.
+ * hands and how the chart reads.
+ *
+ *   kit       ABLETON'S DRUM RACK ORDER. Move puts a Drum Rack on the left
+ *             16 pads as a 4x4, and a Drum Rack is General MIDI from C1 (36)
+ *             ascending left to right, bottom to top — which is why the kick
+ *             is the bottom-left corner on every Move kit ever made. Using
+ *             the same order means muscle memory carries straight from here
+ *             into Move's own kits and back, which is worth more than any
+ *             layout this module could invent.
+ *
+ *               48 HiMidTom  49 Crash   50 HighTom  51 Ride
+ *               44 PedalHH   45 LowTom  46 OpenHH   47 LowMidTom
+ *               40 ElecSnr   41 FloorTm 42 ClosedHH 43 FloorTm2
+ *               36 KICK      37 Rim     38 SNARE    39 Clap
+ *
+ *             The nine voices here do not fill sixteen GM slots, so a slot
+ *             with no exact match takes the nearest voice that does — a rim
+ *             and a clap are struck on the snare, three GM toms share two.
+ *             No pad is dead.
  *
  *   sticking  one surface, two hands. For rudiments, where the only
  *             questions are which hand and when.
- *   kit4      rows are voices, halves are hands. The rock kit.
- *   kit8      two voices per row per hand; the most-played ones (hat, ride,
- *             snare, kick) on the inner columns, under the index fingers.
  *
- * The hi-hat pedal HF is in no layout on purpose. It is part of the engraved
- * legend so that an imported chart renders, but a foot articulation means
- * nothing under a finger, and a pad for it would be a pad taken from a voice
- * that earns one. `exercise_io.playabilityWarnings` reports a chart that asks
- * for a voice the layout cannot reach.
+ * The right four columns DUPLICATE the left rather than mirroring them: the
+ * Ableton order reads left to right, and reversing it for the right hand
+ * would put the kick under the wrong finger and undo the point of matching.
+ * Every voice is still reachable with either hand, which is all the sticking
+ * model needs.
  */
 const GRIDS = {
   sticking: [
@@ -56,22 +71,16 @@ const GRIDS = {
     'SN SN SN SN SN SN SN SN',
     'SN SN SN SN SN SN SN SN',
   ],
-  kit4: [
-    'HH HH HH HH HH HH HH HH',
-    'RD RD RD RD RD RD RD RD',
-    'SN SN SN SN SN SN SN SN',
-    'KK KK KK KK KK KK KK KK',
-  ],
-  kit8: [
-    'CR CR HH HH HH HH CR CR',
-    'HO HO RD RD RD RD HO HO',
-    'HT HT SN SN SN SN HT HT',
-    'LT LT KK KK KK KK LT LT',
+  kit: [
+    'HT CR HT RD HT CR HT RD',
+    'HF LT HO HT HF LT HO HT',
+    'SN LT HH LT SN LT HH LT',
+    'KK SN SN SN KK SN SN SN',
   ],
 };
 
-export const LAYOUT_IDS = ['sticking', 'kit4', 'kit8'];
-export const DEFAULT_LAYOUT = 'kit4';
+export const LAYOUT_IDS = ['sticking', 'kit'];
+export const DEFAULT_LAYOUT = 'kit';
 
 /* Expand each grid once, into pad -> voice. Rows are written top-first but
  * pad row 0 is the BOTTOM row, so the written order is reversed here. */
@@ -108,9 +117,9 @@ export function padHand(pad) {
   return padRowCol(pad).col < COLS / 2 ? LEFT : RIGHT;
 }
 
-/* The column mirrored about the centre line: 0<->7, 1<->6, 2<->5, 3<->4. */
-export function mirrorCol(col) {
-  return COLS - 1 - col;
+/* The same column in the other hand's half: 0<->4, 1<->5, 2<->6, 3<->7. */
+export function twinCol(col) {
+  return (col + COLS / 2) % COLS;
 }
 
 export function layoutExists(layout) {
@@ -192,13 +201,3 @@ export const LED_PRESSED = 8;      /* BrightYellow #FFC516 — your finger     *
 export const LED_HIT = 126;        /* Green        #00FF00                   */
 export const LED_STICK = 3;        /* BrightOrange #C93C00 — wrong hand      */
 export const LED_MISS = 127;       /* Red          #FF0000                   */
-
-export function padBaseColor(pad, layout = DEFAULT_LAYOUT) {
-  return padVoice(pad, layout) ? LED_VOICE : LED_OFF;
-}
-
-/* Staff-order index of a pad's voice, for anything that needs to rank them. */
-export function padVoiceRank(pad, layout = DEFAULT_LAYOUT) {
-  const v = padVoice(pad, layout);
-  return v ? voiceIndex(v) : -1;
-}

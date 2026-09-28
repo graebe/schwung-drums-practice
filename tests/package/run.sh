@@ -75,9 +75,15 @@ ok
 # The install must carry the player's settings, history and hand-added drills
 # across an update.
 INSTALL="$ROOT/scripts/install.sh"
-for keep in settings.json stats.json exercises; do
+for keep in settings.json stats.json user.json; do
   grep -q "$keep" "$INSTALL" || fail "install.sh does not preserve $keep"
 done
+# A hand-written drill is only preserved if the manifest that makes it VISIBLE
+# is preserved too. index.json is shipped and replaced; user.json is not.
+grep -q 'exercises/user.json' "$INSTALL" || fail "install.sh loses the user manifest"
+if grep -q 'cp "$remote/exercises/index.json"' "$INSTALL"; then
+  fail "install.sh preserves the SHIPPED manifest, which would freeze the bundled list"
+fi
 grep -q 'trap rollback' "$INSTALL" || fail "install.sh has no rollback"
 grep -q '/data/UserData/schwung/modules/tools' "$INSTALL" || fail "install.sh uses a stale path"
 ok

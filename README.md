@@ -37,9 +37,10 @@ fingers, in the same way its sister module is a reading trainer rather than a pi
   bottom space, snare in the third, toms above it, cymbals as ✗ heads over the top line. Stems up
   for hands, down for feet. Beams group the subdivision, because sixteenths without beams are not
   reading.
-- **Or like a drum machine.** The same chart in lanes — one row per voice, one column per
-  subdivision, a playhead sweeping across. Immediately legible, and the way Move itself shows a
-  pattern. One setting switches between them; both read the same data.
+- **Reads like drum tab, by default.** One row per voice, `x` for a cymbal and a filled head for a
+  drum, a playhead sweeping across. This is what a drummer reads and it is legible while you are
+  playing rather than only when you stop. The staff is one setting away when reading notation is
+  the point; both views show the same data and teach the same vocabulary.
 - **Scores the distribution, not just the hits.** A hit inside ±30 ms is *perfect*, ±60 ms is
   *good*, past 120 ms the note is gone. But the score is the **mean** — are you rushing or
   dragging — and the **standard deviation**, which is how consistent you are and the number that
@@ -50,8 +51,9 @@ fingers, in the same way its sister module is a reading trainer rather than a pi
   a wrong hand is its own kind of error, counted apart from a missed note.
 - **Scores your dynamics.** An accent has to be loud and a ghost note has to be quiet. That is
   most of what separates a groove that feels good from the same notes played flat.
-- **Loops.** A groove that stops is not a groove. A bar repeats until you stop it, and the score is
-  a rolling window over the last few bars rather than a verdict on one pass.
+- **Has a length.** Every drill is a file, and the file says how long the practice is: a one-bar
+  beat with `"repeats": 8` is an eight-bar practice that ends by itself and shows you the result.
+  Nothing runs until you interrupt it.
 - **Climbs.** The Ladder plays a rudiment at a tempo, and if you keep it clean it puts the tempo up
   and asks again. Your score is the fastest tempo you held it together at, kept per drill, plotted
   over time.
@@ -88,28 +90,34 @@ voice the current layout cannot reach says so before it starts.
 
 ## The pads
 
-The grid is split down the middle: **columns 1–4 are your left hand, columns 5–8 your right.**
-Each voice owns a block of pads within each half, and the two halves mirror about the centre, so a
-voice sits at the same height under either hand and the layout is learned once rather than twice.
-
-Several pads per voice per hand is deliberate, and it is the one idea carried over unchanged from
-the piano module: any pad in the block counts, so doubles and rolls have two fingers to land on
-instead of one, and nothing is lost to fumbling for a single 12 mm square.
+**The kit is laid out in Ableton's Drum Rack order.** Move puts a Drum Rack on the left 16 pads as
+a 4×4, and a Drum Rack is General MIDI from C1 upward, left to right and bottom to top — which is
+why the kick is the bottom-left corner on every Move kit there is. This module uses the same
+order, so what your hands learn here works in Move's own kits and back again.
 
 ```
- sticking                       kit4                      kit8
- ┌───────────────┬───────────────┐  ┌──────────┬──────────┐  ┌──┬──┬──┬──┬──┬──┬──┬──┐
- │               │               │  │    HH    │    HH    │  │CR│CR│HH│HH│HH│HH│CR│CR│
- │       L       │       R       │  │    RD    │    RD    │  │HO│HO│RD│RD│RD│RD│HO│HO│
- │               │               │  │    SN    │    SN    │  │HT│HT│SN│SN│SN│SN│HT│HT│
- │               │               │  │    KK    │    KK    │  │LT│LT│KK│KK│KK│KK│LT│LT│
- └───────────────┴───────────────┘  └──────────┴──────────┘  └──┴──┴──┴──┴──┴──┴──┴──┘
-   one surface, two hands —          rows are voices,          two per row per hand;
-   the rudiment layout               halves are hands          the most-played inside
+      GM 48       49        50        51
+        HT        CR        HT        RD        │  and the same four columns
+      GM 44       45        46        47        │  again under the right hand
+        HF        LT        HO        HT        │
+      GM 40       41        42        43        │  the order reads left to
+        SN        LT        HH        LT        │  right, so it is repeated
+      GM 36       37        38        39        │  rather than mirrored
+      ► KK        SN        SN        SN        │
 ```
 
-**Knob 4** changes layout. Start on `sticking` for rudiments, where the only question is which
-hand and when; move to `kit4` for grooves; `kit8` when you want the toms and the crash.
+Nine voices do not fill sixteen General MIDI slots, so a slot with no exact match takes the
+nearest voice that has one — a rim shot and a hand clap are struck on the snare, three GM toms
+share two. No pad is dead, and the three the Basics need sit together in the bottom-left corner:
+**kick** at 36, **snare** at 38, **closed hi-hat** at 42 directly above it.
+
+The grid is split down the middle — columns 1–4 are your left hand, 5–8 your right — and the right
+half repeats the left rather than reflecting it. Every voice is therefore reachable with either
+hand, which is what makes sticking scoreable, while the Ableton order still reads the right way
+round under both.
+
+**Knob 4** switches to `sticking`, where every pad is the snare and the only questions are which
+hand and when. That is the layout for rudiments.
 
 ### Colours
 
@@ -166,6 +174,41 @@ a flam — and it is punishing until the σ on `normal` is already small.
 means capture what I do. Both pulse when a drill is armed, in their own colours; whichever is
 running goes solid and the other dims. Four beats count you in.
 
+The ready screen **is the chart**, with the three controls laid over it:
+
+```
+ ┌──────────────────────────────────┐
+ │ ▶  PLAY   listen                 │
+ │ ●  REC    practise               │
+ │ ↺  SCRUB  view                   │
+ └──────────────────────────────────┘
+```
+
+The third line is only worth printing because **scrubbing works where it is printed**: knob 1
+moves you through the drill before you start, so you can pick the bar you want to work on. The box
+gets out of the way the moment you leave the start — it sits over the music you are scrubbing
+through — and comes back when you scroll home, which is also the only way to find it again.
+Starting from a scrubbed position begins *there*, with no count-in: it exists to orient you at the
+top, and you have just been looking at the bar you chose.
+
+Once it is running they are a **transport**:
+
+```
+ READY ──Play──▶ RUNNING ◀──Play──▶ PAUSED ──Back──▶ READY ──Back──▶ the list
+```
+
+Play holds the playhead rather than throwing it away, and Record does the same for practice, so
+the two buttons behave alike. **Knob 1 scrubs while paused too** — a scrub is a proper seek, so
+the bars behind settle rather than counting as misses, the bars ahead re-arm and can be taken
+again, and the marks from the last attempt clear. Back restarts; because Back from the ready
+screen already goes to the list, pressing it twice leaves without needing a gesture of its own.
+**Shift + Back closes from anywhere**, whatever screen you are on.
+
+Pausing shifts the clock by the time you spent stopped, so resuming carries on in tempo rather
+than lurching forward to wall time. `PAUSED` appears under the chart, and the transport light
+pulses rather than sitting steady — a paused chart and a chart stuck waiting for you look alike,
+and only one of them wants something from you.
+
 | Control | Does |
 | --- | --- |
 | **Play** | **listen** — the drill plays itself and the pads light as it goes. Nothing scored |
@@ -178,10 +221,29 @@ running goes solid and the other dims. Four beats count you in.
 | **Shift + Back** | close immediately from anywhere |
 | **Knob 1** | tempo, 40–240 |
 | **Knob 2** | read ahead — pixels per beat |
-| **Knob 3** | loop length — 1, 2, 4 or 8 bars |
-| **Knob 4** | kit layout — sticking / kit4 / kit8 |
+| **Knob 3** | reps — how many times the drill repeats |
+| **Knob 4** | kit layout |
 
 ## The drills
+
+### Levels
+
+Every groove is **one file**, and the ladder is derived from it:
+
+| | plays | is |
+| --- | --- | --- |
+| **L1** | cymbals only | the timekeeper alone |
+| **L2** | + kick | hat and kick |
+| **L3** | + snare | the backbeat |
+| **L4** | everything | as written |
+
+Open a groove and you get its rungs; play them in order and each one adds a limb to the last.
+Because the rungs are projections of the same file rather than separate ones, they are provably
+the same groove, and — the part that matters — **a voice never moves between them**. The kick is
+the same pad at L2 as at L4, so what you learn at the bottom transfers literally instead of by
+analogy.
+
+A groove with nothing to strip has one rung and opens straight away.
 
 ### Rudiments
 
@@ -206,6 +268,18 @@ at a time.
 Generated random rhythm lines at a chosen subdivision and density, seeded. The drum equivalent of
 a sight-reading exercise: you have not seen this bar before and you get one pass at it.
 
+### How long a practice is
+
+The file decides. A drill writes its pattern once and says how many times that pattern **is** the
+practice, so a one-bar groove with `"repeats": 8` runs eight bars, stops, and shows you the timing
+summary — which is also when the result is recorded, so every practice produces a score you can
+compare against the last one.
+
+The header counts bars through the whole thing (`3/8`) and the rule under it fills as you go.
+`Reps` in settings overrides the file when you want to play something longer today; `as written`
+leaves the author's intent alone. `"repeats": 0` is endless, which is what the Ladder and the
+Clock use, and what open playing wants.
+
 ### The Ladder
 
 Wraps any rudiment or groove. Play `Ladder bars` bars clean — no misses, no sticking errors, σ
@@ -218,8 +292,12 @@ comparable number for a drill, which is what makes progress legible at all.
 
 ### Ear training
 
+**The ear training leads the list**, because you cannot play a groove you cannot hear.
+
 Three shapes, because they isolate three different skills. Which entry you open is also how you
-pick.
+pick. The drill plays its question; **Play repeats it**, and a correct answer names the drum and
+moves on a beat later — long enough to read what it was, which in the hearing drills is where the
+teaching is.
 
 | Drill | Asks |
 | --- | --- |
@@ -260,19 +338,22 @@ hint is the answer.
 
 ## Settings
 
-Click a row to edit it, turn the jog to change the value, click again when done. Knobs 1–4 are
-shortcuts to the first four.
+Click a row to edit it, turn the jog to change the value, click again when done.
+
+**In settings the knobs follow the rows on screen**, not fixed positions — so the mapping survives
+scrolling and a knob can never point at something you cannot see. **Touch a knob** and the cursor
+jumps to the row it edits, which is how you find the mapping rather than having to remember it.
 
 | Setting | Default | |
 | --- | --- | --- |
-| View | **staff** | `staff` reads like a chart; `grid` reads like a drum machine |
+| View | **grid** | `grid` is drum tab — what a drummer reads; `staff` is real percussion notation, for reading practice |
 | Strict | **normal** | the timing windows, above |
 | Sticking | **strict** | `strict` counts a wrong hand as its own error; `loose` shows it amber but does not count it; `off` ignores hands, which is right for grooves |
 | Dynamics | on | score accents and ghost notes |
 | Accent vel | 90 | an accent must reach this |
 | Ghost vel | 45 | a ghost note must stay under this |
 | Guide pads | **off** | light the voice you need next. This is a reading trainer first |
-| Loop | **on** | repeat the bar until you stop. Off plays the drill once |
+| Reps | **as written** | override how many times the drill repeats. The file is the default, and usually right |
 | Study | off | stop the scroll at a note until it is played. For learning a rudiment, not for keeping time |
 | Click | **on** | the built-in metronome |
 | Click sub | beat | `off` / `beat` / `8ths` / `16ths` |
@@ -298,8 +379,15 @@ are without counting.
 
 ## Writing your own drills
 
-Drop a JSON file in `exercises/` and add a line to `exercises/index.json`. There is no
-directory-listing call in the host, which is why the manifest exists.
+Drop a JSON file in `exercises/` and add a line to **`exercises/user.json`** — not `index.json`.
+There is no directory-listing call in the host, which is why a manifest exists at all; there are
+two of them because `index.json` is what the module ships and is replaced on every update, while
+`user.json` is yours and is carried across. List your drill in `index.json` and it will vanish
+from the menu the next time you update, with the file still sitting on disk.
+
+```json
+{ "exercises": [ { "id": "my-groove", "name": "My groove", "file": "my-groove.json" } ] }
+```
 
 ```json
 {
@@ -308,11 +396,12 @@ directory-listing call in the host, which is why the manifest exists.
   "bpm": 90,
   "timeSig": [4, 4],
   "loopBars": 1,
+  "repeats": 8,
   "sticking": "off",
   "events": [
     { "beat": 0,   "voices": ["KK", "HH"] },
     { "beat": 0.5, "voices": ["HH"], "dyn": "ghost" },
-    { "beat": 1,   "voices": ["SN", "HH"], "dyn": "accent" },
+    { "beat": 1,   "voices": ["SN", "HH"], "dyn": { "SN": "accent" } },
     { "beat": 1.5, "voices": ["HH"], "hand": "L" }
   ]
 }
@@ -322,10 +411,17 @@ directory-listing call in the host, which is why the manifest exists.
 quarter `1.5`. `timeSig` only decides where the bar lines fall. There is no rest event: a gap in
 the beat numbers is a rest.
 
+`loopBars` is how long the written pattern is; **`repeats` is how many times that pattern is the
+practice**, and together they are the whole length of it. Leave `repeats` out and it defaults to
+8 — never to forever. `"repeats": 0` is endless, and has to be asked for.
+
 `voices` names any of the nine ids above; several at once is a simultaneous hit, judged per voice,
 so nailing the kick and missing the hat marks one of each in the same stack. `hand` is `"R"` or
-`"L"` and is only checked when the drill's `sticking` is not `off`. `dyn` is `"accent"` or
-`"ghost"`; leave it out for a normal stroke.
+`"L"` and is only checked when the drill's `sticking` is not `off`.
+
+`dyn` is `"accent"` or `"ghost"`. A plain string applies to every voice in the stack; a **map**
+gives each voice its own, which is what a backbeat needs — an accented snare under a hi-hat that
+is *not* accented. Leave it out for a normal stroke.
 
 ## Requirements
 
@@ -344,8 +440,8 @@ sh scripts/install.sh
 
 `MOVE_HOST` (default `move.local`) and `MOVE_USER` (default `ableton`) override the target. The
 install stages beside the live directory and swaps, so a failed transfer cannot leave a
-half-installed module behind; your settings, your history and any drills you added by hand survive
-an update.
+half-installed module behind; your settings, your history and any drills listed in
+`exercises/user.json` survive an update.
 
 Open it from the Schwung Tools menu. If it does not appear, trigger a module rescan from
 schwung-manager.
@@ -425,4 +521,19 @@ human maintainer. Please validate functionality and licence compatibility before
 
 ## Licence
 
-MIT
+MIT. Copyright (c) 2026 Torben Gräber. See `LICENSE`.
+
+### What it carries that is not its own
+
+Very little, and all of it MIT — the full text of each is in
+[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
+
+| | what | licence |
+| --- | --- | --- |
+| `src/vendor/host/plugin_api_v1.h` | a reduced copy of the Schwung host's ABI header, so the C tests drive the real ABI | MIT, (c) 2025-2026 Charles Vestal |
+| `libm` | the only external crate; `dsp/drums` is `no_std`, so `sinf`/`expf`/`powf` come from here | MIT |
+
+The JavaScript has **no dependencies at all**, runtime or development: the
+tests are `node --test` from the standard library and the module ships as ES
+modules the host's QuickJS loads directly. There is nothing to attribute there,
+and so nothing that can go out of date.

@@ -14,6 +14,7 @@
 
 import * as L from './layout.mjs';
 import { voiceById } from './kit.mjs';
+import { drawX, drawRing, rowsToRuns } from './glyphs.mjs';
 
 /* Lane geometry for a set of voices. Pure, so the tests can check it without
  * drawing anything. */
@@ -72,31 +73,90 @@ export function drawBarLine(ctx, laneList, x) {
 }
 
 /*
- * One hit.
+ * One hit, in drum tab.
  *
- *   pending  a solid block
- *   hit      the same block hollowed out — it opens, exactly as the notehead
- *            opens into a ring on the staff, so the two views teach the same
- *            vocabulary
- *   missed   a cross
+ *   x   a cymbal          O   accent — the same glyph, wider
+ *   o   a drum            .   ghost  — the same glyph, smaller
+ *   ( ) hit    the glyph OPENS, exactly as the notehead opens into a ring
+ *   ✗   missed struck through
+ *
+ * This is what a drummer reads, and it is legible at a glance while playing
+ * rather than only while still — which a row of anonymous blocks was not. The
+ * hit and miss vocabulary is deliberately the same as the staff's, so the two
+ * views teach one language and a player can switch without relearning.
+ *
+ * The glyph primitives come from staff_render.mjs rather than being authored
+ * again here: two copies of a 5x5 ring would drift the first time one was
+ * adjusted.
  */
-export function drawCell(ctx, x, lane, state) {
+/*
+ * A drum is a FILLED blob and a hit is a ring, exactly as on the staff. Tab
+ * writes a drum as `o`, but drawing it hollow would collide with the open
+ * ring that means "you got it" — and telling the player what they have
+ * already played apart from what they still owe matters more than matching
+ * the ASCII shorthand.
+ */
+const DISC = {
+  9: rowsToRuns(['...###...', '.#######.', '#########', '#########', '#########',
+                 '#########', '#########', '.#######.', '...###...']),
+  7: rowsToRuns(['..###..', '.#####.', '#######', '#######', '#######', '.#####.', '..###..']),
+  5: rowsToRuns(['.###.', '#####', '#####', '#####', '.###.']),
+  3: rowsToRuns(['###', '###', '###']),
+  1: rowsToRuns(['#']),
+};
+
+function drawDisc(ctx, cx, cy, w) {
+  const runs = DISC[w] || DISC[3];
+  const half = (w - 1) >> 1;
+  for (let i = 0; i < runs.length; i++) {
+    const r = runs[i];
+    ctx.fillRect(cx - half + r[0], cy - half + r[1], r[2], 1, 1);
+  }
+}
+
+export function cellWidth(dyn, laneH) {
+  /* A drill with one or two voices gets the whole band between them, so its
+   * cells are drawn at the size that room allows rather than at the size a
+   * nine-voice chart is forced down to. */
+  const base = laneH >= 14 ? 7 : laneH >= 8 ? 5 : 3;
+  const step = dyn === 'accent' ? 2 : dyn === 'ghost' ? -2 : 0;
+  /*
+   * Always odd, and always a size the disc table holds: a blob with no centre
+   * pixel cannot be centred on its beat.
+   *
+   * The ceiling is 9 rather than 7 because it has to sit one step ABOVE the
+   * largest base. Clamped at 7 a tall lane drew its normal and its accent at
+   * the same width, which silently collapsed the three weights into two — the
+   * dynamic is carried by weight alone here, so that is the whole vocabulary
+   * gone rather than a cosmetic loss.
+   */
+  return Math.max(1, Math.min(9, base + step));
+}
+
+export function drawCell(ctx, x, lane, state, head = 'note', dyn = 'normal') {
   const cx = Math.round(x);
-  if (cx < L.GRID_LEFT_X - L.GRID_CELL_W || cx >= L.SCREEN_W) return;
-  const h = Math.max(3, lane.h - 2);
-  const top = lane.top + ((lane.h - h) >> 1);
-  const half = L.GRID_CELL_W >> 1;
+  if (cx < L.GRID_LEFT_X - 4 || cx >= L.SCREEN_W) return;
+  const cy = lane.mid;
+  const w = cellWidth(dyn, lane.h);
+
+  if (state === 'hit') {
+    /* It opens. A cymbal keeps a dot of its x inside, so a hit hat and a hit
+     * kick do not both become the same anonymous circle. */
+    drawRing(ctx, cx, cy);
+    if (head !== 'note') ctx.fillRect(cx, cy, 1, 1, 1);
+    return;
+  }
+
+  if (head === 'note') {
+    drawDisc(ctx, cx, cy, w);
+  } else {
+    drawX(ctx, cx, cy, w);
+  }
 
   if (state === 'missed') {
-    ctx.line(cx - half, top, cx + half, top + h - 1, 1);
-    ctx.line(cx - half, top + h - 1, cx + half, top, 1);
-    return;
+    const r = (w >> 1) + 1;
+    ctx.line(cx - r, cy + r, cx + r, cy - r, 1);
   }
-  if (state === 'hit') {
-    ctx.drawRect(cx - half, top, L.GRID_CELL_W, h, 1);
-    return;
-  }
-  ctx.fillRect(cx - half, top, L.GRID_CELL_W, h, 1);
 }
 
 /* Where a pad actually went down, in its lane. Same role as the played marker
@@ -108,12 +168,14 @@ export function drawMarker(ctx, x, lane) {
 }
 
 /* A whole stack, in whatever lanes it touches. */
-export function drawStack(ctx, item, laneList) {
+export function drawStack(ctx, item, laneList, opts = {}) {
   const { entry, x } = item;
   for (let i = 0; i < entry.notes.length; i++) {
     const note = entry.notes[i];
     const lane = laneOf(laneList, note.voice);
     if (!lane) continue;
-    drawCell(ctx, x, lane, note.state);
+    const v = voiceById(note.voice);
+    const dyn = opts.dynamics === false ? 'normal' : note.wantDyn;
+    drawCell(ctx, x, lane, note.state, v ? v.head : 'note', dyn);
   }
 }

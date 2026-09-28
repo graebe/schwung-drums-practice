@@ -68,19 +68,24 @@ pub const RECIPES: [Recipe; NUM_DRUMS] = [
              tone_level: 0.06, ratio2: 1.53, level2: 0.05,
              noise_ms: 1800.0, noise_level: 0.55, hp: 1800.0, lp: 0.0 },
     /* 1 HH closed — the shortest. A hat that rings is a hat that smears the
-     * eighths it is there to mark. */
+     * eighths it is there to mark.
+     *
+     * The corner sits at 4.5kHz, not 7k. Two cascaded one-pole high-passes at
+     * 7k threw away so much of the noise that the hat measured 23dB below the
+     * kick and was inaudible on Move's speaker — a hi-hat you cannot hear is
+     * a drill you cannot do. */
     Recipe { tone_hz: 800.0, tone_end_hz: 800.0, sweep_ms: 1.0, tone_ms: 20.0,
-             tone_level: 0.04, ratio2: 1.41, level2: 0.03,
-             noise_ms: 42.0, noise_level: 0.5, hp: 7000.0, lp: 0.0 },
+             tone_level: 0.10, ratio2: 1.41, level2: 0.07,
+             noise_ms: 52.0, noise_level: 2.1, hp: 4500.0, lp: 0.0 },
     /* 2 HO open — the same source, a longer decay. That is all an open hat is. */
     Recipe { tone_hz: 800.0, tone_end_hz: 800.0, sweep_ms: 1.0, tone_ms: 40.0,
-             tone_level: 0.04, ratio2: 1.41, level2: 0.03,
-             noise_ms: 330.0, noise_level: 0.45, hp: 6200.0, lp: 0.0 },
+             tone_level: 0.09, ratio2: 1.41, level2: 0.06,
+             noise_ms: 330.0, noise_level: 1.25, hp: 4200.0, lp: 0.0 },
     /* 3 RD ride — band-passed so it pings rather than hisses, with a couple of
      * inharmonic partials for the bell. */
     Recipe { tone_hz: 540.0, tone_end_hz: 540.0, sweep_ms: 1.0, tone_ms: 700.0,
-             tone_level: 0.14, ratio2: 2.37, level2: 0.09,
-             noise_ms: 1100.0, noise_level: 0.22, hp: 3000.0, lp: 9000.0 },
+             tone_level: 0.22, ratio2: 2.37, level2: 0.15,
+             noise_ms: 1100.0, noise_level: 0.45, hp: 3000.0, lp: 9000.0 },
     /* 4 HT high tom */
     Recipe { tone_hz: 260.0, tone_end_hz: 190.0, sweep_ms: 45.0, tone_ms: 320.0,
              tone_level: 0.85, ratio2: 1.58, level2: 0.12,
@@ -94,15 +99,23 @@ pub const RECIPES: [Recipe; NUM_DRUMS] = [
     Recipe { tone_hz: 155.0, tone_end_hz: 108.0, sweep_ms: 60.0, tone_ms: 460.0,
              tone_level: 0.90, ratio2: 1.55, level2: 0.12,
              noise_ms: 26.0, noise_level: 0.09, hp: 900.0, lp: 0.0 },
-    /* 7 KK kick — the sweep does the work; the short noise burst is the
-     * beater, without which it is a sine and not a drum. */
-    Recipe { tone_hz: 115.0, tone_end_hz: 47.0, sweep_ms: 42.0, tone_ms: 420.0,
+    /*
+     * 7 KK kick — the sweep does the work; the short noise burst is the
+     * beater, without which it is a sine and not a drum.
+     *
+     * It settles at 62Hz rather than 47. Move's speaker cannot reproduce the
+     * low forties at all, so the kick measured as the LOUDEST thing in the
+     * kit and could not be heard: all its energy was below the driver. 62Hz
+     * with a louder beater keeps the weight on headphones and gives the
+     * speaker something in its range to work with.
+     */
+    Recipe { tone_hz: 150.0, tone_end_hz: 62.0, sweep_ms: 38.0, tone_ms: 400.0,
              tone_level: 1.0, ratio2: 1.0, level2: 0.0,
-             noise_ms: 9.0, noise_level: 0.22, hp: 2200.0, lp: 0.0 },
+             noise_ms: 11.0, noise_level: 0.45, hp: 1800.0, lp: 0.0 },
     /* 8 HF hat pedal — a closed hat, shorter and quieter; it is a foot. */
     Recipe { tone_hz: 700.0, tone_end_hz: 700.0, sweep_ms: 1.0, tone_ms: 15.0,
-             tone_level: 0.03, ratio2: 1.41, level2: 0.02,
-             noise_ms: 30.0, noise_level: 0.30, hp: 5200.0, lp: 0.0 },
+             tone_level: 0.06, ratio2: 1.41, level2: 0.04,
+             noise_ms: 32.0, noise_level: 1.3, hp: 4000.0, lp: 0.0 },
 ];
 
 /*

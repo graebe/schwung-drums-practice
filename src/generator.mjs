@@ -12,18 +12,8 @@
  */
 
 import { VOICE_IDS } from './kit.mjs';
-
-/* mulberry32 — small, fast, and identical across runs. */
-export function rng(seed) {
-  let a = (seed >>> 0) || 1;
-  return function next() {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+import { merge } from './events.mjs';
+import { rng } from './rng.mjs';
 
 export const SUBDIVISIONS = {
   quarters:   { per: 1, name: 'Quarters' },
@@ -35,6 +25,16 @@ export const SUBDIVISIONS = {
 
 const alt = (i) => (i % 2 === 0 ? 'R' : 'L');
 
+/*
+ * Roughly eight bars of playing however long the pattern is, so a one-bar
+ * rudiment and a four-bar switching drill take about the same time. A
+ * practice that runs for wildly different lengths depending on which drill
+ * you picked is hard to build a session out of.
+ */
+function defaultRepeatsFor(bars) {
+  return Math.max(2, Math.round(8 / Math.max(1, bars)));
+}
+
 function chart(id, name, events, opts = {}) {
   return {
     id,
@@ -42,6 +42,9 @@ function chart(id, name, events, opts = {}) {
     bpm: opts.bpm || 90,
     timeSig: opts.timeSig || [4, 4],
     loopBars: opts.bars || 1,
+    /* Generated drills state a length too. Anything that did not would be
+     * endless by omission, which is the shape of the bug this replaced. */
+    repeats: opts.repeats === undefined ? defaultRepeatsFor(opts.bars || 1) : opts.repeats,
     sticking: opts.sticking || 'off',
     generated: true,
     events,
@@ -188,21 +191,6 @@ export function grooveVariation(opts = {}) {
  * entry, and the beam engine reads the gap between neighbours — so two events
  * on beat 0 would draw twice and be read as a zero-length note.
  */
-export function merge(events) {
-  const out = [];
-  for (const e of events) {
-    const last = out[out.length - 1];
-    if (last && Math.abs(last.beat - e.beat) < 1e-6) {
-      for (const v of e.voices) if (!last.voices.includes(v)) last.voices.push(v);
-      if (e.dyn && e.dyn !== 'normal') last.dyn = e.dyn;
-      if (e.hand && !last.hand) last.hand = e.hand;
-      continue;
-    }
-    out.push({ ...e, voices: e.voices.slice() });
-  }
-  return out;
-}
-
 /* The generated drills, in the order they appear in the menu. */
 export function builtins(opts = {}) {
   const o = { bpm: opts.bpm || 90, seed: opts.seed || 1 };

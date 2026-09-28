@@ -49,11 +49,20 @@ fi
 if [ -f "$remote/stats.json" ]; then
   cp "$remote/stats.json" "$stage/stats.json"
 fi
-# Keep any exercises they added by hand.
-if [ -d "$remote/exercises" ]; then
+# Keep any drills they added by hand, AND the manifest that makes them
+# visible. Preserving the files alone was not enough: index.json is shipped
+# and therefore replaced, so a hand-written drill used to survive an update
+# with its entry gone — still on disk, never in the list again.
+#
+# user.json is never shipped, so anything listed in it is theirs. Copying it
+# forward is also what stops a drill this module no longer ships being carried
+# along for ever: it is in neither manifest, so it simply does not load.
+if [ -f "$remote/exercises/user.json" ]; then
+  cp "$remote/exercises/user.json" "$stage/exercises/user.json"
   for f in "$remote/exercises/"*.json; do
     [ -e "$f" ] || continue
     base=$(basename "$f")
+    [ "$base" = "index.json" ] && continue
     [ -e "$stage/exercises/$base" ] || cp "$f" "$stage/exercises/$base"
   done
 fi

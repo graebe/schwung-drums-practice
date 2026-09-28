@@ -6,7 +6,7 @@ import { stats, perVoice } from '../src/timing.mjs';
 
 /* 120bpm: one beat is 500ms, so a 30ms perfect window is 0.06 beats. */
 const para = {
-  bpm: 120, timeSig: [4, 4], loopBars: 1, sticking: 'strict',
+  bpm: 120, timeSig: [4, 4], loopBars: 1, repeats: 1, sticking: 'strict',
   events: [
     { beat: 0,    voices: ['SN'], hand: 'R', dyn: 'accent' },
     { beat: 0.25, voices: ['SN'], hand: 'L' },
@@ -15,11 +15,12 @@ const para = {
   ],
 };
 const groove = {
-  bpm: 120, timeSig: [4, 4], loopBars: 1,
+  bpm: 120, timeSig: [4, 4], loopBars: 1, repeats: 1,
   events: [{ beat: 0, voices: ['KK', 'HH'] }, { beat: 1, voices: ['SN', 'HH'] }],
 };
 
 const mk = (chart, opts = {}) => S.createRun(chart, { sticking: 'off', ...opts });
+const endless = (chart, opts = {}) => mk(chart, { repeats: 0, ...opts });
 
 test('a run starts with every note pending and nothing scored', () => {
   const run = mk(para);
@@ -146,20 +147,20 @@ test('offsets feed the timing accumulator, per voice', () => {
   assert.ok(Math.abs(pv.HH.meanMs + 10) < 1e-6);
 });
 
-test('a loop materialises ahead of the playhead and never finishes', () => {
-  const run = mk(para, { looping: true });
+test('an endless drill materialises ahead of the playhead and never finishes', () => {
+  const run = mk(para, { repeats: 0 });
   const first = run.entries.length;
   assert.ok(first > 4, 'more than one repeat is ready up front');
   S.ensureEntries(run, 40);
   assert.ok(run.entries.length > first);
-  assert.equal(S.runFinished(run, 1e6), false, 'a loop ends when you stop it');
+  assert.equal(S.runFinished(run, 1e6), false, 'endless ends when you stop it');
   /* Repeat 1 sits exactly one loop later. */
   assert.equal(run.entries[4].beat, 4);
   assert.equal(run.entries[4].iter, 1);
 });
 
 test('a one-pass drill finishes once the last note has scrolled past', () => {
-  const run = mk(para, { looping: false });
+  const run = mk(para, { repeats: 1 });
   assert.equal(run.entries.length, 4, 'exactly one pass, no repeats');
   for (const b of [0, 0.25, 0.5, 0.75]) S.judgeHit(run, { voice: 'SN' }, b);
   assert.equal(S.runFinished(run, 0.75), false);
@@ -168,7 +169,7 @@ test('a one-pass drill finishes once the last note has scrolled past', () => {
 });
 
 test('pruning keeps memory flat and never strands a cursor', () => {
-  const run = mk(para, { looping: true });
+  const run = mk(para, { repeats: 0 });
   for (let i = 0; i < 40; i++) {
     S.ensureEntries(run, i);
     S.expireMissed(run, i);
@@ -181,7 +182,7 @@ test('pruning keeps memory flat and never strands a cursor', () => {
 });
 
 test('pruning never drops a note still owed', () => {
-  const run = mk(para, { looping: true });
+  const run = mk(para, { repeats: 0 });
   S.ensureEntries(run, 20);
   const before = run.entries.length;
   S.pruneEntries(run, 1e6);
@@ -189,7 +190,7 @@ test('pruning never drops a note still owed', () => {
 });
 
 test('visible entries carry their own scoring state — one list, no correlation', () => {
-  const run = mk(para, { looping: true });
+  const run = mk(para, { repeats: 0 });
   S.judgeHit(run, { voice: 'SN' }, 0);
   const vis = S.visibleEntries(run, 0, 24);
   assert.ok(vis.length > 0);
@@ -198,7 +199,7 @@ test('visible entries carry their own scoring state — one list, no correlation
 });
 
 test('the seam is continuous — every repeat exact, none missing, none twice', () => {
-  const run = mk(para, { looping: true });
+  const run = mk(para, { repeats: 0 });
   const seen = new Set();
   for (let t = 0; t < 12; t += 0.1) {
     S.ensureEntries(run, t);
@@ -222,7 +223,7 @@ test('the seam is continuous — every repeat exact, none missing, none twice', 
 });
 
 test('Study mode freezes on the note you owe, and playing it releases', () => {
-  const run = mk(para, { looping: false });
+  const run = mk(para, { repeats: 1 });
   S.expireMissed(run, 1.0, true);
   assert.equal(run.misses, 4);
   const notes = S.blockingNotes(run);
@@ -245,7 +246,7 @@ test('the grace can never be shorter than the late window', () => {
 });
 
 test('resyncWait does not let the clock jump backwards', () => {
-  const run = mk(para, { looping: false });
+  const run = mk(para, { repeats: 1 });
   S.resyncWait(run, 0.6);
   assert.equal(S.blockingEntryIndex(run), 3, 'everything behind the playhead is let go');
 });
@@ -278,4 +279,140 @@ test('a chart with no sticking written never raises a sticking error', () => {
   S.judgeHit(run, { voice: 'KK', hand: 'L' }, 0);
   S.judgeHit(run, { voice: 'HH', hand: 'R' }, 0);
   assert.equal(run.stickErrors, 0, 'strict cannot invent a hand the chart did not ask for');
+});
+
+/* ---- a practice has an end ---------------------------------------------- */
+
+test('a practice ENDS by itself after the repeats its file declares', () => {
+  /*
+   * The bug this closes: runFinished began `if (run.looping) return false`,
+   * so a drill ran until the player interrupted it — which meant it never
+   * showed a summary and never recorded a score unless they thought to. The
+   * file now says how long the practice is, and it finishes on its own.
+   */
+  const chart = { ...para, repeats: 4 };
+  const run = mk(chart);
+  assert.equal(run.repeats, 4);
+  assert.equal(run.endBeat, 16, 'four repeats of a four-beat bar');
+
+  let finishedAt = null;
+  for (let t = 0; t <= 24 && finishedAt === null; t += 0.25) {
+    S.ensureEntries(run, t + 8);
+    S.expireMissed(run, t);
+    if (S.runFinished(run, t)) finishedAt = t;
+  }
+  assert.ok(finishedAt !== null, 'the practice never finished');
+  assert.ok(finishedAt >= 16, `finished at beat ${finishedAt}, before the declared bars ran out`);
+  assert.ok(finishedAt < 18, `finished at beat ${finishedAt}, long after the end`);
+});
+
+test('exactly the declared repeats are materialised, and no more', () => {
+  const run = mk({ ...para, repeats: 3 });
+  for (let t = 0; t < 40; t += 0.5) S.ensureEntries(run, t + 8);
+  assert.equal(run.iters, 3);
+  const last = run.entries[run.entries.length - 1];
+  assert.ok(last.beat < 12, `an entry at beat ${last.beat} is past the end`);
+  assert.equal(run.entries.length, para.events.length * 3);
+});
+
+test('repeats 0 is endless, and stays endless — the Ladder depends on it', () => {
+  const run = endless(para);
+  for (let t = 0; t < 60; t += 1) S.ensureEntries(run, t + 8);
+  assert.equal(S.runFinished(run, 1e6), false);
+  assert.equal(S.runProgress(run, 100), 0, 'there is no fraction of forever');
+});
+
+test('progress runs 0 to 1 across the whole practice', () => {
+  const run = mk({ ...para, repeats: 4 });
+  assert.equal(S.runProgress(run, 0), 0);
+  assert.ok(Math.abs(S.runProgress(run, 8) - 0.5) < 1e-9);
+  assert.equal(S.runProgress(run, 16), 1);
+  assert.equal(S.runProgress(run, 999), 1, 'it clamps rather than running past the end');
+});
+
+test('a run cannot finish before every repeat has been materialised', () => {
+  /* Otherwise the first pass being fully scored would end the practice. */
+  const run = mk({ ...para, repeats: 4 });
+  S.ensureEntries(run, 0);
+  for (const e of run.entries) for (const n of e.notes) { n.state = S.HIT; n.played = true; }
+  S.expireMissed(run, 5);
+  assert.equal(S.runFinished(run, 5), false, 'it finished after one repeat of four');
+});
+
+test('dynamics belong to a voice, not to the stack it arrived in', () => {
+  const backbeat = {
+    bpm: 120, timeSig: [4, 4], loopBars: 1, repeats: 1,
+    events: [{ beat: 0, voices: ['HH', 'SN'], dyn: { SN: 'accent' } }],
+  };
+  const run = mk(backbeat, { dynamics: true, accentVel: 90 });
+  const notes = run.entries[0].notes;
+  const hh = notes.find((n) => n.voice === 'HH');
+  const sn = notes.find((n) => n.voice === 'SN');
+  assert.equal(hh.wantDyn, 'normal', 'the hi-hat was accented along with the snare');
+  assert.equal(sn.wantDyn, 'accent');
+  /* And a quiet hi-hat under a loud snare is not a dynamic error. */
+  assert.equal(S.judgeHit(run, { voice: 'HH', velocity: 70 }, 0).dynOk, true);
+  assert.equal(S.judgeHit(run, { voice: 'SN', velocity: 70 }, 0).dynOk, false);
+});
+
+test('a stack-wide dynamic still applies to every voice in it', () => {
+  const chart = {
+    bpm: 120, timeSig: [4, 4], loopBars: 1, repeats: 1,
+    events: [{ beat: 0, voices: ['HH', 'SN'], dyn: 'ghost' }],
+  };
+  const run = mk(chart);
+  for (const n of run.entries[0].notes) assert.equal(n.wantDyn, 'ghost');
+});
+
+test('LISTENING ends too, and does not pile up entries', () => {
+  /*
+   * The reported bug: "the drum practice never ends (I had 11/8 bars)".
+   *
+   * Listen mode settled its notes by hand instead of through takeDue, so
+   * entry.state stayed PENDING, the cursor never left zero, nothing could be
+   * pruned and runFinished — which waits for the cursor to reach the end —
+   * could never fire. It ran past the end of the practice for ever.
+   */
+  const chart = { ...para, repeats: 4 };
+  const run = mk(chart);
+  let finishedAt = null;
+  let peak = 0;
+  for (let t = 0; t <= 40 && finishedAt === null; t += 0.25) {
+    S.ensureEntries(run, t + 8);
+    S.takeDue(run, t);
+    S.pruneEntries(run, t - 2);
+    peak = Math.max(peak, run.entries.length);
+    if (S.runFinished(run, t)) finishedAt = t;
+  }
+  assert.ok(finishedAt !== null, 'listening never finished');
+  assert.ok(finishedAt >= 16, `finished at ${finishedAt}, before the declared bars ran out`);
+  assert.ok(finishedAt < 18, `finished at ${finishedAt}, long after the end`);
+  assert.ok(peak < 60, `${peak} entries — the cursor is stuck and nothing is pruning`);
+});
+
+test('listening settles what it plays, so the cursor keeps moving', () => {
+  const run = mk({ ...para, repeats: 2 });
+  S.ensureEntries(run, 8);
+  assert.equal(run.cursor, 0);
+  const due = S.takeDue(run, 1);
+  assert.ok(due.length > 0, 'nothing came due');
+  assert.ok(run.cursor > 0, 'the cursor did not move past what was played');
+  for (const e of due) assert.notEqual(e.state, S.PENDING, 'an entry was left unsettled');
+});
+
+test('listening is not an attempt — nothing is scored', () => {
+  const run = mk({ ...para, repeats: 1 });
+  S.ensureEntries(run, 8);
+  S.takeDue(run, 8);
+  assert.equal(run.hits, 0, 'listening counted as hits');
+  assert.equal(run.misses, 0);
+  assert.equal(S.runStats(run).accuracy, 0);
+});
+
+test('an entry only comes due once, however often it is asked for', () => {
+  const run = mk({ ...para, repeats: 2 });
+  S.ensureEntries(run, 8);
+  const first = S.takeDue(run, 4).length;
+  assert.ok(first > 0);
+  assert.equal(S.takeDue(run, 4).length, 0, 'the same entries sounded twice');
 });

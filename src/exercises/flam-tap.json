@@ -101,5 +101,6 @@
       "hand": "L",
       "dyn": "ghost"
     }
-  ]
+  ],
+  "repeats": 8
 }

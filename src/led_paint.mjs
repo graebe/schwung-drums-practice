@@ -102,4 +102,35 @@ export function paint(out, state) {
   return out;
 }
 
+/*
+ * What the guide pads point at: the hits coming up, nearest first.
+ *
+ * Lives here rather than in ui.js because it is the same decision as `paint`
+ * — what the pads should say — and it is worth testing. Bounded to six, and
+ * it stops looking once the chart is more than a bar and a half ahead: a pad
+ * lit for a hit eight beats away is not guidance, it is decoration.
+ *
+ * Only the hand being asked for is reported when the drill enforces sticking.
+ * Lighting both halves would answer the question the drill is asking.
+ */
+export function guideTargets(run, songBeats, limit = 6) {
+  const out = [];
+  if (!run) return out;
+  for (let i = run.cursor; i < run.entries.length && out.length < limit; i++) {
+    const e = run.entries[i];
+    const away = e.beat - songBeats;
+    if (away > 1.5) break;
+    if (away < -run.late) continue;
+    for (const n of e.notes) {
+      if (n.state !== 'pending') continue;
+      out.push({
+        voice: n.voice,
+        hand: run.sticking !== 'off' ? n.wantHand : null,
+        beatsAway: away,
+      });
+    }
+  }
+  return out;
+}
+
 export { PAD_COUNT, PAD_FIRST };

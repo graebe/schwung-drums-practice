@@ -7,22 +7,18 @@
     4
   ],
   "loopBars": 1,
+  "repeats": 8,
   "sticking": "off",
   "events": [
     {
       "beat": 0.0,
       "voices": [
-        "HH"
-      ]
-    },
-    {
-      "beat": 0.0,
-      "voices": [
+        "HH",
         "KK"
       ]
     },
     {
-      "beat": 1.0,
+      "beat": 0.5,
       "voices": [
         "HH"
       ]
@@ -30,9 +26,18 @@
     {
       "beat": 1.0,
       "voices": [
+        "HH",
         "SN"
       ],
-      "dyn": "accent"
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "HH"
+      ]
     },
     {
       "beat": 2.0,
@@ -41,23 +46,27 @@
       ]
     },
     {
-      "beat": 2.0,
+      "beat": 2.5,
       "voices": [
+        "HH",
         "KK"
       ]
     },
     {
       "beat": 3.0,
       "voices": [
-        "HH"
-      ]
-    },
-    {
-      "beat": 3.0,
-      "voices": [
+        "HH",
         "SN"
       ],
-      "dyn": "accent"
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 3.5,
+      "voices": [
+        "HH"
+      ]
     }
   ]
 }

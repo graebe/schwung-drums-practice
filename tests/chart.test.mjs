@@ -71,14 +71,34 @@ test('iterationAt tells which repeat a beat belongs to', () => {
   assert.equal(C.iterationAt(chart, 9), 2);
 });
 
-test('the header counts bars within the loop, not forever', () => {
-  const four = { ...chart, loopBars: 4 };
-  assert.deepEqual(C.barBeatOf(four, 0, true), { bar: 1, bars: 4, beat: 1, loop: 1 });
-  assert.deepEqual(C.barBeatOf(four, 9.5, true), { bar: 3, bars: 4, beat: 2, loop: 1 });
-  assert.deepEqual(C.barBeatOf(four, 17, true), { bar: 1, bars: 4, beat: 2, loop: 2 });
-  /* Not looping: the bar number is absolute and just keeps counting. */
-  assert.equal(C.barBeatOf(four, 17, false).bar, 5);
-  assert.equal(C.barBeatOf(four, -3, true).bar, 1, 'the count-in is not bar zero');
+test('the header counts bars through the whole practice', () => {
+  /* "bar 3 of a one-bar loop" tells you nothing; "bar 3 of 8" tells you how
+   * much is left, which is the only reason to put it on screen. */
+  const four = { ...chart, loopBars: 4, repeats: 2 };   /* 8 bars in all */
+  assert.deepEqual(C.barBeatOf(four, 0), { bar: 1, bars: 8, beat: 1, rep: 1, reps: 2 });
+  assert.deepEqual(C.barBeatOf(four, 9.5), { bar: 3, bars: 8, beat: 2, rep: 1, reps: 2 });
+  assert.deepEqual(C.barBeatOf(four, 17), { bar: 5, bars: 8, beat: 2, rep: 2, reps: 2 });
+  assert.equal(C.barBeatOf(four, -3).bar, 1, 'the count-in is not bar zero');
+});
+
+test('an endless drill has no total to count against', () => {
+  const e = { ...chart, repeats: 0 };
+  assert.equal(C.practiceBars(e), 0);
+  assert.equal(C.barBeatOf(e, 20).bars, 0, 'the caller shows the absolute bar instead');
+  assert.equal(C.practiceBeats(e), Infinity);
+  assert.equal(C.practiceProgress(e, 100), 0, 'there is no fraction of forever');
+});
+
+test('a practice states its own length, and silence is never forever', () => {
+  assert.equal(C.repeatsOf({ repeats: 4 }), 4);
+  assert.equal(C.repeatsOf({ repeats: 0 }), 0, '0 is endless, and deliberate');
+  assert.equal(C.repeatsOf({}), C.DEFAULT_REPEATS, 'a file that says nothing still ends');
+  assert.equal(C.repeatsOf({ repeats: -2 }), C.DEFAULT_REPEATS);
+  const eight = { ...chart, loopBars: 1, repeats: 8 };
+  assert.equal(C.practiceBeats(eight), 32);
+  assert.equal(C.practiceBars(eight), 8);
+  assert.ok(Math.abs(C.practiceSeconds(eight) - 16) < 0.01, '32 beats at 120bpm is 16s');
+  assert.ok(Math.abs(C.practiceProgress(eight, 8) - 0.25) < 1e-9);
 });
 
 test('beat and subdivision edges fire once each, on the frame they happen', () => {

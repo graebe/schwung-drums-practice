@@ -54,6 +54,7 @@ export function transportColors(mode, armed, phase) {
 export function jogTarget(screen, editing) {
   if (screen === 'settings') return editing ? 'value' : 'row';
   if (screen === 'menu') return 'menu';
+  if (screen === 'levels') return 'level';
   if (screen === 'quiz') return 'choice';
   if (screen === 'progress') return 'drill';
   return 'none';

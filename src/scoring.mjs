@@ -25,7 +25,8 @@
  * the same stack, which is far more use than a pass/fail on the pair.
  */
 
-import { msToBeats, beatsToMs, beatToX, expandEvents, loopBeats, visibleRange } from './chart.mjs';
+import { msToBeats, beatsToMs, beatToX, expandEvents, loopBeats, repeatsOf,
+         practiceBeats, visibleRange } from './chart.mjs';
 import { createTiming, pushOffset } from './timing.mjs';
 
 /*
@@ -45,10 +46,22 @@ export const DEFAULT_STRICTNESS = 'normal';
 export const PENDING = 'pending';
 export const HIT = 'hit';
 export const MISSED = 'missed';
+/*
+ * Settled by a SEEK rather than by playing or failing to.
+ *
+ * A scrub has to leave the notes behind the playhead resolved so the cursors
+ * can move past them, but they were never offered and must not be scored: a
+ * skipped bar is not four misses. It is its own state rather than a reuse of
+ * MISSED precisely so it can never reach the counters.
+ */
+export const SKIPPED = 'skipped';
 
 export const STICK_STRICT = 'strict';
 export const STICK_LOOSE = 'loose';
 export const STICK_OFF = 'off';
+
+/* See ensureEntries. */
+export const MAX_ENTRIES = 4096;
 
 /*
  * A note carries two independent facts, and conflating them is the trap here.
@@ -63,6 +76,22 @@ export const STICK_OFF = 'off';
  * you eventually fumbled out would count as a clean hit.
  */
 
+/*
+ * The dynamic for one voice of a stack.
+ *
+ * `dyn` may be a string (the whole stack) or a map keyed by voice. It has to
+ * allow the map, because the commonest thing in drumming is an accented snare
+ * under an UNaccented hi-hat — a backbeat — and a stack-wide dynamic makes
+ * that impossible to write. The string form stays for the many drills where
+ * every voice in the stack really does share a dynamic.
+ */
+export function dynFor(event, voice) {
+  const d = event && event.dyn;
+  if (!d) return 'normal';
+  if (typeof d === 'string') return d;
+  return d[voice] || 'normal';
+}
+
 function makeEntry(event, iter) {
   const voices = (event.voices || []).slice();
   return {
@@ -73,7 +102,7 @@ function makeEntry(event, iter) {
     notes: voices.map((voice) => ({
       voice,
       wantHand: event.hand || null,
-      wantDyn: event.dyn || 'normal',
+      wantDyn: dynFor(event, voice),
       state: PENDING,
       played: false,
       offsetBeats: 0,
@@ -106,8 +135,15 @@ export function createRun(chart, opts = {}) {
     dynamics: opts.dynamics !== false,
     accentVel: opts.accentVel === undefined ? 90 : opts.accentVel,
     ghostVel: opts.ghostVel === undefined ? 45 : opts.ghostVel,
-    looping: Boolean(opts.looping),
+    /*
+     * How many times the pattern runs, and therefore where the practice ends.
+     * 0 is endless and is only ever set deliberately — by the Ladder and the
+     * Clock, which impose their own ending, and by open practice.
+     */
+    repeats: opts.repeats === undefined ? repeatsOf(chart) : opts.repeats,
     loopBeats: loopBeats(chart),
+    endBeat: opts.repeats === 0 ? Infinity
+      : (opts.repeats > 0 ? opts.repeats * loopBeats(chart) : practiceBeats(chart)),
     entries: [],
     dropped: 0,      /* entries pruned off the front, for stable numbering   */
     iters: 0,        /* loop iterations materialised so far                  */
@@ -140,7 +176,7 @@ export function createRun(chart, opts = {}) {
  * start, is a bug with a timer on it.
  */
 export function ensureEntries(run, uptoBeat) {
-  if (!run.looping) {
+  if (run.repeats === 1) {
     if (run.iters === 0) {
       appendIteration(run, 0);
       run.iters = 1;
@@ -152,7 +188,19 @@ export function ensureEntries(run, uptoBeat) {
    * is not enough, because the read-ahead can already show the next repeat
    * before the current one has finished scrolling past. */
   const horizon = uptoBeat + run.loopBeats * 2;
-  while (run.iters * run.loopBeats < horizon) {
+  /*
+   * MAX_ENTRIES is a backstop, not a limit anyone should reach: pruning keeps
+   * a real session far below it. It is here because this is the only loop in
+   * the module whose bound comes from the CLOCK rather than from the data,
+   * and a clock that went wrong would otherwise allocate until the device
+   * died rather than until the module misbehaved.
+   */
+  /* Never past the end of the practice: `repeats` is what makes a drill
+   * finish, and materialising one iteration beyond it would put notes on
+   * screen after the summary was due. */
+  const cap = run.repeats === 0 ? Infinity : run.repeats;
+  while (run.iters < cap && run.iters * run.loopBeats < horizon
+         && run.entries.length < MAX_ENTRIES) {
     appendIteration(run, run.iters);
     run.iters++;
   }
@@ -400,6 +448,83 @@ function releaseBlocked(run, voice) {
 }
 
 /*
+ * Move the playhead to `beat`, which is NOT the same as moving the clock.
+ *
+ * Each of these is its own way to look right and behave wrongly, and all five
+ * have to happen together:
+ *
+ *   behind   settles, so both cursors can walk past it — but as SKIPPED, so
+ *            a bar you scrubbed over is not counted as a bar you missed
+ *   ahead    RE-ARMS, so the bar can be taken again. This is the half that
+ *            `resyncWait` does not do: both cursors only ever walk forward
+ *            and have to be rewound by hand
+ *   markers  from the previous attempt drop, or they would hang in the air
+ *            over notes that have not been played yet
+ *   cursors  rewind to zero and re-advance, because they cannot go backwards
+ *   caller   silences the engine and clears any freeze
+ */
+export function seekTo(run, beat) {
+  for (let i = 0; i < run.entries.length; i++) {
+    const entry = run.entries[i];
+    const behind = entry.beat < beat;
+    for (let n = 0; n < entry.notes.length; n++) {
+      const note = entry.notes[n];
+      if (behind) {
+        if (note.state === PENDING) note.state = SKIPPED;
+        note.played = true;
+      } else {
+        note.state = PENDING;
+        note.played = false;
+        note.offsetBeats = 0;
+        note.handOk = true;
+        note.dynOk = true;
+      }
+    }
+    settleEntry(entry);
+  }
+  run.markers.length = 0;
+  run.cursor = 0;
+  run.waitCursor = 0;
+  advanceCursor(run);
+  advanceWaitCursor(run);
+  return run;
+}
+
+/*
+ * Listen mode: the drill plays ITSELF. Returns the entries that have just
+ * come due, having settled them so both cursors move past.
+ *
+ * This has to go through here rather than the caller setting `note.state` by
+ * hand, which is what it used to do. `settleEntry` and the cursor walk are
+ * private, so without them `entry.state` stayed PENDING for ever: the cursor
+ * never left zero, nothing could be pruned — the entry list grew without
+ * bound — and `runFinished` could never fire, because it waits for the cursor
+ * to reach the end. Listening ran until you stopped it, past the end of the
+ * practice, with the header counting bar 11 of 8.
+ *
+ * Nothing is SCORED here. The notes are marked hit so they open on screen as
+ * the drill plays them, but no counter moves: listening is not an attempt.
+ */
+export function takeDue(run, songBeats) {
+  const out = [];
+  for (let i = run.cursor; i < run.entries.length; i++) {
+    const entry = run.entries[i];
+    if (entry.beat > songBeats) break;
+    if (entry.sounded) continue;
+    entry.sounded = true;
+    for (let n = 0; n < entry.notes.length; n++) {
+      entry.notes[n].state = HIT;
+      entry.notes[n].played = true;
+    }
+    settleEntry(entry);
+    out.push(entry);
+  }
+  advanceCursor(run);
+  advanceWaitCursor(run);
+  return out;
+}
+
+/*
  * Bring the wait pointer up to the playhead, marking anything behind it as
  * played. Called when Study is switched on mid-run: without it the pointer
  * would still be parked on a note from minutes ago and the clock would be
@@ -454,11 +579,15 @@ export function visibleEntries(run, songBeats, pxPerBeat) {
 function settleEntry(entry) {
   let pending = 0;
   let missed = 0;
+  let skipped = 0;
   for (let i = 0; i < entry.notes.length; i++) {
-    if (entry.notes[i].state === PENDING) pending++;
-    else if (entry.notes[i].state === MISSED) missed++;
+    const st = entry.notes[i].state;
+    if (st === PENDING) pending++;
+    else if (st === MISSED) missed++;
+    else if (st === SKIPPED) skipped++;
   }
   if (pending > 0) entry.state = PENDING;
+  else if (skipped === entry.notes.length) entry.state = SKIPPED;
   else if (missed === entry.notes.length) entry.state = MISSED;
   else if (missed > 0) entry.state = 'partial';
   else entry.state = HIT;
@@ -524,9 +653,13 @@ export function since(run, snap) {
 }
 
 /*
- * A one-pass run is over once the chart has scrolled past and nothing is
- * pending. A LOOP is never over — it ends when the player stops it, which is
- * the point of a loop.
+ * A practice is over once its last repeat has scrolled past and nothing is
+ * still pending.
+ *
+ * This used to begin `if (run.looping) return false`, which meant a drill
+ * never finished, never showed a summary and never recorded a score unless
+ * the player thought to interrupt it. The file now says how long the practice
+ * is, and this is where that length takes effect.
  *
  * `blocked` is true while the scroll is frozen waiting for a note. Without it
  * the run would report finished mid-freeze: the clock is pinned at
@@ -534,9 +667,25 @@ export function since(run, snap) {
  * up over a note you are still being asked to play.
  */
 export function runFinished(run, songBeats, blocked = false) {
-  if (run.looping) return false;
+  if (run.repeats === 0) return false;   /* endless, by request */
   if (blocked) return false;
+  /* Every repeat must be materialised before the end can be judged, or a
+   * practice would finish as soon as the first pass was scored. */
+  if (run.iters < run.repeats) return false;
   if (run.cursor < run.entries.length) return false;
   const last = run.entries[run.entries.length - 1];
-  return !last || songBeats > last.beat + run.late;
+  if (!last) return songBeats >= run.endBeat;
+  /*
+   * The practice runs its DECLARED LENGTH, not merely until the last note.
+   * A drill whose figure sits at the top of the bar would otherwise finish
+   * three beats early and cut the rests — and the rests are part of the
+   * exercise; counting through them is most of what keeping time is.
+   */
+  return songBeats > Math.max(run.endBeat, last.beat + run.late);
+}
+
+/* How far through the practice, 0..1 — for the progress rule. 0 if endless. */
+export function runProgress(run, songBeats) {
+  if (!Number.isFinite(run.endBeat) || run.endBeat <= 0) return 0;
+  return Math.max(0, Math.min(1, songBeats / run.endBeat));
 }

@@ -89,8 +89,9 @@ if (screen) {
     V.drawLadder(ctx, { ladder: Object.assign(createLadder({ bpm: 112 }), { rungs: 6 }), barsDone: 2 });
   } else if (screen === 'ready') {
     V.drawReady(ctx, {
-      chart, bpm: chart.bpm, looping, loopBars: chart.loopBars, title: 'READY',
-      songBeats: 0, run, outLabel: 'kit',
+      run: runAt(0), chart, bpm: chart.bpm, title: chart.name,
+      songBeats: Number(arg('beats', 0)), pxPerBeat: px, view,
+      dynamics: true, rightLabel: '8 bars',
     });
   } else if (screen === 'menu') {
     V.drawList(ctx, { title: 'DRUMS', items: drills.map((d) => d.name), selected: 3 });

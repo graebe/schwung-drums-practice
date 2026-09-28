@@ -9,7 +9,8 @@
 
 import { isVoice, VOICE_IDS } from './kit.mjs';
 import { layoutVoices, LAYOUT_IDS } from './padmap.mjs';
-import { merge } from './generator.mjs';
+import { merge } from './events.mjs';
+import { DEFAULT_REPEATS, practiceSeconds, practiceBars } from './chart.mjs';
 
 const HANDS = ['R', 'L'];
 const DYNS = ['accent', 'normal', 'ghost'];
@@ -28,6 +29,15 @@ export function validateExercise(obj) {
   }
   if (obj.loopBars !== undefined && !(obj.loopBars >= 1 && obj.loopBars <= 16)) {
     errs.push('loopBars out of range');
+  }
+  /*
+   * `repeats` is how many times the pattern IS the practice — the file states
+   * its own length. 0 means endless and has to be written deliberately; a
+   * missing field defaults to DEFAULT_REPEATS rather than to forever.
+   */
+  if (obj.repeats !== undefined
+      && !(Number.isInteger(obj.repeats) && obj.repeats >= 0 && obj.repeats <= 64)) {
+    errs.push('repeats must be a whole number 0-64 (0 = endless)');
   }
   if (obj.sticking !== undefined && !STICKINGS.includes(obj.sticking)) {
     errs.push(`sticking must be one of ${STICKINGS.join('/')}`);
@@ -59,7 +69,21 @@ export function validateExercise(obj) {
       if (!isVoice(v)) errs.push(`${at} names unknown voice ${JSON.stringify(v)}`);
     }
     if (e.hand !== undefined && !HANDS.includes(e.hand)) errs.push(`${at} hand must be R or L`);
-    if (e.dyn !== undefined && !DYNS.includes(e.dyn)) errs.push(`${at} dyn must be accent/ghost`);
+    /* A string applies to the whole stack; a map gives each voice its own,
+     * which is what an accented snare under a plain hi-hat needs. */
+    if (e.dyn !== undefined) {
+      if (typeof e.dyn === 'string') {
+        if (!DYNS.includes(e.dyn)) errs.push(`${at} dyn must be accent/ghost`);
+      } else if (e.dyn && typeof e.dyn === 'object') {
+        for (const v of Object.keys(e.dyn)) {
+          if (!isVoice(v)) errs.push(`${at} dyn names unknown voice ${v}`);
+          else if (!DYNS.includes(e.dyn[v])) errs.push(`${at} dyn.${v} must be accent/ghost`);
+          else if (!e.voices.includes(v)) errs.push(`${at} dyn names ${v}, which it does not play`);
+        }
+      } else {
+        errs.push(`${at} dyn must be a name or a map`);
+      }
+    }
   }
   return errs;
 }
@@ -81,6 +105,7 @@ export function normalizeExercise(obj, id) {
     bpm: obj.bpm || 90,
     timeSig: obj.timeSig || [4, 4],
     loopBars: obj.loopBars || 1,
+    repeats: obj.repeats === undefined ? DEFAULT_REPEATS : obj.repeats,
     sticking: obj.sticking || 'off',
     events,
   };
@@ -147,4 +172,14 @@ export function playabilityWarnings(chart) {
   return out;
 }
 
-export { VOICE_IDS };
+/* "8 bars · 0:21" for the ready screen. An endless drill says so. */
+export function practiceLength(chart) {
+  const bars = practiceBars(chart);
+  if (bars === 0) return 'endless';
+  const secs = Math.round(practiceSeconds(chart));
+  const mm = Math.floor(secs / 60);
+  const ss = String(secs % 60).padStart(2, '0');
+  return `${bars} bars  ${mm}:${ss}`;
+}
+
+export { VOICE_IDS, DEFAULT_REPEATS };

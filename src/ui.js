@@ -33,16 +33,21 @@ import * as SC from './scoring.mjs';
 import * as CH from './chart.mjs';
 import * as V from './view.mjs';
 import * as GEN from './generator.mjs';
+import * as GR from './grid_render.mjs';
+import * as LV from './levels.mjs';
+import * as MENU_ from './menu.mjs';
+import { dynOf } from './events.mjs';
 import * as IO from './exercise_io.mjs';
 import * as ST from './stats.mjs';
 import * as LAD from './ladder.mjs';
 import * as Q from './guess.mjs';
-import { paint, flashColor, FLASH_MS } from './led_paint.mjs';
+import { paint, flashColor, guideTargets, FLASH_MS } from './led_paint.mjs';
 import { stats as timingStats, statsSince } from './timing.mjs';
 
 const MODULE_DIR = '/data/UserData/schwung/modules/tools/drums-practice';
 const SETTINGS_PATH = `${MODULE_DIR}/settings.json`;
 const STATS_PATH = `${MODULE_DIR}/stats.json`;
+const CRASH_PATH = `${MODULE_DIR}/crash.log`;
 const EXERCISE_DIR = `${MODULE_DIR}/exercises`;
 
 const DRAW_INTERVAL_MS = 20;
@@ -62,6 +67,8 @@ const QUIZ = 'quiz';
 const RESULT = 'result';
 const PROGRESS = 'progress';
 const SETTINGS = 'settings';
+const ERROR = 'error';
+const LEVELS = 'levels';
 
 /* MIDI out routes. */
 const OUT_TRACK = 1;
@@ -99,6 +106,89 @@ function writeFile(path, text) {
   try { return host_write_file(path, text) === true; } catch (e) { return false; }
 }
 
+/* ---- failing safely ------------------------------------------------------ */
+/*
+ * THE RULE: nothing this module does may leave the Move needing a rescue.
+ *
+ * The first hardware run wedged the screen and left NOTHING behind — the log
+ * held a successful init and then silence, and the only way out was a chord
+ * the player had to be told about. Every part of this section exists because
+ * of that.
+ *
+ *   guard()       no host callback may throw INTO the host. QuickJS runs this
+ *                 on shadow_ui's loop; an exception there stops the frame and
+ *                 the OLED simply keeps whatever it last had, which reads as a
+ *                 freeze with no cause.
+ *   panic         whatever broke, sixteen voices must not be left ringing.
+ *   crash.log     the message is written next to the module, so a freeze can
+ *                 be diagnosed over SSH afterwards instead of guessed at.
+ *   safe mode     after a few failures the drill stops running entirely and
+ *                 only the error screen is drawn. Retrying a path that throws
+ *                 every frame is how a fault becomes a hang.
+ *
+ * An infinite loop still cannot be escaped from inside JavaScript, so the
+ * defence against THAT is upstream: every loop in this module is bounded, and
+ * `MAX_ENTRIES` in scoring.mjs is the backstop for the one that grows.
+ */
+const MAX_ERRORS = 5;
+const SLOW_FRAME_MS = 250;
+
+let errCount = 0;
+let lastError = null;
+let safeMode = false;
+let crashWritten = false;
+/*
+ * Set when drawing the ERROR SCREEN ITSELF throws — which means a host draw
+ * primitive is gone and nothing can be put on the display at all. At that
+ * point the only useful thing left is to stop trying and stay responsive to
+ * Back, so the player can close the module instead of being held by a loop
+ * that repaints, fails, and panics the engine fifty times a second.
+ */
+let drawDead = false;
+
+function describe(e) {
+  if (!e) return 'unknown';
+  const msg = e.message !== undefined ? e.message : String(e);
+  return String(msg).slice(0, 120);
+}
+
+function recordError(where, e) {
+  /*
+   * Past the limit this does nothing but count. Everything below — the
+   * panic, the file write, the screen change — is worth doing once and
+   * ruinous to do every frame, and a path that throws at 50Hz will arrive
+   * here 50 times a second for as long as the module is open.
+   */
+  errCount++;
+  if (safeMode) return;
+  lastError = { where, message: describe(e) };
+  /* Silence first. Whatever else is broken, the kit must not be left ringing
+   * behind a screen that is no longer responding. */
+  try { dspSet('panic', '1'); } catch (ignored) { /* nothing left to try */ }
+  if (errCount >= MAX_ERRORS) safeMode = true;
+  screen = ERROR;
+
+  /* Only the FIRST failure is written. A path that throws every frame would
+   * otherwise put an eMMC write in the frame loop, which is how a fault
+   * becomes a brick. */
+  if (!crashWritten) {
+    crashWritten = true;
+    const stack = e && e.stack ? String(e.stack).slice(0, 600) : '';
+    writeFile(CRASH_PATH,
+      `${new Date().toISOString()}\n${where}: ${describe(e)}\n${stack}\n`);
+  }
+}
+
+/* Run `fn`, and turn any throw into a screen the player can read. */
+function guard(where, fn) {
+  try {
+    return fn();
+  } catch (e) {
+    recordError(where, e);
+    return undefined;
+  }
+}
+
 /* ---- state -------------------------------------------------------------- */
 let settings = SET.coerceInto({}, null);
 let stats = ST.emptyStats();
@@ -115,13 +205,61 @@ let progressSel = 0;
 
 let chart = null;
 let run = null;
+/*
+ * DERIVED STATE, rebuilt by whatever invalidates it rather than by the draw.
+ *
+ * All five of these were recomputed on every frame from data that had not
+ * changed: the settings rows cost 11.9us and the playability check 11.6us,
+ * each MORE than drawing the entire scrolling chart. On QuickJS, interpreted
+ * on a Cortex-A72, that is a real slice of a 20ms frame spent rebuilding an
+ * answer nobody asked again.
+ *
+ * The rule the module keeps now: a draw reads, it does not compute.
+ */
+let menuLabels = [];
+let settingsRowsCache = [];
+let chartWarning = '';
+let chartLanes = null;
+let chartLength = '';
+let chartOutLabel = '';
+let progressCache = null;
+let resultCache = null;
+let levelRows = [];
+let levelChart = null;
+let levelSel = 0;
 let quiz = null;
 let ladder = null;
 let ladderReason = '';
 let clockMode = false;
 let mode = C.MODE_IDLE;
+let shiftHeld = false;
 
 let startedAt = 0;
+/*
+ * THE TRANSPORT.
+ *
+ *   READY ─Play─▶ RUNNING ◀─Play─▶ PAUSED ─Back─▶ READY ─Back─▶ list
+ *
+ * Play, Record and Back all used to land on stop(), which threw the playhead
+ * away — so there was no way to take a breath in the middle of a drill and
+ * carry on. Play now HOLDS the position and Record does the same for
+ * practice, so the two buttons behave alike; Back restarts, and because Back
+ * from READY already goes to the list, pressing it twice leaves without
+ * inventing a second gesture.
+ *
+ * Pausing shifts `startedAt` by the time spent stopped — the trick
+ * `waitedBeats` already uses — so resuming carries on in tempo rather than
+ * lurching forward to wall time.
+ */
+let paused = false;
+let pausedAt = 0;
+/*
+ * Scrubbing is continuous, at SCRUB_UNITS_PER_BAR clicks to the bar — about a
+ * third of a turn — rather than teleporting between bar lines. These encoders
+ * send more than one unit per detent, which is why the other knobs already
+ * clamp; this is the number most likely to need changing on the device.
+ */
+const SCRUB_UNITS_PER_BAR = 36;
 let songBeats = 0;
 let prevBeats = 0;
 let waitedBeats = 0;
@@ -197,13 +335,17 @@ function serviceOutbox(all) {
 
 /* ---- LEDs --------------------------------------------------------------- */
 function paintLeds(t) {
-  const targets = settings.guide && run && screen === RUNNING ? guideTargets() : null;
+  const targets = settings.guide && run && screen === RUNNING
+    ? guideTargets(run, songBeats) : null;
   paint(ledBuf, {
     layout: settings.layout,
     held,
     flash: flash && t < flashUntil ? flash : null,
     targets,
-    prompt: screen === QUIZ && quiz && quiz.mode === 'pick' ? null : null,
+    /* The second hint lights the pad. Only for the drills whose answer IS a
+     * pad — naming a groove has no pad to light. */
+    prompt: screen === QUIZ && quiz && quiz.kind === 'voice' && quiz.hints >= 2
+      ? [quiz.prompt] : null,
     dark: false,
   });
   for (let i = 0; i < PAD.PAD_COUNT; i++) {
@@ -220,29 +362,13 @@ function darkenPads() {
   }
 }
 
-/*
- * What the guide pads point at. Only the hand being asked for lights when the
- * drill enforces sticking — lighting both halves would answer the question.
- */
-function guideTargets() {
-  const out = [];
-  const from = run.cursor;
-  for (let i = from; i < run.entries.length && out.length < 6; i++) {
-    const e = run.entries[i];
-    const away = e.beat - songBeats;
-    if (away > 1.5) break;
-    if (away < -run.late) continue;
-    for (const n of e.notes) {
-      if (n.state !== SC.PENDING) continue;
-      out.push({ voice: n.voice, hand: run.sticking !== 'off' ? n.wantHand : null, beatsAway: away });
-    }
-  }
-  return out;
-}
-
 function transport() {
   const phase = (now() / 600) % 1;
-  const colors = C.transportColors(mode, screen === READY || screen === RUNNING, phase);
+  /* Paused pulses rather than sitting steady, which would claim something is
+   * running. Paused and stuck both show a motionless scroll and only one of
+   * them is waiting for you. */
+  const running = paused ? C.MODE_IDLE : mode;
+  const colors = C.transportColors(running, screen === READY || screen === RUNNING, phase);
   setButtonLED(C.CC_PLAY, colors.play);
   setButtonLED(C.CC_RECORD, colors.record);
 }
@@ -271,43 +397,80 @@ function flushFiles(force) {
 /* ---- the drill list ----------------------------------------------------- */
 let fileCharts = [];
 
+/*
+ * TWO manifests, and the split is load-bearing.
+ *
+ *   index.json  what this module ships. REPLACED on every update.
+ *   user.json   what you added. PRESERVED across updates.
+ *
+ * There is no directory-listing call in the host, which is why a manifest
+ * exists at all. One manifest was not enough: the install preserves
+ * hand-added exercise FILES but overwrites index.json, so before this a drill
+ * you wrote survived an update with its entry gone — the file was still
+ * there and it never appeared in the list again. It also meant a drill this
+ * module stopped shipping was copied forward for ever.
+ */
 function loadExercises() {
   fileCharts = [];
-  const manText = readFile(`${EXERCISE_DIR}/index.json`);
-  if (!manText) return;
-  const { entries } = IO.parseManifest(manText);
+  loadManifest(`${EXERCISE_DIR}/index.json`);
+  loadManifest(`${EXERCISE_DIR}/user.json`);
+}
+
+function loadManifest(path) {
+  const text = readFile(path);
+  if (!text) return;
+  const { entries } = IO.parseManifest(text);
   for (const e of entries) {
-    const text = readFile(`${EXERCISE_DIR}/${e.file}`);
-    if (!text) continue;
-    const r = IO.parseExercise(text, e.id);
+    const text2 = readFile(`${EXERCISE_DIR}/${e.file}`);
+    if (!text2) continue;
+    const r = IO.parseExercise(text2, e.id);
     /* A drill that does not validate simply does not appear. Loading it
      * half-formed would mean being marked down for someone else's typo. */
     if (r.chart) fileCharts.push({ ...r.chart, group: e.group });
   }
 }
 
+/*
+ * THE FIRST THING IN THE LIST IS THE FIRST THING TO PLAY.
+ *
+ * This used to open with Progress, five quizzes, the Ladder and the Clock,
+ * then ten generated drills — seventeen entries before a beat. Somebody who
+ * has just installed a drum trainer wants to play a drum beat, so the
+ * bundled material leads, Basics first, and the things that are ABOUT
+ * practising rather than practice itself go to the bottom.
+ *
+ * `fileCharts` arrives in manifest order, which index.json already groups
+ * basics -> grooves -> rudiments.
+ */
 function rebuildMenu() {
-  menuItems = [];
-  menuItems.push({ kind: 'progress', label: 'Progress' });
-  for (const d of Q.DRILLS) {
-    menuItems.push({ kind: 'quiz', label: d.name, quiz: d });
-  }
-  menuItems.push({ kind: 'ladder', label: 'Ladder' });
-  menuItems.push({ kind: 'clock', label: 'Clock' });
-  for (const c of GEN.builtins({ bpm: settings.bpm })) {
-    menuItems.push({ kind: 'chart', label: c.name, chart: c });
-  }
-  for (const c of fileCharts) {
-    menuItems.push({ kind: 'chart', label: c.name, chart: c });
-  }
+  menuItems = MENU_.buildMenu({
+    fileCharts,
+    generated: GEN.builtins({ bpm: settings.bpm }),
+    quizzes: Q.DRILLS,
+  });
   if (menuSel >= menuItems.length) menuSel = 0;
+  menuLabels = MENU_.menuRows(menuItems);
 }
 
 /* ---- arming and running ------------------------------------------------- */
 function armChart(c) {
   chart = { ...c, bpm: c.generated ? settings.bpm : c.bpm };
-  if (c.generated) chart.loopBars = settings.loopBars;
+  /*
+   * How long a practice is belongs to the FILE. `reps` is an override for
+   * when you want to play something longer today, and 0 means "as written" —
+   * so leaving it alone keeps the author's intent.
+   */
+  if (settings.reps > 0) chart.repeats = settings.reps;
   run = SC.createRun(chart, runOpts());
+  /* Everything about the armed drill that the draw would otherwise work out
+   * again fifty times a second. */
+  chartWarning = IO.playabilityWarnings(chart)[0] || '';
+  chartLanes = GR.lanes(KIT.voicesInChart(chart));
+  chartLength = IO.practiceLength(chart);
+  chartOutLabel = SET.rowFor('midiOut').format(settings.midiOut);
+  /* A newly armed drill starts at home, where the box is. */
+  songBeats = 0;
+  prevBeats = 0;
   screen = READY;
   mode = C.MODE_IDLE;
   announce(`${chart.name} ready`);
@@ -322,20 +485,118 @@ function runOpts() {
     accentVel: settings.accentVel,
     ghostVel: settings.ghostVel,
     latencyMs: settings.latencyMs,
-    looping: settings.loop,
+    /* The Ladder and the Clock outlast the drill they wrap and impose their
+     * own ending, so they run it endless. Everything else ends when the
+     * written practice does. */
+    repeats: (ladder || clockMode) ? 0 : undefined,
   };
 }
 
 function start(practice) {
+  /*
+   * Start where the playhead IS, not always at the top: scrubbing the ready
+   * screen is how you pick a passage, and resetting would make that pointless.
+   * Read it before createRun, which is what does the resetting.
+   */
+  const from = screen === READY && songBeats > 0 ? songBeats : 0;
   run = SC.createRun(chart, runOpts());
   mode = practice ? C.MODE_PRACTICE : C.MODE_LISTEN;
-  startedAt = now();
   waitedBeats = 0;
-  songBeats = C.countInStart(settings.countIn);
+  /*
+   * NO COUNT-IN WHEN STARTING MID-DRILL, deliberately: it exists to orient
+   * you at the top, you have just been looking at the bar you picked, and
+   * with Study on the scroll halts at the first note anyway.
+   */
+  songBeats = from > 0 ? from : C.countInStart(settings.countIn);
   prevBeats = songBeats;
+  startedAt = now() - CH.beatsToMs(songBeats, chart.bpm);
+  /*
+   * seekTo settles the bars behind the start point rather than counting them
+   * as missed, and rewinds both cursors so the run does not open with a
+   * backlog to expire.
+   */
+  if (from > 0) {
+    SC.ensureEntries(run, from + 8);
+    SC.seekTo(run, from);
+  }
   screen = RUNNING;
+  paused = false;
   if (ladder) LAD.beginRung(ladder, run, 0);
   announce(practice ? 'practising' : 'listening');
+}
+
+/* Hold the playhead. The clock stops; the panel does not. */
+function pause() {
+  if (paused) return;
+  paused = true;
+  pausedAt = now();
+  dspSet('panic', '1');
+  announce('paused');
+}
+
+function resume() {
+  if (!paused) return;
+  /* The whole point: the time spent stopped never happened. */
+  startedAt += now() - pausedAt;
+  paused = false;
+  announce('playing');
+}
+
+function togglePause() {
+  if (paused) resume();
+  else pause();
+}
+
+/* Back from a run restarts it, rather than ending it. */
+function restart() {
+  dspSet('panic', '1');
+  paused = false;
+  mode = C.MODE_IDLE;
+  screen = READY;
+  /* Back restarts from the TOP, which is also how you get the box back. */
+  songBeats = 0;
+  prevBeats = 0;
+  run = SC.createRun(chart, runOpts());
+  announce(`${chart.name} ready`);
+}
+
+/*
+ * Scrub, in whole bars, while paused.
+ *
+ * A SEEK IS NOT A CLOCK MOVE: the notes behind settle, the notes ahead re-arm
+ * so the bar can be taken again, and the markers from the previous attempt
+ * drop. `SC.seekTo` does that; this only has to rebase the clock so resuming
+ * carries on from where the scrub left off.
+ */
+function scrub(delta) {
+  if (!run || !chart) return;
+  const perBar = CH.beatsPerBar(chart);
+  /*
+   * COUNT IN UNITS, NOT IN BEATS. Adding perBar/36 per click accumulates
+   * binary error: 72 clicks of 4/36 lands on 7.999999999999998, so two full
+   * bars of turning would read bar 2 beat 4 and the counter would sit an
+   * epsilon behind the hand for the rest of the drill. Multiplying once is
+   * exact, and the round also snaps a playhead left off-grid back onto it by
+   * at most half a unit — a fraction of the click you just turned.
+   *
+   * The base is floored at zero because the count-in sits at -countInBeats
+   * until the run starts; without it the first click is spent climbing out.
+   */
+  const base = Math.max(0, songBeats);
+  const units = Math.round((base * SCRUB_UNITS_PER_BAR) / perBar) + delta;
+  const limit = Number.isFinite(run.endBeat) ? run.endBeat : base + perBar;
+  let to = (units * perBar) / SCRUB_UNITS_PER_BAR;
+  to = Math.max(0, Math.min(Math.max(0, limit - perBar), to));
+  if (Math.abs(to - songBeats) < 1e-9) return;
+
+  songBeats = to;
+  prevBeats = to;
+  waitedBeats = 0;
+  blocked = false;
+  SC.ensureEntries(run, to + 8);
+  SC.seekTo(run, to);
+  dspSet('panic', '1');
+  startedAt = now() - CH.beatsToMs(to, chart.bpm);
 }
 
 function stop() {
@@ -393,15 +654,11 @@ function serviceClick() {
 /* Listen mode plays the drill so you can watch it before trying it. */
 function serviceReference() {
   if (mode !== C.MODE_LISTEN) return;
-  for (let i = run.cursor; i < run.entries.length; i++) {
-    const e = run.entries[i];
-    if (e.beat > songBeats) break;
-    if (e.sounded) continue;
-    e.sounded = true;
+  /* SC.takeDue settles each entry and moves the cursors; doing it here by
+   * hand left the cursor at zero, so nothing pruned and the run never ended. */
+  for (const e of SC.takeDue(run, songBeats)) {
     for (const n of e.notes) {
       sound(n.voice, n.wantDyn === 'accent' ? 115 : n.wantDyn === 'ghost' ? 45 : 90);
-      n.state = SC.HIT;
-      n.played = true;
     }
   }
 }
@@ -433,6 +690,110 @@ function serviceLadder() {
   LAD.beginRung(ladder, run, songBeats);
 }
 
+/* ---- the quiz prompt ----------------------------------------------------- */
+/*
+ * A hearing drill has to make a sound, and this one did not.
+ *
+ * `Hear: drum`, `Hear: subdivision` and `Pick: groove` all ask you to identify
+ * something you have just heard, and nothing was ever playing it — three of
+ * the five drills asked a question they never posed. The prompt is scheduled
+ * here and emptied a tick at a time, because two of the three are RHYTHMS and
+ * cannot be sounded in one call.
+ */
+const QUIZ_ADVANCE_MS = 500;
+const PROMPT_BPM = 96;
+let promptQueue = [];       /* { atMs, voice, vel }, soonest first */
+let quizSolvedAt = 0;
+
+function clearPrompt() {
+  promptQueue.length = 0;
+}
+
+/* Lay out the prompt on the wall clock. The quiz has no musical clock of its
+ * own — there is nothing to keep time WITH yet — so it runs on milliseconds. */
+function schedulePrompt() {
+  clearPrompt();
+  if (!quiz || !quiz.prompt) return;
+  const t = now();
+
+  if (quiz.kind === 'voice') {
+    promptQueue.push({ atMs: t, voice: quiz.prompt, vel: 105 });
+    return;
+  }
+
+  if (quiz.kind === 'subdiv') {
+    /* Two beats of it, accented on the beat: one beat is not enough to hear a
+     * subdivision as a group, and the accent is what makes the grouping
+     * audible rather than a stream. */
+    const spec = GEN.SUBDIVISIONS[quiz.prompt];
+    const per = spec ? spec.per : 2;
+    const beatMs = 60000 / PROMPT_BPM;
+    for (let b = 0; b < 2; b++) {
+      for (let k = 0; k < per; k++) {
+        promptQueue.push({
+          atMs: t + (b + k / per) * beatMs,
+          voice: 'HH',
+          vel: k === 0 ? 115 : 75,
+        });
+      }
+    }
+    return;
+  }
+
+  if (quiz.kind === 'groove') {
+    const c = quiz.charts.find((x) => x.id === quiz.prompt);
+    if (!c) return;
+    const beatMs = 60000 / (c.bpm || PROMPT_BPM);
+    for (const e of c.events) {
+      for (const v of e.voices) {
+        const d = dynOf(e, v);
+        promptQueue.push({
+          atMs: t + e.beat * beatMs,
+          voice: v,
+          vel: d === 'accent' ? 115 : d === 'ghost' ? 45 : 92,
+        });
+      }
+    }
+  }
+}
+
+function servicePrompt() {
+  if (!promptQueue.length) return;
+  const t = now();
+  while (promptQueue.length && promptQueue[0].atMs <= t) {
+    const e = promptQueue.shift();
+    sound(e.voice, e.vel);
+  }
+}
+
+/* Whether this drill withholds the answer until you have heard it. */
+function promptIsAudible() {
+  return quiz && (quiz.mode === 'hear' || quiz.mode === 'pick');
+}
+
+/*
+ * Move on, a beat after the answer lands.
+ *
+ * Not instantly: in `hear` the notation is revealed only once you get it
+ * right, and that reveal IS the teaching. Advancing on the same frame would
+ * take it away before it could be read.
+ */
+function serviceQuiz() {
+  if (!quizSolvedAt || now() - quizSolvedAt < QUIZ_ADVANCE_MS) return;
+  quizSolvedAt = 0;
+  if (Q.roundComplete(quiz)) {
+    finishQuiz();
+    return;
+  }
+  Q.advance(quiz);
+  if (promptIsAudible()) {
+    schedulePrompt();
+    announce('listen');
+  } else {
+    announce(Q.labelFor(quiz, quiz.prompt));
+  }
+}
+
 /* ---- input -------------------------------------------------------------- */
 function padDown(pad, vel) {
   held.add(pad);
@@ -445,7 +806,9 @@ function padDown(pad, vel) {
     if (quiz.mode !== 'pick') {
       const r = Q.pressVoice(quiz, voice, now());
       setFlash([pad], r === 'right' ? PAD.LED_HIT : PAD.LED_MISS);
-      if (r === 'right' && Q.roundComplete(quiz)) finishQuiz();
+      /* The prompt moves on a beat later, not on this frame — see
+       * serviceQuiz. Without it the drill asked one question for ever. */
+      if (r === 'right') quizSolvedAt = now();
     }
     return;
   }
@@ -474,16 +837,35 @@ function finishQuiz() {
     err: quiz.wrong, at: Date.now() / 1000,
   }));
   saveStats();
+  /* The round is over, so the numbers are final: work them out once here
+   * rather than rescanning the whole history on every frame of the result. */
+  const series = ST.forDrill(stats, Q.quizDrillId(quiz));
+  resultCache = {
+    rate: Q.ratePerMinute(quiz, now()),
+    best: ST.summarise(series).best,
+    errorRate: Q.errorFraction(quiz),
+    hints: quiz.hintsTaken,
+    series,
+  };
   screen = RESULT;
-  announce(`round done, ${Math.round(Q.ratePerMinute(quiz, now()))} per minute`);
+  announce(`round done, ${Math.round(resultCache.rate)} per minute`);
   return elapsed;
 }
 
 function openSelected() {
   const item = menuItems[menuSel];
   if (!item) return;
+  if (item.kind === 'levels') {
+    levelChart = item.chart;
+    levelRows = LV.levelRows(item.levels);
+    levelSel = 0;
+    screen = LEVELS;
+    announce(`${item.chart.name}. Pick a level.`);
+    return;
+  }
   if (item.kind === 'progress') {
     screen = PROGRESS;
+    rebuildProgress();
     return;
   }
   if (item.kind === 'quiz') {
@@ -492,7 +874,9 @@ function openSelected() {
       roundSize: settings.roundSize, charts: fileCharts,
       seed: (Date.now() & 0xffff) || 1,
     });
+    quizSolvedAt = 0;
     screen = QUIZ;
+    if (promptIsAudible()) schedulePrompt();
     return;
   }
   if (item.kind === 'clock') {
@@ -524,53 +908,144 @@ function openSelected() {
   armChart(item.chart);
 }
 
+/* The plot for whichever drill the jog is on. Scans the whole history, so it
+ * runs when the selection changes and not once a frame. */
+function rebuildProgress() {
+  const drills = ST.drillsWithHistory(stats);
+  const id = drills[progressSel % Math.max(1, drills.length)] || '';
+  const recs = ST.forDrill(stats, id);
+  progressCache = { drillLabel: ST.drillLabel(id), records: recs, summary: ST.summarise(recs) };
+}
+
+function openLevel() {
+  const row = levelRows[levelSel];
+  if (!row || !levelChart) return;
+  const projected = LV.projectLevel(levelChart, row.level);
+  if (projected) armChart(projected);
+}
+
 function back() {
+  /* From the error screen BACK always closes. Whatever state the module is
+   * in, one press of the button the player already knows has to end it. */
+  if (screen === ERROR || safeMode) return false;
   if (screen === SETTINGS && settingsEditing) { settingsEditing = false; return true; }
+  if (screen === LEVELS) { screen = MENU; return true; }
   if (screen === MENU) return false;
-  if (screen === RUNNING) { stop(); return true; }
+  /* Back from a run RESTARTS it. Back again lands on READY, whose own Back
+   * goes to the list — so leaving needs no gesture of its own. */
+  if (screen === RUNNING) { restart(); return true; }
   screen = MENU;
   quiz = null;
   ladder = null;
+  clearPrompt();
+  quizSolvedAt = 0;
   return true;
 }
 
+/*
+ * CLOSING IS A TWO-STEP, AND IT HAS TO BE.
+ *
+ * Note-offs leave through move_midi_inject_to_move, which the shim holds back
+ * until two consecutive quiet SPI frames and for three more frames after
+ * overtake ends. Calling host_exit_module() on the same tick that queues them
+ * races the teardown and the offs are dropped — which leaves notes sounding
+ * on a Move track after the module has gone, with nothing left running that
+ * could stop them.
+ *
+ * So: silence, sweep every channel at a pace the ring can take, let it drain,
+ * then leave. The internal kit is cut immediately because that path is a
+ * direct parameter write and does not go near the ring.
+ */
+const EXIT_DRAIN_MS = 120;
+/* The inject ring holds ~64 packets and drains 31 per audio block. Two
+ * channels is four packets a tick, which it never has to queue behind. */
+const PANIC_CH_PER_TICK = 2;
+let pendingExitAt = 0;
+let panicChannelNext = 16;   /* 16 = the sweep has finished */
+/*
+ * Set once we have gone. The host does not necessarily stop calling tick()
+ * the instant host_exit_module returns, and without this the next tick
+ * repaints the pads we just darkened — so the grid lights back up behind a
+ * module that has closed, with nothing on screen to explain it.
+ */
+let exited = false;
+
 function closeModule() {
-  dspSet('panic', '1');
-  /* Note-offs on every channel, down both routes. Injected MIDI is held back
-   * for a few audio frames and three more AFTER overtake ends, so exiting on
-   * the same tick that queues them drops them — hence the drain below. */
-  for (let chn = 0; chn < 16; chn++) {
-    queue(OUT_TRACK | OUT_USB, 0xB0 | chn, 120, 0);
-    queue(OUT_TRACK | OUT_USB, 0xB0 | chn, 123, 0);
+  if (pendingExitAt || exited) return;
+  guard('close:panic', () => dspSet('panic', '1'));
+  mode = C.MODE_IDLE;
+  paused = false;
+  /*
+   * Sweep EVERY channel, not just the one in settings: it may have been
+   * changed during the session, and a note can be sounding on one this module
+   * is no longer addressing.
+   */
+  panicChannelNext = 0;
+  pendingExitAt = now() + EXIT_DRAIN_MS;
+}
+
+function serviceExit() {
+  if (!pendingExitAt) return;
+  if (panicChannelNext < 16) {
+    for (let n = 0; n < PANIC_CH_PER_TICK && panicChannelNext < 16; n++) {
+      const chn = panicChannelNext++;
+      queue(OUT_TRACK | OUT_USB, 0xB0 | chn, 120, 0);
+      queue(OUT_TRACK | OUT_USB, 0xB0 | chn, 123, 0);
+    }
+    return;
   }
-  serviceOutbox(true);
-  darkenPads();
-  setButtonLED(C.CC_PLAY, 0);
-  setButtonLED(C.CC_RECORD, 0);
-  flushFiles(true);
+  if (now() < pendingExitAt) return;   /* let the ring finish draining */
+  pendingExitAt = 0;
+  exited = true;
+  guard('exit:leds', () => {
+    darkenPads();
+    setButtonLED(C.CC_PLAY, 0);
+    setButtonLED(C.CC_RECORD, 0);
+  });
+  guard('exit:files', () => flushFiles(true));
   if (typeof host_exit_module === 'function') host_exit_module();
 }
 
 /* ---- drawing ------------------------------------------------------------ */
+/*
+ * EVERY path through this function draws something.
+ *
+ * It used to end with `if (screen === RUNNING && run)`, so any state whose
+ * data was missing — a READY with no chart, a SUMMARY with no run — drew
+ * nothing at all and the OLED kept its last frame. That is indistinguishable
+ * from a hang, and it is what the first hardware run looked like. The
+ * fallback at the bottom makes a stale screen impossible.
+ */
 function draw() {
+  if (screen === ERROR || safeMode) {
+    V.drawError(ctx, {
+      where: lastError ? lastError.where : '?',
+      message: lastError ? lastError.message : 'unknown',
+      count: errCount,
+      safeMode,
+    });
+    return;
+  }
   if (screen === MENU) {
-    V.drawList(ctx, { title: 'DRUMS', items: menuItems.map((m) => m.label), selected: menuSel });
+    V.drawList(ctx, { title: 'DRUMS', items: menuLabels, selected: menuSel });
+    return;
+  }
+  if (screen === LEVELS) {
+    V.drawList(ctx, {
+      title: (levelChart ? levelChart.name : '').slice(0, 16),
+      items: levelRows, selected: levelSel,
+    });
     return;
   }
   if (screen === SETTINGS) {
     V.drawList(ctx, {
       title: settingsEditing ? 'SET *' : 'SETTINGS',
-      items: SET.settingsRows(settings), selected: settingsSel,
+      items: settingsRowsCache, selected: settingsSel,
     });
     return;
   }
   if (screen === PROGRESS) {
-    const drills = ST.drillsWithHistory(stats);
-    const id = drills[progressSel % Math.max(1, drills.length)] || '';
-    const recs = ST.forDrill(stats, id);
-    V.drawProgress(ctx, {
-      drillLabel: ST.drillLabel(id), records: recs, summary: ST.summarise(recs),
-    });
+    if (progressCache) V.drawProgress(ctx, progressCache);
     return;
   }
   if (screen === QUIZ && quiz) {
@@ -582,13 +1057,8 @@ function draw() {
     });
     return;
   }
-  if (screen === RESULT && quiz) {
-    V.drawResult(ctx, {
-      rate: Q.ratePerMinute(quiz, now()),
-      best: ST.summarise(ST.forDrill(stats, Q.quizDrillId(quiz))).best,
-      errorRate: Q.errorFraction(quiz), hints: quiz.hintsTaken,
-      series: ST.forDrill(stats, Q.quizDrillId(quiz)),
-    });
+  if (screen === RESULT && resultCache) {
+    V.drawResult(ctx, resultCache);
     return;
   }
   if (screen === LADDER && ladder) {
@@ -600,19 +1070,26 @@ function draw() {
     return;
   }
   if (screen === READY && chart) {
-    const warn = IO.playabilityWarnings(chart)[0] || '';
     V.drawReady(ctx, {
-      chart, bpm: chart.bpm, looping: settings.loop, loopBars: chart.loopBars,
-      title: 'READY', songBeats: 0, warning: warn, run,
-      outLabel: SET.rowFor('midiOut').format(settings.midiOut),
+      run, chart, bpm: chart.bpm, title: chart.name,
+      songBeats, pxPerBeat: settings.pxPerBeat, view: settings.view,
+      lanes: chartLanes, dynamics: settings.dynamics, warning: chartWarning,
+      /*
+       * The length before you start, the position once you are scrubbing —
+       * while navigating "where am I" is the only question, and the scroll
+       * alone cannot answer it in bars.
+       */
+      rightLabel: songBeats > 0
+        ? `${CH.barBeatOf(chart, songBeats).bar}/${CH.barBeatOf(chart, songBeats).bars || '?'}`
+        : chartLength,
     });
     return;
   }
-  if (screen === RUNNING && run) {
+  if (screen === RUNNING && run && chart) {
     V.drawReadingView(ctx, {
       run, chart, songBeats, pxPerBeat: settings.pxPerBeat, view: settings.view,
-      title: chart.name, bpm: chart.bpm, looping: settings.loop,
-      dynamics: settings.dynamics, beatFlash, timing: run.timing,
+      title: chart.name, bpm: chart.bpm, lanes: chartLanes,
+      dynamics: settings.dynamics, beatFlash, timing: run.timing, paused,
     });
     if (clockMode) {
       const perBar = CH.beatsPerBar(chart);
@@ -627,40 +1104,107 @@ function draw() {
     }
     const digit = C.countInDigit(songBeats, settings.countIn);
     if (digit > 0) V.drawCountIn(ctx, digit);
+    return;
   }
+
+  /*
+   * Nothing matched. That is a bug rather than a state, so say so on screen
+   * instead of leaving the last frame up: a visibly wrong screen can be
+   * reported, a frozen one cannot.
+   */
+  V.drawError(ctx, {
+    where: 'draw',
+    message: `no screen for "${screen}"`,
+    count: errCount,
+    safeMode,
+  });
 }
 
 /* ---- lifecycle ---------------------------------------------------------- */
 globalThis.init = function init() {
+  guard('init', initInner);
+};
+
+function initInner() {
   const loaded = SET.loadSettings(readFile(SETTINGS_PATH));
   settings = loaded.settings;
   if (loaded.changed) saveSettings();
   stats = ST.parseStats(readFile(STATS_PATH));
   loadExercises();
   rebuildMenu();
+  settingsRowsCache = SET.settingsRows(settings);
   invalidateLedCache();
   darkenPads();
   dspSet('gain', '0.45');
   screen = MENU;
   announce('Drums Practice');
-};
+}
 
 globalThis.tick = function tick() {
   if (globalThis.overtakeParked) return;
+  guard('tick', tickInner);
+};
+
+function tickInner() {
+  /* Gone. Do nothing at all, least of all light the pads again. */
+  if (exited) return;
+
   const t = now();
 
-  if (screen === RUNNING && run && chart) {
+  /*
+   * Leaving takes priority over everything, including safe mode: whatever
+   * else is broken, the way out has to keep working. Nothing else runs while
+   * the queue drains — it is a tenth of a second and the module is going.
+   */
+  if (pendingExitAt) {
+    serviceExit();
+    serviceOutbox(false);
+    return;
+  }
+
+  /*
+   * In safe mode the drill is not run at all — only the error is drawn. A
+   * path that throws every frame, retried fifty times a second, is how a
+   * fault stops being a fault and becomes a hang.
+   */
+  if (safeMode) {
+    if (!drawDead && t - lastDraw >= DRAW_INTERVAL_MS) {
+      lastDraw = t;
+      try {
+        draw();
+      } catch (e) {
+        /* The error screen cannot be drawn either, so the display is beyond
+         * help. Stop touching it; Back still works. */
+        drawDead = true;
+      }
+    }
+    return;
+  }
+
+  if (screen === RUNNING && run && chart && !paused) {
     advanceClock();
+    /*
+     * Material is generated in EVERY mode, because it is pruned in every mode.
+     * Growing it only while practising meant Listen ran out after the two
+     * repeats created up front and then showed an empty chart for the rest of
+     * the drill — the notes simply stopped appearing. Scoring stays
+     * practice-only; having something to look at does not.
+     */
+    SC.ensureEntries(run, songBeats + 8);
     serviceClick();
     serviceReference();
     if (mode === C.MODE_PRACTICE) {
-      SC.ensureEntries(run, songBeats + 8);
       SC.expireMissed(run, songBeats, settings.study);
       serviceLadder();
     }
     SC.pruneEntries(run, CH.xToBeat(L.DESPAWN_X, songBeats, settings.pxPerBeat) - 1);
     V.pruneMarkers(run, CH.xToBeat(L.DESPAWN_X, songBeats, settings.pxPerBeat));
     if (SC.runFinished(run, songBeats, blocked)) stop();
+  }
+
+  if (screen === QUIZ && quiz) {
+    servicePrompt();
+    serviceQuiz();
   }
 
   flushDsp();
@@ -674,27 +1218,70 @@ globalThis.tick = function tick() {
   if (t - lastDraw >= DRAW_INTERVAL_MS) {
     lastDraw = t;
     draw();
+    /*
+     * A frame this slow is not survivable at 50Hz — the screen will stutter
+     * and the LED queue will back up — so stop the drill and say so rather
+     * than limping. This cannot catch a true infinite loop (nothing inside
+     * JavaScript can), which is why every loop in this module is bounded.
+     */
+    const spent = now() - t;
+    if (spent > SLOW_FRAME_MS) {
+      recordError('draw', new Error(`frame took ${Math.round(spent)}ms`));
+    }
   }
   flushFiles(false);
-};
+}
 
 globalThis.onMidiMessageInternal = function onMidiMessageInternal(data) {
+  guard('midi', () => midiInner(data));
+};
+
+/*
+ * The host hands over a PLAIN THREE-BYTE MIDI MESSAGE: [status, d1, d2].
+ *
+ * Not a four-byte USB-MIDI packet. This module shipped once assuming the
+ * latter, which made every press decode its data byte as the status: a Menu
+ * press arrived as 0xB0,50,127 and was read as status 50, matched no branch,
+ * and was dropped. The module drew its menu once and then ignored every
+ * input — which on the device is indistinguishable from a freeze, and took a
+ * rescue chord to escape.
+ *
+ * The four-byte form is what goes OUT (move_midi_inject_to_move takes a cable
+ * nibble); nothing comes in that way. Do not "fix" this to handle both: a
+ * status byte always has its high bit set, so a length-sniffing decoder would
+ * silently misread a real message the day the host changed.
+ */
+function midiInner(data) {
   if (!data || data.length < 3) return;
-  const status = data[1] === undefined ? data[0] : data[1];
-  const d1 = data[2];
-  const d2 = data[3];
+  const status = data[0];
+  const d1 = data[1];
+  const d2 = data[2];
   const type = status & 0xF0;
 
   if (type === 0x90 || type === 0x80) {
-    /* Notes below 10 are capacitive KNOB TOUCH, not pads. Every module that
-     * forgets this gets phantom hits the moment a finger rests on a knob. */
-    if (d1 <= C.KNOB_TOUCH_MAX) return;
+    /*
+     * Notes below 10 are capacitive KNOB TOUCH, not pads — a module that
+     * treats them as pads gets phantom hits the moment a finger rests on a
+     * knob. They are not noise, though: touching a knob in Settings moves the
+     * cursor to the row that knob edits, which is what makes the mapping
+     * something you can FIND rather than something you have to know.
+     */
+    if (d1 <= C.KNOB_TOUCH_MAX) {
+      if (type === 0x90 && d2 > 0) knobTouched(d1);
+      return;
+    }
     if (!PAD.isPad(d1)) return;
     if (type === 0x90 && d2 > 0) padDown(d1, d2);
     else padUp(d1);
     return;
   }
   if (type !== 0xB0) return;
+
+  /* Shift is a modifier, not an action: it is tracked and never consumed. */
+  if (d1 === C.CC_SHIFT) {
+    shiftHeld = d2 > 0;
+    return;
+  }
 
   switch (d1) {
     case C.CC_JOG_TURN: {
@@ -704,23 +1291,42 @@ globalThis.onMidiMessageInternal = function onMidiMessageInternal(data) {
       return;
     }
     case C.CC_JOG_CLICK:
-      if (d2 > 0) click();
+      /* Shift + jog click opens settings from anywhere — the one gesture that
+       * has to work whatever screen you are on. */
+      if (d2 > 0) {
+        if (shiftHeld) {
+          screen = screen === SETTINGS ? MENU : SETTINGS;
+          settingsEditing = false;
+        } else {
+          click();
+        }
+      }
       return;
     case C.CC_MENU:
       if (d2 > 0) { screen = MENU; rebuildMenu(); }
       return;
     case C.CC_BACK:
-      if (d2 > 0 && !back()) closeModule();
+      /* Shift + Back closes from anywhere, as the manual promises. */
+      if (d2 <= 0) return;
+      if (shiftHeld || !back()) closeModule();
       return;
     case C.CC_PLAY:
-      if (d2 > 0 && screen === READY) start(false);
-      else if (d2 > 0 && screen === RUNNING) stop();
+      if (d2 <= 0) return;
+      /* In a hearing drill Play repeats the question — without it a prompt
+       * you did not catch is a prompt you cannot answer. */
+      if (screen === QUIZ && promptIsAudible()) { schedulePrompt(); return; }
+      if (screen === READY) start(false);
+      else if (screen === RUNNING) togglePause();
       return;
     case C.CC_RECORD:
       if (d2 <= 0) return;
-      if (screen === QUIZ && quiz) { Q.takeHint(quiz); return; }
+      if (screen === QUIZ && quiz) {
+        const hint = Q.takeHint(quiz);
+        if (hint === 'sound' || hint === 'name') schedulePrompt();
+        return;
+      }
       if (screen === READY) start(true);
-      else if (screen === RUNNING) stop();
+      else if (screen === RUNNING) togglePause();
       return;
     default:
       break;
@@ -728,17 +1334,59 @@ globalThis.onMidiMessageInternal = function onMidiMessageInternal(data) {
 
   if (d1 >= C.CC_KNOB1 && d1 < C.CC_KNOB1 + C.KNOB_COUNT) {
     const k = d1 - C.CC_KNOB1;
-    if (k >= SET.KNOB_ROWS.length) return;
     const delta = decodeDelta(d2);
     if (!delta) return;
+    /*
+     * THE KNOBS ARE CONTEXTUAL. Knob 1 scrubs while paused; in Settings they
+     * follow the rows on screen; everywhere else the first four are the ones
+     * worth having under your hands mid-drill.
+     */
+    /*
+     * Whenever the music is NOT running: paused, or on the ready screen.
+     * Seeking under your own feet mid-playback is not something anyone wants;
+     * seeking before you start is how you pick a bar to work on.
+     */
+    if (k === 0 && (screen === READY || (screen === RUNNING && paused))) {
+      scrub(delta);
+      return;
+    }
+    if (screen === SETTINGS) {
+      const i = settingsRowForKnob(k);
+      if (i < 0) return;
+      settingsSel = i;
+      editSetting(SET.ROWS[i].key, delta);
+      return;
+    }
+    if (k >= SET.KNOB_ROWS.length) return;
     editSetting(SET.ROWS[SET.KNOB_ROWS[k]].key, delta);
   }
-};
+}
+
+/*
+ * Which settings row a knob addresses.
+ *
+ * The rows ON SCREEN, not fixed setting numbers: the mapping then survives
+ * scrolling, and a knob can never point at a row you cannot see.
+ */
+function settingsRowForKnob(k) {
+  const top = V.listWindow(SET.ROWS.length, settingsSel);
+  const i = top + k;
+  return i < SET.ROWS.length ? i : -1;
+}
+
+function knobTouched(knob) {
+  if (screen !== SETTINGS) return;
+  const i = settingsRowForKnob(knob);
+  if (i < 0) return;
+  settingsSel = i;
+}
 
 function jog(delta) {
   const target = C.jogTarget(screen, settingsEditing);
   if (target === 'menu') {
     menuSel = Math.max(0, Math.min(menuItems.length - 1, menuSel + delta));
+  } else if (target === 'level') {
+    levelSel = Math.max(0, Math.min(levelRows.length - 1, levelSel + delta));
   } else if (target === 'row') {
     settingsSel = Math.max(0, Math.min(SET.ROWS.length - 1, settingsSel + delta));
   } else if (target === 'value') {
@@ -748,21 +1396,20 @@ function jog(delta) {
   } else if (target === 'drill') {
     const n = Math.max(1, ST.drillsWithHistory(stats).length);
     progressSel = (((progressSel + delta) % n) + n) % n;
+    rebuildProgress();
   }
 }
 
 function click() {
   if (screen === MENU) { openSelected(); return; }
+  if (screen === LEVELS) { openLevel(); return; }
   if (screen === SETTINGS) { settingsEditing = !settingsEditing; return; }
   if (screen === QUIZ && quiz && quiz.mode === 'pick') {
     const r = Q.pickChoice(quiz, now());
-    if (r === 'right') {
-      if (Q.roundComplete(quiz)) finishQuiz();
-      else Q.advance(quiz);
-    }
+    if (r === 'right') quizSolvedAt = now();
     return;
   }
-  if (screen === RESULT) { screen = MENU; quiz = null; return; }
+  if (screen === RESULT) { screen = MENU; quiz = null; resultCache = null; return; }
   if (screen === SUMMARY || screen === LADDER) { screen = chart ? READY : MENU; return; }
 }
 
@@ -774,6 +1421,7 @@ function click() {
  */
 function editSetting(key, delta) {
   SET.applySetting(settings, key, delta);
+  settingsRowsCache = SET.settingsRows(settings);
   saveSettings();
   if (SET.affectsChart(key) && chart && screen !== RUNNING) {
     const src = menuItems[menuSel];
@@ -784,10 +1432,42 @@ function editSetting(key, delta) {
 globalThis.onMidiMessageExternal = function onMidiMessageExternal(_data) {};
 
 globalThis.onResume = function onResume() {
-  invalidateLedCache();
-  for (let i = 0; i < PAD.PAD_COUNT; i++) ledPrev[i] = -1;
+  guard('resume', () => {
+    invalidateLedCache();
+    for (let i = 0; i < PAD.PAD_COUNT; i++) ledPrev[i] = -1;
+  });
 };
 
+/*
+ * The HOST is tearing us down — there are no more ticks coming, so this is
+ * the one place the work has to be synchronous and best-effort.
+ *
+ * It does NOT call host_exit_module: we are already being unloaded, and
+ * asking again would be answering a question nobody asked. The deferred path
+ * above is for when the PLAYER leaves, which is the case where the drain
+ * matters and where there are still ticks to do it in.
+ *
+ * Not guarded as one block: closing has to get ALL the way through even if
+ * part of it throws. A failure to write settings must not stop the panic, and
+ * a failure to panic must not stop the LEDs going dark — the player is
+ * leaving either way, and what they must not be left with is a lit grid and a
+ * ringing kit.
+ */
 globalThis.onUnload = function onUnload() {
-  closeModule();
+  pendingExitAt = 0;
+  exited = true;
+  guard('unload:panic', () => dspSet('panic', '1'));
+  guard('unload:midi', () => {
+    for (let chn = 0; chn < 16; chn++) {
+      queue(OUT_TRACK | OUT_USB, 0xB0 | chn, 120, 0);
+      queue(OUT_TRACK | OUT_USB, 0xB0 | chn, 123, 0);
+    }
+    serviceOutbox(true);
+  });
+  guard('unload:leds', () => {
+    darkenPads();
+    setButtonLED(C.CC_PLAY, 0);
+    setButtonLED(C.CC_RECORD, 0);
+  });
+  guard('unload:files', () => flushFiles(true));
 };

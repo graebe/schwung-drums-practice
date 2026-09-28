@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as S from '../src/settings_def.mjs';
+import * as L from '../src/layout.mjs';
 
 test('every row is complete and every default is in range', () => {
   for (const row of S.ROWS) {
@@ -22,7 +23,7 @@ test('the label fits the screen', () => {
 
 test('knobs 1-4 are the first four rows', () => {
   assert.deepEqual(S.KNOB_ROWS, [0, 1, 2, 3]);
-  assert.deepEqual(S.KNOB_ROWS.map((i) => S.ROWS[i].key), ['bpm', 'pxPerBeat', 'loopBars', 'layout']);
+  assert.deepEqual(S.KNOB_ROWS.map((i) => S.ROWS[i].key), ['bpm', 'pxPerBeat', 'reps', 'layout']);
 });
 
 test('an int clamps and never escapes its range', () => {
@@ -43,12 +44,22 @@ test('a bool toggles ONCE however the delta was batched', () => {
   assert.equal(s.dynamics, true);
 });
 
+test('Reps is an override, and defaults to what the file says', () => {
+  /* How long a practice is belongs to the file that defines it. */
+  assert.equal(S.DEFAULTS.reps, 0);
+  assert.equal(S.formatValue(S.rowFor('reps'), 0), 'as written');
+  assert.equal(S.formatValue(S.rowFor('reps'), 16), '16x');
+  assert.equal(S.affectsChart('reps'), true, 'changing it rebuilds the armed drill');
+  assert.equal(S.DEFAULTS.loop, undefined, 'the endless-loop setting is gone');
+  assert.equal(S.DEFAULTS.loopBars, undefined, 'the loop length lives in the file');
+});
+
 test('a list stops at its ends rather than wrapping', () => {
-  const s = { ...S.DEFAULTS, layout: 'sticking' };
+  const s = { ...S.DEFAULTS, layout: 'kit' };
   S.applySetting(s, 'layout', -5);
-  assert.equal(s.layout, 'sticking');
+  assert.equal(s.layout, 'kit');
   S.applySetting(s, 'layout', 9);
-  assert.equal(s.layout, 'kit8');
+  assert.equal(s.layout, 'sticking');
 });
 
 test('an unknown key changes nothing', () => {
@@ -79,7 +90,7 @@ test('a corrupt or missing file loads the defaults rather than failing', () => {
 test('settings round-trip through the file unchanged', () => {
   const { settings } = S.loadSettings(null);
   settings.bpm = 123;
-  settings.layout = 'kit8';
+  settings.layout = 'sticking';
   settings.dynamics = false;
   const again = S.loadSettings(S.serialiseSettings(settings)).settings;
   for (const row of S.ROWS) assert.equal(again[row.key], settings[row.key], row.key);
@@ -87,14 +98,18 @@ test('settings round-trip through the file unchanged', () => {
 
 test('only the settings that change the material force a rebuild', () => {
   assert.equal(S.affectsChart('bpm'), true);
-  assert.equal(S.affectsChart('loopBars'), true);
-  assert.equal(S.affectsChart('loop'), true);
+  assert.equal(S.affectsChart('reps'), true);
   assert.equal(S.affectsChart('view'), false, 'a redraw is not a rebuild');
   assert.equal(S.affectsChart('pxPerBeat'), false);
 });
 
-test('every row formats without throwing, at both ends of its range', () => {
-  const s = { ...S.DEFAULTS };
+test('every row formats, and label plus value fits the row', () => {
+  /*
+   * The real constraint is the ROW, not a character count: the label is drawn
+   * at the left and the value right-aligned, and past TEXT_MAX_PX the host
+   * simply stops plotting and the value goes missing in silence.
+   */
+  const px = (t) => t.length * 6 - 1;
   for (const row of S.ROWS) {
     const vals = row.type === 'bool' ? [true, false]
       : row.type === 'int' ? [row.min, row.max]
@@ -102,17 +117,47 @@ test('every row formats without throwing, at both ends of its range', () => {
     for (const v of vals) {
       const out = S.formatValue(row, v);
       assert.equal(typeof out, 'string');
-      assert.ok(out.length > 0 && out.length <= 9, `${row.key}=${v} -> "${out}"`);
+      assert.ok(out.length > 0, `${row.key}=${v} formatted to nothing`);
+      const wide = px(row.label) + px(out) + 8;
+      assert.ok(wide <= L.TEXT_MAX_PX, `"${row.label}  ${out}" is ${wide}px of ${L.TEXT_MAX_PX}`);
     }
   }
-  assert.equal(S.settingsRows(s).length, S.ROWS.length);
+  assert.equal(S.settingsRows({ ...S.DEFAULTS }).length, S.ROWS.length);
 });
 
 test('the defaults are the ones the README promises', () => {
   assert.equal(S.DEFAULTS.guide, false, 'a lit pad is an answer, not a hint');
-  assert.equal(S.DEFAULTS.loop, true);
+  assert.equal(S.DEFAULTS.view, 'grid', 'drum tab is what a drummer reads');
   assert.equal(S.DEFAULTS.study, false);
   assert.equal(S.DEFAULTS.strictness, 'normal');
   assert.equal(S.DEFAULTS.midiCh, 0, 'broadcast: a channel mismatch is silent');
   assert.equal(S.DEFAULTS.midiOut, 4, 'the built-in kit, so nothing has to be set up');
+});
+
+test('the v2 migration moves a stale staff default to drum tab, once', () => {
+  /*
+   * A file written at v1 carries view:"staff" whether or not anybody chose
+   * it — that was the only default there had ever been — so the new default
+   * would otherwise reach nobody who had already opened the module.
+   */
+  const v1 = JSON.stringify({ version: 1, view: 'staff', bpm: 104, latencyMs: 12 });
+  const a = S.loadSettings(v1);
+  assert.equal(a.settings.view, 'grid');
+  assert.equal(a.changed, true, 'the file has to be rewritten at the new version');
+  assert.equal(a.settings.bpm, 104, 'a real preference must survive');
+  assert.equal(a.settings.latencyMs, 12);
+
+  /* And once migrated, a chosen staff is respected. */
+  const b = S.loadSettings(S.serialiseSettings({ ...a.settings, view: 'staff' }));
+  assert.equal(b.settings.view, 'staff');
+  assert.equal(b.changed, false, 'a current file must not be rewritten every open');
+});
+
+test('settings dropped between versions simply vanish', () => {
+  /* `loop` and `loopBars` are gone: how long a practice runs lives in the
+   * file now. coerceInto only ever copies keys the table still declares. */
+  const { settings } = S.loadSettings(JSON.stringify({ version: 1, loop: true, loopBars: 4 }));
+  assert.equal(settings.loop, undefined);
+  assert.equal(settings.loopBars, undefined);
+  assert.equal(JSON.parse(S.serialiseSettings(settings)).loop, undefined);
 });

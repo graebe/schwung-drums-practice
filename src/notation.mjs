@@ -36,11 +36,6 @@ export function diatonicToY(diatonic) {
   return ANCHOR_Y - (diatonic - ANCHOR_DIATONIC) * STEP_PX;
 }
 
-/* Staff y for a MIDI pitch. */
-export function pitchToY(pitch) {
-  return diatonicToY(diatonicOf(pitch));
-}
-
 /*
  * Ledger-line positions a note needs: the y of every staff line the note
  * sits beyond, walking outward from the staff to (and including) the note.

@@ -42,3 +42,30 @@ test('ui.js declares all six lifecycle hooks', () => {
     assert.ok(src.includes(`globalThis.${hook} =`), `${hook} is not declared`);
   }
 });
+
+test('incoming MIDI is decoded as a three-byte message, not a USB packet', () => {
+  /*
+   * THE BUG THIS PINS. The module shipped once reading data[1] as the status
+   * byte, on the assumption that the host passed a four-byte USB-MIDI packet.
+   * It does not — it passes [status, d1, d2]. Every press therefore decoded
+   * its data byte as the status, matched no branch and was dropped: the
+   * module drew its menu once and then ignored every input, which on the
+   * device is indistinguishable from a freeze.
+   *
+   * It survived the whole test suite because the test helpers sent the
+   * four-byte form too — the tests agreed with the code because both came
+   * from the same misreading. So this asserts against the SHAPE OF THE
+   * SOURCE, which is the only thing in the loop that did not.
+   */
+  const fn = src.slice(src.indexOf('function midiInner'), src.indexOf('function jog('));
+  assert.match(fn, /const status = data\[0\]/, 'the status byte is data[0]');
+  assert.match(fn, /const d1 = data\[1\]/);
+  assert.match(fn, /const d2 = data\[2\]/);
+  assert.equal(/data\[3\]/.test(fn), false, 'there is no fourth byte coming in');
+});
+
+test('the four-byte form is only ever used OUTBOUND', () => {
+  /* move_midi_inject_to_move takes a cable nibble; nothing arrives that way. */
+  const out = src.slice(src.indexOf('function serviceOutbox'));
+  assert.match(out, /move_midi_inject_to_move\(\[\(2 << 4\)/);
+});

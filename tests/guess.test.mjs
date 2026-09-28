@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as Q from '../src/guess.mjs';
 import { voiceChoices, subdivChoices, grooveChoices, shuffle } from '../src/choices.mjs';
-import { rng } from '../src/generator.mjs';
+import { rng } from '../src/rng.mjs';
 import { VOICE_IDS } from '../src/kit.mjs';
 
 test('distractors are the things you would actually confuse', () => {
@@ -149,4 +149,31 @@ test('error rate is wrong over attempts, so round sizes compare', () => {
   Q.pressVoice(q, wrong, 10);
   Q.pressVoice(q, q.prompt, 20);
   assert.equal(Q.errorFraction(q), 0.5);
+});
+
+test('an answered prompt stops scoring until the next one arrives', () => {
+  /*
+   * A voice sits on several pads, so a flurry across the grid would otherwise
+   * score the same answer two or three times — and a round of twenty would
+   * finish having asked seven questions.
+   */
+  const q = Q.createQuiz({ kind: 'voice', mode: 'guess', roundSize: 20, seed: 11 });
+  assert.equal(Q.pressVoice(q, q.prompt, 100), 'right');
+  assert.equal(q.correct, 1);
+  assert.equal(Q.pressVoice(q, q.prompt, 110), 'ignored', 'the same answer scored twice');
+  assert.equal(Q.pressVoice(q, 'KK', 120), 'ignored', 'a wrong press counted after the answer');
+  assert.equal(q.correct, 1);
+  assert.equal(q.wrong, 0);
+
+  Q.advance(q);
+  assert.equal(q.revealed, false, 'the next prompt arrived already answered');
+  assert.notEqual(Q.pressVoice(q, q.prompt, 130), 'ignored');
+});
+
+test('the same is true of picking', () => {
+  const q = Q.createQuiz({ kind: 'subdiv', mode: 'pick', roundSize: 20, seed: 3 });
+  q.choice = q.options.indexOf(q.prompt);
+  assert.equal(Q.pickChoice(q, 100), 'right');
+  assert.equal(Q.pickChoice(q, 110), 'ignored');
+  assert.equal(q.correct, 1);
 });

@@ -12,7 +12,8 @@
  *   y 8       rule
  *   y 10..45  chart area — the staff, or the grid's lanes
  *   y 47      rule
- *   y 48..55  sticking lane (scrolls with the notes)
+ *   y 48      bar ticks, hanging off the rule
+ *   y 49..55  the under lane — bar numbers, or the sticking
  *   y 57..63  the timing bar
  */
 
@@ -140,12 +141,40 @@ export const GRID_BOTTOM_Y = 45;
 export const GRID_LABEL_X = 1;
 export const GRID_LEFT_X = 15;      /* where the lanes begin                 */
 export const GRID_LANE_H_MIN = 4;
-export const GRID_LANE_H_MAX = 9;
-export const GRID_CELL_W = 3;       /* a hit's block, centred on its beat    */
+/*
+ * 18, not 9. The cap decides how much of the band a drill actually uses, and
+ * at 9 the common case wasted it: a three-voice groove drew 27 of the 36 rows
+ * and split the other nine into margin above and below, which read as a chart
+ * that had failed to fill its frame. At 18 every count from two to nine lands
+ * on the band or within a row of it — 2x18, 3x12, 4x9, 6x6 and 9x4 are 36.
+ *
+ * Height is not empty space: cellWidth() takes the lane's height, so a tall
+ * lane draws the 7px disc rather than the 5px one, and drawMarker's tick grows
+ * with it. A single lane is the one count that cannot fill the band, and 18 is
+ * where it stops — past that its marker would be as tall as a bar line and
+ * start competing with the furniture it is supposed to be read against.
+ */
+export const GRID_LANE_H_MAX = 18;
 
-/* ---- Sticking lane ------------------------------------------------------ */
-export const NAME_RULE_Y = 47;
-export const NAME_LANE_Y = 49;
+/* ---- The under lane ----------------------------------------------------- */
+/*
+ * One band under the chart, and the drill decides what goes in it.
+ *
+ * A groove has no written hand, so its seven rows used to be reserved and then
+ * left blank — a rule across the whole screen dividing nothing from nothing.
+ * They now carry the BAR NUMBER, which is what the eye wants while reading and
+ * what the header could only say in words.
+ *
+ * A rudiment keeps its R/L there. The two cannot share the band: at 32px/beat
+ * a bar is the whole screen wide, so a bar number has to be clamped to stay
+ * visible, and a clamped number sits exactly over the downbeat's hand — the
+ * one letter of a paradiddle you least want hidden. The ticks are drawn for
+ * both, because a tick costs one row and hangs off the rule.
+ */
+export const UNDER_RULE_Y = 47;
+export const UNDER_TICK_Y = 48;
+export const UNDER_TICK_H = 2;
+export const UNDER_LANE_Y = 49;
 
 /* ---- Timing bar --------------------------------------------------------- */
 /*
@@ -183,8 +212,10 @@ export const TEXT_MAX_PX = SCREEN_W - 2;
 export const RESULT_BIG_Y = 10;
 export const RESULT_BIG_SCALE = 3;
 export const RESULT_LEFT_X = 3;
-export const RESULT_RIGHT_X = SCREEN_W - 3;
 export const RESULT_ROW_A_Y = 26;
+/* The drill name on the summary. It used to be written as UNDER_LANE_Y - 8,
+ * which quietly tied a still screen to the running view's scrolling lane. */
+export const SUMMARY_NAME_Y = 41;
 export const RESULT_ROW_B_Y = 34;
 export const RESULT_PLOT = { x: 3, y: 42, w: SCREEN_W - 6, h: 12 };
 /* The per-voice timing table on the summary: one row per voice that played. */

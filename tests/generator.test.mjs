@@ -97,23 +97,6 @@ test('a snare never lands on the downbeat, where it would fight the kick', () =>
   }
 });
 
-test('merge folds simultaneous hits and keeps the loudest dynamic', () => {
-  const m = G.merge([
-    { beat: 0, voices: ['KK'], dyn: 'normal' },
-    { beat: 0, voices: ['SN'], dyn: 'accent' },
-    { beat: 1, voices: ['HH'] },
-  ]);
-  assert.equal(m.length, 2);
-  assert.deepEqual(m[0].voices, ['KK', 'SN']);
-  assert.equal(m[0].dyn, 'accent');
-});
-
-test('merge does not mutate what it was handed', () => {
-  const src = [{ beat: 0, voices: ['KK'] }, { beat: 0, voices: ['SN'] }];
-  G.merge(src);
-  assert.deepEqual(src[0].voices, ['KK']);
-});
-
 test('the sticking drill asks a hand of every stroke', () => {
   const c = G.stickingDrill({ seed: 3 });
   assert.equal(c.sticking, 'strict');

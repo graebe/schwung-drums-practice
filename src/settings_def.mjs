@@ -23,9 +23,14 @@ export const ROWS = [
   { key: 'bpm',        label: 'Tempo',     type: 'int',  min: 40, max: 240, rebuild: true,
     format: (v) => `${v}` },
   { key: 'pxPerBeat',  label: 'Read ahead', type: 'int', min: 12, max: 48 },
-  { key: 'loopBars',   label: 'Loop len',  type: 'list', values: [1, 2, 4, 8], rebuild: true,
-    format: (v) => `${v} bar${v === 1 ? '' : 's'}` },
-  { key: 'layout',     label: 'Kit',       type: 'list', values: ['sticking', 'kit4', 'kit8'] },
+  /*
+   * An OVERRIDE, not the source of truth. How long a practice is belongs to
+   * the file that defines it; this is here so you can decide to play
+   * something twice as long today without editing it. `0` is "as written".
+   */
+  { key: 'reps',       label: 'Reps',      type: 'list', values: [0, 4, 8, 16, 32], rebuild: true,
+    format: (v) => (v === 0 ? 'as written' : `${v}x`) },
+  { key: 'layout',     label: 'Kit',       type: 'list', values: ['kit', 'sticking'] },
 
   /* ---- the rest ---- */
   { key: 'view',       label: 'View',      type: 'list', values: ['staff', 'grid'] },
@@ -35,7 +40,6 @@ export const ROWS = [
   { key: 'accentVel',  label: 'Accent vel', type: 'int', min: 40, max: 127 },
   { key: 'ghostVel',   label: 'Ghost vel', type: 'int',  min: 1,  max: 90 },
   { key: 'guide',      label: 'Guide pads', type: 'bool' },
-  { key: 'loop',       label: 'Loop',      type: 'bool', rebuild: true },
   { key: 'study',      label: 'Study',     type: 'bool' },
   { key: 'click',      label: 'Click',     type: 'bool' },
   { key: 'clickSubdiv', label: 'Click sub', type: 'list', values: [0, 1, 2, 4],
@@ -63,9 +67,12 @@ export const ROWS = [
 export const DEFAULTS = {
   bpm: 90,
   pxPerBeat: 32,
-  loopBars: 1,
-  layout: 'kit4',
-  view: 'staff',
+  reps: 0,
+  layout: 'kit',
+  /* Drum tab, not a staff. It is what a drummer reads, it is legible at a
+   * glance while playing, and the percussion staff is one setting away for
+   * when reading notation is the point. */
+  view: 'grid',
   strictness: 'normal',
   sticking: 'strict',
   dynamics: true,
@@ -74,7 +81,6 @@ export const DEFAULTS = {
   /* Off by default: this is a reading trainer first, and a lit pad is an
    * answer rather than a hint. */
   guide: false,
-  loop: true,
   study: false,
   click: true,
   clickSubdiv: 1,
@@ -91,7 +97,7 @@ export const DEFAULTS = {
 };
 
 /* Bumped whenever a migration is added below. */
-export const SETTINGS_VERSION = 1;
+export const SETTINGS_VERSION = 2;
 
 export const KNOB_ROWS = [0, 1, 2, 3];
 
@@ -177,7 +183,27 @@ export function coerceInto(target, loaded) {
  */
 export function migrate(settings, fromVersion) {
   let changed = false;
-  if (!Number.isFinite(fromVersion) || fromVersion < 1) changed = true;
+  const from = Number.isFinite(fromVersion) ? fromVersion : 0;
+  if (from < 1) changed = true;
+
+  /*
+   * v2 — the default view became drum tab.
+   *
+   * A file written at v1 carries `view: "staff"` whether or not anybody chose
+   * it, because that was the only default there had ever been. Leaving it
+   * alone would mean the new default reached nobody who had already opened
+   * the module once. This resets a deliberate choice of the staff exactly
+   * once, which is the lesser evil, and the setting is one click away.
+   *
+   * The dead keys from v1 (`loop`, `loopBars`) need no handling: how long a
+   * practice runs now lives in the file, and coerceInto only ever copies keys
+   * the table still declares.
+   */
+  if (from < 2) {
+    settings.view = DEFAULTS.view;
+    changed = true;
+  }
+
   settings.version = SETTINGS_VERSION;
   return changed;
 }

@@ -20,8 +20,9 @@ test('the hand split is the left half of the grid', () => {
     const { col } = P.padRowCol(pad);
     assert.equal(P.padHand(pad), col < 4 ? P.LEFT : P.RIGHT);
   }
-  assert.equal(P.mirrorCol(0), 7);
-  assert.equal(P.mirrorCol(3), 4);
+  assert.equal(P.twinCol(0), 4);
+  assert.equal(P.twinCol(3), 7);
+  assert.equal(P.twinCol(7), 3);
 });
 
 test('every layout assigns every pad a known voice', () => {
@@ -34,17 +35,39 @@ test('every layout assigns every pad a known voice', () => {
   }
 });
 
-test('the halves mirror exactly — the layout is learned once, not twice', () => {
+test('the halves DUPLICATE, so the Ableton order reads the same under each hand', () => {
+  /* Not mirrored: a Drum Rack reads left to right, and reversing it for the
+   * right hand would put the kick under the wrong finger. */
   for (const layout of P.LAYOUT_IDS) {
     for (let row = 0; row < P.ROWS; row++) {
       for (let col = 0; col < P.COLS; col++) {
         assert.equal(
           P.padVoice(P.padAt(row, col), layout),
-          P.padVoice(P.padAt(row, P.mirrorCol(col)), layout),
-          `${layout} row ${row} col ${col} does not mirror`,
+          P.padVoice(P.padAt(row, P.twinCol(col)), layout),
+          `${layout} row ${row} col ${col} differs from its twin`,
         );
       }
     }
+  }
+});
+
+test('the kit follows Ableton\'s Drum Rack order', () => {
+  /*
+   * Move lays a Drum Rack on the left 16 pads as a 4x4, General MIDI from C1
+   * ascending left to right, bottom to top. Matching it means muscle memory
+   * carries between this module and Move's own kits.
+   */
+  const at = (row, col) => P.padVoice(P.padAt(row, col), 'kit');
+  assert.equal(at(0, 0), 'KK', 'GM 36 — the kick is the bottom-left corner');
+  assert.equal(at(0, 2), 'SN', 'GM 38 — the snare');
+  assert.equal(at(1, 2), 'HH', 'GM 42 — closed hi-hat, directly above the snare');
+  assert.equal(at(2, 2), 'HO', 'GM 46 — open hi-hat, above the closed one');
+  assert.equal(at(2, 0), 'HF', 'GM 44 — hi-hat pedal');
+  assert.equal(at(3, 1), 'CR', 'GM 49 — crash');
+  assert.equal(at(3, 3), 'RD', 'GM 51 — ride');
+  /* And the three the Basics need sit in the bottom-left corner together. */
+  for (const v of ['KK', 'SN', 'HH']) {
+    assert.ok(P.padsForVoice(v, 'kit', P.LEFT).length > 0, `${v} is not under the left hand`);
   }
 });
 
@@ -72,34 +95,24 @@ test('padsForVoice round-trips against padVoice', () => {
   }
 });
 
-test('the layouts are a ladder — each reaches at least as much as the last', () => {
+test('sticking is one surface; the kit reaches every voice', () => {
   assert.deepEqual(P.layoutVoices('sticking'), ['SN']);
-  const four = P.layoutVoices('kit4');
-  const eight = P.layoutVoices('kit8');
-  assert.equal(four.length, 4);
-  assert.equal(eight.length, 8);
-  for (const v of four) assert.ok(eight.includes(v), `kit8 must still reach ${v}`);
-});
-
-test('the hi-hat pedal is engraved but has no pad, in any layout', () => {
-  for (const layout of P.LAYOUT_IDS) {
-    assert.equal(P.padsForVoice('HF', layout).length, 0);
-  }
+  assert.equal(P.layoutVoices('kit').length, 9, 'the whole legend is playable');
 });
 
 test('layoutForChart picks the narrowest layout that can play it', () => {
   assert.equal(P.layoutForChart({ events: [{ voices: ['SN'] }] }), 'sticking');
-  assert.equal(P.layoutForChart({ events: [{ voices: ['KK', 'SN', 'HH'] }] }), 'kit4');
-  assert.equal(P.layoutForChart({ events: [{ voices: ['CR', 'KK'] }] }), 'kit8');
-  assert.equal(P.layoutForChart({ events: [{ voices: ['HF'] }] }), null);
+  assert.equal(P.layoutForChart({ events: [{ voices: ['KK', 'SN', 'HH'] }] }), 'kit');
+  assert.equal(P.layoutForChart({ events: [{ voices: ['HF'] }] }), 'kit',
+    'the hi-hat pedal has a pad now, at its GM slot');
 });
 
 test('unknown layouts and pads are refused rather than guessed at', () => {
   assert.equal(P.padVoice(68, 'nope'), null);
-  assert.equal(P.padVoice(5, 'kit4'), null);
+  assert.equal(P.padVoice(5, 'kit'), null);
   assert.deepEqual(P.padsForVoice('SN', 'nope'), []);
   assert.deepEqual(P.layoutVoices('nope'), []);
-  assert.equal(P.layoutExists('kit4'), true);
+  assert.equal(P.layoutExists('kit'), true);
   assert.equal(P.layoutExists('nope'), false);
 });
 

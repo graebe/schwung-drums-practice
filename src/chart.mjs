@@ -9,16 +9,22 @@
  * rendered for any instant of any drill — which is what lets the whole
  * reading view be asserted on in `node --test`.
  *
- * LOOPING does not wind the clock back. songBeats runs forward forever and
- * the MATERIAL repeats: iteration k of the drill sits at beat + k*loopBeats.
+ * REPEATING does not wind the clock back. songBeats runs forward and the
+ * MATERIAL repeats: iteration k of the drill sits at beat + k*loopBeats.
  * Wrapping the clock instead would have been less code and quietly wrong —
  * every timing error is a difference between two beat positions, and a clock
  * that jumps backwards at the seam turns a hit 5ms late into a hit one whole
  * loop early. It would also make the scroll discontinuous at exactly the
  * moment the player is being asked to keep time through it.
  *
+ * A PRACTICE HAS A LENGTH, and the file states it. `loopBars` is how long the
+ * written pattern is; `repeats` is how many times that pattern IS the
+ * practice. The first version of this module had neither — a drill looped
+ * until you stopped it, which meant it never finished, never showed a summary
+ * and never recorded a score unless you thought to interrupt it.
+ *
  * Chart shape (from generator.mjs, or loaded by exercise_io.mjs):
- *   { id, name, bpm, timeSig: [num, den], loopBars, sticking,
+ *   { id, name, bpm, timeSig: [num, den], loopBars, repeats, sticking,
  *     events: [ { beat, voices: ['SN'], hand, dyn } ] }
  */
 
@@ -78,6 +84,45 @@ export function loopBeats(chart) {
   return Math.max(perBar, Math.ceil(total / perBar) * perBar);
 }
 
+/*
+ * How many times the pattern runs. A file that says nothing still ends —
+ * DEFAULT_REPEATS rather than forever — because "no length stated" almost
+ * always means the author did not think about it, and a practice that never
+ * finishes is the one thing this module must not go back to.
+ *
+ * 0 means endless, and is deliberate rather than absent: the Ladder and the
+ * Clock both wrap a drill and impose their own ending, and open playing is a
+ * real thing to want.
+ */
+export const DEFAULT_REPEATS = 8;
+
+export function repeatsOf(chart) {
+  const r = chart && chart.repeats;
+  if (r === 0) return 0;
+  if (Number.isFinite(r) && r > 0) return Math.floor(r);
+  return DEFAULT_REPEATS;
+}
+
+/* The whole practice, in beats. Infinity when endless. */
+export function practiceBeats(chart) {
+  const reps = repeatsOf(chart);
+  return reps === 0 ? Infinity : reps * loopBeats(chart);
+}
+
+/* Total bars in the practice, 0 when endless — for the "bar 3/8" readout. */
+export function practiceBars(chart) {
+  const reps = repeatsOf(chart);
+  if (reps === 0) return 0;
+  return Math.max(1, Math.round((reps * loopBeats(chart)) / beatsPerBar(chart)));
+}
+
+/* How long the practice takes, in seconds. Infinity when endless. */
+export function practiceSeconds(chart) {
+  const beats = practiceBeats(chart);
+  if (!Number.isFinite(beats)) return Infinity;
+  return beatsToMs(beats, chart.bpm || 90) / 1000;
+}
+
 /* The events of iteration `iter`, at absolute beats. */
 export function expandEvents(chart, iter) {
   const shift = iter * loopBeats(chart);
@@ -114,22 +159,65 @@ export function visibleBars(chart, songBeats, pxPerBeat, endBeat = Infinity) {
 }
 
 /*
- * Where the playhead is, for the header. Under a loop the bar is reported
- * WITHIN the loop ("bar 2/4") rather than as an ever-growing absolute count:
- * after ten minutes "bar 147" tells you nothing you can act on, and what you
- * actually want to know is where you are in the thing that repeats.
+ * The bars the RULER needs, which is one more than the chart draws.
+ *
+ * visibleBars() returns only the lines that are on screen, and the line of the
+ * bar you are currently IN is behind the playhead by definition — so a ruler
+ * built from it alone has nothing to name the current bar with, and its number
+ * would appear only in the moments just before a downbeat. Prepending the
+ * current bar, at its own off-screen x, is what lets the ruler hold a number
+ * against the left edge for the whole bar; its tick is off screen and simply
+ * is not drawn.
  */
-export function barBeatOf(chart, songBeats, looping = false) {
+export function rulerBars(chart, songBeats, pxPerBeat, endBeat = Infinity) {
+  const perBar = beatsPerBar(chart);
+  const visible = visibleBars(chart, songBeats, pxPerBeat, endBeat);
+  const clamped = Math.max(0, songBeats);
+  const beat = Math.floor(clamped / perBar) * perBar;
+  if (beat > endBeat) return visible;
+  const cur = {
+    bar: Math.floor(clamped / perBar) + 1,
+    beat,
+    x: beatToX(beat, songBeats, pxPerBeat) + L.BAR_OFFSET_PX,
+  };
+  /* Already there when the playhead sits exactly on the line. */
+  if (visible.length && visible[0].bar === cur.bar) return visible;
+  return [cur, ...visible];
+}
+
+/*
+ * Where the playhead is, for the header.
+ *
+ * The bar is reported against the WHOLE PRACTICE — "bar 3/8" — not within the
+ * repeating pattern. Knowing you are in bar 3 of a one-bar loop tells you
+ * nothing; knowing you are three bars into eight tells you how much is left,
+ * which is the only reason to put it on screen.
+ *
+ * An endless drill has no total, so `bars` is 0 and the caller shows the
+ * absolute count instead.
+ */
+export function barBeatOf(chart, songBeats) {
   const perBar = beatsPerBar(chart);
   const clamped = Math.max(0, songBeats);
-  const bars = looping ? Math.max(1, Math.round(loopBeats(chart) / perBar)) : 0;
   const absBar = Math.floor(clamped / perBar);
+  const bars = practiceBars(chart);
+  const perLoop = Math.max(1, Math.round(loopBeats(chart) / perBar));
   return {
-    bar: (looping ? absBar % bars : absBar) + 1,
+    bar: absBar + 1,
     bars,
     beat: Math.floor(clamped % perBar) + 1,
-    loop: looping ? Math.floor(absBar / bars) + 1 : 1,
+    rep: Math.floor(absBar / perLoop) + 1,
+    reps: repeatsOf(chart),
   };
+}
+
+/* How far through the practice, 0..1. Always 0 when endless — there is no
+ * fraction of forever, and a bar that crept forward regardless would be a
+ * lie the player would learn to ignore. */
+export function practiceProgress(chart, songBeats) {
+  const total = practiceBeats(chart);
+  if (!Number.isFinite(total) || total <= 0) return 0;
+  return Math.max(0, Math.min(1, songBeats / total));
 }
 
 /* Which loop iteration a beat falls in. */

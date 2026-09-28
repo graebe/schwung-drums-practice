@@ -1,5 +1,5 @@
 /*
- * VENDORED, UNMODIFIED, from the Schwung host:
+ * VENDORED, AND REDUCED, from the Schwung host:
  *   https://github.com/charlesvestal/schwung  —  src/vendor/host/plugin_api_v1.h
  *
  * MIT License. Copyright (c) 2025-2026 Charles Vestal.
@@ -7,8 +7,21 @@
  *
  * Carried here so that tests/dsp/test_drums.c exercises the engine through
  * exactly the C ABI the Move calls, rather than through a Rust-side
- * restatement of it that could drift from the real one. Do not edit: if the
- * host's header changes, replace this file wholesale.
+ * restatement of it that could drift from the real one.
+ *
+ * WHAT WAS REDUCED, and why saying so matters. The upstream header is mostly
+ * prose — the threading contract, the realtime rules, the history behind the
+ * reserved tail — and none of it survives here. Two DECLARATIONS did not
+ * either: host_api_v1_t's `reserved[8]` tail and the _Static_assert that pins
+ * its offset. That is safe only because of how this copy is used: the C test
+ * passes NULL for the host and never constructs the struct, and the Rust side
+ * (dsp/schwung-plugin) keeps its own mirror which stops at get_beat_position
+ * and never appends. A module may be older than the host; it may never be
+ * newer. Read the upstream header before changing anything here — it explains
+ * how a module's private copy of this struct once boot-looped a device.
+ *
+ * Do not edit to add fields. If the host's ABI changes, replace this file
+ * wholesale from upstream and re-reduce it.
  */
 #ifndef MOVE_PLUGIN_API_V1_H
 #define MOVE_PLUGIN_API_V1_H
