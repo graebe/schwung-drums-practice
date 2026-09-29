@@ -73,6 +73,25 @@ test('the timing bar fits the screen and is centred on it', () => {
   assert.ok(L.TIMING_BAR_Y + L.TIMING_BAR_H <= L.SCREEN_H);
 });
 
+test('the timing band is tiled exactly by its three parts', () => {
+  /* Five rows of histogram, one axis, one row for zero and the mean. If these
+   * stop adding up, a column either overruns into the axis or a row goes
+   * unused — and the band has no spare rows to absorb either. */
+  assert.equal(L.TIMING_HIST_ROWS + 2, L.TIMING_BAR_H,
+    'the histogram, the axis and the mark row do not fill the band');
+  assert.ok(L.TIMING_BAR_Y > L.UNDER_LANE_Y + L.TEXT_H - 1,
+    'the band starts inside the lane under the chart');
+  assert.ok(L.TIMING_HIST_BINS % 2 === 1, 'an even bin count has no bin centred on the beat');
+  /* Every bin must be reachable as a distinct column, or bins are being drawn
+   * on top of each other and the resolution is a fiction. */
+  const axisPx = L.TIMING_HALF_W * 2 + 1;
+  assert.ok(L.TIMING_HIST_BINS <= axisPx, `${L.TIMING_HIST_BINS} bins into ${axisPx}px`);
+  /* And one bin must be finer than the tightest window, or the window is
+   * narrower than a single column and cannot be aimed at. */
+  assert.ok((L.TIMING_SPAN_MS * 2) / L.TIMING_HIST_BINS < 15,
+    'a bin is coarser than the tight goodMs, so the window is sub-column');
+});
+
 test('the timing scale is wider than the worst window it must show', () => {
   /* Otherwise a disastrous hit pins at the end and reads as merely bad. */
   assert.ok(L.TIMING_SPAN_MS > 160, 'the loose "gone" window is 160ms');

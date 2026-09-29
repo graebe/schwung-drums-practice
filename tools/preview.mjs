@@ -10,6 +10,8 @@
  *   npm run preview -- --exercise single-paradiddle --beats 0.5
  *   npm run preview -- --exercise rock-backbeat --view grid --film 0,1,2,3
  *   npm run preview -- --screen summary
+ *   npm run preview -- --timing -55,12      mean,sd[,n] — the timing band alone
+ *   npm run preview -- --exercise rock-backbeat --beats 20 --sloppy
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { createScreen, toAscii } from './screen_buffer.mjs';
@@ -19,6 +21,8 @@ import { builtins } from '../src/generator.mjs';
 import { parseExercise, parseManifest } from '../src/exercise_io.mjs';
 import { createLadder } from '../src/ladder.mjs';
 import { DEFAULTS } from '../src/settings_def.mjs';
+import { createTiming, pushOffset, recentStats } from '../src/timing.mjs';
+import * as L from '../src/layout.mjs';
 
 const exDir = new URL('../src/exercises/', import.meta.url);
 
@@ -45,6 +49,39 @@ if (arg('list', false)) {
   process.exit(0);
 }
 
+/*
+ * The timing band on its own, from a mean and a spread. It is a picture that
+ * can only really be judged by eye, and there was no way to look at one
+ * without writing a throwaway script.
+ *
+ * The offsets are drawn from a FIXED seed, so two runs of the same figures give
+ * the same picture and a change to the drawing is the only thing that can move
+ * it.
+ */
+const timingArg = arg('timing', false);
+if (timingArg && timingArg !== true) {
+  const [meanMs = 0, sdMs = 0, n = 24] = String(timingArg).split(',').map(Number);
+  let seed = 20260929;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const acc = createTiming();
+  for (let i = 0; i < n; i++) {
+    /* Two uniforms summed — near enough a bell for a legibility check. */
+    pushOffset(acc, 'SN', meanMs + (rnd() + rnd() - 1) * sdMs * 1.7, i);
+  }
+  const s = recentStats(acc, L.TIMING_RECENT_N);
+  const ctx = createScreen();
+  V.drawTimingBar(ctx, acc, { goodMs: 60, okMs: 120, goneMs: 160 });
+  console.log(`--- timing: n=${s.n} mean=${s.meanMs.toFixed(1)}ms sd=${s.sdMs.toFixed(1)}ms ---`);
+  console.log(toAscii(ctx).split('\n').filter((line) => {
+    const m = /^\s*(\d+) /.exec(line);
+    return !m || Number(m[1]) >= L.TIMING_BAR_Y;
+  }).join('\n'));
+  process.exit(0);
+}
+
+/* Without this the preview plays every note 2.7ms late — machine-perfect — so
+ * the timing band shows one centred column and its shape cannot be judged. */
+const sloppy = arg('sloppy', false) !== false;
 const id = String(arg('exercise', 'single-paradiddle'));
 const chart = drills.find((d) => d.id === id) || drills[0];
 const view = String(arg('view', 'staff'));
@@ -113,7 +150,7 @@ if (screen) {
   for (const beats of frames) {
     const ctx = createScreen();
     V.drawReadingView(ctx, {
-      run: runAt(beats), chart, songBeats: beats, pxPerBeat: px, view,
+      run: runAt(beats, { sloppy }), chart, songBeats: beats, pxPerBeat: px, view,
       title: chart.name, bpm: chart.bpm, looping, dynamics: true,
       beatFlash: Math.abs(beats % 1) < 0.02,
     });

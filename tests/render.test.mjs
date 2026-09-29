@@ -249,19 +249,155 @@ test('the timing bar puts zero in the middle and early on the left', () => {
   assert.equal(timingX(9999), timingX(L.TIMING_SPAN_MS));
 });
 
-test('the timing cloud sits where the hits were', () => {
+/*
+ * The timing band. It used to draw minor ticks every 50ms — nine evenly-spaced
+ * marks across the full width, which is what an eight-segment bar counter looks
+ * like, and is how it got read. Those marks were also the biggest thing in the
+ * band and identical in every state, while the hits got two rows out of seven.
+ *
+ * The old test here asserted only that eight early hits tipped a left-vs-right
+ * pixel count. It passed throughout, because the graduations were symmetric and
+ * cancelled: it proved a difference existed, not that two performances looked
+ * different from each other or that the picture was legible at all.
+ */
+function timingBand(offsets, windows = { goodMs: 60, okMs: 120, goneMs: 160 }) {
   const ctx = createScreen();
   const t = createTiming();
-  for (let i = 0; i < 8; i++) pushOffset(t, 'SN', -80, i);
+  for (let i = 0; i < offsets.length; i++) pushOffset(t, 'SN', offsets[i], i);
   drawReadingView(ctx, {
-    run: { timing: t, entries: [], markers: [], windows: { goodMs: 60 }, sticking: 'off',
-           endBeat: Infinity },
+    run: { timing: t, entries: [], markers: [], windows, sticking: 'off', endBeat: Infinity },
     chart: { timeSig: [4, 4], events: [], bpm: 90 },
     songBeats: 0, pxPerBeat: 32, view: 'grid', title: 't', bpm: 90, looping: true,
   });
-  const left = countOn(ctx, timingX(-80) - 2, L.TIMING_BAR_Y, 5, L.TIMING_BAR_H);
-  const right = countOn(ctx, timingX(80) - 2, L.TIMING_BAR_Y, 5, L.TIMING_BAR_H);
-  assert.ok(left > right, 'a bar of early hits did not show up on the early side');
+  return ctx;
+}
+
+/* Offsets with a given mean and spread, from a fixed seed. */
+function spread(n, meanMs, sdMs, seed = 20260929) {
+  let st = seed;
+  const rnd = () => (st = (st * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  return Array.from({ length: n }, () => meanMs + (rnd() + rnd() - 1) * sdMs * 1.7);
+}
+
+/* Lit columns of the histogram rows only — the data, never the furniture. */
+function histCols(ctx) {
+  const out = [];
+  for (let x = 0; x < L.SCREEN_W; x++) {
+    if (countOn(ctx, x, L.TIMING_BAR_Y, 1, L.TIMING_HIST_ROWS) > 0) out.push(x);
+  }
+  return out;
+}
+const centreOfMass = (cols) => cols.reduce((a, b) => a + b, 0) / cols.length;
+
+test('two different performances do not draw the same picture', () => {
+  const tight = timingBand(spread(48, 0, 12));
+  const rushing = timingBand(spread(48, -55, 12));
+  const dragging = timingBand(spread(48, 55, 12));
+  const scattered = timingBand(spread(48, 0, 130));
+
+  const all = { tight, rushing, dragging, scattered };
+  const names = Object.keys(all);
+  for (let a = 0; a < names.length; a++) {
+    for (let b = a + 1; b < names.length; b++) {
+      assert.ok(!all[names[a]].pixels.every((v, k) => v === all[names[b]].pixels[k]),
+        `${names[a]} and ${names[b]} draw identical pixels`);
+    }
+  }
+
+  /* And differ in the RIGHT direction, not merely somewhere. */
+  const c = (x) => centreOfMass(histCols(x));
+  assert.ok(c(rushing) < c(tight) - 4, 'rushing did not sit left of centred playing');
+  assert.ok(c(dragging) > c(tight) + 4, 'dragging did not sit right of centred playing');
+  assert.ok(histCols(scattered).length > histCols(tight).length + 8,
+    'scattered playing did not draw a wider shape than tight playing');
+});
+
+test('every pixel above the axis is data, and the furniture is not graduations', () => {
+  const empty = timingBand([]);
+  /* Nothing played: the histogram rows are completely blank, so anything there
+   * later can only be hits. */
+  assert.equal(countOn(empty, 0, L.TIMING_BAR_Y, L.SCREEN_W, L.TIMING_HIST_ROWS), 0,
+    'the band drew something above the axis before a note was played');
+
+  /* No row is a row of evenly-spaced isolated marks — the shape that read as
+   * eight bars. A dotted axis row is allowed; a row of 1px marks with 10px
+   * gaps, repeated across the width, is not. */
+  for (let y = L.TIMING_BAR_Y; y < L.TIMING_BAR_Y + L.TIMING_BAR_H; y++) {
+    const gaps = [];
+    let prev = -1;
+    for (let x = 0; x < L.SCREEN_W; x++) {
+      if (!isOn(empty, x, y)) continue;
+      if (prev >= 0 && x - prev > 1) gaps.push(x - prev);
+      prev = x;
+    }
+    const wide = gaps.filter((g) => g > 3);
+    assert.ok(wide.length <= 1, `row ${y} is a row of ${wide.length + 1} spaced marks`);
+  }
+});
+
+test('the picture and the header read the same hits', () => {
+  /* Enough early hits to fill the horizon, then a horizon's worth of late ones:
+   * the early hits have aged out and the picture must say so, exactly as the
+   * header's mean does. */
+  const offsets = [...spread(60, -90, 8, 11), ...spread(L.TIMING_RECENT_N, 90, 8, 22)];
+  const cols = histCols(timingBand(offsets));
+  assert.ok(centreOfMass(cols) > L.TIMING_CENTER_X,
+    'the band still showed the hits that have aged out of the header');
+});
+
+test('a hit past the end of the scale pins, it does not vanish', () => {
+  const cols = histCols(timingBand(spread(20, 0, 8).concat([400, 420, 460])));
+  const edge = timingX(L.TIMING_SPAN_MS);
+  assert.ok(cols.some((x) => x >= edge - L.TIMING_HIST_BIN_W),
+    'a hit 400ms late was dropped rather than pinned to the edge');
+});
+
+test('one bad hit among many good ones is still drawn', () => {
+  /*
+   * The case a proportional height loses. Forty hits on the beat put forty in
+   * one bin, so a lone hit elsewhere is 1/40 of the peak — 0.125 of a row,
+   * which rounds to nothing. You played one note badly and the bar would have
+   * said you played them all well.
+   */
+  const cols = histCols(timingBand(new Array(40).fill(0).concat([150])));
+  const at = timingX(150);
+  assert.ok(cols.some((x) => Math.abs(x - at) <= L.TIMING_HIST_BIN_W),
+    'the single late hit rounded away to nothing beside a tall peak');
+});
+
+test('on the beat is a column centred on zero', () => {
+  assert.equal(L.TIMING_HIST_BINS % 2, 1,
+    'an even bin count splits the beat across two columns, so a centred spike cannot exist');
+  const cols = histCols(timingBand(new Array(24).fill(0)));
+  assert.equal(Math.round(centreOfMass(cols)), L.TIMING_CENTER_X,
+    'perfectly-timed hits did not draw on the centre');
+  assert.ok(cols.length <= L.TIMING_HIST_BIN_W + 1, `one bin should be lit, ${cols.length} were`);
+});
+
+test('the good window is the one solid run on the axis', () => {
+  const windows = { goodMs: 60, okMs: 120, goneMs: 160 };
+  const ctx = timingBand([], windows);
+  const axisY = L.TIMING_BAR_Y + L.TIMING_HIST_ROWS;
+  /* Continuous between the window edges... */
+  for (let x = timingX(-windows.goodMs); x <= timingX(windows.goodMs); x++) {
+    assert.ok(isOn(ctx, x, axisY), `the window has a hole at x${x}`);
+  }
+  /* ...and immediately outside it there is a gap, so the run's width is the
+   * window's width and not a pixel or two more. */
+  assert.ok(!isOn(ctx, timingX(-windows.goodMs) - 1, axisY), 'a dot is stuck to the left edge');
+  assert.ok(!isOn(ctx, timingX(windows.goodMs) + 1, axisY), 'a dot is stuck to the right edge');
+});
+
+test('zero is marked, and the mean sits beside it', () => {
+  const markY = L.TIMING_BAR_Y + L.TIMING_HIST_ROWS + 1;
+  const empty = timingBand([]);
+  assert.ok(isOn(empty, L.TIMING_CENTER_X, markY), 'zero is not marked');
+
+  const early = timingBand(spread(48, -90, 8));
+  const lit = [];
+  for (let x = 0; x < L.SCREEN_W; x++) if (isOn(early, x, markY)) lit.push(x);
+  assert.ok(lit.some((x) => x < L.TIMING_CENTER_X - 8), 'the mean mark is not left of zero');
+  assert.ok(lit.includes(L.TIMING_CENTER_X), 'zero stopped being marked once a mean appeared');
 });
 
 test('the hit line marks now, and thickens on the beat', () => {

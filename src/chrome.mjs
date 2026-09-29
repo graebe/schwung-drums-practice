@@ -11,7 +11,7 @@
 
 import * as L from './layout.mjs';
 import { barBeatOf } from './chart.mjs';
-import { recentOffsets, recentStats } from './timing.mjs';
+import { histogram, recentStats } from './timing.mjs';
 import * as SR from './staff_render.mjs';
 
 /* ---- Header ------------------------------------------------------------- */
@@ -36,7 +36,7 @@ export function drawHeader(ctx, s) {
    * navigating "where am I" is the only question, and the scroll alone cannot
    * answer it in bars.
    */
-  const t = s.timing ? recentStats(s.timing, 48) : null;
+  const t = s.timing ? recentStats(s.timing, L.TIMING_RECENT_N) : null;
   const right = s.rightLabel !== undefined ? s.rightLabel
     : t && t.n > 0
       ? `${t.meanMs >= 0 ? '+' : ''}${Math.round(t.meanMs)} s${Math.round(t.sdMs)}`
@@ -121,38 +121,87 @@ export function drawBarRuler(ctx, bars, numbers) {
   }
 }
 
+/*
+ * How your playing is DISTRIBUTED, which is a shape rather than a number:
+ *
+ *   tight      a narrow spike on the centre
+ *   rushing    a spike left of it
+ *   dragging   a spike right of it
+ *   scattered  a wide, low mound
+ *
+ * That is readable in the moment a drummer can spare to glance down, which a
+ * cloud of twenty-four dots on two rows was not — in a tight passage they
+ * merged into one blob, and a dot's ROW was picked by its index parity, so
+ * height carried no meaning at all.
+ *
+ * The scale never rescales horizontally (see timingX) so the centre is always
+ * the beat. It does normalise VERTICALLY, to its own tallest column: the shape
+ * is about where the hits sit relative to each other, and a fixed vertical
+ * scale would leave the picture almost flat until you had played a lot. The
+ * cost is that thirty hits and three hundred can draw the same silhouette —
+ * the header carries the counts, this carries the shape.
+ */
 export function drawTimingBar(ctx, timing, windows) {
   const y = L.TIMING_BAR_Y;
-  const mid = y + 3;
+  const baseline = y + L.TIMING_HIST_ROWS - 1; /* columns grow UP from here */
+  const axisY = baseline + 1;
+  const markY = axisY + 1;
   const cx = L.TIMING_CENTER_X;
 
-  /* The axis, with the good window drawn as a brighter run either side of
-   * zero — so "inside the window" is a place on the bar, not a number to
-   * remember. */
-  ctx.fillRect(cx - L.TIMING_HALF_W, mid, L.TIMING_HALF_W * 2 + 1, 1, 1);
-  if (windows) {
-    const gx = timingX(windows.goodMs) - cx;
-    for (let dx = -gx; dx <= gx; dx += 2) ctx.fillRect(cx + dx, mid - 1, 1, 1, 1);
-  }
-  for (let t = L.TIMING_TICK_MS; t <= L.TIMING_SPAN_MS; t += L.TIMING_TICK_MS) {
-    ctx.fillRect(timingX(t), mid - 1, 1, 3, 1);
-    ctx.fillRect(timingX(-t), mid - 1, 1, 3, 1);
-  }
-  ctx.fillRect(cx, y, 1, L.TIMING_BAR_H, 1);
+  /*
+   * The axis, and the good window as the one SOLID run on it. "Inside the
+   * window" has to be a place on the bar rather than a number to remember, and
+   * before this the window was dotted along the same row as the minor ticks —
+   * so the most important reference on the screen was indistinguishable from
+   * graduations. Now the graduations are gone and it is the only solid thing.
+   */
+  const good = windows ? windows.goodMs : 0;
+  const goodR = timingX(good);
+  const goodL = timingX(-good);
+  const left = timingX(-L.TIMING_SPAN_MS);
+  const right = timingX(L.TIMING_SPAN_MS);
+  ctx.fillRect(goodL, axisY, goodR - goodL + 1, 1, 1);
+  /*
+   * Dotted OUTWARD from the window's edges rather than on one phase across the
+   * whole axis. A global phase can put a lit pixel hard against the solid run,
+   * which reads as a window one or two pixels wider than it is — and the width
+   * of that run is the one measurement on the bar.
+   */
+  for (let x = goodL - 2; x >= left; x -= 2) ctx.fillRect(x, axisY, 1, 1, 1);
+  for (let x = goodR + 2; x <= right; x += 2) ctx.fillRect(x, axisY, 1, 1, 1);
+
+  /* Zero, and nothing else that does not move. */
+  ctx.fillRect(cx, markY, 1, 1, 1);
 
   if (!timing) return;
-  const dots = recentOffsets(timing, L.TIMING_DOTS);
-  for (let i = 0; i < dots.length; i++) {
-    /* Newest at the bottom, so the cloud drifts as you drift. */
-    const row = mid + 2 + (i % 2);
-    ctx.fillRect(timingX(dots[i]), row, 1, 1, 1);
+  const s = recentStats(timing, L.TIMING_RECENT_N);
+  if (s.n === 0) return;
+
+  const bins = histogram(timing, L.TIMING_HIST_BINS, L.TIMING_SPAN_MS, L.TIMING_RECENT_N);
+  let peak = 0;
+  for (let i = 0; i < bins.length; i++) if (bins[i] > peak) peak = bins[i];
+  const scale = Math.max(peak, L.TIMING_HIST_MIN_SCALE);
+  const binMs = (L.TIMING_SPAN_MS * 2) / L.TIMING_HIST_BINS;
+  const half = L.TIMING_HIST_BIN_W >> 1;
+
+  for (let i = 0; i < bins.length; i++) {
+    if (!bins[i]) continue;
+    /* At least one row for any bin that has hits in it: a column that rounded
+     * away would be a hit the bar silently did not report. */
+    const h = Math.max(1, Math.min(L.TIMING_HIST_ROWS,
+      Math.round((bins[i] / scale) * L.TIMING_HIST_ROWS)));
+    const centreMs = -L.TIMING_SPAN_MS + (i + 0.5) * binMs;
+    const bx = timingX(centreMs) - half;
+    ctx.fillRect(bx, baseline - h + 1, L.TIMING_HIST_BIN_W, h, 1);
   }
-  const s = recentStats(timing, 48);
-  if (s.n > 0) {
-    const mx = timingX(s.meanMs);
-    ctx.fillRect(mx, mid - 3, 1, 2, 1);
-    ctx.fillRect(mx - 1, mid - 3, 3, 1, 1);
-  }
+
+  /*
+   * The mean, on the SAME ROW as zero and deliberately so: the gap between the
+   * two is your average error, read off directly, and when you are on the beat
+   * they merge — which is exactly the picture "on the beat" should make.
+   */
+  const mx = timingX(s.meanMs);
+  ctx.fillRect(mx - 1, markY, 3, 1, 1);
 }
 
 /* ---- Lists (the menu and the settings page) ----------------------------- */
