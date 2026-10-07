@@ -1,7 +1,7 @@
 {
-  "id": "single-ratamacue",
-  "name": "Single ratamacue",
-  "bpm": 72,
+  "id": "swiss-army-triplet",
+  "name": "Swiss army triplet",
+  "bpm": 70,
   "timeSig": [
     4,
     4
@@ -15,44 +15,59 @@
       "voices": [
         "SN"
       ],
-      "hand": "R"
+      "hand": "R",
+      "dyn": "accent"
     },
     {
       "beat": 0.333333,
       "voices": [
         "SN"
       ],
-      "hand": "L"
+      "hand": "R"
     },
     {
       "beat": 0.666667,
       "voices": [
         "SN"
       ],
-      "hand": "R"
+      "hand": "L"
+    },
+    {
+      "beat": 0.833333,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L",
+      "dyn": "ghost"
     },
     {
       "beat": 1,
       "voices": [
         "SN"
       ],
-      "hand": "L",
+      "hand": "R",
       "dyn": "accent"
+    },
+    {
+      "beat": 1.333333,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 1.666667,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
     },
     {
       "beat": 1.833333,
       "voices": [
         "SN"
       ],
-      "hand": "R",
-      "dyn": "ghost"
-    },
-    {
-      "beat": 1.916667,
-      "voices": [
-        "SN"
-      ],
-      "hand": "R",
+      "hand": "L",
       "dyn": "ghost"
     },
     {
@@ -60,7 +75,8 @@
       "voices": [
         "SN"
       ],
-      "hand": "L"
+      "hand": "R",
+      "dyn": "accent"
     },
     {
       "beat": 2.333333,
@@ -77,6 +93,14 @@
       "hand": "L"
     },
     {
+      "beat": 2.833333,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L",
+      "dyn": "ghost"
+    },
+    {
       "beat": 3,
       "voices": [
         "SN"
@@ -85,15 +109,21 @@
       "dyn": "accent"
     },
     {
-      "beat": 3.833333,
+      "beat": 3.333333,
       "voices": [
         "SN"
       ],
-      "hand": "L",
-      "dyn": "ghost"
+      "hand": "R"
     },
     {
-      "beat": 3.916667,
+      "beat": 3.666667,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 3.833333,
       "voices": [
         "SN"
       ],

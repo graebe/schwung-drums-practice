@@ -1,6 +1,6 @@
 {
-  "id": "single-ratamacue",
-  "name": "Single ratamacue",
+  "id": "lesson-25",
+  "name": "Lesson 25",
   "bpm": 72,
   "timeSig": [
     4,
@@ -18,41 +18,34 @@
       "hand": "R"
     },
     {
-      "beat": 0.333333,
+      "beat": 0.5,
       "voices": [
         "SN"
       ],
       "hand": "L"
     },
     {
-      "beat": 0.666667,
-      "voices": [
-        "SN"
-      ],
-      "hand": "R"
-    },
-    {
       "beat": 1,
       "voices": [
         "SN"
       ],
-      "hand": "L",
+      "hand": "R",
       "dyn": "accent"
     },
     {
-      "beat": 1.833333,
+      "beat": 1.75,
       "voices": [
         "SN"
       ],
-      "hand": "R",
+      "hand": "L",
       "dyn": "ghost"
     },
     {
-      "beat": 1.916667,
+      "beat": 1.875,
       "voices": [
         "SN"
       ],
-      "hand": "R",
+      "hand": "L",
       "dyn": "ghost"
     },
     {
@@ -60,17 +53,10 @@
       "voices": [
         "SN"
       ],
-      "hand": "L"
-    },
-    {
-      "beat": 2.333333,
-      "voices": [
-        "SN"
-      ],
       "hand": "R"
     },
     {
-      "beat": 2.666667,
+      "beat": 2.5,
       "voices": [
         "SN"
       ],
@@ -85,7 +71,7 @@
       "dyn": "accent"
     },
     {
-      "beat": 3.833333,
+      "beat": 3.75,
       "voices": [
         "SN"
       ],
@@ -93,7 +79,7 @@
       "dyn": "ghost"
     },
     {
-      "beat": 3.916667,
+      "beat": 3.875,
       "voices": [
         "SN"
       ],

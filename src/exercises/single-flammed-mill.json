@@ -1,69 +1,46 @@
 {
-  "id": "double-ratamacue",
-  "name": "Double ratamacue",
-  "bpm": 68,
+  "id": "single-flammed-mill",
+  "name": "Single flammed mill",
+  "bpm": 72,
   "timeSig": [
-    3,
+    4,
     4
   ],
-  "loopBars": 2,
+  "loopBars": 1,
   "sticking": "strict",
-  "repeats": 4,
+  "repeats": 8,
   "events": [
     {
       "beat": 0,
       "voices": [
         "SN"
       ],
-      "hand": "R"
+      "hand": "R",
+      "dyn": "accent"
     },
     {
-      "beat": 0.833333,
-      "voices": [
-        "SN"
-      ],
-      "hand": "L",
-      "dyn": "ghost"
-    },
-    {
-      "beat": 0.916667,
-      "voices": [
-        "SN"
-      ],
-      "hand": "L",
-      "dyn": "ghost"
-    },
-    {
-      "beat": 1,
+      "beat": 0.25,
       "voices": [
         "SN"
       ],
       "hand": "R"
     },
     {
-      "beat": 1.333333,
+      "beat": 0.5,
       "voices": [
         "SN"
       ],
       "hand": "L"
     },
     {
-      "beat": 1.666667,
+      "beat": 0.75,
       "voices": [
         "SN"
       ],
       "hand": "R"
     },
     {
-      "beat": 2,
-      "voices": [
-        "SN"
-      ],
-      "hand": "L",
-      "dyn": "accent"
-    },
-    {
-      "beat": 2.833333,
+      "beat": 0.875,
       "voices": [
         "SN"
       ],
@@ -71,7 +48,73 @@
       "dyn": "ghost"
     },
     {
-      "beat": 2.916667,
+      "beat": 1,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L",
+      "dyn": "accent"
+    },
+    {
+      "beat": 1.25,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 1.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 1.875,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L",
+      "dyn": "ghost"
+    },
+    {
+      "beat": 2,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R",
+      "dyn": "accent"
+    },
+    {
+      "beat": 2.25,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 2.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 2.875,
       "voices": [
         "SN"
       ],
@@ -83,63 +126,32 @@
       "voices": [
         "SN"
       ],
-      "hand": "L"
+      "hand": "L",
+      "dyn": "accent"
     },
     {
-      "beat": 3.833333,
-      "voices": [
-        "SN"
-      ],
-      "hand": "R",
-      "dyn": "ghost"
-    },
-    {
-      "beat": 3.916667,
-      "voices": [
-        "SN"
-      ],
-      "hand": "R",
-      "dyn": "ghost"
-    },
-    {
-      "beat": 4,
+      "beat": 3.25,
       "voices": [
         "SN"
       ],
       "hand": "L"
     },
     {
-      "beat": 4.333333,
+      "beat": 3.5,
       "voices": [
         "SN"
       ],
       "hand": "R"
     },
     {
-      "beat": 4.666667,
+      "beat": 3.75,
       "voices": [
         "SN"
       ],
       "hand": "L"
     },
     {
-      "beat": 5,
-      "voices": [
-        "SN"
-      ],
-      "hand": "R",
-      "dyn": "accent"
-    },
-    {
-      "beat": 5.833333,
-      "voices": [
-        "SN"
-      ],
-      "hand": "L",
-      "dyn": "ghost"
-    },
-    {
-      "beat": 5.916667,
+      "beat": 3.875,
       "voices": [
         "SN"
       ],

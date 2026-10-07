@@ -1,6 +1,6 @@
 {
-  "id": "single-ratamacue",
-  "name": "Single ratamacue",
+  "id": "six-stroke-roll",
+  "name": "Six stroke roll",
   "bpm": 72,
   "timeSig": [
     4,
@@ -15,90 +15,88 @@
       "voices": [
         "SN"
       ],
-      "hand": "R"
+      "hand": "R",
+      "dyn": "accent"
     },
     {
-      "beat": 0.333333,
+      "beat": 0.5,
       "voices": [
         "SN"
       ],
       "hand": "L"
     },
     {
-      "beat": 0.666667,
+      "beat": 0.75,
       "voices": [
         "SN"
       ],
-      "hand": "R"
+      "hand": "L"
     },
     {
       "beat": 1,
       "voices": [
         "SN"
       ],
-      "hand": "L",
-      "dyn": "accent"
+      "hand": "R"
     },
     {
-      "beat": 1.833333,
-      "voices": [
-        "SN"
-      ],
-      "hand": "R",
-      "dyn": "ghost"
-    },
-    {
-      "beat": 1.916667,
-      "voices": [
-        "SN"
-      ],
-      "hand": "R",
-      "dyn": "ghost"
-    },
-    {
-      "beat": 2,
-      "voices": [
-        "SN"
-      ],
-      "hand": "L"
-    },
-    {
-      "beat": 2.333333,
+      "beat": 1.25,
       "voices": [
         "SN"
       ],
       "hand": "R"
     },
     {
-      "beat": 2.666667,
+      "beat": 1.5,
       "voices": [
         "SN"
       ],
-      "hand": "L"
+      "hand": "L",
+      "dyn": "accent"
+    },
+    {
+      "beat": 2,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L",
+      "dyn": "accent"
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 2.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
     },
     {
       "beat": 3,
       "voices": [
         "SN"
       ],
+      "hand": "L"
+    },
+    {
+      "beat": 3.25,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 3.5,
+      "voices": [
+        "SN"
+      ],
       "hand": "R",
       "dyn": "accent"
-    },
-    {
-      "beat": 3.833333,
-      "voices": [
-        "SN"
-      ],
-      "hand": "L",
-      "dyn": "ghost"
-    },
-    {
-      "beat": 3.916667,
-      "voices": [
-        "SN"
-      ],
-      "hand": "L",
-      "dyn": "ghost"
     }
   ]
 }

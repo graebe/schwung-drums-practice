@@ -1,0 +1,198 @@
+{
+  "id": "thirteen-stroke-roll",
+  "name": "Thirteen stroke roll",
+  "bpm": 72,
+  "timeSig": [
+    4,
+    4
+  ],
+  "loopBars": 2,
+  "sticking": "strict",
+  "repeats": 4,
+  "events": [
+    {
+      "beat": 0,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 0.25,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 0.5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 0.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 1,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 1.25,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 1.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 2,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 2.25,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 2.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 3,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R",
+      "dyn": "accent"
+    },
+    {
+      "beat": 4,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 4.25,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 4.5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 4.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 5.25,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 5.5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 5.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 6,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 6.25,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 6.5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 6.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 7,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L",
+      "dyn": "accent"
+    }
+  ]
+}

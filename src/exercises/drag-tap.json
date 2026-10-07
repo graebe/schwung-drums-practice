@@ -1,6 +1,6 @@
 {
   "id": "drag-tap",
-  "name": "Drag tap",
+  "name": "Single drag tap",
   "bpm": 72,
   "timeSig": [
     4,
@@ -8,28 +8,21 @@
   ],
   "loopBars": 1,
   "sticking": "strict",
+  "repeats": 8,
   "events": [
     {
-      "beat": 0.0,
+      "beat": 0,
       "voices": [
         "SN"
       ],
-      "hand": "R",
-      "dyn": "accent"
-    },
-    {
-      "beat": 0.25,
-      "voices": [
-        "SN"
-      ],
-      "hand": "L"
+      "hand": "R"
     },
     {
       "beat": 0.5,
       "voices": [
         "SN"
       ],
-      "hand": "R",
+      "hand": "L",
       "dyn": "accent"
     },
     {
@@ -37,7 +30,8 @@
       "voices": [
         "SN"
       ],
-      "hand": "L"
+      "hand": "R",
+      "dyn": "ghost"
     },
     {
       "beat": 0.875,
@@ -48,26 +42,18 @@
       "dyn": "ghost"
     },
     {
-      "beat": 1.0,
+      "beat": 1,
       "voices": [
         "SN"
       ],
-      "hand": "L",
-      "dyn": "accent"
-    },
-    {
-      "beat": 1.25,
-      "voices": [
-        "SN"
-      ],
-      "hand": "R"
+      "hand": "L"
     },
     {
       "beat": 1.5,
       "voices": [
         "SN"
       ],
-      "hand": "L",
+      "hand": "R",
       "dyn": "accent"
     },
     {
@@ -75,7 +61,70 @@
       "voices": [
         "SN"
       ],
+      "hand": "L",
+      "dyn": "ghost"
+    },
+    {
+      "beat": 1.875,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L",
+      "dyn": "ghost"
+    },
+    {
+      "beat": 2,
+      "voices": [
+        "SN"
+      ],
       "hand": "R"
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L",
+      "dyn": "accent"
+    },
+    {
+      "beat": 2.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R",
+      "dyn": "ghost"
+    },
+    {
+      "beat": 2.875,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R",
+      "dyn": "ghost"
+    },
+    {
+      "beat": 3,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 3.5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R",
+      "dyn": "accent"
+    },
+    {
+      "beat": 3.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L",
+      "dyn": "ghost"
     },
     {
       "beat": 3.875,
@@ -85,6 +134,5 @@
       "hand": "L",
       "dyn": "ghost"
     }
-  ],
-  "repeats": 8
+  ]
 }

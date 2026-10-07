@@ -1,6 +1,6 @@
 {
-  "id": "single-ratamacue",
-  "name": "Single ratamacue",
+  "id": "flamacue",
+  "name": "Flamacue",
   "bpm": 72,
   "timeSig": [
     4,
@@ -18,21 +18,7 @@
       "hand": "R"
     },
     {
-      "beat": 0.333333,
-      "voices": [
-        "SN"
-      ],
-      "hand": "L"
-    },
-    {
-      "beat": 0.666667,
-      "voices": [
-        "SN"
-      ],
-      "hand": "R"
-    },
-    {
-      "beat": 1,
+      "beat": 0.25,
       "voices": [
         "SN"
       ],
@@ -40,15 +26,36 @@
       "dyn": "accent"
     },
     {
-      "beat": 1.833333,
+      "beat": 0.5,
       "voices": [
         "SN"
       ],
-      "hand": "R",
+      "hand": "R"
+    },
+    {
+      "beat": 0.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 0.875,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L",
       "dyn": "ghost"
     },
     {
-      "beat": 1.916667,
+      "beat": 1,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 1.875,
       "voices": [
         "SN"
       ],
@@ -63,21 +70,7 @@
       "hand": "L"
     },
     {
-      "beat": 2.333333,
-      "voices": [
-        "SN"
-      ],
-      "hand": "R"
-    },
-    {
-      "beat": 2.666667,
-      "voices": [
-        "SN"
-      ],
-      "hand": "L"
-    },
-    {
-      "beat": 3,
+      "beat": 2.25,
       "voices": [
         "SN"
       ],
@@ -85,15 +78,36 @@
       "dyn": "accent"
     },
     {
-      "beat": 3.833333,
+      "beat": 2.5,
       "voices": [
         "SN"
       ],
-      "hand": "L",
+      "hand": "L"
+    },
+    {
+      "beat": 2.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 2.875,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R",
       "dyn": "ghost"
     },
     {
-      "beat": 3.916667,
+      "beat": 3,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 3.875,
       "voices": [
         "SN"
       ],

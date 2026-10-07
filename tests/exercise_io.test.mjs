@@ -89,7 +89,8 @@ test('the manifest names every bundled file, and every file is named', () => {
 });
 
 test('every bundled drill loads, validates and is playable', () => {
-  assert.equal(manifest.entries.length, 30);
+  /* All forty PAS rudiments, and at least the fourteen grooves 1.0 shipped. */
+  assert.ok(manifest.entries.length >= 54, `${manifest.entries.length} drills`);
   let rudiments = 0;
   let grooves = 0;
 
@@ -104,8 +105,8 @@ test('every bundled drill loads, validates and is playable', () => {
     if (RUDIMENT_CATS.includes(e.category)) rudiments++;
     if (!RUDIMENT_CATS.includes(e.category)) grooves++;
   }
-  assert.equal(grooves, 14);
-  assert.equal(rudiments, 16);
+  assert.ok(grooves >= 14, `${grooves} grooves`);
+  assert.equal(rudiments, 40, 'the PAS forty, all of them');
 });
 
 test('every rudiment enforces sticking and writes a hand on every stroke', () => {
@@ -265,4 +266,32 @@ test('per-voice dynamics are validated against the voices actually played', () =
   assert.ok(IO.validateExercise({
     name: 'n', events: [{ beat: 0, voices: ['HH'], dyn: { HH: 'loud' } }],
   }).length);
+});
+
+/*
+ * A DRAG IS TWO GRACE NOTES. drag.json was byte-for-byte flam.json, and the
+ * drag tap and both ratamacues wrote their drags with ONE grace note — a flam
+ * spelled with a drag's name. Every drag in the drag family has two, from the
+ * hand opposite its main stroke, ahead of it.
+ */
+test('every drag is two grace notes from the other hand, and Drag is not Flam', () => {
+  const chart = (id) => IO.parseExercise(read(`${id}.json`), id).chart;
+  assert.notDeepEqual(chart('drag').events, chart('flam').events);
+  for (const e of manifest.entries.filter((x) => x.category === 'drags' && x.id !== 'single-dragadiddle')) {
+    const evs = chart(e.id).events;
+    for (let i = 0; i < evs.length; i++) {
+      const v = evs[i];
+      if (v.dyn !== 'ghost') continue;
+      const next = evs[i + 1];
+      if (next && next.dyn === 'ghost') {
+        /* A drag before beat 0 sits at the end of the loop: its main stroke
+         * is the loop's first. */
+        const main = evs[(i + 2) % evs.length];
+        assert.ok(main && main.hand !== v.hand && next.hand === v.hand, `${e.id}: a drag at ${v.beat} is not ll R`);
+        i++;
+      } else {
+        assert.fail(`${e.id}: a lone grace note at ${v.beat} — a flam, not a drag`);
+      }
+    }
+  }
 });

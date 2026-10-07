@@ -1,7 +1,7 @@
 {
-  "id": "single-ratamacue",
-  "name": "Single ratamacue",
-  "bpm": 72,
+  "id": "single-stroke-four",
+  "name": "Single stroke four",
+  "bpm": 70,
   "timeSig": [
     4,
     4
@@ -18,45 +18,63 @@
       "hand": "R"
     },
     {
-      "beat": 0.333333,
+      "beat": 0.166667,
       "voices": [
         "SN"
       ],
       "hand": "L"
     },
     {
-      "beat": 0.666667,
+      "beat": 0.333333,
       "voices": [
         "SN"
       ],
       "hand": "R"
     },
     {
+      "beat": 0.5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
       "beat": 1,
       "voices": [
         "SN"
       ],
-      "hand": "L",
-      "dyn": "accent"
+      "hand": "R"
     },
     {
-      "beat": 1.833333,
+      "beat": 1.166667,
       "voices": [
         "SN"
       ],
-      "hand": "R",
-      "dyn": "ghost"
+      "hand": "L"
     },
     {
-      "beat": 1.916667,
+      "beat": 1.333333,
       "voices": [
         "SN"
       ],
-      "hand": "R",
-      "dyn": "ghost"
+      "hand": "R"
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
     },
     {
       "beat": 2,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 2.166667,
       "voices": [
         "SN"
       ],
@@ -70,7 +88,7 @@
       "hand": "R"
     },
     {
-      "beat": 2.666667,
+      "beat": 2.5,
       "voices": [
         "SN"
       ],
@@ -81,24 +99,28 @@
       "voices": [
         "SN"
       ],
-      "hand": "R",
-      "dyn": "accent"
+      "hand": "R"
     },
     {
-      "beat": 3.833333,
+      "beat": 3.166667,
       "voices": [
         "SN"
       ],
-      "hand": "L",
-      "dyn": "ghost"
+      "hand": "L"
     },
     {
-      "beat": 3.916667,
+      "beat": 3.333333,
       "voices": [
         "SN"
       ],
-      "hand": "L",
-      "dyn": "ghost"
+      "hand": "R"
+    },
+    {
+      "beat": 3.5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
     }
   ]
 }

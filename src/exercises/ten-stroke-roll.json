@@ -1,9 +1,9 @@
 {
-  "id": "double-ratamacue",
-  "name": "Double ratamacue",
-  "bpm": 68,
+  "id": "ten-stroke-roll",
+  "name": "Ten stroke roll",
+  "bpm": 72,
   "timeSig": [
-    3,
+    4,
     4
   ],
   "loopBars": 2,
@@ -18,20 +18,25 @@
       "hand": "R"
     },
     {
-      "beat": 0.833333,
+      "beat": 0.25,
       "voices": [
         "SN"
       ],
-      "hand": "L",
-      "dyn": "ghost"
+      "hand": "R"
     },
     {
-      "beat": 0.916667,
+      "beat": 0.5,
       "voices": [
         "SN"
       ],
-      "hand": "L",
-      "dyn": "ghost"
+      "hand": "L"
+    },
+    {
+      "beat": 0.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
     },
     {
       "beat": 1,
@@ -41,65 +46,41 @@
       "hand": "R"
     },
     {
-      "beat": 1.333333,
-      "voices": [
-        "SN"
-      ],
-      "hand": "L"
-    },
-    {
-      "beat": 1.666667,
+      "beat": 1.25,
       "voices": [
         "SN"
       ],
       "hand": "R"
     },
     {
-      "beat": 2,
-      "voices": [
-        "SN"
-      ],
-      "hand": "L",
-      "dyn": "accent"
-    },
-    {
-      "beat": 2.833333,
-      "voices": [
-        "SN"
-      ],
-      "hand": "R",
-      "dyn": "ghost"
-    },
-    {
-      "beat": 2.916667,
-      "voices": [
-        "SN"
-      ],
-      "hand": "R",
-      "dyn": "ghost"
-    },
-    {
-      "beat": 3,
+      "beat": 1.5,
       "voices": [
         "SN"
       ],
       "hand": "L"
     },
     {
-      "beat": 3.833333,
+      "beat": 1.75,
       "voices": [
         "SN"
       ],
-      "hand": "R",
-      "dyn": "ghost"
+      "hand": "L"
     },
     {
-      "beat": 3.916667,
+      "beat": 2,
       "voices": [
         "SN"
       ],
       "hand": "R",
-      "dyn": "ghost"
+      "dyn": "accent"
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L",
+      "dyn": "accent"
     },
     {
       "beat": 4,
@@ -109,42 +90,69 @@
       "hand": "L"
     },
     {
-      "beat": 4.333333,
-      "voices": [
-        "SN"
-      ],
-      "hand": "R"
-    },
-    {
-      "beat": 4.666667,
+      "beat": 4.25,
       "voices": [
         "SN"
       ],
       "hand": "L"
     },
     {
+      "beat": 4.5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 4.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
       "beat": 5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 5.25,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L"
+    },
+    {
+      "beat": 5.5,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 5.75,
+      "voices": [
+        "SN"
+      ],
+      "hand": "R"
+    },
+    {
+      "beat": 6,
+      "voices": [
+        "SN"
+      ],
+      "hand": "L",
+      "dyn": "accent"
+    },
+    {
+      "beat": 6.5,
       "voices": [
         "SN"
       ],
       "hand": "R",
       "dyn": "accent"
-    },
-    {
-      "beat": 5.833333,
-      "voices": [
-        "SN"
-      ],
-      "hand": "L",
-      "dyn": "ghost"
-    },
-    {
-      "beat": 5.916667,
-      "voices": [
-        "SN"
-      ],
-      "hand": "L",
-      "dyn": "ghost"
     }
   ]
 }
