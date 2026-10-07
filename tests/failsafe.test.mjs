@@ -233,7 +233,9 @@ test('a bug in the drill renderer lands on the error screen, naming the cause', 
   ticks(2);
   /* Open a drill with no ladder and start it, which is what reaches the
    * renderer. */
-  for (let i = 0; i < 25; i++) cc(CC.jogTurn, 1);
+  cc(CC.jogTurn, 1); cc(CC.jogTurn, 1);   /* Rudiments */
+  cc(CC.jogClick, 127);                    /* › Rolls */
+  cc(CC.jogClick, 127);                    /* › Single stroke roll */
   cc(CC.jogClick, 127);
   ticks(3);
   cc(CC.record, 127);

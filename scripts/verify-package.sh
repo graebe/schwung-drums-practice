@@ -19,9 +19,12 @@ do
   echo "$LIST" | grep -qx "$entry" || { echo "missing from package: $entry" >&2; exit 1; }
 done
 
-# The siblings are stamped per build, so check by count rather than by name.
+# The siblings are stamped per build, so check by count rather than by name —
+# and the count is READ from package.sh's MODULES, not restated here, so adding
+# a module cannot leave this check asserting last month's number.
+EXPECT=$(sed -n 's/^MODULES="\(.*\)"$/\1/p' "$(dirname "$0")/package.sh" | wc -w | tr -d ' ')
 MJS=$(echo "$LIST" | grep -c '/[A-Za-z0-9_]*-[0-9][0-9]*\.mjs$' || true)
-[ "$MJS" -eq 27 ] || { echo "expected 27 stamped modules, found $MJS" >&2; exit 1; }
+[ "$MJS" -eq "$EXPECT" ] || { echo "expected $EXPECT stamped modules, found $MJS" >&2; exit 1; }
 
 # Every relative import, from any packaged file, must resolve to a packaged
 # file — and must carry this build's stamp. An unstamped sibling would be

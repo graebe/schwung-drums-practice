@@ -191,8 +191,8 @@ export function grooveVariation(opts = {}) {
  * entry, and the beam engine reads the gap between neighbours — so two events
  * on beat 0 would draw twice and be read as a zero-length note.
  */
-/* The generated drills, in the order they appear in the menu. */
-export function builtins(opts = {}) {
+/* Basics › Subdivisions: the same every time, because they are exercises. */
+export function subdivisionDrills(opts = {}) {
   const o = { bpm: opts.bpm || 90, seed: opts.seed || 1 };
   return [
     subdivisionDrill('quarters', o),
@@ -201,11 +201,27 @@ export function builtins(opts = {}) {
     subdivisionDrill('sixteenths', o),
     subdivisionDrill('sextuplets', o),
     subdivisionLadder(o),
-    readingLine({ ...o, per: 2, bars: 2 }),
-    readingLine({ ...o, per: 4, bars: 2, density: 0.4 }),
-    stickingDrill(o),
-    grooveVariation(o),
   ];
+}
+
+/*
+ * Basics › Random, as recipes rather than charts: each takes a seed, and the
+ * list asks for a new one every time a row is opened — material you have
+ * already learned by heart is not reading practice. A restart replays the set
+ * you just played, because the armed chart is kept.
+ */
+export const RANDOM_DRILLS = [
+  { name: 'Reading 8ths', make: (o) => readingLine({ ...o, per: 2, bars: 2 }) },
+  { name: 'Reading 16ths', make: (o) => readingLine({ ...o, per: 4, bars: 2, density: 0.4 }) },
+  { name: 'Random sticking', make: (o) => stickingDrill(o) },
+  { name: 'Groove variation', make: (o) => grooveVariation(o) },
+];
+
+/* Every generated drill at one seed, in list order — for the tests and the
+ * preview, which want one fixed set. */
+export function builtins(opts = {}) {
+  const o = { bpm: opts.bpm || 90, seed: opts.seed || 1 };
+  return subdivisionDrills(o).concat(RANDOM_DRILLS.map((d) => d.make(o)));
 }
 
 export { VOICE_IDS };

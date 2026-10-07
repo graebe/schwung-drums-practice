@@ -84,9 +84,19 @@ async function loadUi({ extraFiles = {} } = {}) {
 
 const CC = { jogTurn: 14, jogClick: 3, menu: 50, back: 51, play: 85, record: 86,
              knob1: 71, shift: 49 };
-/* The ear training leads the list, so the drills start after it. */
-const QUIZZES = DRILLS.length;
-const toFirstDrill = () => { for (let i = 0; i < QUIZZES; i++) cc(CC.jogTurn, 1); };
+/*
+ * Getting about the tree. Rows are found by facts that hold whatever is
+ * bundled: Grooves is the second row and Rock & Pop its first family, and the
+ * jog clamps, so the end of the top list is Progress with Quiz just above it.
+ */
+/* Grooves › Rock & Pop, highlight on its first groove (Rock backbeat). */
+const toFirstDrill = () => { cc(CC.jogTurn, 1); cc(CC.jogClick, 127); cc(CC.jogClick, 127); };
+/* Into the Quiz folder, highlight on its first drill. */
+const toQuizzes = () => {
+  for (let i = 0; i < 60; i++) cc(CC.jogTurn, 1);
+  cc(CC.jogTurn, 127);
+  cc(CC.jogClick, 127);
+};
 const cc = (n, v) => globalThis.onMidiMessageInternal([0xb0, n, v]);
 const pad = (n, v) => globalThis.onMidiMessageInternal([v > 0 ? 0x90 : 0x80, n, v]);
 /* 25ms a tick, so every tick also draws. */
@@ -329,8 +339,8 @@ test('a finished practice records a score without being asked', async () => {
   assert.ok(parsed.records.length >= 1, 'a finished practice recorded no score');
 });
 
-test('the ear training leads the menu', async () => {
-  const { screen } = await loadUi();
+test('the list opens on Basics, with the material ahead of the practice tools', async () => {
+  await loadUi();
   globalThis.init();
   ticks(3);
   const drawn = [];
@@ -338,8 +348,41 @@ test('the ear training leads the menu', async () => {
   globalThis.print = (x, y, s2, v) => { drawn.push(s2); orig(x, y, s2, v); };
   ticks(2);
   globalThis.print = orig;
-  /* You cannot play a groove you cannot hear. */
-  assert.ok(drawn.some((t) => /Guess|Hear|Pick/.test(t)), `menu opens with: ${drawn.join('|')}`);
+  for (const row of ['Basics', 'Grooves', 'Rudiments']) {
+    assert.ok(drawn.includes(row), `the top list does not show ${row}: ${drawn.join('|')}`);
+  }
+});
+
+test('Back walks up one folder at a time, and leaves only from the top', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  toFirstDrill();                            /* two folders deep */
+  cc(CC.back, 127); ticks(1);
+  cc(CC.back, 127); ticks(1);
+  assert.equal(log.exited, 0, 'Back left from inside a folder');
+  const drawn = [];
+  const orig = globalThis.print;
+  globalThis.print = (x, y, s2, v) => { drawn.push(s2); orig(x, y, s2, v); };
+  ticks(2);
+  globalThis.print = orig;
+  assert.ok(drawn.includes('DRUMS'), `not back at the top: ${drawn.join('|')}`);
+});
+
+test('the Ladder with nothing armed asks for a drill instead of picking one', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  for (let i = 0; i < 60; i++) cc(CC.jogTurn, 1);
+  cc(CC.jogTurn, 127); cc(CC.jogTurn, 127);  /* Training */
+  cc(CC.jogClick, 127);
+  cc(CC.jogClick, 127);                      /* Ladder */
+  const drawn = [];
+  const orig = globalThis.print;
+  globalThis.print = (x, y, s2, v) => { drawn.push(s2); orig(x, y, s2, v); };
+  ticks(2);
+  globalThis.print = orig;
+  assert.ok(drawn.includes('ARM A DRILL'), drawn.join('|'));
 });
 
 /* ---- the transport ------------------------------------------------------ */
@@ -467,9 +510,11 @@ test('Back restarts, and Back twice leaves without a gesture of its own', async 
   assert.ok(drawnText().some((t) => /SCRUB/.test(t)), 'Back did not restart the drill');
   assert.equal(log.exited || 0, 0);
 
-  cc(CC.back, 127);                 /* ready -> the list */
+  cc(CC.back, 127);                 /* ready -> the folder it came from */
   ticks(4);
-  assert.ok(drawnText().some((t) => /DRUMS/.test(t)), 'Back did not reach the list');
+  /* The groove's own ladder: having just played one rung, the next thing you
+   * want is the next rung, one step away rather than back at the top. */
+  assert.ok(drawnText().some((t) => /ROCK BACKBEAT/.test(t)), 'Back did not land on the ladder');
   assert.equal(log.exited || 0, 0, 'it left the module instead of going to the list');
 });
 
@@ -600,8 +645,9 @@ test('a drill listed in user.json loads alongside the shipped ones', async () =>
   const drawn = [];
   const orig = globalThis.print;
   globalThis.print = (x, y, s, v) => { drawn.push(s); orig(x, y, s, v); };
-  /* Scroll to the end of the bundled drills, where a user entry lands. */
-  for (let i = 0; i < 36; i++) cc(CC.jogTurn, 1);
+  /* A user drill with no shipped category lands in Other, after Rudiments. */
+  for (let i = 0; i < 3; i++) cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);
   ticks(3);
   globalThis.print = orig;
   assert.ok(drawn.some((t) => /My groove/.test(t)), `user drill missing: ${drawn.join('|')}`);
@@ -738,7 +784,7 @@ test('the module closes from EVERY screen, and silences everything on the way', 
     paused: () => { startFirstDrill(); ticks(10); cc(CC.play, 127); ticks(2); },
     settings: () => { cc(CC.shift, 127); cc(CC.jogClick, 127); ticks(2); cc(CC.shift, 0); },
     progress: () => { for (let i = 0; i < 60; i++) cc(CC.jogTurn, 1); cc(CC.jogClick, 127); ticks(2); },
-    quiz: () => { cc(CC.jogClick, 127); ticks(2); },
+    quiz: () => { toQuizzes(); cc(CC.jogClick, 127); ticks(2); },
   };
   for (const [name, go] of Object.entries(routes)) {
     const { log } = await loadUi();
@@ -837,6 +883,7 @@ test('a scrub cannot run past the end of the practice', async () => {
 /* ---- the ear training actually works ------------------------------------ */
 
 function openQuiz(index) {
+  toQuizzes();
   for (let i = 0; i < index; i++) cc(CC.jogTurn, 1);
   cc(CC.jogClick, 127);
   ticks(3);
@@ -940,6 +987,7 @@ test('a rhythm prompt is spread over time, not dumped in one frame', async () =>
    * It is measured against the prompt's OWN length now. What the test is about
    * is that no two notes share a frame.
    */
+  toQuizzes();
   for (let i = 0; i < idx; i++) cc(CC.jogTurn, 1);
   cc(CC.jogClick, 127);
   let framesWithSound = 0;
@@ -1142,4 +1190,30 @@ test('Listen lights each drum as it plays it', async () => {
     lit = log.leds.some(([n, c]) => hh.has(n) && c === P.LED_TARGET_NEAR);
   }
   assert.ok(lit, 'Listen played the hi-hat without lighting it');
+});
+
+/*
+ * CLOCK MODE DID NOT STAY WITH ITS DRILL. Using the Clock and then opening a
+ * groove level kept the muting click and the drift banner, because opening a
+ * level never reset it.
+ */
+test('the Clock stays with the drill it wrapped', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  toFirstDrill();
+  cc(CC.jogClick, 127); cc(CC.jogClick, 127); ticks(2);   /* Rock backbeat L1 armed */
+  for (let i = 0; i < 4; i++) { cc(CC.back, 127); ticks(1); } /* up to the top */
+  for (let i = 0; i < 60; i++) cc(CC.jogTurn, 1);
+  cc(CC.jogTurn, 127); cc(CC.jogTurn, 127);                  /* Training */
+  cc(CC.jogClick, 127);
+  cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127); ticks(2);                            /* Clock, on the armed drill */
+  for (let i = 0; i < 4; i++) { cc(CC.back, 127); ticks(1); }
+  for (let i = 0; i < 60; i++) cc(CC.jogTurn, 127);          /* back to the first row */
+  toFirstDrill();
+  cc(CC.jogClick, 127); cc(CC.jogClick, 127); ticks(2);   /* a plain level again */
+  cc(CC.record, 127);
+  const drawn = drawnText(200);
+  assert.ok(!drawn.some((t) => /LISTEN|ON YOUR OWN/.test(t)), 'the Clock banner followed into a plain drill');
 });

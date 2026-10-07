@@ -34,8 +34,7 @@ import * as CH from './chart.mjs';
 import * as V from './view.mjs';
 import * as GEN from './generator.mjs';
 import * as GR from './grid_render.mjs';
-import * as LV from './levels.mjs';
-import * as MENU_ from './menu.mjs';
+import * as CAT from './catalog.mjs';
 import { dynOf } from './events.mjs';
 import * as IO from './exercise_io.mjs';
 import * as ST from './stats.mjs';
@@ -68,7 +67,6 @@ const RESULT = 'result';
 const PROGRESS = 'progress';
 const SETTINGS = 'settings';
 const ERROR = 'error';
-const LEVELS = 'levels';
 
 /* MIDI out routes. */
 const OUT_TRACK = 1;
@@ -197,8 +195,16 @@ let settingsDirty = false;
 let lastFlush = 0;
 
 let screen = MENU;
-let menuItems = [];
-let menuSel = 0;
+/* The drill tree, and the folders open in it (catalog.mjs). */
+let catalog = null;
+let nav = [];
+/* The chart the armed drill was built from, before the Tempo and Reps settings
+ * were applied — re-armed from when one of those changes, so a random drill
+ * keeps its notes and a level keeps its rung. */
+let armedSource = null;
+/* A word for the list's title bar, briefly: "ARM A DRILL". */
+let menuNote = '';
+let menuNoteUntil = 0;
 let settingsSel = 0;
 let settingsEditing = false;
 let progressSel = 0;
@@ -216,7 +222,6 @@ let run = null;
  *
  * The rule the module keeps now: a draw reads, it does not compute.
  */
-let menuLabels = [];
 let settingsRowsCache = [];
 let chartWarning = '';
 let chartLanes = null;
@@ -224,9 +229,6 @@ let chartLength = '';
 let chartOutLabel = '';
 let progressCache = null;
 let resultCache = null;
-let levelRows = [];
-let levelChart = null;
-let levelSel = 0;
 let quiz = null;
 let ladder = null;
 let ladderReason = '';
@@ -444,6 +446,9 @@ function flushFiles(force) {
 
 /* ---- the drill list ----------------------------------------------------- */
 let fileCharts = [];
+/* [{ chart, category }] in manifest order, and the categories to file them in. */
+let fileEntries = [];
+let fileCategories = [];
 
 /*
  * TWO manifests, and the split is load-bearing.
@@ -460,6 +465,8 @@ let fileCharts = [];
  */
 function loadExercises() {
   fileCharts = [];
+  fileEntries = [];
+  fileCategories = [];
   loadManifest(`${EXERCISE_DIR}/index.json`);
   loadManifest(`${EXERCISE_DIR}/user.json`);
 }
@@ -467,37 +474,42 @@ function loadExercises() {
 function loadManifest(path) {
   const text = readFile(path);
   if (!text) return;
-  const { entries } = IO.parseManifest(text);
+  const { entries, categories } = IO.parseManifest(text);
+  /* The shipped manifest declares the categories; user.json may file a drill
+   * into one of them, and anything else lands in Other. */
+  for (const c of categories) {
+    if (!fileCategories.some((x) => x.id === c.id)) fileCategories.push(c);
+  }
   for (const e of entries) {
     const text2 = readFile(`${EXERCISE_DIR}/${e.file}`);
     if (!text2) continue;
     const r = IO.parseExercise(text2, e.id);
     /* A drill that does not validate simply does not appear. Loading it
      * half-formed would mean being marked down for someone else's typo. */
-    if (r.chart) fileCharts.push({ ...r.chart, group: e.group });
+    if (!r.chart) continue;
+    fileCharts.push(r.chart);
+    fileEntries.push({ chart: r.chart, category: e.category });
   }
 }
 
 /*
- * THE FIRST THING IN THE LIST IS THE FIRST THING TO PLAY.
+ * THE FIRST THING IN THE LIST IS THE FIRST THING TO PLAY: Basics, then the
+ * grooves and rudiments, and the things that are ABOUT practising rather than
+ * practice itself — Training, Quiz, Progress — at the bottom. Each is a folder
+ * now, so the top of the list is seven rows rather than forty-eight.
  *
- * This used to open with Progress, five quizzes, the Ladder and the Clock,
- * then ten generated drills — seventeen entries before a beat. Somebody who
- * has just installed a drum trainer wants to play a drum beat, so the
- * bundled material leads, Basics first, and the things that are ABOUT
- * practising rather than practice itself go to the bottom.
- *
- * `fileCharts` arrives in manifest order, which index.json already groups
- * basics -> grooves -> rudiments.
+ * Rebuilt whenever the material or the tempo changes; the open folders are
+ * carried across by path.
  */
 function rebuildMenu() {
-  menuItems = MENU_.buildMenu({
-    fileCharts,
-    generated: GEN.builtins({ bpm: settings.bpm }),
-    quizzes: Q.DRILLS,
+  catalog = CAT.drumsTree({
+    entries: fileEntries,
+    categories: fileCategories,
+    bpm: settings.bpm,
+    drills: Q.DRILLS,
+    newSeed: () => (Date.now() & 0x7fffffff) || 1,
   });
-  if (menuSel >= menuItems.length) menuSel = 0;
-  menuLabels = MENU_.menuRows(menuItems);
+  nav = nav.length ? CAT.navRestore(catalog, CAT.navPath(nav)) : CAT.navStart(catalog);
 }
 
 /* ---- arming and running ------------------------------------------------- */
@@ -965,15 +977,12 @@ function finishQuiz() {
   return elapsed;
 }
 
-function openSelected() {
-  const item = menuItems[menuSel];
+/* Open the highlighted row: into a folder, or do what the row holds. */
+function openRow() {
+  const item = CAT.navCurrent(nav);
   if (!item) return;
-  if (item.kind === 'levels') {
-    levelChart = item.chart;
-    levelRows = LV.levelRows(item.levels);
-    levelSel = 0;
-    screen = LEVELS;
-    announce(`${item.chart.name}. Pick a level.`);
+  if (CAT.navPush(nav)) {
+    announce(`${item.label}.`);
     return;
   }
   if (item.kind === 'progress') {
@@ -992,22 +1001,25 @@ function openSelected() {
     if (promptIsAudible()) schedulePrompt();
     return;
   }
+  /*
+   * The Ladder and the Clock WRAP the armed drill — climb its tempo, take its
+   * click away. With nothing armed they used to grab the first drill in the
+   * list, which was a single stroke roll nobody had picked; now they say so.
+   */
+  if ((item.kind === 'clock' || item.kind === 'ladder') && !chart) {
+    menuNote = 'ARM A DRILL';
+    menuNoteUntil = now() + 2000;
+    announce('Arm a drill first, then open the ' + item.label + '.');
+    return;
+  }
   if (item.kind === 'clock') {
-    /* Clock wraps whatever is armed, exactly as the Ladder does. */
-    const firstChart = menuItems.find((m) => m.kind === 'chart');
-    if (!chart && firstChart) armChart(firstChart.chart);
-    if (!chart) return;
     clockMode = true;
     ladder = null;
     screen = READY;
+    announce(`Clock: ${chart.name}`);
     return;
   }
   if (item.kind === 'ladder') {
-    /* The Ladder wraps whatever is armed; with nothing armed it takes the
-     * first real drill so the entry is never a dead end. */
-    const first = menuItems.find((m) => m.kind === 'chart');
-    if (!chart && first) armChart(first.chart);
-    if (!chart) return;
     /* From the tempo the drill is actually played at — the file's own, or the
      * Tempo setting for a generated one. Starting from the setting credited
      * the first rung with a tempo it was never played at. */
@@ -1017,11 +1029,17 @@ function openSelected() {
     ladderReason = '';
     clockMode = false;
     screen = READY;
+    announce(`Ladder: ${chart.name}`);
     return;
   }
+  /* A drill. Whatever the Ladder or the Clock was wrapping before, this is not
+   * it. */
   ladder = null;
   clockMode = false;
-  armChart(item.chart);
+  const built = item.build();
+  if (!built) return;
+  armedSource = built;
+  armChart(built);
 }
 
 /* The plot for whichever drill the jog is on. Scans the whole history, so it
@@ -1041,24 +1059,13 @@ function drillNames() {
   return names;
 }
 
-function openLevel() {
-  const row = levelRows[levelSel];
-  if (!row || !levelChart) return;
-  /* A level is a drill like any other: whatever the Ladder or the Clock was
-   * wrapping before, this is not it. */
-  ladder = null;
-  clockMode = false;
-  const projected = LV.projectLevel(levelChart, row.level);
-  if (projected) armChart(projected);
-}
-
 function back() {
   /* From the error screen BACK always closes. Whatever state the module is
    * in, one press of the button the player already knows has to end it. */
   if (screen === ERROR || safeMode) return false;
   if (screen === SETTINGS && settingsEditing) { settingsEditing = false; return true; }
-  if (screen === LEVELS) { screen = MENU; return true; }
-  if (screen === MENU) return false;
+  /* Up one folder; only the top of the tree is left by Back. */
+  if (screen === MENU) return CAT.navPop(nav);
   /* Back from a run RESTARTS it. Back again lands on READY, whose own Back
    * goes to the list — so leaving needs no gesture of its own. */
   if (screen === RUNNING) { restart(); return true; }
@@ -1156,14 +1163,9 @@ function draw() {
     return;
   }
   if (screen === MENU) {
-    V.drawList(ctx, { title: 'DRUMS', items: menuLabels, selected: menuSel });
-    return;
-  }
-  if (screen === LEVELS) {
-    V.drawList(ctx, {
-      title: (levelChart ? levelChart.name : '').slice(0, 16),
-      items: levelRows, selected: levelSel,
-    });
+    const top = CAT.navTop(nav);
+    const title = menuNote && now() < menuNoteUntil ? menuNote : top.node.label.toUpperCase();
+    V.drawList(ctx, { title: title.slice(0, 16), items: CAT.rowsOf(top.node), selected: top.cursor });
     return;
   }
   if (screen === SETTINGS) {
@@ -1522,9 +1524,8 @@ function knobTouched(knob) {
 function jog(delta) {
   const target = C.jogTarget(screen, settingsEditing);
   if (target === 'menu') {
-    menuSel = Math.max(0, Math.min(menuItems.length - 1, menuSel + delta));
-  } else if (target === 'level') {
-    levelSel = Math.max(0, Math.min(levelRows.length - 1, levelSel + delta));
+    const top = CAT.navTop(nav);
+    top.cursor = Math.max(0, Math.min(top.node.children.length - 1, top.cursor + delta));
   } else if (target === 'row') {
     settingsSel = Math.max(0, Math.min(SET.ROWS.length - 1, settingsSel + delta));
   } else if (target === 'value') {
@@ -1539,8 +1540,7 @@ function jog(delta) {
 }
 
 function click() {
-  if (screen === MENU) { openSelected(); return; }
-  if (screen === LEVELS) { openLevel(); return; }
+  if (screen === MENU) { openRow(); return; }
   if (screen === SETTINGS) { settingsEditing = !settingsEditing; return; }
   if (screen === QUIZ && quiz && quiz.mode === 'pick') {
     const r = Q.pickChoice(quiz, now());
@@ -1567,9 +1567,13 @@ function editSetting(key, delta) {
   if (key === 'study' && settings.study && !wasStudying && run && screen === RUNNING) {
     SC.resyncWait(run, songBeats);
   }
-  if (SET.affectsChart(key) && chart && screen !== RUNNING) {
-    const src = menuItems[menuSel];
-    if (src && src.kind === 'chart') armChart(src.chart);
+  /* Re-armed from the chart it was built from, so a level, a random drill or a
+   * drill wrapped by the Ladder or Clock is rebuilt too — and the Settings
+   * screen you are editing in stays up. */
+  if (SET.affectsChart(key) && armedSource && chart && screen !== RUNNING) {
+    const keep = screen;
+    armChart(armedSource);
+    if (keep === SETTINGS) screen = SETTINGS;
   }
 }
 

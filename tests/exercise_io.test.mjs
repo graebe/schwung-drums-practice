@@ -7,6 +7,9 @@ import { chartTotalBeats, loopBeats, practiceSeconds } from '../src/chart.mjs';
 import { layoutForChart } from '../src/padmap.mjs';
 import { createRun } from '../src/scoring.mjs';
 
+/* The rudiment families; every other category is a groove family. */
+const RUDIMENT_CATS = ['rolls', 'diddles', 'flams', 'drags'];
+
 const dir = new URL('../src/exercises/', import.meta.url);
 const read = (f) => readFileSync(new URL(f, dir), 'utf8');
 
@@ -98,15 +101,15 @@ test('every bundled drill loads, validates and is playable', () => {
     assert.ok(layoutForChart(c), `${e.id} needs a layout that does not exist`);
     /* A drill must fit inside its own loop, or it overlaps its own repeat. */
     assert.ok(chartTotalBeats(c) < loopBeats(c), `${e.id} overruns its loop`);
-    if (e.group === 'rudiment') rudiments++;
-    if (e.group === 'groove') grooves++;
+    if (RUDIMENT_CATS.includes(e.category)) rudiments++;
+    if (!RUDIMENT_CATS.includes(e.category)) grooves++;
   }
   assert.equal(grooves, 14);
   assert.equal(rudiments, 16);
 });
 
 test('every rudiment enforces sticking and writes a hand on every stroke', () => {
-  for (const e of manifest.entries.filter((x) => x.group === 'rudiment')) {
+  for (const e of manifest.entries.filter((x) => RUDIMENT_CATS.includes(x.category))) {
     const c = IO.parseExercise(read(e.file), e.id).chart;
     assert.equal(c.sticking, 'strict', `${e.id}`);
     for (const ev of c.events) assert.ok(ev.hand, `${e.id} has a stroke with no hand`);
@@ -116,7 +119,7 @@ test('every rudiment enforces sticking and writes a hand on every stroke', () =>
 test('every rudiment alternates into something a pair of hands could play', () => {
   /* Two strokes on the same hand at the same instant is not a rudiment, it is
    * a typo. */
-  for (const e of manifest.entries.filter((x) => x.group === 'rudiment')) {
+  for (const e of manifest.entries.filter((x) => RUDIMENT_CATS.includes(x.category))) {
     const c = IO.parseExercise(read(e.file), e.id).chart;
     for (let i = 1; i < c.events.length; i++) {
       const gap = c.events[i].beat - c.events[i - 1].beat;
@@ -129,7 +132,7 @@ test('every rudiment alternates into something a pair of hands could play', () =
 test('every groove leaves sticking off and every drill builds a run', () => {
   for (const e of manifest.entries) {
     const c = IO.parseExercise(read(e.file), e.id).chart;
-    if (e.group === 'groove') assert.equal(c.sticking, 'off', e.id);
+    if (!RUDIMENT_CATS.includes(e.category)) assert.equal(c.sticking, 'off', e.id);
     const run = createRun(c, { looping: true });
     assert.ok(run.entries.length > 0, e.id);
     assert.ok(run.totalNotes > 0, e.id);

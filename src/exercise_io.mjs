@@ -139,9 +139,19 @@ export function parseManifest(text) {
   const entries = [];
   for (const e of list) {
     if (!e || typeof e.file !== 'string' || typeof e.id !== 'string') continue;
-    entries.push({ id: e.id, name: e.name || e.id, file: e.file, group: e.group || '' });
+    /* No category, or one the shipped manifest does not declare, files the
+     * drill under Other — which is what a user.json written before categories
+     * looks like. */
+    entries.push({ id: e.id, name: e.name || e.id, file: e.file,
+                   category: typeof e.category === 'string' ? e.category : null });
   }
-  return { entries };
+  const categories = [];
+  const cats = obj && Array.isArray(obj.categories) ? obj.categories : [];
+  for (const c of cats) {
+    if (!c || typeof c.id !== 'string' || typeof c.name !== 'string') continue;
+    categories.push({ id: c.id, name: c.name, folder: typeof c.folder === 'string' ? c.folder : null });
+  }
+  return { entries, categories };
 }
 
 /*

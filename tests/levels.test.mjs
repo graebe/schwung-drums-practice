@@ -13,6 +13,9 @@ import * as LV from '../src/levels.mjs';
 import { parseExercise, parseManifest } from '../src/exercise_io.mjs';
 import { validateExercise } from '../src/exercise_io.mjs';
 
+/* The rudiment families; every other category is a groove family. */
+const RUDIMENT_CATS = ['rolls', 'diddles', 'flams', 'drags'];
+
 const dir = new URL('../src/exercises/', import.meta.url);
 const read = (f) => readFileSync(new URL(f, dir), 'utf8');
 const manifest = parseManifest(read('index.json'));
@@ -100,7 +103,7 @@ test('availableLevels collapses rungs that would play the same notes', () => {
 });
 
 test('every bundled groove has a ladder, and every rung is a valid drill', () => {
-  const grooves = manifest.entries.filter((e) => e.group === 'groove');
+  const grooves = manifest.entries.filter((e) => !RUDIMENT_CATS.includes(e.category));
   assert.equal(grooves.length, 14);
   let withLadder = 0;
   for (const e of grooves) {
