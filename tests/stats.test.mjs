@@ -91,5 +91,25 @@ test('the drill id separates settings that change the task', () => {
     ST.drillId('drill', 'x', { strictness: 'tight', sticking: 'strict' }),
     ST.drillId('drill', 'x', { strictness: 'loose', sticking: 'strict' }),
   );
-  assert.equal(ST.drillLabel('ladder:single-paradiddle:normal'), 'single-paradiddle');
+  assert.equal(ST.drillLabel('ladder:single-paradiddle:normal'), 'Ladder: single-paradiddle');
+});
+
+test('drill labels keep apart what the old one-segment label merged', () => {
+  const names = { 'rock-backbeat': 'Rock backbeat', 'guess:voice': 'Guess: drum' };
+  assert.equal(ST.drillLabel('drill:rock-backbeat:l2:normal', names), 'Rock backbeat L2');
+  assert.equal(ST.drillLabel('drill:rock-backbeat:l3:tight:strict', names), 'Rock backbeat L3 tight');
+  assert.equal(ST.drillLabel('clock:rock-backbeat:normal', names), 'Clock: Rock backbeat');
+  assert.equal(ST.drillLabel('guess:voice', names), 'Guess: drum');
+  assert.equal(ST.drillLabel('hear:groove'), 'groove', 'an unnamed quiz still reads');
+});
+
+test('a drill\'s best is its tightest take at its tempo, not its tempo', () => {
+  const s = ST.emptyStats();
+  const r = (bpm, sd) => ST.makeRecord({ drill: 'drill:x:normal', bpm, sd, n: 10 });
+  const a = r(90, 30); ST.addRecord(s, a);
+  assert.equal(ST.isPersonalBest(s, a), true);
+  const b = r(90, 25); ST.addRecord(s, b);
+  assert.equal(ST.isPersonalBest(s, b), true, 'tighter at the same tempo is a best');
+  const c = r(90, 28); ST.addRecord(s, c);
+  assert.equal(ST.isPersonalBest(s, c), false);
 });

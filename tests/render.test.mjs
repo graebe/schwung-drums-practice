@@ -773,3 +773,46 @@ test('Study names the drum it has stopped for, and the note is on the hit line',
   expireMissed(run, 1.5, true);
   assert.equal(stuckLabel(run), 'Kick + Hi-hat', 'no hand named where the drill asks none');
 });
+
+import { drawSummary, drawResult, drawQuiz } from '../src/view.mjs';
+import { createQuiz, takeHint } from '../src/guess.mjs';
+
+function capture() {
+  const seen = [];
+  const c = createScreen();
+  const text = c.text.bind(c);
+  c.text = (x, y, str, v) => { seen.push(str); return text(x, y, str, v); };
+  return { c, seen };
+}
+
+test('a best take says so, on the summary and on a quiz result', () => {
+  const chart = { id: 'x', name: 'X', bpm: 90, timeSig: [4, 4], loopBars: 1, repeats: 1,
+    events: [{ beat: 0, voices: ['SN'] }] };
+  const run = createRun(chart);
+  judgeHit(run, { voice: 'SN' }, 0);
+  let { c, seen } = capture();
+  drawSummary(c, { run, tightMs: 30, isBest: true });
+  assert.ok(seen.includes('BEST YET'));
+  ({ c, seen } = capture());
+  drawSummary(c, { run, tightMs: 30, isBest: false });
+  assert.ok(seen.includes('RESULT') && !seen.includes('BEST YET'));
+  ({ c, seen } = capture());
+  drawResult(c, { rate: 30, best: 30, errorRate: 0, hints: 0, series: [], isBest: true });
+  assert.ok(seen.includes('BEST YET'));
+});
+
+test('the first Hear hint names the drum and still hides the staff', () => {
+  const quiz = createQuiz({ kind: 'voice', mode: 'hear', roundSize: 10, seed: 3 });
+  const draw = () => {
+    const { c, seen } = capture();
+    drawQuiz(c, { quiz, labelFor: (id) => voiceById(id).label, isEliminated: () => false,
+      hintsLeft: 2 - quiz.hints, progress: '0/10' });
+    return seen;
+  };
+  const name = voiceById(quiz.prompt).label;
+  assert.ok(!draw().includes(name), 'named before any hint');
+  assert.equal(takeHint(quiz), 'name');
+  const after = draw();
+  assert.ok(after.includes(name), 'the name hint showed no name');
+  assert.ok(after.includes('?'), 'and the staff is still withheld');
+});

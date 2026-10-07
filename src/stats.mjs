@@ -22,9 +22,37 @@ export function drillId(kind, id, opts = {}) {
   return parts.join(':');
 }
 
-export function drillLabel(id) {
-  const parts = String(id).split(':');
-  return parts.length > 1 ? parts[1] : id;
+const STRICTNESS = ['loose', 'normal', 'tight'];
+const KIND_PREFIX = { ladder: 'Ladder: ', clock: 'Clock: ' };
+
+/*
+ * What the Progress screen calls a drill: "Rock backbeat L2",
+ * "Ladder: Single paradiddle tight", "Guess: drum".
+ *
+ * It used to be the id's second segment and nothing else, so a groove's levels,
+ * its strictness variants and every quiz of one kind collapsed onto the same
+ * words — three different histories, one label, no way to tell which plot was
+ * which. `names` maps a chart id, or a quiz id, to what the list calls it.
+ *
+ * The chart id itself may hold a colon (a level projection is "<id>:l2"), so
+ * the strictness — always recorded — marks where it ends.
+ */
+export function drillLabel(id, names = {}) {
+  const str = String(id);
+  if (names[str]) return names[str];
+  const parts = str.split(':');
+  const kind = parts[0];
+  if (!(kind in KIND_PREFIX) && kind !== 'drill') return parts.length > 1 ? parts.slice(1).join(' ') : str;
+  const rest = parts.slice(1);
+  let end = rest.findIndex((p) => STRICTNESS.includes(p));
+  if (end < 0) end = rest.length;
+  const chartId = rest.slice(0, end).join(':');
+  const level = /:l(\d)$/.exec(chartId);
+  const base = level ? chartId.slice(0, -level[0].length) : chartId;
+  let label = (KIND_PREFIX[kind] || '') + (names[base] || base) + (level ? ` L${level[1]}` : '');
+  const strict = rest[end];
+  if (strict && strict !== 'normal') label += ` ${strict}`;
+  return label;
 }
 
 /*
@@ -121,9 +149,24 @@ export function summarise(records) {
   return { n: records.length, best, last: last.bpm, bestSd, lastSd: last.sd };
 }
 
+/*
+ * Whether `rec` beats everything before it on the same drill.
+ *
+ * For a quiz the number is answers per minute and for the Ladder the top clean
+ * tempo, so higher is better. A drill or a Clock run is played at the tempo it
+ * is written at — the same number every time — so there the score is how TIGHT
+ * it was: a best is the smallest spread at that tempo or faster. Judged by
+ * tempo alone, the first attempt would have been the only best there could
+ * ever be.
+ */
 export function isPersonalBest(stats, rec) {
   const prev = forDrill(stats, rec.d);
-  for (const r of prev) if (r !== rec && r.bpm >= rec.bpm) return false;
+  const kind = String(rec.d).split(':')[0];
+  const bySpread = kind === 'drill' || kind === 'clock';
+  for (const r of prev) {
+    if (r === rec) continue;
+    if (bySpread ? (r.bpm >= rec.bpm && r.sd <= rec.sd) : r.bpm >= rec.bpm) return false;
+  }
   return true;
 }
 

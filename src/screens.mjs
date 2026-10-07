@@ -31,7 +31,7 @@ export function drawSummary(ctx, s) {
   const t = stats(s.run.timing);
   const st = runStatsOf(s.run);
 
-  ctx.text(1, 0, 'RESULT', 1);
+  ctx.text(1, 0, s.isBest ? 'BEST YET' : 'RESULT', 1);
   const acc = st.total ? `${Math.round(st.accuracy * 100)}%` : '--';
   ctx.text(L.SCREEN_W - ctx.textWidth(acc) - 1, 0, acc, 1);
   ctx.fillRect(0, L.HEADER_RULE_Y, L.SCREEN_W, 1, 1);
@@ -135,7 +135,9 @@ export function drawQuiz(ctx, s) {
     } else {
       ctx.text(66, 24, '?', 1);
     }
-    if (q.revealed) {
+    /* Hear's first hint NAMES it and keeps the staff hidden: the name without
+     * the picture, so the second hint (the pad) still has something to give. */
+    if (q.revealed || (q.mode === 'hear' && q.hints >= 1)) {
       const name = s.labelFor(q.prompt);
       ctx.text((L.SCREEN_W - ctx.textWidth(name)) >> 1, L.SUMMARY_NAME_Y, name, 1);
     }
@@ -150,7 +152,7 @@ export function drawQuiz(ctx, s) {
 /* ---- Quiz result -------------------------------------------------------- */
 export function drawResult(ctx, s) {
   ctx.clear();
-  ctx.text(1, 0, 'ROUND', 1);
+  ctx.text(1, 0, s.isBest ? 'BEST YET' : 'ROUND', 1);
   ctx.fillRect(0, L.HEADER_RULE_Y, L.SCREEN_W, 1, 1);
 
   const rate = `${Math.round(s.rate)}`;

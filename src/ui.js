@@ -230,6 +230,10 @@ let levelSel = 0;
 let quiz = null;
 let ladder = null;
 let ladderReason = '';
+/* Bars of the current rung held when a Ladder was stopped, for its screen. */
+let ladderBarsDone = 0;
+/* Whether the take on the summary beat every one before it. */
+let summaryIsBest = false;
 let clockMode = false;
 let mode = C.MODE_IDLE;
 let shiftHeld = false;
@@ -686,6 +690,11 @@ function scrub(delta) {
 
 function stop() {
   dspSet('panic', '1');
+  summaryIsBest = false;
+  if (ladder) {
+    ladderBarsDone = Math.max(0, Math.min(ladder.bars,
+      Math.floor((songBeats - ladder.windowStart) / CH.beatsPerBar(chart))));
+  }
   if (mode === C.MODE_PRACTICE && run && run.hits > 0) recordRun();
   mode = C.MODE_IDLE;
   screen = ladder ? LADDER : SUMMARY;
@@ -693,7 +702,7 @@ function stop() {
 
 function recordRun() {
   const t = timingStats(run.timing);
-  stats = ST.addRecord(stats, ST.makeRecord({
+  const rec = ST.makeRecord({
     drill: ST.drillId(clockMode ? 'clock' : 'drill', chart.id, settings),
     bpm: chart.bpm,
     sd: t.sdMs,
@@ -701,7 +710,9 @@ function recordRun() {
     n: t.n,
     err: run.misses + run.stickErrors + run.dynErrors,
     at: Date.now() / 1000,
-  }));
+  });
+  stats = ST.addRecord(stats, rec);
+  summaryIsBest = ST.forDrill(stats, rec.d).length > 1 && ST.isPersonalBest(stats, rec);
   saveStats();
 }
 
@@ -927,12 +938,16 @@ function setFlash(pads, color) {
 
 function finishQuiz() {
   const elapsed = Q.roundElapsed(quiz, now());
-  stats = ST.addRecord(stats, ST.makeRecord({
+  const rec = ST.makeRecord({
     drill: Q.quizDrillId(quiz),
     bpm: Q.ratePerMinute(quiz, now()),
     sd: 0, mean: 0, n: quiz.correct,
     err: quiz.wrong, at: Date.now() / 1000,
-  }));
+  });
+  stats = ST.addRecord(stats, rec);
+  /* Asked after the append and only with a history to beat: the first round
+   * of a drill is not a best, it is a start. */
+  const isBest = ST.forDrill(stats, rec.d).length > 1 && ST.isPersonalBest(stats, rec);
   saveStats();
   /* The round is over, so the numbers are final: work them out once here
    * rather than rescanning the whole history on every frame of the result. */
@@ -943,6 +958,7 @@ function finishQuiz() {
     errorRate: Q.errorFraction(quiz),
     hints: quiz.hintsTaken,
     series,
+    isBest,
   };
   screen = RESULT;
   announce(`round done, ${Math.round(resultCache.rate)} per minute`);
@@ -992,8 +1008,11 @@ function openSelected() {
     const first = menuItems.find((m) => m.kind === 'chart');
     if (!chart && first) armChart(first.chart);
     if (!chart) return;
+    /* From the tempo the drill is actually played at — the file's own, or the
+     * Tempo setting for a generated one. Starting from the setting credited
+     * the first rung with a tempo it was never played at. */
     ladder = LAD.createLadder({
-      bpm: settings.bpm, step: settings.ladderStep, bars: settings.ladderBars,
+      bpm: chart.bpm, step: settings.ladderStep, bars: settings.ladderBars,
     });
     ladderReason = '';
     clockMode = false;
@@ -1011,12 +1030,24 @@ function rebuildProgress() {
   const drills = ST.drillsWithHistory(stats);
   const id = drills[progressSel % Math.max(1, drills.length)] || '';
   const recs = ST.forDrill(stats, id);
-  progressCache = { drillLabel: ST.drillLabel(id), records: recs, summary: ST.summarise(recs) };
+  progressCache = { drillLabel: ST.drillLabel(id, drillNames()), records: recs, summary: ST.summarise(recs) };
+}
+
+/* What Progress calls each drill: the list's own names, for charts and quizzes. */
+function drillNames() {
+  const names = {};
+  for (const c of fileCharts) names[c.id] = c.name;
+  for (const d of Q.DRILLS) names[`${d.mode}:${d.kind}`] = d.name;
+  return names;
 }
 
 function openLevel() {
   const row = levelRows[levelSel];
   if (!row || !levelChart) return;
+  /* A level is a drill like any other: whatever the Ladder or the Clock was
+   * wrapping before, this is not it. */
+  ladder = null;
+  clockMode = false;
   const projected = LV.projectLevel(levelChart, row.level);
   if (projected) armChart(projected);
 }
@@ -1034,6 +1065,7 @@ function back() {
   screen = MENU;
   quiz = null;
   ladder = null;
+  clockMode = false;
   clearPrompt();
   quizSolvedAt = 0;
   return true;
@@ -1159,11 +1191,11 @@ function draw() {
     return;
   }
   if (screen === LADDER && ladder) {
-    V.drawLadder(ctx, { ladder, reason: ladderReason, barsDone: ladder.bars });
+    V.drawLadder(ctx, { ladder, reason: ladderReason, barsDone: ladderBarsDone });
     return;
   }
   if (screen === SUMMARY && run) {
-    V.drawSummary(ctx, { run, tightMs: SC.WINDOWS[settings.strictness].perfectMs });
+    V.drawSummary(ctx, { run, tightMs: SC.WINDOWS[settings.strictness].perfectMs, isBest: summaryIsBest });
     return;
   }
   if (screen === READY && chart) {
