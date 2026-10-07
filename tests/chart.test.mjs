@@ -111,9 +111,9 @@ test('beat and subdivision edges fire once each, on the frame they happen', () =
 
 test('waiting holds the playhead and resumes in tempo, never lurching', () => {
   const a = C.applyWait(5, 0, null);
-  assert.deepEqual(a, { songBeats: 5, waitedBeats: 0, blocked: false });
+  assert.deepEqual(a, { songBeats: 5, waitedBeats: 0, blocked: false, scoreBeats: 5, frozenAt: null });
   const b = C.applyWait(5, 0, 3);
-  assert.deepEqual(b, { songBeats: 3, waitedBeats: 2, blocked: true });
+  assert.deepEqual(b, { songBeats: 3, waitedBeats: 2, blocked: true, scoreBeats: 5, frozenAt: 0 });
   /* Two beats of real time passed while frozen; releasing resumes AT 3, not 5. */
   const c = C.applyWait(5, b.waitedBeats, null);
   assert.equal(c.songBeats, 3);
@@ -131,4 +131,19 @@ test('a label is trimmed to the gap before the next one', () => {
   const vis = [{ x: 10 }, { x: 30 }];
   assert.equal(C.labelLimitPx(vis, 0, 24), 18);
   assert.equal(C.labelLimitPx(vis, 1, 24), L.SCREEN_W - 30, 'the last one runs to the edge');
+});
+
+test('while frozen the judge keeps real time, frame after frame', () => {
+  /* Frame 1 folds the overshoot into waitedBeats; without frozenAt, frame 2
+   * would read rawBeats - waitedBeats and pin the judge to the block point. */
+  const f1 = C.applyWait(3.5, 0, 3, null);
+  const f2 = C.applyWait(4.5, f1.waitedBeats, 3, f1.frozenAt);
+  assert.equal(f2.songBeats, 3, 'the scroll stays on the note');
+  assert.equal(f2.scoreBeats, 4.5, 'the judge has seen every beat go by');
+  /* Released on that same instant: the scroll resumes from the note, and the
+   * two clocks agree again. */
+  const released = C.applyWait(4.5, f2.waitedBeats, null, f2.frozenAt);
+  assert.equal(released.songBeats, 3, 'released, it resumes from the note');
+  assert.equal(released.scoreBeats, 3);
+  assert.equal(released.frozenAt, null);
 });

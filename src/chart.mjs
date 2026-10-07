@@ -250,11 +250,27 @@ export function isSubdivEdge(prevBeats, songBeats, per) {
  * accumulated into `waitedBeats` and subtracted out. The drill therefore
  * resumes in tempo from where it stopped instead of lurching forward to catch
  * up, and the click freezes with it because both are derived from songBeats.
+ *
+ * TWO CLOCKS, and the second one is the point (ported from Piano Practice,
+ * where it was learned the hard way). The scroll stops on the note; the JUDGE
+ * must not. `scoreBeats` keeps real time while `songBeats` sits still, so a
+ * note found three seconds late is three seconds late rather than "perfect",
+ * and its late window can close while the scroll waits on it. It cannot be
+ * derived after the fact — the first frozen frame folds the overshoot into
+ * `waitedBeats` — so `frozenAt` carries the pre-freeze `waitedBeats` across
+ * frames, and is null whenever nothing is frozen.
  */
-export function applyWait(rawBeats, waitedBeats, blockBeat) {
+export function applyWait(rawBeats, waitedBeats, blockBeat, frozenAt = null) {
   const t = rawBeats - waitedBeats;
   if (blockBeat === null || blockBeat === undefined || t <= blockBeat) {
-    return { songBeats: t, waitedBeats, blocked: false };
+    return { songBeats: t, waitedBeats, blocked: false, scoreBeats: t, frozenAt: null };
   }
-  return { songBeats: blockBeat, waitedBeats: waitedBeats + (t - blockBeat), blocked: true };
+  const start = frozenAt === null || frozenAt === undefined ? waitedBeats : frozenAt;
+  return {
+    songBeats: blockBeat,
+    waitedBeats: waitedBeats + (t - blockBeat),
+    blocked: true,
+    scoreBeats: rawBeats - start,
+    frozenAt: start,
+  };
 }

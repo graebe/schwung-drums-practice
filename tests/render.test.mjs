@@ -12,9 +12,9 @@ import { createScreen, countOn, isOn } from '../tools/screen_buffer.mjs';
 import * as L from '../src/layout.mjs';
 import * as SR from '../src/staff_render.mjs';
 import * as GR from '../src/grid_render.mjs';
-import { drawReadingView, timingX } from '../src/view.mjs';
+import { drawReadingView, timingX, stuckLabel } from '../src/view.mjs';
 import { rulerBars } from '../src/chart.mjs';
-import { createRun, ensureEntries, judgeHit, expireMissed } from '../src/scoring.mjs';
+import { createRun, ensureEntries, judgeHit, expireMissed, blockingBeat, visibleEntries } from '../src/scoring.mjs';
 import { subdivisionDrill, grooveVariation } from '../src/generator.mjs';
 import { voiceById, VOICES } from '../src/kit.mjs';
 import { diatonicToY } from '../src/notation.mjs';
@@ -747,4 +747,29 @@ test('the scrub glyph is a BROKEN ring, not a closed one', () => {
   /* And it is wider than the two buttons, which is what makes it read as a
    * knob rather than a third button. */
   assert.ok(SCRUB_W > 7);
+});
+
+test('Study names the drum it has stopped for, and the note is on the hit line', () => {
+  const chart = {
+    id: 'x', name: 'X', bpm: 120, timeSig: [4, 4], loopBars: 1, repeats: 1, sticking: 'strict',
+    events: [{ beat: 0, voices: ['SN'], hand: 'R' }, { beat: 1, voices: ['KK', 'HH'] }],
+  };
+  const run = createRun(chart, { sticking: 'strict' });
+  expireMissed(run, 0.5, true);
+  assert.equal(stuckLabel(run), 'Snare R');
+  const seen = [];
+  const c = createScreen();
+  const text = c.text.bind(c);
+  c.text = (x, y, str, v) => { seen.push(str); return text(x, y, str, v); };
+  drawReadingView(c, { run, chart, songBeats: blockingBeat(run), pxPerBeat: 24, view: 'staff',
+    blocked: true, title: 'X', bpm: 120 });
+  assert.ok(seen.includes('Snare R'), seen.join(' | '));
+  /* The frozen note is drawn ON the hit line, not lost off the left edge
+   * where the old one-beat grace put it. */
+  const frozen = visibleEntries(run, blockingBeat(run), 24).find((v) => v.index === 0);
+  assert.ok(frozen, 'the note Study is waiting for is not on screen');
+  assert.equal(frozen.x, L.HIT_X);
+  judgeHit(run, { voice: 'SN', hand: 'R' }, 0.5, 0);
+  expireMissed(run, 1.5, true);
+  assert.equal(stuckLabel(run), 'Kick + Hi-hat', 'no hand named where the drill asks none');
 });

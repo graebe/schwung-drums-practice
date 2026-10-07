@@ -225,7 +225,7 @@ test('the seam is continuous — every repeat exact, none missing, none twice', 
 test('Study mode freezes on the note you owe, and playing it releases', () => {
   const run = mk(para, { repeats: 1 });
   S.expireMissed(run, 1.0, true);
-  assert.equal(run.misses, 4);
+  assert.equal(run.misses, 1, 'only the note the scroll is on can expire');
   const notes = S.blockingNotes(run);
   assert.equal(notes.length, 1, 'stuck on the first unplayed note');
   assert.equal(S.blockingEntryIndex(run), 0);
@@ -235,14 +235,68 @@ test('Study mode freezes on the note you owe, and playing it releases', () => {
   assert.equal(S.blockingEntryIndex(run), 1, 'and the freeze moves on');
 });
 
-test('the grace can never be shorter than the late window', () => {
-  /* Otherwise the clock freezes while the note is still pending, the note can
-   * never reach its late window, and the only thing that would release the
-   * freeze can never happen. */
+test('Study freezes on the note itself, on the hit line', () => {
+  /* It used to freeze a beat or more past the note — off the left edge, so the
+   * note it was waiting for was the one not drawn. */
   const run = mk(para);
-  assert.equal(S.effectiveGrace(run, 0.001), run.late);
-  assert.equal(S.effectiveGrace(run, 99), 99);
-  assert.equal(S.blockingBeat(run, 0.001), 0 + run.late);
+  assert.equal(S.blockingBeat(run), 0);
+  S.judgeHit(run, { voice: 'SN', hand: 'R' }, 0);
+  assert.equal(S.blockingBeat(run), run.entries[1].beat);
+});
+
+/*
+ * ONE PRESS RELEASES A HALT — Piano Practice's bug, which drums had too. The
+ * judge's clock runs on while the scroll is frozen, so the NEXT snare drifted
+ * into the window and took the press, leaving the frozen one unplayed.
+ */
+test('frozen on a missed snare, one press of it releases the scroll', () => {
+  const run = mk(para, { repeats: 1 });
+  /* Scroll pinned at beat 0; the honest clock has run on to 0.25, where the
+   * next snare is. */
+  S.expireMissed(run, 0.25, true);
+  assert.equal(run.entries[0].notes[0].state, S.MISSED);
+  const j = S.judgeHit(run, { voice: 'SN', hand: 'L' }, 0.25, 0);
+  assert.equal(j.result, 'late', 'the press is the frozen note, released late');
+  assert.equal(run.entries[0].notes[0].played, true);
+  assert.equal(run.entries[1].notes[0].state, S.PENDING, 'the unseen next snare is untouched');
+  assert.equal(S.blockingEntryIndex(run), 1);
+});
+
+test('frozen inside the window, the press is an ordinary hit on the honest clock', () => {
+  const run = mk(para, { repeats: 1 });
+  const t = run.good / 2;
+  const j = S.judgeHit(run, { voice: 'SN', hand: 'R' }, t, 0);
+  assert.equal(j.result === 'good' || j.result === 'perfect', true);
+  assert.equal(j.entryIndex, 0);
+  assert.ok(Math.abs(j.offsetBeats - t) < 1e-9, 'scored on real time, not the frozen 0');
+});
+
+test('frozen past the window but not yet expired: the press releases it as a miss', () => {
+  /* The dead zone between `good` and `late`: before, nothing matched and the
+   * right pad scored a stray while the scroll sat there. */
+  const run = mk(para, { repeats: 1 });
+  const t = (run.good + run.late) / 2;
+  assert.equal(run.entries[0].notes[0].state, S.PENDING);
+  const j = S.judgeHit(run, { voice: 'SN', hand: 'R' }, t, 0);
+  assert.equal(j.result, 'late');
+  assert.equal(run.misses, 1, 'counted as the miss it was about to become');
+  assert.equal(run.strays, 0);
+  assert.equal(S.blockingEntryIndex(run), 1);
+});
+
+test('the wrong drum while frozen is a stray and releases nothing', () => {
+  const run = mk(para, { repeats: 1 });
+  S.expireMissed(run, 0.2, true);
+  assert.equal(S.judgeHit(run, { voice: 'KK' }, 0.2, 0).result, 'stray');
+  assert.equal(S.blockingEntryIndex(run), 0);
+});
+
+test('waiting never expires a note the scroll has not reached', () => {
+  const run = mk(para, { repeats: 1 });
+  /* Frozen on note 0 for a whole bar of real time. */
+  S.expireMissed(run, 4, true);
+  assert.equal(run.misses, 1, 'only the note being waited for');
+  assert.equal(run.entries[1].notes[0].state, S.PENDING);
 });
 
 test('resyncWait does not let the clock jump backwards', () => {
@@ -415,4 +469,12 @@ test('an entry only comes due once, however often it is asked for', () => {
   const first = S.takeDue(run, 4).length;
   assert.ok(first > 0);
   assert.equal(S.takeDue(run, 4).length, 0, 'the same entries sounded twice');
+});
+
+test('the next entry is the first at or after the playhead', () => {
+  const run = mk(para, { repeats: 1 });
+  assert.equal(S.nextEntryIndex(run, 0), 0, 'exactly on a note');
+  assert.equal(S.nextEntryIndex(run, 0.1), 1, 'between notes');
+  assert.equal(S.nextEntryIndex(run, 0.75), 3);
+  assert.equal(S.nextEntryIndex(run, 0.9), -1, 'past the last');
 });

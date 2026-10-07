@@ -19,7 +19,7 @@ import * as L from './layout.mjs';
 import * as SR from './staff_render.mjs';
 import * as GR from './grid_render.mjs';
 import * as B from './beam.mjs';
-import { visibleEntries, runProgress } from './scoring.mjs';
+import { visibleEntries, runProgress, blockingNotes } from './scoring.mjs';
 import { visibleBars, rulerBars, beatToX, practiceBeats } from './chart.mjs';
 import { voiceById, voicesInChart } from './kit.mjs';
 import { diatonicToY } from './notation.mjs';
@@ -58,13 +58,36 @@ export function drawReadingView(ctx, s) {
   drawUnderLane(ctx, s, visible, rulerBars(s.chart, s.songBeats, px, endBeat));
   drawTimingBar(ctx, s.run && s.run.timing, s.run && s.run.windows);
   /* Paused and stuck both show a motionless scroll, and only one of them is
-   * waiting for you to play something. */
-  if (s.paused) {
-    const label = 'PAUSED';
-    const w = ctx.textWidth(label);
-    ctx.fillRect(L.TIMING_CENTER_X - (w >> 1) - 2, L.UNDER_LANE_Y - 1, w + 4, L.TEXT_H, 1);
-    ctx.text(L.TIMING_CENTER_X - (w >> 1), L.UNDER_LANE_Y, label, 0);
+   * waiting for you to play something — so each SAYS which it is. */
+  if (s.paused) drawLaneCallout(ctx, 'PAUSED');
+  else if (s.blocked && s.run) drawLaneCallout(ctx, stuckLabel(s.run));
+}
+
+/*
+ * What Study is waiting for, in words: "Snare R", "Kick + Hi-hat". The note is
+ * on the hit line, but on a drum chart the staff position alone is a thing you
+ * have to have learned, and this is the moment you evidently have not yet.
+ * The hand is named only when the drill enforces one.
+ */
+export function stuckLabel(run) {
+  const notes = blockingNotes(run);
+  const parts = [];
+  for (let i = 0; i < notes.length; i++) {
+    const v = voiceById(notes[i].voice);
+    const hand = run.sticking !== 'off' && notes[i].wantHand ? ` ${notes[i].wantHand}` : '';
+    parts.push((v ? v.label : notes[i].voice) + hand);
   }
+  return parts.join(' + ');
+}
+
+/* One knocked-out line, centred in the under-lane. */
+function drawLaneCallout(ctx, text) {
+  if (!text) return;
+  let label = text;
+  while (label.length > 1 && ctx.textWidth(label) > L.SCREEN_W - 6) label = label.slice(0, -1);
+  const w = ctx.textWidth(label);
+  ctx.fillRect(L.TIMING_CENTER_X - (w >> 1) - 2, L.UNDER_LANE_Y - 1, w + 4, L.TEXT_H, 1);
+  ctx.text(L.TIMING_CENTER_X - (w >> 1), L.UNDER_LANE_Y, label, 0);
 }
 
 function drawStaffBody(ctx, s, visible, px, bars) {

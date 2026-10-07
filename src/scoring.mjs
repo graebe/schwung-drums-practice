@@ -254,19 +254,35 @@ function dynOkFor(run, note, velocity) {
  * A pad went down. Finds the nearest unresolved entry holding a matching
  * pending voice within the GOOD window and resolves that one note.
  *
- * `hit` is { voice, hand, velocity }.
+ * `hit` is { voice, hand, velocity }. `rawBeats` is the judge's clock, which
+ * keeps real time; `displayRaw` is the scroll's, which Study freezes on a
+ * note. They are the same number whenever nothing is frozen.
+ *
+ * WHILE FROZEN, THE FROZEN NOTE OWNS THE PRESS (Piano Practice's rule). The
+ * judge's clock runs on past the scroll, so on it a later note of the same
+ * voice — one the scroll has not reached, and on a drum kit the next snare is
+ * rarely far — drifts into the window. Scored as a hit on that unseen note, it
+ * left the frozen one unplayed and the scroll stuck: two presses to move on.
+ * So the note on the hit line answers its own voice first, and a note past the
+ * wait pointer is measured on the clock the player can see: a note the scroll
+ * never reached can be neither missed (expireMissed) nor hit.
  */
-export function judgeHit(run, hit, rawBeats) {
+export function judgeHit(run, hit, rawBeats, displayRaw = rawBeats) {
   const songBeats = rawBeats - run.latencyBeats;
+  const displayBeats = displayRaw - run.latencyBeats;
   const { voice, hand } = hit;
   const velocity = hit.velocity;
+  if (displayBeats < songBeats - 1e-9) {
+    const frozen = judgeFrozen(run, hit, songBeats);
+    if (frozen) return frozen;
+  }
   let bestEntry = -1;
   let bestNote = -1;
   let bestDist = Infinity;
 
   for (let i = run.cursor; i < run.entries.length; i++) {
     const entry = run.entries[i];
-    const dist = entry.beat - songBeats;
+    const dist = entry.beat - (i > run.waitCursor ? displayBeats : songBeats);
     if (dist > run.good) break; /* everything further out is further out */
     if (Math.abs(dist) > run.good) continue;
     for (let n = 0; n < entry.notes.length; n++) {
@@ -286,17 +302,8 @@ export function judgeHit(run, hit, rawBeats) {
      * is the note the scroll is frozen on — already scored a miss, but still
      * unplayed. Playing it releases the freeze and scores nothing: the miss
      * was recorded when its window closed and is not taken back. */
-    const released = releaseBlocked(run, voice);
-    if (released) {
-      run.lastJudgement = {
-        result: 'late', voice, hand, velocity,
-        wantHand: null, handOk: true, wantDyn: 'normal', dynOk: true,
-        offsetBeats: songBeats - released.beat,
-        offsetMs: beatsToMs(songBeats - released.beat, run.bpm),
-        entryIndex: released.entryIndex, noteIndex: released.noteIndex,
-      };
-      return run.lastJudgement;
-    }
+    const late = releaseLate(run, hit, songBeats);
+    if (late) return late;
     run.strays++;
     run.combo = 0;
     run.lastJudgement = {
@@ -307,8 +314,55 @@ export function judgeHit(run, hit, rawBeats) {
     return run.lastJudgement;
   }
 
-  const entry = run.entries[bestEntry];
-  const note = entry.notes[bestNote];
+  return hitNote(run, hit, bestEntry, bestNote, songBeats);
+}
+
+/*
+ * The frozen note, if this press is it. Inside the good window it is an
+ * ordinary hit, on the honest clock. Past it the note is a miss — exactly what
+ * it would have become a moment later when its late window closed — and the
+ * press releases it. Null when the press is some other voice, which then goes
+ * through the ordinary search like any other.
+ */
+function judgeFrozen(run, hit, songBeats) {
+  const i = blockingEntry(run);
+  if (i < 0) return null;
+  const entry = run.entries[i];
+  for (let n = 0; n < entry.notes.length; n++) {
+    const note = entry.notes[n];
+    if (note.played || !voiceMatches(note, hit.voice)) continue;
+    if (note.state === PENDING) {
+      if (Math.abs(songBeats - entry.beat) <= run.good) return hitNote(run, hit, i, n, songBeats);
+      note.state = MISSED;
+      run.misses++;
+      run.combo = 0;
+      settleEntry(entry);
+      advanceCursor(run);
+    }
+    return releaseLate(run, hit, songBeats);
+  }
+  return null;
+}
+
+/* Release the frozen note if this press is it: a 'late' judgement, or null. */
+function releaseLate(run, hit, songBeats) {
+  const released = releaseBlocked(run, hit.voice);
+  if (!released) return null;
+  run.lastJudgement = {
+    result: 'late', voice: hit.voice, hand: hit.hand, velocity: hit.velocity,
+    wantHand: null, handOk: true, wantDyn: 'normal', dynOk: true,
+    offsetBeats: songBeats - released.beat,
+    offsetMs: beatsToMs(songBeats - released.beat, run.bpm),
+    entryIndex: released.entryIndex, noteIndex: released.noteIndex,
+  };
+  return run.lastJudgement;
+}
+
+/* Score one note a hit, with its hand and dynamic, and move both cursors on. */
+function hitNote(run, hit, entryIndex, noteIndex, songBeats) {
+  const { voice, hand, velocity } = hit;
+  const entry = run.entries[entryIndex];
+  const note = entry.notes[noteIndex];
   const offsetBeats = songBeats - entry.beat;
   const offsetMs = beatsToMs(offsetBeats, run.bpm);
 
@@ -348,8 +402,8 @@ export function judgeHit(run, hit, rawBeats) {
     dynOk: note.dynOk,
     offsetBeats,
     offsetMs,
-    entryIndex: bestEntry,
-    noteIndex: bestNote,
+    entryIndex,
+    noteIndex,
   };
   return run.lastJudgement;
 }
@@ -364,6 +418,14 @@ export function judgeHit(run, hit, rawBeats) {
 export function expireMissed(run, songBeats, waiting = false) {
   let expired = 0;
   for (let i = run.cursor; i < run.entries.length; i++) {
+    /*
+     * A NOTE THE SCROLL NEVER REACHED CANNOT BE MISSED. This clock is the
+     * judge's, which keeps real time while Study holds the scroll on one note
+     * — so without this bound the windows of every note BEHIND the freeze
+     * close too, and one stall would cross out the next bar before it was
+     * ever shown.
+     */
+    if (waiting && i > run.waitCursor) break;
     const entry = run.entries[i];
     if (entry.beat + run.late >= songBeats) break;
     for (let n = 0; n < entry.notes.length; n++) {
@@ -393,22 +455,20 @@ export function blockingEntryIndex(run) {
 }
 
 /*
- * The grace can never be shorter than the late window, or the clock would
- * freeze while the note is still PENDING — and since expireMissed is driven
- * by the clock, the note could never reach its late window and be marked
- * missed, so the only thing that releases the freeze could never happen. A
- * deadlock. Clamping means the note is always already scored by the time the
- * scroll stops for it.
+ * The beat the scroll must freeze at in Study mode, or null: the note's OWN
+ * beat, so it stops on the hit line where you can see it.
+ *
+ * It used to be the note plus a grace of at least a beat — the late window had
+ * to close before the scroll stopped, because there was one clock and a
+ * frozen clock could never reach it. At that offset the note sat left of the
+ * despawn edge, so the one note Study was waiting for was the one not drawn.
+ * The judge runs on its own clock now (applyWait's scoreBeats), so the freeze
+ * can be exactly where the note is.
  */
-export function effectiveGrace(run, graceBeats) {
-  return Math.max(graceBeats, run.late);
-}
-
-/* The beat the scroll must freeze at in Study mode, or null. */
-export function blockingBeat(run, graceBeats) {
+export function blockingBeat(run) {
   const i = blockingEntry(run);
   if (i < 0) return null;
-  return run.entries[i].beat + effectiveGrace(run, graceBeats);
+  return run.entries[i].beat;
 }
 
 /*
@@ -426,6 +486,18 @@ export function blockingNotes(run) {
     if (!entry.notes[n].played) out.push(entry.notes[n]);
   }
   return out;
+}
+
+/*
+ * The first materialised entry at or after `beat`, or -1: what plays next from
+ * a parked playhead. A scrub lights its pads, so you can see on the grid where
+ * you have landed and not only on the chart.
+ */
+export function nextEntryIndex(run, beat) {
+  for (let i = 0; i < run.entries.length; i++) {
+    if (run.entries[i].beat >= beat - 1e-9) return i;
+  }
+  return -1;
 }
 
 function releaseBlocked(run, voice) {

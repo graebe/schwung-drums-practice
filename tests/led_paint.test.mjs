@@ -124,3 +124,23 @@ test('a stack points at every voice in it', () => {
   const at2 = guideTargets(run, 2).filter((t) => Math.abs(t.beatsAway) < 1e-9);
   assert.deepEqual(at2.map((t) => t.voice).sort(), ['HH', 'KK']);
 });
+
+test('a stuck drum pulses on its own pads, and only on the hand asked for', () => {
+  const sn = P.padsForVoice('SN', 'kit');
+  const on = paint(buf(), { layout: 'kit', stuck: [{ voice: 'SN', hand: null }], phase: 1 });
+  const off = paint(buf(), { layout: 'kit', stuck: [{ voice: 'SN', hand: null }], phase: 0 });
+  for (const p of sn) {
+    assert.equal(at(on, p), P.LED_PROMPT);
+    assert.equal(at(off, p), P.LED_OFF, 'it pulses rather than sitting steady');
+  }
+  const right = paint(buf(), { layout: 'kit', stuck: [{ voice: 'SN', hand: 'R' }], phase: 1 });
+  for (const p of P.padsForVoice('SN', 'kit', 'L')) assert.notEqual(at(right, p), P.LED_PROMPT);
+});
+
+test('Listen lights what it is playing, and a press still outranks it', () => {
+  const kk = P.padsForVoice('KK', 'kit')[0];
+  const out = paint(buf(), { layout: 'kit', sounding: ['KK'] });
+  assert.equal(at(out, kk), P.LED_TARGET_NEAR);
+  const pressed = paint(buf(), { layout: 'kit', sounding: ['KK'], held: new Set([kk]) });
+  assert.equal(at(pressed, kk), P.LED_PRESSED);
+});

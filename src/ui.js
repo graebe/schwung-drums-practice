@@ -254,6 +254,18 @@ let startedAt = 0;
 let paused = false;
 let pausedAt = 0;
 /*
+ * The playhead was moved by the scrub knob since the music last ran, so the
+ * pads show the stack it has landed on — whatever Guide pads says, because
+ * scrubbing is finding your place, not playing. A freshly armed drill, a plain
+ * pause and the moment the music runs all leave the pads to the usual rules.
+ */
+let scrubCue = false;
+/* What Listen just played, lit until `listenLitUntil` (ms): a drum is a hit,
+ * not a held key, so the light is a short flash in time with the sound. */
+let listenLit = [];
+let listenLitUntil = 0;
+const LISTEN_LIT_MS = 120;
+/*
  * Scrubbing is continuous, at SCRUB_UNITS_PER_BAR clicks to the bar — about a
  * third of a turn — rather than teleporting between bar lines. These encoders
  * send more than one unit per detent, which is why the other knobs already
@@ -263,6 +275,14 @@ const SCRUB_UNITS_PER_BAR = 36;
 let songBeats = 0;
 let prevBeats = 0;
 let waitedBeats = 0;
+/*
+ * The judge's clock. Equal to songBeats except while Study holds the scroll on
+ * a note, when it runs on in real time — see CH.applyWait. Everything that
+ * SCORES reads this; everything that DRAWS reads songBeats.
+ */
+let scoreBeats = 0;
+/* `waitedBeats` as it was when the current freeze began, or null. */
+let frozenAt = null;
 let blocked = false;
 let beatFlash = false;
 
@@ -334,14 +354,38 @@ function serviceOutbox(all) {
 }
 
 /* ---- LEDs --------------------------------------------------------------- */
+/* The stack a parked playhead has landed on, as guide targets. */
+function scrubTargets() {
+  if (!scrubCue || !run || !(screen === READY || (screen === RUNNING && paused))) return null;
+  const e = run.entries[SC.nextEntryIndex(run, Math.max(0, songBeats))];
+  if (!e) return null;
+  return e.notes.map((n) => ({
+    voice: n.voice,
+    hand: run.sticking !== 'off' ? n.wantHand : null,
+    beatsAway: 0,
+  }));
+}
+
+/* The drum Study has stopped for. A rescue, so it lives behind Guide pads like
+ * every other hint: this is a reading trainer first. */
+function stuckTargets() {
+  if (!settings.guide || !blocked || !run || screen !== RUNNING) return null;
+  const notes = SC.blockingNotes(run);
+  if (!notes.length) return null;
+  return notes.map((n) => ({ voice: n.voice, hand: run.sticking !== 'off' ? n.wantHand : null }));
+}
+
 function paintLeds(t) {
-  const targets = settings.guide && run && screen === RUNNING
-    ? guideTargets(run, songBeats) : null;
+  const targets = scrubTargets() || (settings.guide && run && screen === RUNNING
+    ? guideTargets(run, songBeats) : null);
   paint(ledBuf, {
     layout: settings.layout,
     held,
     flash: flash && t < flashUntil ? flash : null,
     targets,
+    sounding: mode === C.MODE_LISTEN && screen === RUNNING && t < listenLitUntil ? listenLit : null,
+    stuck: stuckTargets(),
+    phase: Math.floor(t / 500) % 2,
     /* The second hint lights the pad. Only for the drills whose answer IS a
      * pad — naming a groove has no pad to light. */
     prompt: screen === QUIZ && quiz && quiz.kind === 'voice' && quiz.hints >= 2
@@ -471,6 +515,7 @@ function armChart(c) {
   /* A newly armed drill starts at home, where the box is. */
   songBeats = 0;
   prevBeats = 0;
+  scrubCue = false;
   screen = READY;
   mode = C.MODE_IDLE;
   announce(`${chart.name} ready`);
@@ -502,6 +547,8 @@ function start(practice) {
   run = SC.createRun(chart, runOpts());
   mode = practice ? C.MODE_PRACTICE : C.MODE_LISTEN;
   waitedBeats = 0;
+  frozenAt = null;
+  blocked = false;
   /*
    * NO COUNT-IN WHEN STARTING MID-DRILL, deliberately: it exists to orient
    * you at the top, you have just been looking at the bar you picked, and
@@ -509,6 +556,11 @@ function start(practice) {
    */
   songBeats = from > 0 ? from : C.countInStart(settings.countIn);
   prevBeats = songBeats;
+  scoreBeats = songBeats;
+  /* THE ONE CLOCK ORIGIN: startedAt alone says where beat 0 is, count-in
+   * included, and advanceClock adds nothing to it. It used to add the count-in
+   * a second time, so a drill opened at -8 with the digit stuck on "4" for
+   * half of it, and a start from a scrubbed bar ran from four beats early. */
   startedAt = now() - CH.beatsToMs(songBeats, chart.bpm);
   /*
    * seekTo settles the bars behind the start point rather than counting them
@@ -521,6 +573,7 @@ function start(practice) {
   }
   screen = RUNNING;
   paused = false;
+  scrubCue = false;
   if (ladder) LAD.beginRung(ladder, run, 0);
   announce(practice ? 'practising' : 'listening');
 }
@@ -539,6 +592,7 @@ function resume() {
   /* The whole point: the time spent stopped never happened. */
   startedAt += now() - pausedAt;
   paused = false;
+  scrubCue = false;
   announce('playing');
 }
 
@@ -547,15 +601,43 @@ function togglePause() {
   else pause();
 }
 
+/*
+ * A transport button pressed mid-run. Its OWN mode's button pauses and
+ * resumes; the OTHER one switches in place, from wherever the playhead is —
+ * watch a bar, then play it, without going back to the top. Switching into
+ * practice re-arms the notes ahead, which Listen had marked as played.
+ */
+function transportPress(want) {
+  if (mode === want) { togglePause(); return; }
+  mode = want;
+  if (want === C.MODE_PRACTICE) {
+    SC.seekTo(run, Math.max(0, songBeats));
+    waitedBeats = 0;
+    frozenAt = null;
+    blocked = false;
+    scoreBeats = songBeats;
+    startedAt = now() - CH.beatsToMs(songBeats, chart.bpm);
+    if (paused) pausedAt = now();
+  }
+  dspSet('panic', '1');
+  if (paused) resume();
+  announce(want === C.MODE_PRACTICE ? 'practising' : 'listening');
+}
+
 /* Back from a run restarts it, rather than ending it. */
 function restart() {
   dspSet('panic', '1');
   paused = false;
+  scrubCue = false;
   mode = C.MODE_IDLE;
   screen = READY;
   /* Back restarts from the TOP, which is also how you get the box back. */
   songBeats = 0;
   prevBeats = 0;
+  scoreBeats = 0;
+  waitedBeats = 0;
+  frozenAt = null;
+  blocked = false;
   run = SC.createRun(chart, runOpts());
   announce(`${chart.name} ready`);
 }
@@ -584,6 +666,7 @@ function scrub(delta) {
    */
   const base = Math.max(0, songBeats);
   const units = Math.round((base * SCRUB_UNITS_PER_BAR) / perBar) + delta;
+  scrubCue = true;
   const limit = Number.isFinite(run.endBeat) ? run.endBeat : base + perBar;
   let to = (units * perBar) / SCRUB_UNITS_PER_BAR;
   to = Math.max(0, Math.min(Math.max(0, limit - perBar), to));
@@ -591,7 +674,9 @@ function scrub(delta) {
 
   songBeats = to;
   prevBeats = to;
+  scoreBeats = to;
   waitedBeats = 0;
+  frozenAt = null;
   blocked = false;
   SC.ensureEntries(run, to + 8);
   SC.seekTo(run, to);
@@ -622,16 +707,20 @@ function recordRun() {
 
 /* ---- the clock ---------------------------------------------------------- */
 function advanceClock() {
-  const raw = CH.msToBeats(now() - startedAt, chart.bpm) + C.countInStart(settings.countIn);
+  const raw = CH.msToBeats(now() - startedAt, chart.bpm);
   prevBeats = songBeats;
   if (settings.study && mode === C.MODE_PRACTICE) {
-    const block = SC.blockingBeat(run, 1);
-    const r = CH.applyWait(raw, waitedBeats, block);
+    const block = SC.blockingBeat(run);
+    const r = CH.applyWait(raw, waitedBeats, block, frozenAt);
     songBeats = r.songBeats;
     waitedBeats = r.waitedBeats;
+    scoreBeats = r.scoreBeats;
+    frozenAt = r.frozenAt;
     blocked = r.blocked;
   } else {
     songBeats = raw - waitedBeats;
+    scoreBeats = songBeats;
+    frozenAt = null;
     blocked = false;
   }
   beatFlash = CH.isBeatEdge(prevBeats, songBeats);
@@ -657,9 +746,12 @@ function serviceReference() {
   /* SC.takeDue settles each entry and moves the cursors; doing it here by
    * hand left the cursor at zero, so nothing pruned and the run never ended. */
   for (const e of SC.takeDue(run, songBeats)) {
+    listenLit = [];
     for (const n of e.notes) {
       sound(n.voice, n.wantDyn === 'accent' ? 115 : n.wantDyn === 'ghost' ? 45 : 90);
+      listenLit.push(n.voice);
     }
+    listenLitUntil = now() + LISTEN_LIT_MS;
   }
 }
 
@@ -685,7 +777,9 @@ function serviceLadder() {
   /* Climb: the tempo changes, so the clock has to be rebased or the playhead
    * would jump to wherever the new tempo puts the elapsed milliseconds. */
   chart = { ...chart, bpm: ladder.bpm };
-  startedAt = now() - CH.beatsToMs(songBeats, ladder.bpm);
+  /* The raw clock is songBeats PLUS whatever Study held it for; rebasing on
+   * songBeats alone would subtract the wait twice and jump the playhead back. */
+  startedAt = now() - CH.beatsToMs(songBeats + waitedBeats, ladder.bpm);
   run.bpm = ladder.bpm;
   LAD.beginRung(ladder, run, songBeats);
 }
@@ -814,7 +908,10 @@ function padDown(pad, vel) {
   }
 
   if (screen !== RUNNING || mode !== C.MODE_PRACTICE) return;
-  const j = SC.judgeHit(run, { voice, hand, velocity: vel }, songBeats);
+  /* The marker goes where the press was SEEN (songBeats); the judgement is
+   * about TIME, so it keeps the honest clock — and is told the frozen one, so
+   * a note the scroll has not reached is only as near as it looks. */
+  const j = SC.judgeHit(run, { voice, hand, velocity: vel }, scoreBeats, songBeats);
   SC.addMarker(run, voice, songBeats, hand);
   setFlash(PAD.padsForVoice(voice, settings.layout, hand), flashColor(j));
 }
@@ -1089,7 +1186,7 @@ function draw() {
     V.drawReadingView(ctx, {
       run, chart, songBeats, pxPerBeat: settings.pxPerBeat, view: settings.view,
       title: chart.name, bpm: chart.bpm, lanes: chartLanes,
-      dynamics: settings.dynamics, beatFlash, timing: run.timing, paused,
+      dynamics: settings.dynamics, beatFlash, timing: run.timing, paused, blocked,
     });
     if (clockMode) {
       const perBar = CH.beatsPerBar(chart);
@@ -1203,7 +1300,7 @@ function tickInner() {
     serviceClick();
     serviceReference();
     if (mode === C.MODE_PRACTICE) {
-      SC.expireMissed(run, songBeats, settings.study);
+      SC.expireMissed(run, scoreBeats, settings.study);
       serviceLadder();
     }
     SC.pruneEntries(run, CH.xToBeat(L.DESPAWN_X, songBeats, settings.pxPerBeat) - 1);
@@ -1325,7 +1422,7 @@ function midiInner(data) {
        * you did not catch is a prompt you cannot answer. */
       if (screen === QUIZ && promptIsAudible()) { schedulePrompt(); return; }
       if (screen === READY) start(false);
-      else if (screen === RUNNING) togglePause();
+      else if (screen === RUNNING) transportPress(C.MODE_LISTEN);
       return;
     case C.CC_RECORD:
       if (d2 <= 0) return;
@@ -1335,7 +1432,7 @@ function midiInner(data) {
         return;
       }
       if (screen === READY) start(true);
-      else if (screen === RUNNING) togglePause();
+      else if (screen === RUNNING) transportPress(C.MODE_PRACTICE);
       return;
     default:
       break;
@@ -1429,9 +1526,15 @@ function click() {
  * to re-run at another speed.
  */
 function editSetting(key, delta) {
+  const wasStudying = settings.study;
   SET.applySetting(settings, key, delta);
   settingsRowsCache = SET.settingsRows(settings);
   saveSettings();
+  /* Study switched on mid-run would otherwise find the wait pointer parked on a
+   * note from minutes ago and pin the clock there — a jump backwards. */
+  if (key === 'study' && settings.study && !wasStudying && run && screen === RUNNING) {
+    SC.resyncWait(run, songBeats);
+  }
   if (SET.affectsChart(key) && chart && screen !== RUNNING) {
     const src = menuItems[menuSel];
     if (src && src.kind === 'chart') armChart(src.chart);

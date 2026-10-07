@@ -11,7 +11,10 @@
  *
  *   judgement   what just happened to you        flash > everything
  *   pressed     where your finger is
- *   target      what is being asked for          only with Guide pads on
+ *   stuck       what Study is waiting for         pulsing; only with Guide pads
+ *   sounding    what Listen is playing right now
+ *   target      what is being asked for          only with Guide pads on, or
+ *                                                where a scrub has landed
  *   base        what lives on this pad
  *
  * A judgement outranks a press because the press is still down when the
@@ -57,6 +60,9 @@ function targetColor(beatsAway) {
  *   held       a Set-like with .has(pad), or null
  *   flash      { pads: [...], color } or null — the judgement, for FLASH_MS
  *   targets    [{ voice, hand, beatsAway }] or null, only when guiding
+ *   sounding   [voice, ...] Listen is playing, or null
+ *   stuck      [{ voice, hand }] Study is frozen on, or null
+ *   phase      0/1, the pulse for `stuck`
  *   prompt     [voice, ...] lit for a quiz prompt, or null
  *   dark       true to blank everything (the module is closing)
  */
@@ -86,6 +92,23 @@ export function paint(out, state) {
         if (t.hand && padHand(pad) !== t.hand) continue;
         const tc = targetColor(t.beatsAway);
         if (tc !== LED_OFF) c = tc;
+      }
+    }
+
+    if (state.sounding) {
+      for (let k = 0; k < state.sounding.length; k++) {
+        if (padVoice(pad, layout) === state.sounding[k]) c = LED_TARGET_NEAR;
+      }
+    }
+
+    /* The music has stopped for exactly this drum, so it pulses: the one light
+     * on the grid that is waiting for you rather than describing something. */
+    if (state.stuck) {
+      for (let k = 0; k < state.stuck.length; k++) {
+        const t = state.stuck[k];
+        if (padVoice(pad, layout) !== t.voice) continue;
+        if (t.hand && padHand(pad) !== t.hand) continue;
+        c = state.phase ? LED_PROMPT : LED_OFF;
       }
     }
 

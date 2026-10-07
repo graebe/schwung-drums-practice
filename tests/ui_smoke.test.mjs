@@ -369,7 +369,7 @@ function drawnText(ticksToRun = 2) {
   return out;
 }
 
-test('Play pauses and HOLDS the playhead instead of throwing it away', async () => {
+test('the running mode\'s own button pauses and HOLDS the playhead', async () => {
   const { screen } = await loadUi();
   globalThis.init();
   ticks(2);
@@ -377,7 +377,7 @@ test('Play pauses and HOLDS the playhead instead of throwing it away', async () 
   ticks(200);                       /* five seconds in */
 
   const moving = screen.pixels.slice();
-  cc(CC.play, 127);                 /* pause */
+  cc(CC.record, 127);               /* pause: practice's own button */
   ticks(4);
   const held = screen.pixels.slice();
   ticks(200);                       /* five more seconds of wall time */
@@ -394,10 +394,10 @@ test('resuming carries on in tempo rather than lurching to wall time', async () 
   ticks(2);
   startFirstDrill();
   ticks(80);
-  cc(CC.play, 127);                 /* pause */
+  cc(CC.record, 127);               /* pause: practice's own button */
   const atPause = screen.pixels.slice();
   ticks(400);                       /* ten seconds of doing nothing */
-  cc(CC.play, 127);                 /* resume */
+  cc(CC.record, 127);               /* resume */
   ticks(2);
   const justAfter = screen.pixels.slice();
 
@@ -410,17 +410,24 @@ test('resuming carries on in tempo rather than lurching to wall time', async () 
   assert.ok(screen.pixels.some((p, i) => p !== justAfter[i]), 'it never restarted');
 });
 
-test('Record pauses too, so the two buttons behave alike', async () => {
-  const { screen } = await loadUi();
+test('the OTHER button switches listen and practice in place, without pausing', async () => {
+  /* Watch a bar, then play it: the playhead does not go back to the top, and
+   * the music does not stop to make the switch. */
+  const { log, screen } = await loadUi();
   globalThis.init();
   ticks(2);
   startFirstDrill();
-  ticks(60);
-  cc(CC.record, 127);
-  ticks(4);
-  const held = screen.pixels.slice();
-  ticks(120);
-  assert.deepEqual(screen.pixels.slice(), held, 'Record did not pause');
+  ticks(200);                       /* practising, five seconds in */
+  cc(CC.play, 127);                 /* switch to listening */
+  log.params.length = 0;
+  const atSwitch = screen.pixels.slice();
+  ticks(80);
+  assert.ok(screen.pixels.some((p, i) => p !== atSwitch[i]), 'the switch stopped the music');
+  assert.ok(log.params.some(([k]) => k === 'n'), 'listening played nothing after the switch');
+  assert.ok(!drawnText().some((t) => /PAUSED/.test(t)), 'switching paused instead');
+  cc(CC.record, 127);               /* and back to practising */
+  ticks(40);
+  assert.ok(!drawnText().some((t) => /PAUSED/.test(t)));
 });
 
 test('the knob scrubs while paused, and only while paused', async () => {
@@ -435,7 +442,7 @@ test('the knob scrubs while paused, and only while paused', async () => {
   for (let i = 0; i < 20; i++) cc(CC.knob1, 1);
   ticks(2);
 
-  cc(CC.play, 127);                 /* pause */
+  cc(CC.record, 127);               /* pause: practice's own button */
   ticks(4);
   const atPause = screen.pixels.slice();
   /* A scrub banks raw units and emits a bar every twelfth. */
@@ -1041,4 +1048,98 @@ test('LISTENING ends by itself too, not just practising', async () => {
     .map((t) => t.split('/').map(Number))
     .filter(([bar, bars]) => bar > bars);
   assert.equal(overrun.length, 0, `the bar counter ran past the end: ${overrun.slice(0, 3)}`);
+});
+
+/*
+ * THE COUNT-IN IS FOUR BEATS, NOT EIGHT. start() put the count-in into the
+ * clock origin and advanceClock added it again, so a drill opened at -8 with
+ * the digit stuck on "4" for half of it. Asserted on TIME, through the first
+ * note the engine is asked to sound — a pixel diff could not tell 4 from 8.
+ */
+test('the count-in lasts exactly the beats it says', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  toFirstDrill();
+  cc(CC.jogClick, 127); ticks(2);
+  cc(CC.jogClick, 127); ticks(2);          /* Rock backbeat, L1: hi-hat, 92 bpm */
+  log.params.length = 0;
+  cc(CC.play, 127);                        /* listen, from the top */
+  let elapsed = 0;
+  while (elapsed < 10000 && !log.params.some(([k]) => k === 'n')) {
+    globalThis.__advance(5);
+    elapsed += 5;
+    globalThis.tick();
+  }
+  const fourBeats = 4 * 60000 / 92;
+  assert.ok(Math.abs(elapsed - fourBeats) <= 30,
+    `the first note sounded ${elapsed}ms after Play; four beats is ${Math.round(fourBeats)}ms`);
+});
+
+test('a start from a scrubbed bar plays from that bar, with no count-in', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  toFirstDrill();
+  cc(CC.jogClick, 127); ticks(2);
+  cc(CC.jogClick, 127); ticks(2);
+  for (let i = 0; i < 36; i++) cc(CC.knob1, 1);   /* one bar */
+  ticks(1);
+  log.params.length = 0;
+  cc(CC.play, 127);
+  let elapsed = 0;
+  while (elapsed < 10000 && !log.params.some(([k]) => k === 'n')) {
+    globalThis.__advance(5);
+    elapsed += 5;
+    globalThis.tick();
+  }
+  /* Bar 2's first hi-hat is ON the start point: it sounds straight away, not
+   * four beats later. */
+  assert.ok(elapsed <= 30, `a scrubbed start waited ${elapsed}ms before its first note`);
+});
+
+/* The colour each pad was last set to, from the captured LED writes. */
+function padColours(log) {
+  const last = {};
+  for (const [n, c] of log.leds) last[n] = c;
+  return last;
+}
+
+test('a scrub lights the stack it lands on, and running hands the pads back', async () => {
+  const { log } = await loadUi();
+  const P = await import(new URL('../src/padmap.mjs', import.meta.url));
+  globalThis.init();
+  ticks(2);
+  toFirstDrill();
+  cc(CC.jogClick, 127); ticks(2);
+  cc(CC.jogClick, 127); ticks(2);          /* Rock backbeat L1: hi-hat eighths */
+  const near = () => Object.entries(padColours(log))
+    .filter(([, c]) => c === P.LED_TARGET_NEAR).map(([n]) => Number(n)).sort((a, b) => a - b);
+  assert.deepEqual(near(), [], 'a freshly armed drill starts dark');
+  for (let i = 0; i < 9; i++) cc(CC.knob1, 1);   /* a beat: lands on a hi-hat */
+  ticks(2);
+  const hh = P.padsForVoice('HH', 'kit').slice().sort((a, b) => a - b);
+  assert.deepEqual(near(), hh, 'the scrub did not light the hi-hat it landed on');
+  cc(CC.record, 127);                       /* practise from there */
+  ticks(2);
+  assert.deepEqual(near(), [], 'running, with Guide pads off, nothing is lit');
+});
+
+test('Listen lights each drum as it plays it', async () => {
+  const { log } = await loadUi();
+  const P = await import(new URL('../src/padmap.mjs', import.meta.url));
+  globalThis.init();
+  ticks(2);
+  toFirstDrill();
+  cc(CC.jogClick, 127); ticks(2);
+  cc(CC.jogClick, 127); ticks(2);
+  cc(CC.play, 127);                         /* listen */
+  const hh = new Set(P.padsForVoice('HH', 'kit'));
+  let lit = false;
+  for (let i = 0; i < 1600 && !lit; i++) {   /* past the 2.6s count-in */
+    globalThis.__advance(5);
+    globalThis.tick();
+    lit = log.leds.some(([n, c]) => hh.has(n) && c === P.LED_TARGET_NEAR);
+  }
+  assert.ok(lit, 'Listen played the hi-hat without lighting it');
 });
