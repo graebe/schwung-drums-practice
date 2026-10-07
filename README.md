@@ -425,7 +425,8 @@ is *not* accented. Leave it out for a normal stroke.
 
 ## Requirements
 
-- Ableton Move with [Schwung](https://github.com/charlesvestal/schwung) installed
+- Ableton Move with [Schwung](https://github.com/charlesvestal/schwung) 1.4.0 or newer installed —
+  tested on 1.7.3
 
 Schwung is unofficial software that modifies Move's software. Back up anything you care about and
 read Schwung's recovery guidance before installing it.
