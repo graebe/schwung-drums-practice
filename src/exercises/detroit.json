@@ -1,0 +1,194 @@
+{
+  "id": "detroit",
+  "name": "Detroit",
+  "bpm": 126,
+  "timeSig": [
+    4,
+    4
+  ],
+  "loopBars": 2,
+  "repeats": 4,
+  "sticking": "off",
+  "events": [
+    {
+      "beat": 0,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 0.5,
+      "voices": [
+        "HH",
+        "RD"
+      ]
+    },
+    {
+      "beat": 0.75,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 1,
+      "voices": [
+        "HH",
+        "SN",
+        "KK"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "HH",
+        "RD"
+      ]
+    },
+    {
+      "beat": 1.75,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 2,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "HH",
+        "RD"
+      ]
+    },
+    {
+      "beat": 2.75,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 3,
+      "voices": [
+        "HH",
+        "SN",
+        "KK"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 3.5,
+      "voices": [
+        "HH",
+        "RD"
+      ]
+    },
+    {
+      "beat": 3.75,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 4,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 4.5,
+      "voices": [
+        "HH",
+        "RD"
+      ]
+    },
+    {
+      "beat": 4.75,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 5,
+      "voices": [
+        "HH",
+        "SN",
+        "KK"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 5.5,
+      "voices": [
+        "HH",
+        "RD"
+      ]
+    },
+    {
+      "beat": 5.75,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 6,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 6.5,
+      "voices": [
+        "HH",
+        "RD"
+      ]
+    },
+    {
+      "beat": 6.75,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 7,
+      "voices": [
+        "HH",
+        "SN",
+        "KK"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 7.5,
+      "voices": [
+        "HH",
+        "RD"
+      ]
+    },
+    {
+      "beat": 7.75,
+      "voices": [
+        "HH",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    }
+  ]
+}

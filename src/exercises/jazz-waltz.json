@@ -1,0 +1,50 @@
+{
+  "id": "jazz-waltz",
+  "name": "Jazz waltz",
+  "bpm": 120,
+  "timeSig": [
+    9,
+    8
+  ],
+  "loopBars": 1,
+  "repeats": 8,
+  "sticking": "off",
+  "events": [
+    {
+      "beat": 0,
+      "voices": [
+        "RD",
+        "KK"
+      ]
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "RD",
+        "HF"
+      ]
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 3,
+      "voices": [
+        "RD",
+        "HF"
+      ]
+    },
+    {
+      "beat": 4,
+      "voices": [
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    }
+  ]
+}

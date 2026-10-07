@@ -1,7 +1,7 @@
 {
-  "id": "disco",
-  "name": "Disco",
-  "bpm": 118,
+  "id": "punk",
+  "name": "Punk",
+  "bpm": 156,
   "timeSig": [
     4,
     4
@@ -20,25 +20,29 @@
     {
       "beat": 0.5,
       "voices": [
-        "HO"
-      ]
-    },
-    {
-      "beat": 1,
-      "voices": [
         "HH",
-        "SN",
-        "KK"
+        "SN"
       ],
       "dyn": {
         "SN": "accent"
       }
     },
     {
+      "beat": 1,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
       "beat": 1.5,
       "voices": [
-        "HO"
-      ]
+        "HH",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
     },
     {
       "beat": 2,
@@ -50,25 +54,29 @@
     {
       "beat": 2.5,
       "voices": [
-        "HO"
-      ]
-    },
-    {
-      "beat": 3,
-      "voices": [
         "HH",
-        "SN",
-        "KK"
+        "SN"
       ],
       "dyn": {
         "SN": "accent"
       }
     },
     {
+      "beat": 3,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
       "beat": 3.5,
       "voices": [
-        "HO"
-      ]
+        "HH",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
     }
   ]
 }

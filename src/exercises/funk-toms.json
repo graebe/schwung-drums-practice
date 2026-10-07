@@ -1,0 +1,166 @@
+{
+  "id": "funk-toms",
+  "name": "Funk with toms",
+  "bpm": 98,
+  "timeSig": [
+    4,
+    4
+  ],
+  "loopBars": 2,
+  "repeats": 4,
+  "sticking": "off",
+  "events": [
+    {
+      "beat": 0,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 0.5,
+      "voices": [
+        "HH",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 1,
+      "voices": [
+        "HH",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 1.75,
+      "voices": [
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 2,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "HH",
+        "SN",
+        "KK"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 3,
+      "voices": [
+        "HH",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 3.5,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 4,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 4.5,
+      "voices": [
+        "HH",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 5,
+      "voices": [
+        "HH",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 5.5,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 5.75,
+      "voices": [
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 6,
+      "voices": [
+        "HT"
+      ]
+    },
+    {
+      "beat": 6.5,
+      "voices": [
+        "HT"
+      ]
+    },
+    {
+      "beat": 7,
+      "voices": [
+        "LT"
+      ]
+    },
+    {
+      "beat": 7.25,
+      "voices": [
+        "SN"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 7.5,
+      "voices": [
+        "LT"
+      ]
+    }
+  ]
+}

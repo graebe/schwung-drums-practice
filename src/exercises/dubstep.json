@@ -1,7 +1,7 @@
 {
-  "id": "disco",
-  "name": "Disco",
-  "bpm": 118,
+  "id": "dubstep",
+  "name": "Dubstep",
+  "bpm": 140,
   "timeSig": [
     4,
     4
@@ -18,51 +18,38 @@
       ]
     },
     {
-      "beat": 0.5,
-      "voices": [
-        "HO"
-      ]
-    },
-    {
       "beat": 1,
       "voices": [
-        "HH",
-        "SN",
-        "KK"
-      ],
-      "dyn": {
-        "SN": "accent"
-      }
-    },
-    {
-      "beat": 1.5,
-      "voices": [
-        "HO"
+        "HH"
       ]
     },
     {
       "beat": 2,
       "voices": [
         "HH",
-        "KK"
-      ]
+        "SN"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
     },
     {
       "beat": 2.5,
       "voices": [
-        "HO"
+        "KK"
+      ]
+    },
+    {
+      "beat": 2.75,
+      "voices": [
+        "LT"
       ]
     },
     {
       "beat": 3,
       "voices": [
-        "HH",
-        "SN",
-        "KK"
-      ],
-      "dyn": {
-        "SN": "accent"
-      }
+        "HH"
+      ]
     },
     {
       "beat": 3.5,

@@ -1,7 +1,7 @@
 {
-  "id": "disco",
-  "name": "Disco",
-  "bpm": 118,
+  "id": "pop-four-floor",
+  "name": "Pop four-floor",
+  "bpm": 112,
   "timeSig": [
     4,
     4
@@ -20,7 +20,7 @@
     {
       "beat": 0.5,
       "voices": [
-        "HO"
+        "HH"
       ]
     },
     {
@@ -37,7 +37,7 @@
     {
       "beat": 1.5,
       "voices": [
-        "HO"
+        "HH"
       ]
     },
     {
@@ -50,7 +50,7 @@
     {
       "beat": 2.5,
       "voices": [
-        "HO"
+        "HH"
       ]
     },
     {

@@ -1,0 +1,231 @@
+{
+  "id": "hard-techno",
+  "name": "Hard techno",
+  "bpm": 140,
+  "timeSig": [
+    4,
+    4
+  ],
+  "loopBars": 2,
+  "repeats": 4,
+  "sticking": "off",
+  "events": [
+    {
+      "beat": 0,
+      "voices": [
+        "CR",
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 0.25,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 0.5,
+      "voices": [
+        "HO"
+      ]
+    },
+    {
+      "beat": 0.75,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 1,
+      "voices": [
+        "HH",
+        "SN",
+        "KK"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 1.25,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "HO"
+      ]
+    },
+    {
+      "beat": 1.75,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 2,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 2.25,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "HO"
+      ]
+    },
+    {
+      "beat": 2.75,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 3,
+      "voices": [
+        "HH",
+        "SN",
+        "KK"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 3.25,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 3.5,
+      "voices": [
+        "HO"
+      ]
+    },
+    {
+      "beat": 3.75,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 4,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 4.25,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 4.5,
+      "voices": [
+        "HO"
+      ]
+    },
+    {
+      "beat": 4.75,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 5,
+      "voices": [
+        "HH",
+        "SN",
+        "KK"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 5.25,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 5.5,
+      "voices": [
+        "HO"
+      ]
+    },
+    {
+      "beat": 5.75,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 6,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 6.25,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 6.5,
+      "voices": [
+        "HO"
+      ]
+    },
+    {
+      "beat": 6.75,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 7,
+      "voices": [
+        "SN",
+        "LT",
+        "KK"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 7.25,
+      "voices": [
+        "LT"
+      ]
+    },
+    {
+      "beat": 7.5,
+      "voices": [
+        "LT"
+      ]
+    },
+    {
+      "beat": 7.75,
+      "voices": [
+        "LT"
+      ]
+    }
+  ]
+}

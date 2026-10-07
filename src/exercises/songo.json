@@ -1,0 +1,186 @@
+{
+  "id": "songo",
+  "name": "Songo",
+  "bpm": 104,
+  "timeSig": [
+    4,
+    4
+  ],
+  "loopBars": 2,
+  "repeats": 4,
+  "sticking": "off",
+  "events": [
+    {
+      "beat": 0,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 0.5,
+      "voices": [
+        "RD",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 0.75,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 1,
+      "voices": [
+        "HF"
+      ]
+    },
+    {
+      "beat": 1.25,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 1.75,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 2,
+      "voices": [
+        "SN"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 2.25,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 2.75,
+      "voices": [
+        "RD",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 3,
+      "voices": [
+        "RD",
+        "HF"
+      ]
+    },
+    {
+      "beat": 3.5,
+      "voices": [
+        "RD",
+        "LT",
+        "KK"
+      ]
+    },
+    {
+      "beat": 4,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 4.5,
+      "voices": [
+        "RD",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 4.75,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 5,
+      "voices": [
+        "HF"
+      ]
+    },
+    {
+      "beat": 5.25,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 5.5,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 5.75,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 6,
+      "voices": [
+        "SN"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 6.25,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 6.75,
+      "voices": [
+        "RD",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 7,
+      "voices": [
+        "RD",
+        "HF"
+      ]
+    },
+    {
+      "beat": 7.5,
+      "voices": [
+        "RD",
+        "LT",
+        "KK"
+      ]
+    }
+  ]
+}

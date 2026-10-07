@@ -104,7 +104,7 @@ test('availableLevels collapses rungs that would play the same notes', () => {
 
 test('every bundled groove has a ladder, and every rung is a valid drill', () => {
   const grooves = manifest.entries.filter((e) => !RUDIMENT_CATS.includes(e.category));
-  assert.equal(grooves.length, 14);
+  assert.ok(grooves.length >= 42, `${grooves.length} grooves`);
   let withLadder = 0;
   for (const e of grooves) {
     const c = chartOf(e.id);
@@ -119,7 +119,35 @@ test('every bundled groove has a ladder, and every rung is a valid drill', () =>
       assert.ok(p.id.endsWith(lv.id), 'a rung is identifiable for the stats');
     }
   }
-  assert.ok(withLadder >= 12, `only ${withLadder} of 14 grooves gained a ladder`);
+  assert.equal(withLadder, grooves.length, 'every groove is learned a limb at a time');
+});
+
+/*
+ * THE FOURTH RUNG. "Everything" adds the toms, and no groove 1.0 shipped used
+ * a tom, so L4 always collapsed into L3 and nobody ever saw it. A groove that
+ * writes toms reaches it now — and enough of them do that it is taught.
+ */
+test('a groove with toms reaches the fourth rung', () => {
+  let withL4 = 0;
+  for (const e of manifest.entries.filter((x) => !RUDIMENT_CATS.includes(x.category))) {
+    const c = chartOf(e.id);
+    const toms = c.events.some((ev) => ev.voices.some((v) => v === 'HT' || v === 'LT'));
+    const ids = LV.availableLevels(c).map((lv) => lv.id);
+    if (toms) {
+      assert.ok(ids.includes('l4'), `${e.id} writes toms but has no fourth rung`);
+      withL4++;
+    }
+  }
+  assert.ok(withL4 >= 8, `only ${withL4} grooves teach the fourth rung`);
+});
+
+/* One hand cannot close and open the hi-hat at once. */
+test('no groove asks for the closed and the open hi-hat together', () => {
+  for (const e of manifest.entries) {
+    for (const ev of chartOf(e.id).events) {
+      assert.ok(!(ev.voices.includes('HH') && ev.voices.includes('HO')), `${e.id} at ${ev.beat}`);
+    }
+  }
 });
 
 test('a rung is recorded against its own id, so the plot never mixes them', () => {

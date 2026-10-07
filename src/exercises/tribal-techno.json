@@ -1,0 +1,114 @@
+{
+  "id": "tribal-techno",
+  "name": "Tribal techno",
+  "bpm": 130,
+  "timeSig": [
+    4,
+    4
+  ],
+  "loopBars": 1,
+  "repeats": 8,
+  "sticking": "off",
+  "events": [
+    {
+      "beat": 0,
+      "voices": [
+        "HH",
+        "KK"
+      ],
+      "dyn": {
+        "HH": "ghost"
+      }
+    },
+    {
+      "beat": 0.5,
+      "voices": [
+        "HH",
+        "HT"
+      ],
+      "dyn": {
+        "HH": "ghost"
+      }
+    },
+    {
+      "beat": 1,
+      "voices": [
+        "HH",
+        "KK"
+      ],
+      "dyn": {
+        "HH": "ghost"
+      }
+    },
+    {
+      "beat": 1.25,
+      "voices": [
+        "LT"
+      ]
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "HH",
+        "HT"
+      ],
+      "dyn": {
+        "HH": "ghost"
+      }
+    },
+    {
+      "beat": 2,
+      "voices": [
+        "HH",
+        "SN",
+        "KK"
+      ],
+      "dyn": {
+        "HH": "ghost",
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 2.25,
+      "voices": [
+        "LT"
+      ]
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "HH"
+      ],
+      "dyn": {
+        "HH": "ghost"
+      }
+    },
+    {
+      "beat": 3,
+      "voices": [
+        "HH",
+        "HT",
+        "KK"
+      ],
+      "dyn": {
+        "HH": "ghost"
+      }
+    },
+    {
+      "beat": 3.25,
+      "voices": [
+        "LT"
+      ]
+    },
+    {
+      "beat": 3.5,
+      "voices": [
+        "HH",
+        "HT"
+      ],
+      "dyn": {
+        "HH": "ghost"
+      }
+    }
+  ]
+}

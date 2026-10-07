@@ -1,0 +1,89 @@
+{
+  "id": "afro-cuban-68",
+  "name": "Afro-Cuban 6/8",
+  "bpm": 96,
+  "timeSig": [
+    6,
+    8
+  ],
+  "loopBars": 2,
+  "repeats": 4,
+  "sticking": "off",
+  "events": [
+    {
+      "beat": 0,
+      "voices": [
+        "RD",
+        "KK"
+      ]
+    },
+    {
+      "beat": 0.5,
+      "voices": [
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 1,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "HT",
+        "KK"
+      ]
+    },
+    {
+      "beat": 2,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "RD",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 3,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 3.5,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 4.5,
+      "voices": [
+        "RD",
+        "SN",
+        "LT",
+        "KK"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 5.5,
+      "voices": [
+        "RD"
+      ]
+    }
+  ]
+}

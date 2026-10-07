@@ -1,7 +1,7 @@
 {
-  "id": "disco",
-  "name": "Disco",
-  "bpm": 118,
+  "id": "uk-garage",
+  "name": "UK garage",
+  "bpm": 132,
   "timeSig": [
     4,
     4
@@ -13,22 +13,25 @@
     {
       "beat": 0,
       "voices": [
-        "HH",
         "KK"
       ]
     },
     {
       "beat": 0.5,
       "voices": [
-        "HO"
+        "HH"
+      ]
+    },
+    {
+      "beat": 0.833333,
+      "voices": [
+        "HH"
       ]
     },
     {
       "beat": 1,
       "voices": [
-        "HH",
-        "SN",
-        "KK"
+        "SN"
       ],
       "dyn": {
         "SN": "accent"
@@ -37,11 +40,11 @@
     {
       "beat": 1.5,
       "voices": [
-        "HO"
+        "HH"
       ]
     },
     {
-      "beat": 2,
+      "beat": 1.833333,
       "voices": [
         "HH",
         "KK"
@@ -50,15 +53,19 @@
     {
       "beat": 2.5,
       "voices": [
-        "HO"
+        "HH"
+      ]
+    },
+    {
+      "beat": 2.833333,
+      "voices": [
+        "HH"
       ]
     },
     {
       "beat": 3,
       "voices": [
-        "HH",
-        "SN",
-        "KK"
+        "SN"
       ],
       "dyn": {
         "SN": "accent"
@@ -67,7 +74,13 @@
     {
       "beat": 3.5,
       "voices": [
-        "HO"
+        "HH"
+      ]
+    },
+    {
+      "beat": 3.833333,
+      "voices": [
+        "HH"
       ]
     }
   ]

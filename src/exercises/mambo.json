@@ -1,0 +1,168 @@
+{
+  "id": "mambo",
+  "name": "Mambo",
+  "bpm": 132,
+  "timeSig": [
+    4,
+    4
+  ],
+  "loopBars": 2,
+  "repeats": 4,
+  "sticking": "off",
+  "events": [
+    {
+      "beat": 0,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 0.5,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 1,
+      "voices": [
+        "RD",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 1.25,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 1.75,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 2,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 3,
+      "voices": [
+        "RD",
+        "LT"
+      ]
+    },
+    {
+      "beat": 3.25,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 3.5,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 3.75,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 4,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 4.5,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 5,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 5.25,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 5.5,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 5.75,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 6,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 6.5,
+      "voices": [
+        "RD",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 7,
+      "voices": [
+        "RD",
+        "LT"
+      ]
+    },
+    {
+      "beat": 7.25,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 7.5,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 7.75,
+      "voices": [
+        "RD"
+      ]
+    }
+  ]
+}

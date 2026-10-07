@@ -1,0 +1,42 @@
+{
+  "id": "two-beat",
+  "name": "Two-beat",
+  "bpm": 144,
+  "timeSig": [
+    4,
+    4
+  ],
+  "loopBars": 1,
+  "repeats": 8,
+  "sticking": "off",
+  "events": [
+    {
+      "beat": 0,
+      "voices": [
+        "RD",
+        "KK"
+      ]
+    },
+    {
+      "beat": 1,
+      "voices": [
+        "RD",
+        "HF"
+      ]
+    },
+    {
+      "beat": 2,
+      "voices": [
+        "RD",
+        "KK"
+      ]
+    },
+    {
+      "beat": 3,
+      "voices": [
+        "RD",
+        "HF"
+      ]
+    }
+  ]
+}

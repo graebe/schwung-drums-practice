@@ -1,7 +1,7 @@
 {
-  "id": "disco",
-  "name": "Disco",
-  "bpm": 118,
+  "id": "linear-funk",
+  "name": "Linear funk",
+  "bpm": 92,
   "timeSig": [
     4,
     4
@@ -13,22 +13,25 @@
     {
       "beat": 0,
       "voices": [
-        "HH",
         "KK"
       ]
     },
     {
-      "beat": 0.5,
+      "beat": 0.25,
       "voices": [
-        "HO"
+        "HH"
+      ]
+    },
+    {
+      "beat": 0.75,
+      "voices": [
+        "HH"
       ]
     },
     {
       "beat": 1,
       "voices": [
-        "HH",
-        "SN",
-        "KK"
+        "SN"
       ],
       "dyn": {
         "SN": "accent"
@@ -37,28 +40,46 @@
     {
       "beat": 1.5,
       "voices": [
-        "HO"
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 1.75,
+      "voices": [
+        "HH"
       ]
     },
     {
       "beat": 2,
       "voices": [
-        "HH",
         "KK"
+      ]
+    },
+    {
+      "beat": 2.25,
+      "voices": [
+        "HH"
       ]
     },
     {
       "beat": 2.5,
       "voices": [
-        "HO"
+        "KK"
+      ]
+    },
+    {
+      "beat": 2.75,
+      "voices": [
+        "HH"
       ]
     },
     {
       "beat": 3,
       "voices": [
-        "HH",
-        "SN",
-        "KK"
+        "SN"
       ],
       "dyn": {
         "SN": "accent"
@@ -67,7 +88,16 @@
     {
       "beat": 3.5,
       "voices": [
-        "HO"
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 3.75,
+      "voices": [
+        "HH"
       ]
     }
   ]

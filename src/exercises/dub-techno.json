@@ -1,0 +1,140 @@
+{
+  "id": "dub-techno",
+  "name": "Dub techno",
+  "bpm": 120,
+  "timeSig": [
+    4,
+    4
+  ],
+  "loopBars": 1,
+  "repeats": 8,
+  "sticking": "off",
+  "events": [
+    {
+      "beat": 0,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 0.25,
+      "voices": [
+        "HH"
+      ],
+      "dyn": {
+        "HH": "ghost"
+      }
+    },
+    {
+      "beat": 0.5,
+      "voices": [
+        "HO"
+      ]
+    },
+    {
+      "beat": 0.75,
+      "voices": [
+        "HH"
+      ],
+      "dyn": {
+        "HH": "ghost"
+      }
+    },
+    {
+      "beat": 1,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 1.25,
+      "voices": [
+        "HH"
+      ],
+      "dyn": {
+        "HH": "ghost"
+      }
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "HO"
+      ]
+    },
+    {
+      "beat": 1.75,
+      "voices": [
+        "HH",
+        "SN"
+      ],
+      "dyn": {
+        "HH": "ghost",
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 2,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 2.25,
+      "voices": [
+        "HH"
+      ],
+      "dyn": {
+        "HH": "ghost"
+      }
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "HO"
+      ]
+    },
+    {
+      "beat": 2.75,
+      "voices": [
+        "HH"
+      ],
+      "dyn": {
+        "HH": "ghost"
+      }
+    },
+    {
+      "beat": 3,
+      "voices": [
+        "KK"
+      ]
+    },
+    {
+      "beat": 3.25,
+      "voices": [
+        "HH"
+      ],
+      "dyn": {
+        "HH": "ghost"
+      }
+    },
+    {
+      "beat": 3.5,
+      "voices": [
+        "HO",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 3.75,
+      "voices": [
+        "HH"
+      ],
+      "dyn": {
+        "HH": "ghost"
+      }
+    }
+  ]
+}

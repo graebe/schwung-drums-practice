@@ -1,7 +1,7 @@
 {
-  "id": "disco",
-  "name": "Disco",
-  "bpm": 118,
+  "id": "house",
+  "name": "House",
+  "bpm": 124,
   "timeSig": [
     4,
     4
@@ -24,6 +24,15 @@
       ]
     },
     {
+      "beat": 0.75,
+      "voices": [
+        "HH"
+      ],
+      "dyn": {
+        "HH": "ghost"
+      }
+    },
+    {
       "beat": 1,
       "voices": [
         "HH",
@@ -41,6 +50,15 @@
       ]
     },
     {
+      "beat": 1.75,
+      "voices": [
+        "HH"
+      ],
+      "dyn": {
+        "HH": "ghost"
+      }
+    },
+    {
       "beat": 2,
       "voices": [
         "HH",
@@ -52,6 +70,15 @@
       "voices": [
         "HO"
       ]
+    },
+    {
+      "beat": 2.75,
+      "voices": [
+        "HH"
+      ],
+      "dyn": {
+        "HH": "ghost"
+      }
     },
     {
       "beat": 3,
@@ -69,6 +96,15 @@
       "voices": [
         "HO"
       ]
+    },
+    {
+      "beat": 3.75,
+      "voices": [
+        "HH"
+      ],
+      "dyn": {
+        "HH": "ghost"
+      }
     }
   ]
 }

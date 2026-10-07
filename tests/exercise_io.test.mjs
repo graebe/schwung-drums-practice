@@ -169,8 +169,10 @@ const SHAPE = {
                          SN: '--------X-------',
                          KK: '--------o-------' },
   /* Four on the floor, with the hat opening on the off-beats. */
+  /* The open hat on the OFFBEATS. 1.0 had it on 2 and 4, over the closed one —
+   * a hat cannot be open and closed at once, and the offbeat is the style. */
   'disco':             { HH: 'o---o---o---o---',
-                         HO: '----o-------o---',
+                         HO: '--o---o---o---o-',
                          SN: '----X-------X---',
                          KK: 'o---o---o---o---' },
   'motown':            { HH: 'o---o---o---o---',

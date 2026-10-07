@@ -1,7 +1,7 @@
 {
-  "id": "disco",
-  "name": "Disco",
-  "bpm": 118,
+  "id": "cha-cha",
+  "name": "Cha-cha",
+  "bpm": 116,
   "timeSig": [
     4,
     4
@@ -13,52 +13,28 @@
     {
       "beat": 0,
       "voices": [
-        "HH",
+        "RD",
         "KK"
-      ]
-    },
-    {
-      "beat": 0.5,
-      "voices": [
-        "HO"
       ]
     },
     {
       "beat": 1,
       "voices": [
-        "HH",
-        "SN",
-        "KK"
-      ],
-      "dyn": {
-        "SN": "accent"
-      }
-    },
-    {
-      "beat": 1.5,
-      "voices": [
-        "HO"
+        "RD"
       ]
     },
     {
       "beat": 2,
       "voices": [
-        "HH",
+        "RD",
         "KK"
-      ]
-    },
-    {
-      "beat": 2.5,
-      "voices": [
-        "HO"
       ]
     },
     {
       "beat": 3,
       "voices": [
-        "HH",
-        "SN",
-        "KK"
+        "RD",
+        "SN"
       ],
       "dyn": {
         "SN": "accent"
@@ -67,8 +43,11 @@
     {
       "beat": 3.5,
       "voices": [
-        "HO"
-      ]
+        "SN"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
     }
   ]
 }

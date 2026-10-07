@@ -1,7 +1,7 @@
 {
-  "id": "disco",
-  "name": "Disco",
-  "bpm": 118,
+  "id": "trap-hats",
+  "name": "Trap hats",
+  "bpm": 140,
   "timeSig": [
     4,
     4
@@ -20,54 +20,73 @@
     {
       "beat": 0.5,
       "voices": [
-        "HO"
+        "HH"
       ]
     },
     {
       "beat": 1,
       "voices": [
-        "HH",
-        "SN",
-        "KK"
-      ],
-      "dyn": {
-        "SN": "accent"
-      }
+        "HH"
+      ]
     },
     {
       "beat": 1.5,
       "voices": [
-        "HO"
+        "HH",
+        "KK"
       ]
     },
     {
       "beat": 2,
       "voices": [
         "HH",
-        "KK"
-      ]
-    },
-    {
-      "beat": 2.5,
-      "voices": [
-        "HO"
-      ]
-    },
-    {
-      "beat": 3,
-      "voices": [
-        "HH",
-        "SN",
-        "KK"
+        "SN"
       ],
       "dyn": {
         "SN": "accent"
       }
     },
     {
+      "beat": 2.166667,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 2.333333,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 2.666667,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 2.833333,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 3,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
       "beat": 3.5,
       "voices": [
-        "HO"
+        "HH"
       ]
     }
   ]

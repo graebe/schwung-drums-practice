@@ -1,0 +1,68 @@
+{
+  "id": "uptempo-swing",
+  "name": "Up-tempo swing",
+  "bpm": 270,
+  "timeSig": [
+    12,
+    8
+  ],
+  "loopBars": 1,
+  "repeats": 8,
+  "sticking": "off",
+  "events": [
+    {
+      "beat": 0,
+      "voices": [
+        "RD",
+        "KK"
+      ],
+      "dyn": {
+        "KK": "ghost"
+      }
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "RD",
+        "HF"
+      ]
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "RD",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 3,
+      "voices": [
+        "RD",
+        "KK"
+      ],
+      "dyn": {
+        "KK": "ghost"
+      }
+    },
+    {
+      "beat": 4.5,
+      "voices": [
+        "RD",
+        "HF"
+      ]
+    },
+    {
+      "beat": 5.5,
+      "voices": [
+        "RD",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    }
+  ]
+}

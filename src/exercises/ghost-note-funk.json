@@ -1,0 +1,141 @@
+{
+  "id": "ghost-note-funk",
+  "name": "Ghost-note funk",
+  "bpm": 94,
+  "timeSig": [
+    4,
+    4
+  ],
+  "loopBars": 1,
+  "repeats": 8,
+  "sticking": "off",
+  "events": [
+    {
+      "beat": 0,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 0.25,
+      "voices": [
+        "HH",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 0.5,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 0.75,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 1,
+      "voices": [
+        "HH",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 1.25,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "HH",
+        "SN",
+        "KK"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 1.75,
+      "voices": [
+        "HH",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 2,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 2.25,
+      "voices": [
+        "HH",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 2.75,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 3,
+      "voices": [
+        "HH",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 3.25,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 3.5,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 3.75,
+      "voices": [
+        "HH",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "ghost"
+      }
+    }
+  ]
+}

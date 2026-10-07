@@ -1,0 +1,154 @@
+{
+  "id": "mozambique",
+  "name": "Mozambique",
+  "bpm": 112,
+  "timeSig": [
+    4,
+    4
+  ],
+  "loopBars": 2,
+  "repeats": 4,
+  "sticking": "off",
+  "events": [
+    {
+      "beat": 0,
+      "voices": [
+        "RD",
+        "KK"
+      ]
+    },
+    {
+      "beat": 0.5,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 1,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "RD",
+        "HT"
+      ]
+    },
+    {
+      "beat": 1.75,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 2,
+      "voices": [
+        "LT",
+        "KK"
+      ]
+    },
+    {
+      "beat": 2.25,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 2.75,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 3,
+      "voices": [
+        "HT"
+      ]
+    },
+    {
+      "beat": 3.25,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 3.5,
+      "voices": [
+        "RD",
+        "LT"
+      ]
+    },
+    {
+      "beat": 4,
+      "voices": [
+        "RD",
+        "KK"
+      ]
+    },
+    {
+      "beat": 4.5,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 5,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 5.5,
+      "voices": [
+        "RD",
+        "HT"
+      ]
+    },
+    {
+      "beat": 5.75,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 6,
+      "voices": [
+        "LT",
+        "KK"
+      ]
+    },
+    {
+      "beat": 6.25,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 6.75,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 7,
+      "voices": [
+        "HT"
+      ]
+    },
+    {
+      "beat": 7.25,
+      "voices": [
+        "RD"
+      ]
+    },
+    {
+      "beat": 7.5,
+      "voices": [
+        "RD",
+        "LT"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,123 @@
+{
+  "id": "halftime-ballad",
+  "name": "Halftime ballad",
+  "bpm": 68,
+  "timeSig": [
+    4,
+    4
+  ],
+  "loopBars": 2,
+  "repeats": 4,
+  "sticking": "off",
+  "events": [
+    {
+      "beat": 0,
+      "voices": [
+        "CR",
+        "KK"
+      ]
+    },
+    {
+      "beat": 0.5,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 1,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 1.5,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 2,
+      "voices": [
+        "HH",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 2.5,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 3,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 3.5,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 4,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 4.5,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 5,
+      "voices": [
+        "HH"
+      ]
+    },
+    {
+      "beat": 5.5,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 6,
+      "voices": [
+        "HH",
+        "SN"
+      ],
+      "dyn": {
+        "SN": "accent"
+      }
+    },
+    {
+      "beat": 6.5,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 7,
+      "voices": [
+        "HT"
+      ]
+    },
+    {
+      "beat": 7.5,
+      "voices": [
+        "LT"
+      ]
+    }
+  ]
+}
