@@ -18,10 +18,25 @@
       "lines": [
         "PLAY   listen, unscored",
         "REC    practise, scored",
+        "Same button pauses; the",
+        "other one switches.",
         "MENU   the drill list",
         "BACK   up, then out",
-        "JOG    move / pick",
         "SHIFT+click  settings"
+      ]
+    },
+    {
+      "title": "The list",
+      "lines": [
+        "Folders: Basics,",
+        "Grooves, Rudiments,",
+        "Training, Quiz and",
+        "Progress.",
+        "",
+        "Click opens, Back goes",
+        "up. A groove opens its",
+        "levels, one limb more",
+        "each rung."
       ]
     },
     {
@@ -29,11 +44,12 @@
       "lines": [
         "1  tempo, 40-240",
         "2  read ahead",
-        "3  loop length",
+        "3  reps",
         "4  kit layout",
         "",
-        "Changing tempo or loop",
-        "rebuilds the drill."
+        "Stopped, knob 1 scrubs;",
+        "the pads show the drums",
+        "where you landed."
       ]
     },
     {
@@ -45,20 +61,33 @@
         "block; any pad in it",
         "counts.",
         "",
-        "sticking  one surface",
-        "kit4      the rock kit",
-        "kit8      the whole kit"
+        "kit       the whole kit",
+        "sticking  one surface"
       ]
     },
     {
       "title": "Colours",
       "lines": [
         "green   you got it",
-        "amber   right drum but",
-        "        the WRONG HAND",
+        "amber   right drum, but",
+        "        WRONG HAND or",
+        "        wrong dynamic",
         "red     you missed it",
         "yellow  your finger",
-        "violet  what is coming"
+        "violet  now / playing",
+        "purple  what is coming",
+        "pulse   Study waits here"
+      ]
+    },
+    {
+      "title": "Study",
+      "lines": [
+        "Settings > Study stops",
+        "the scroll ON a note you",
+        "missed. The lane names",
+        "it; Guide pads pulse it.",
+        "",
+        "One press carries on."
       ]
     },
     {

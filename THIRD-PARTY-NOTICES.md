@@ -7,8 +7,8 @@ This file exists because `src/vendor/host/plugin_api_v1.h` points at it.
 
 ## Schwung — the host ABI header
 
-`src/vendor/host/plugin_api_v1.h` is a reduced copy of `src/host/plugin_api_v1.h`
-from the Schwung host.
+`src/vendor/host/plugin_api_v1.h` is a verbatim copy of `src/host/plugin_api_v1.h`
+from the Schwung host, at v1.7.3.
 
 - Upstream: https://github.com/charlesvestal/schwung
 - MIT License. Copyright (c) 2025-2026 Charles Vestal.
@@ -48,6 +48,17 @@ The only external crate the DSP depends on. `dsp/drums` is `no_std`, so its
 library.
 
 - https://github.com/rust-lang/libm — MIT.
+
+## The drills
+
+Nothing in `src/exercises/` is transcribed from anyone's recording or book.
+
+- **Rudiments** — the forty International Drum Rudiments are traditional
+  material, standardised by the Percussive Arts Society. The stickings and
+  accents were checked against the PAS sheet; the sheet itself is not copied,
+  and each rudiment is written out here in its own open form.
+- **Grooves** — every one is an original pattern written for this module in
+  the manner of its style, and named by the style, never after a record.
 
 ## Everything else
 

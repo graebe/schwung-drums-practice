@@ -59,8 +59,13 @@ fingers, in the same way its sister module is a reading trainer rather than a pi
   over time.
 - **Sounds like a kit, with no setup** — the module renders its own drums and its own click and
   mixes them into Move's audio. No track, no instrument, no MIDI channel to match.
-- **Generates its own material**, seeded, so you can re-attempt the exact drill you just fluffed —
-  and takes hand-written exercises as JSON, interchangeable with the generated ones.
+- **A library, in folders.** All forty PAS rudiments, by family, and forty-two grooves across six
+  families from rock to techno, each learned a limb at a time.
+- **Waits for you.** With **Study** on, the scroll stops *on* the note you missed, names it, and one
+  press of it carries on.
+- **Generates its own material** — subdivision drills, and random reading lines, sticking and
+  grooves drawn fresh each time you open one — and takes hand-written exercises as JSON,
+  interchangeable with the generated ones.
 
 ## The kit
 
@@ -83,9 +88,8 @@ horizontal axis.
 Stems up are hands, stems down are feet. That is how a drum chart is engraved and it costs one
 line of code to honour.
 
-The hi-hat pedal `HF` is engraved but has no pad. A foot articulation means nothing under a
-finger, and a pad for it would be one taken from a voice that earns it; it is in the legend so
-that a chart written elsewhere still renders. Nothing bundled uses it, and a drill that asks for a
+The hi-hat pedal `HF` has a pad in the kit layout (third row, first column), because the jazz and
+Latin grooves need it — a hat foot on 2 and 4 is what a swing ride sits on. A drill that asks for a
 voice the current layout cannot reach says so before it starts.
 
 ## The pads
@@ -129,11 +133,12 @@ the one signal you should never have to read.
 | --- | --- |
 | dark | not in this layout |
 | dim purple | a voice lives here — background |
-| pale lavender | the voice you are being asked for, with **Guide pads** on |
-| bright violet | it is now — and what **Listen** is playing |
+| purple | it is coming, with **Guide pads** on |
+| bright violet | it is now — with Guide pads on; what **Listen** is playing; and where a **scrub** has landed |
+| pale lavender | the drum a quiz is asking for, at its last hint — and, pulsing, the drum **Study** is waiting for (with Guide pads on) |
 | yellow | your finger is on it |
 | green | you got it |
-| **amber** | right voice, **wrong hand** |
+| **amber** | right voice, **wrong hand**, or wrong dynamic |
 | red | you missed it |
 
 Amber is its own colour on purpose. "Right note, wrong hand" is a different mistake from "wrong
@@ -185,24 +190,26 @@ The ready screen **is the chart**, with the three controls laid over it:
 ```
 
 The third line is only worth printing because **scrubbing works where it is printed**: knob 1
-moves you through the drill before you start, so you can pick the bar you want to work on. The box
-gets out of the way the moment you leave the start — it sits over the music you are scrubbing
-through — and comes back when you scroll home, which is also the only way to find it again.
-Starting from a scrubbed position begins *there*, with no count-in: it exists to orient you at the
-top, and you have just been looking at the bar you chose.
+moves you through the drill before you start, so you can pick the bar you want to work on, and the
+pads light the drums of the stack you have landed on — so you can see where you are on the grid as
+well as on the chart. The box gets out of the way the moment you leave the start — it sits over
+the music you are scrubbing through — and comes back when you scroll home, which is also the only
+way to find it again. Starting from a scrubbed position begins *there*, with no count-in: it
+exists to orient you at the top, and you have just been looking at the bar you chose.
 
 Once it is running they are a **transport**:
 
 ```
- READY ──Play──▶ RUNNING ◀──Play──▶ PAUSED ──Back──▶ READY ──Back──▶ the list
+ READY ──Play──▶ RUNNING ◀──Play──▶ PAUSED ──Back──▶ READY ──Back──▶ its folder
 ```
 
-Play holds the playhead rather than throwing it away, and Record does the same for practice, so
-the two buttons behave alike. **Knob 1 scrubs while paused too** — a scrub is a proper seek, so
-the bars behind settle rather than counting as misses, the bars ahead re-arm and can be taken
-again, and the marks from the last attempt clear. Back restarts; because Back from the ready
-screen already goes to the list, pressing it twice leaves without needing a gesture of its own.
-**Shift + Back closes from anywhere**, whatever screen you are on.
+The button of the mode that is running **pauses** and holds the playhead rather than throwing it
+away; the **other** button switches between listening and practising in place, without going back
+to the top — watch a bar, then play it. **Knob 1 scrubs while paused too** — a scrub is a proper
+seek, so the bars behind settle rather than counting as misses, the bars ahead re-arm and can be
+taken again, and the marks from the last attempt clear. Back restarts; Back from the ready screen
+goes to the folder the drill came from — for a groove, its ladder, so the next rung is one step
+away. **Shift + Back closes from anywhere**, whatever screen you are on.
 
 Pausing shifts the clock by the time you spent stopped, so resuming carries on in tempo rather
 than lurching forward to wall time. `PAUSED` appears under the chart, and the transport light
@@ -214,10 +221,10 @@ and only one of them wants something from you.
 | **Play** | **listen** — the drill plays itself and the pads light as it goes. Nothing scored |
 | **Record** | **practice** — you play it, it scores you |
 | **Jog turn** | moves the highlight in the drill list and in settings, and does nothing anywhere else — a knock cannot change what you are playing |
-| **Jog click** | open the list / pick a drill; in settings, edit the selected row |
-| **Menu** | open the drill list |
+| **Jog click** | open the highlighted folder, or arm the drill; in settings, edit the selected row |
+| **Menu** | back to the drill list |
 | **Shift + jog click** | settings |
-| **Back** | up a level, then out of the module |
+| **Back** | up one folder, then out of the module from the top |
 | **Shift + Back** | close immediately from anywhere |
 | **Knob 1** | tempo, 40–240 |
 | **Knob 2** | read ahead — pixels per beat |
@@ -225,6 +232,17 @@ and only one of them wants something from you.
 | **Knob 4** | kit layout |
 
 ## The drills
+
+The list is a tree. **Click** opens a folder, **Back** goes up one, and Back at the top leaves.
+
+```
+Basics      Subdivisions · Random (reading 8ths/16ths, sticking, groove variation — fresh each time)
+Grooves     Rock & Pop · Funk & Soul · Latin & World · Jazz & Swing · Electronic · Techno
+Rudiments   Rolls · Diddles · Flams · Drags          (the PAS forty)
+Training    Ladder · Clock                           (on the drill you have armed)
+Quiz        Guess / Hear / Pick
+Progress
+```
 
 ### Levels
 
@@ -243,30 +261,56 @@ the same groove, and — the part that matters — **a voice never moves between
 the same pad at L2 as at L4, so what you learn at the bottom transfers literally instead of by
 analogy.
 
-A groove with nothing to strip has one rung and opens straight away.
+Every bundled groove has a ladder. The fourth rung appears in the grooves that use **toms** — the
+fills, songo, mozambique, tribal techno — because that is the limb it adds. A drill with nothing
+to strip, like a rudiment, has one rung and opens straight away.
 
 ### Rudiments
 
-Sixteen, with sticking enforced: single and double stroke rolls, the paradiddle family, flams,
-drags, ratamacues and the numbered rolls. These are the drum scales — the vocabulary everything
-else is assembled from — and they are the material the Ladder is for.
+**All forty** of the Percussive Arts Society's International Drum Rudiments, with sticking
+enforced, filed as the PAS files them:
+
+| Family | |
+| --- | --- |
+| Rolls | single stroke roll, four and seven; multiple bounce; triple stroke; double stroke; the 5, 6, 7, 9, 10, 11, 13, 15 and 17 stroke rolls |
+| Diddles | single, double and triple paradiddle; paradiddle-diddle |
+| Flams | flam, flam accent, flam tap, flamacue, flam paradiddle, single flammed mill, flam paradiddle-diddle, pataflafla, Swiss army triplet, inverted flam tap, flam drag |
+| Drags | drag, single and double drag tap, lesson 25, single dragadiddle, drag paradiddle 1 and 2, single, double and triple ratamacue |
+
+These are the drum scales — the vocabulary everything else is assembled from — and they are the
+material the Ladder is for. Each sticking and accent follows the PAS sheet; the rhythms are the
+**open** forms the sheet itself says to start from. Grace notes are written measured, because a
+pad and a scoring window cannot tell a closed flam from a double hit: a **flam** is one grace note
+from the other hand, half a step of the rudiment's grid ahead of its stroke, and a **drag** is two,
+half and a quarter step ahead. Close them up as the tempo rises. The **multiple bounce roll** cannot
+be buzzed on a pad, so it is practised as its hand pulse.
 
 ### Grooves
 
-Fourteen styles: rock backbeat, straight eights, sixteenth funk, shuffle, half-time shuffle, bossa
-nova, samba, reggae one-drop, jazz ride, disco, motown, second line, afrobeat, boom-bap. Sticking
-is off for these; what matters is the voice and the time.
+Forty-two, in six families, each running easy to hard. Sticking is off for these; what matters is
+the voice and the time.
 
-### Subdivisions
+| Family | |
+| --- | --- |
+| Rock & Pop | rock backbeat, straight eights, pop four-floor, motown, disco, punk, halftime ballad, rock with a fill |
+| Funk & Soul | sixteenth funk, ghost-note funk, halftime shuffle, linear funk, funk with toms |
+| Latin & World | reggae one-drop, cha-cha, bossa nova, samba, afrobeat, second line, mambo, songo, mozambique, Afro-Cuban 6/8 |
+| Jazz & Swing | two-beat, jazz ride, shuffle, jazz waltz, up-tempo swing |
+| Electronic | house, boom bap, dubstep, trap hats, breakbeat, UK garage, drum & bass |
+| Techno | peak-time, minimal, dub techno, electro, Detroit, tribal, hard techno |
 
-Generated: quarters, eighths, triplets, sixteenths, sextuplets — and **switching between them** on
-a cue, which is the actual skill and the one that does not survive being practised one subdivision
-at a time.
+Every pattern is written for this module in the manner of its style and named by the style — never
+after a record's beat.
 
-### Reading
+### Basics
 
-Generated random rhythm lines at a chosen subdivision and density, seeded. The drum equivalent of
-a sight-reading exercise: you have not seen this bar before and you get one pass at it.
+**Subdivisions**: quarters, eighths, triplets, sixteenths, sextuplets — and **switching between
+them** on a cue, which is the actual skill and the one that does not survive being practised one
+subdivision at a time.
+
+**Random**: reading lines in eighths and sixteenths, a random sticking, and a groove variation —
+drawn from a **fresh seed every time you open one**, because material you have learned by heart is
+not reading practice. A restart replays the set you just played.
 
 ### How long a practice is
 
@@ -282,7 +326,8 @@ Clock use, and what open playing wants.
 
 ### The Ladder
 
-Wraps any rudiment or groove. Play `Ladder bars` bars clean — no misses, no sticking errors, σ
+In **Training**. It wraps the drill you have armed — arm one first; with nothing armed the list
+says so — starting from that drill's own tempo. Play `Ladder bars` bars clean — no misses, no sticking errors, σ
 inside the strictness threshold — and the tempo goes up by `Ladder step` and it asks again. Fail
 and the ladder ends.
 
@@ -292,9 +337,7 @@ comparable number for a drill, which is what makes progress legible at all.
 
 ### Ear training
 
-**The ear training leads the list**, because you cannot play a groove you cannot hear.
-
-Three shapes, because they isolate three different skills. Which entry you open is also how you
+In the **Quiz** folder. Three shapes, because they isolate three different skills. Which entry you open is also how you
 pick. The drill plays its question; **Play repeats it**, and a correct answer names the drum and
 moves on a beat later — long enough to read what it was, which in the hearing drills is where the
 teaching is.
@@ -314,9 +357,21 @@ are absurd is a quiz you pass by elimination without ever hearing the answer.
 There is no *guess the subdivision* and no *guess the groove*: for both, the notation **is** the
 answer, so there would be nothing left to ask.
 
+**Record** is help, two presses deep, and what each press does depends on what the drill is
+withholding: in **Guess** the first sounds the drum and the second lights its pad; in **Hear** the
+first names it — the staff stays hidden — and the second lights its pad; in **Pick** each press
+strikes out a wrong option. A hinted answer still counts and keeps your streak — a hint you are
+afraid to use is a hint that does not help you learn — but the round records how many you took.
+
+The pad is lit only at the last hint, and never by Guide pads: that setting is a playing aid for
+the reading modes, where the music is moving and a hint keeps you with it.
+
+A round that beats every earlier one says **BEST YET**, and so does a practice that is your
+tightest yet at its tempo.
+
 ### Clock
 
-The exam. Open it on top of any drill: the click plays for four bars and then **stops**, and you
+The exam, in **Training**. Open it on top of the drill you have armed: the click plays for four bars and then **stops**, and you
 keep going. The header shows how far you have drifted, live, so you can hear yourself going wrong
 and pull it back rather than only finding out at the end. Then the click returns, and you find out
 whether you were right.
@@ -327,14 +382,6 @@ has been showing you all along.
 
 Everything else here is played against a metronome, which is a crutch you eventually have to put
 down. This is the drill that tells you whether you can.
-
-**Record** is help, two presses deep, and what each press does depends on what the drill is
-withholding. A hinted answer still counts and keeps your streak — a hint you are afraid to use is
-a hint that does not help you learn — but the round records how many you took.
-
-**The answer is never lit on the pads**, not even with Guide pads on. That setting is a playing
-aid for the reading modes, where the music is moving and a hint keeps you with it. In a quiz the
-hint is the answer.
 
 ## Settings
 
@@ -354,7 +401,7 @@ jumps to the row it edits, which is how you find the mapping rather than having 
 | Ghost vel | 45 | a ghost note must stay under this |
 | Guide pads | **off** | light the voice you need next. This is a reading trainer first |
 | Reps | **as written** | override how many times the drill repeats. The file is the default, and usually right |
-| Study | off | stop the scroll at a note until it is played. For learning a rudiment, not for keeping time |
+| Study | off | stop the scroll **on** a note you missed until it is played: the lane under the chart names it, its pads pulse with Guide pads on, and one press carries on. For learning a rudiment, not for keeping time |
 | Click | **on** | the built-in metronome |
 | Click sub | beat | `off` / `beat` / `8ths` / `16ths` |
 | Count in | 4 | beats before the first note |
@@ -386,8 +433,12 @@ two of them because `index.json` is what the module ships and is replaced on eve
 from the menu the next time you update, with the file still sitting on disk.
 
 ```json
-{ "exercises": [ { "id": "my-groove", "name": "My groove", "file": "my-groove.json" } ] }
+{ "exercises": [ { "id": "my-groove", "name": "My groove", "file": "my-groove.json", "category": "rock" } ] }
 ```
+
+`category` files it into one of the shipped folders — `rock`, `funk`, `latin`, `jazz`,
+`electronic`, `techno`, `rolls`, `diddles`, `flams`, `drags`. Leave it out, or name one that does
+not exist, and the drill appears in an **Other** folder.
 
 ```json
 {
@@ -471,7 +522,8 @@ Everything except `ui.js` is pure and runs under plain `node`.
 | `src/kit.mjs` | the nine voices — staff position, notehead, stem, DSP channel |
 | `src/layout.mjs` | every screen coordinate, in one leaf module |
 | `src/notation.mjs` | staff placement and ledger lines |
-| `src/beam.mjs` | beat-grouped stems and beams, computed once per chart |
+| `src/catalog.mjs` | the drill tree and how the list walks it |
+| `src/beam.mjs` | beat-grouped stems and beams |
 | `src/staff_render.mjs` | the percussion staff: heads, stems, beams, accents, bar lines |
 | `src/grid_render.mjs` | the lane view |
 | `src/view.mjs` | whole screens, composed from the above |
@@ -531,7 +583,7 @@ Very little, and all of it MIT — the full text of each is in
 
 | | what | licence |
 | --- | --- | --- |
-| `src/vendor/host/plugin_api_v1.h` | a reduced copy of the Schwung host's ABI header, so the C tests drive the real ABI | MIT, (c) 2025-2026 Charles Vestal |
+| `src/vendor/host/plugin_api_v1.h` | a copy of Schwung 1.7.3's ABI header, so the C tests drive the real ABI | MIT, (c) 2025-2026 Charles Vestal |
 | `libm` | the only external crate; `dsp/drums` is `no_std`, so `sinf`/`expf`/`powf` come from here | MIT |
 
 The JavaScript has **no dependencies at all**, runtime or development: the
