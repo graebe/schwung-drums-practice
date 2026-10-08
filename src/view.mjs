@@ -23,11 +23,11 @@ import { visibleEntries, runProgress, blockingNotes } from './scoring.mjs';
 import { visibleBars, rulerBars, beatToX, practiceBeats } from './chart.mjs';
 import { voiceById, voicesInChart } from './kit.mjs';
 import { diatonicToY } from './notation.mjs';
-import { drawHeader, drawTimingBar, drawCountIn, timingX, drawBarRuler } from './chrome.mjs';
+import { drawHeader, drawFooter, drawCountIn, drawBarRuler } from './chrome.mjs';
 import { drawPlayGlyph, drawRecordGlyph, drawScrubGlyph } from './glyphs.mjs';
 
 /* Re-exported so ui.js and the tests have one place to draw from. */
-export { drawHeader, drawTimingBar, drawCountIn, timingX, drawBarRuler };
+export { drawHeader, drawFooter, drawCountIn, drawBarRuler };
 export { pruneMarkers } from './scoring.mjs';
 export { drawList, listWindow, pageTop, LIST_ROWS, drawPlot } from './chrome.mjs';
 export * from './screens.mjs';
@@ -35,10 +35,7 @@ export * from './screens.mjs';
 /* ---- The reading view --------------------------------------------------- */
 export function drawReadingView(ctx, s) {
   ctx.clear();
-  drawHeader(ctx, {
-    ...s,
-    progress: s.run ? runProgress(s.run, s.songBeats) : 0,
-  });
+  drawHeader(ctx, s);
 
   const px = s.pxPerBeat || L.PX_PER_BEAT_DEFAULT;
   const visible = visibleEntries(s.run, s.songBeats, px);
@@ -56,7 +53,12 @@ export function drawReadingView(ctx, s) {
   }
 
   drawUnderLane(ctx, s, visible, rulerBars(s.chart, s.songBeats, px, endBeat));
-  drawTimingBar(ctx, s.run && s.run.timing, s.run && s.run.windows);
+  /* How far through, and hits/misses so far — as in the piano trainer. */
+  /* `progress` is the caller's when the run is endless: the Ladder's rung, the
+   * Clock's rounds. Otherwise it is the run's own. */
+  const progress = s.progress !== undefined ? s.progress
+    : s.run ? runProgress(s.run, s.songBeats) : 0;
+  drawFooter(ctx, progress, s.run ? `${s.run.hits}/${s.run.misses}` : '');
   /* Paused and stuck both show a motionless scroll, and only one of them is
    * waiting for you to play something — so each SAYS which it is. */
   if (s.paused) drawLaneCallout(ctx, 'PAUSED');
@@ -86,8 +88,8 @@ function drawLaneCallout(ctx, text) {
   let label = text;
   while (label.length > 1 && ctx.textWidth(label) > L.SCREEN_W - 6) label = label.slice(0, -1);
   const w = ctx.textWidth(label);
-  ctx.fillRect(L.TIMING_CENTER_X - (w >> 1) - 2, L.UNDER_LANE_Y - 1, w + 4, L.TEXT_H, 1);
-  ctx.text(L.TIMING_CENTER_X - (w >> 1), L.UNDER_LANE_Y, label, 0);
+  ctx.fillRect((L.SCREEN_W >> 1) - (w >> 1) - 2, L.UNDER_LANE_Y - 1, w + 4, L.TEXT_H, 1);
+  ctx.text((L.SCREEN_W >> 1) - (w >> 1), L.UNDER_LANE_Y, label, 0);
 }
 
 function drawStaffBody(ctx, s, visible, px, bars) {

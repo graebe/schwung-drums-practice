@@ -14,7 +14,7 @@
  *   y 47      rule
  *   y 48      bar ticks, hanging off the rule
  *   y 49..55  the under lane — bar numbers, or the sticking
- *   y 57..63  the timing bar
+ *   y 56..62  the footer — progress bar, hits/misses
  */
 
 export const SCREEN_W = 128;
@@ -178,45 +178,18 @@ export const UNDER_LANE_Y = 49;
 
 /* ---- Timing bar --------------------------------------------------------- */
 /*
- * The one thing on this screen you learn to read. Zero is the centre of the
- * screen, not of a box, so the eye has a fixed landmark it can trust between
- * frames; early is left and late is right, which is the same direction the
- * music scrolls.
+ * The footer: how far through the drill you are, as a bar, and hits/misses
+ * beside it — the same as the piano trainer's, so the two modules read alike.
  *
- * TIMING_SPAN_MS is the half-width. It is deliberately WIDER than the widest
- * "gone" window (160ms at loose), so a hit never pins silently to the end of
- * the scale and read as merely-bad when it was disastrous.
- *
- * WHAT IS NOT HERE ANY MORE: minor ticks every 50ms. Nine evenly-spaced marks
- * across the full width is what an eight-segment bar counter looks like, and
- * that is how it was read — the band was mistaken for a progress display. They
- * were also the largest single piece of ink in it and they never changed,
- * while the hits themselves got two rows out of seven. The data is the picture
- * now, and the only furniture left is the axis and zero.
+ * This row used to hold a timing histogram. It looked like a progress display
+ * and was read as one, while the drill had no actual progress display
+ * anywhere; the live timing is in the header ("+3 s12") and the full
+ * breakdown is on the result screen.
  */
-export const TIMING_BAR_Y = 57;
-export const TIMING_BAR_H = 7;
-export const TIMING_CENTER_X = SCREEN_W / 2;
-export const TIMING_HALF_W = 44;
-export const TIMING_SPAN_MS = 200;
+export const FOOTER_Y = 58;
+export const PROGRESS_H = 3;
+export const FOOTER_BAR_W = SCREEN_W - 44;
 
-/*
- * The distribution, which is the whole band: five rows of histogram, one row
- * of axis, one row for zero and the mean.
- *
- * BINS MUST BE ODD. With 29 over +/-200ms the middle bin spans +/-6.9ms and is
- * centred on timingX(0), so "on the beat" is one centred column. An even count
- * splits the beat across two columns and there is then no such thing as a
- * centred spike — the shape you are meant to be aiming for could not be drawn.
- * 29 also puts a bin at 13.8ms, finer than the tightest goodMs (15ms), so the
- * good window is never narrower than one column.
- */
-export const TIMING_HIST_BINS = 29;
-export const TIMING_HIST_BIN_W = 3;
-export const TIMING_HIST_ROWS = 5;
-/* So the first hit is a short column rather than a full-height spike: the
- * mound builds up as you play instead of arriving complete and then flattening. */
-export const TIMING_HIST_MIN_SCALE = 3;
 /*
  * ONE horizon, shared with the header. The dots used to show the last 24 hits
  * while the mean flag beside them and the header's own "+3 s13" both showed 48,

@@ -7,10 +7,13 @@
         "Read the chart, play the",
         "pad, watch your timing.",
         "",
-        "The bar at the bottom is",
-        "your error: zero in the",
-        "middle, early left, late",
-        "right. Narrow is good."
+        "Header: +3 s12 is 3ms",
+        "late, a spread of 12.",
+        "Narrow is good.",
+        "",
+        "The bar at the bottom",
+        "fills as the drill goes,",
+        "hits/misses beside it."
       ]
     },
     {

@@ -1,6 +1,6 @@
 /*
- * chrome.mjs — the furniture every screen shares: the header, the timing bar,
- * the list, the plot and the count-in.
+ * chrome.mjs — the furniture every screen shares: the header, the bar ruler,
+ * the progress footer, the list, the plot and the count-in.
  *
  * Its own module so that the reading view and the eight other screens can
  * each be their own file without one importing the other. That edge — a
@@ -11,7 +11,7 @@
 
 import * as L from './layout.mjs';
 import { barBeatOf } from './chart.mjs';
-import { histogram, recentStats } from './timing.mjs';
+import { recentStats } from './timing.mjs';
 import * as SR from './staff_render.mjs';
 
 /* ---- Header ------------------------------------------------------------- */
@@ -55,32 +55,9 @@ export function drawHeader(ctx, s) {
   ctx.text(L.SCREEN_W - rw - mw - 5, 0, mid, 1);
   ctx.text(L.SCREEN_W - rw - 1, 0, right, 1);
   ctx.fillRect(0, L.HEADER_RULE_Y, L.SCREEN_W, 1, 1);
-
-  /*
-   * The header rule doubles as a progress bar: it is already a full-width
-   * line in exactly the right place, so the practice fills it from the left
-   * by thickening. Nothing new moves on screen and nothing else had to give
-   * up a row. An endless drill leaves it alone, because there is no fraction
-   * of forever and a bar that crept along regardless would be a lie.
-   */
-  if (s.run && s.progress > 0) {
-    ctx.fillRect(0, L.HEADER_RULE_Y - 1, Math.round(s.progress * L.SCREEN_W), 1, 1);
-  }
 }
 
-/* ---- The timing bar ----------------------------------------------------- */
-/*
- * Zero in the middle of the SCREEN, early left, late right — the same
- * direction the music scrolls. The eye needs a landmark it can trust between
- * frames, so the centre never moves and the scale never rescales itself to
- * the data: a bar that redrew its own axis every time you played badly would
- * make bad playing look the same as good.
- */
-export function timingX(ms) {
-  const clamped = Math.max(-L.TIMING_SPAN_MS, Math.min(L.TIMING_SPAN_MS, ms));
-  return Math.round(L.TIMING_CENTER_X + (clamped / L.TIMING_SPAN_MS) * L.TIMING_HALF_W);
-}
-
+/* ---- The bar ruler and the footer ------------------------------------- */
 /*
  * The bar ruler: the rule under the chart, a tick where each bar line falls,
  * and the bar's number beside it.
@@ -122,86 +99,14 @@ export function drawBarRuler(ctx, bars, numbers) {
 }
 
 /*
- * How your playing is DISTRIBUTED, which is a shape rather than a number:
- *
- *   tight      a narrow spike on the centre
- *   rushing    a spike left of it
- *   dragging   a spike right of it
- *   scattered  a wide, low mound
- *
- * That is readable in the moment a drummer can spare to glance down, which a
- * cloud of twenty-four dots on two rows was not — in a tight passage they
- * merged into one blob, and a dot's ROW was picked by its index parity, so
- * height carried no meaning at all.
- *
- * The scale never rescales horizontally (see timingX) so the centre is always
- * the beat. It does normalise VERTICALLY, to its own tallest column: the shape
- * is about where the hits sit relative to each other, and a fixed vertical
- * scale would leave the picture almost flat until you had played a lot. The
- * cost is that thirty hits and three hundred can draw the same silhouette —
- * the header carries the counts, this carries the shape.
+ * The footer: an outlined bar that fills as the drill goes, and the hits and
+ * misses so far at its right. Drawn as the piano trainer draws it.
  */
-export function drawTimingBar(ctx, timing, windows) {
-  const y = L.TIMING_BAR_Y;
-  const baseline = y + L.TIMING_HIST_ROWS - 1; /* columns grow UP from here */
-  const axisY = baseline + 1;
-  const markY = axisY + 1;
-  const cx = L.TIMING_CENTER_X;
-
-  /*
-   * The axis, and the good window as the one SOLID run on it. "Inside the
-   * window" has to be a place on the bar rather than a number to remember, and
-   * before this the window was dotted along the same row as the minor ticks —
-   * so the most important reference on the screen was indistinguishable from
-   * graduations. Now the graduations are gone and it is the only solid thing.
-   */
-  const good = windows ? windows.goodMs : 0;
-  const goodR = timingX(good);
-  const goodL = timingX(-good);
-  const left = timingX(-L.TIMING_SPAN_MS);
-  const right = timingX(L.TIMING_SPAN_MS);
-  ctx.fillRect(goodL, axisY, goodR - goodL + 1, 1, 1);
-  /*
-   * Dotted OUTWARD from the window's edges rather than on one phase across the
-   * whole axis. A global phase can put a lit pixel hard against the solid run,
-   * which reads as a window one or two pixels wider than it is — and the width
-   * of that run is the one measurement on the bar.
-   */
-  for (let x = goodL - 2; x >= left; x -= 2) ctx.fillRect(x, axisY, 1, 1, 1);
-  for (let x = goodR + 2; x <= right; x += 2) ctx.fillRect(x, axisY, 1, 1, 1);
-
-  /* Zero, and nothing else that does not move. */
-  ctx.fillRect(cx, markY, 1, 1, 1);
-
-  if (!timing) return;
-  const s = recentStats(timing, L.TIMING_RECENT_N);
-  if (s.n === 0) return;
-
-  const bins = histogram(timing, L.TIMING_HIST_BINS, L.TIMING_SPAN_MS, L.TIMING_RECENT_N);
-  let peak = 0;
-  for (let i = 0; i < bins.length; i++) if (bins[i] > peak) peak = bins[i];
-  const scale = Math.max(peak, L.TIMING_HIST_MIN_SCALE);
-  const binMs = (L.TIMING_SPAN_MS * 2) / L.TIMING_HIST_BINS;
-  const half = L.TIMING_HIST_BIN_W >> 1;
-
-  for (let i = 0; i < bins.length; i++) {
-    if (!bins[i]) continue;
-    /* At least one row for any bin that has hits in it: a column that rounded
-     * away would be a hit the bar silently did not report. */
-    const h = Math.max(1, Math.min(L.TIMING_HIST_ROWS,
-      Math.round((bins[i] / scale) * L.TIMING_HIST_ROWS)));
-    const centreMs = -L.TIMING_SPAN_MS + (i + 0.5) * binMs;
-    const bx = timingX(centreMs) - half;
-    ctx.fillRect(bx, baseline - h + 1, L.TIMING_HIST_BIN_W, h, 1);
-  }
-
-  /*
-   * The mean, on the SAME ROW as zero and deliberately so: the gap between the
-   * two is your average error, read off directly, and when you are on the beat
-   * they merge — which is exactly the picture "on the beat" should make.
-   */
-  const mx = timingX(s.meanMs);
-  ctx.fillRect(mx - 1, markY, 3, 1, 1);
+export function drawFooter(ctx, progress, right) {
+  const w = Math.max(0, Math.min(1, progress)) * L.FOOTER_BAR_W;
+  ctx.drawRect(1, L.FOOTER_Y, L.FOOTER_BAR_W, L.PROGRESS_H, 1);
+  if (w > 0) ctx.fillRect(1, L.FOOTER_Y, Math.round(w), L.PROGRESS_H, 1);
+  if (right) ctx.text(L.SCREEN_W - ctx.textWidth(right) - 1, L.FOOTER_Y - 2, right, 1);
 }
 
 /* ---- Lists (the menu and the settings page) ----------------------------- */

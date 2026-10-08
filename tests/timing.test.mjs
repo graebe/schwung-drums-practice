@@ -84,23 +84,6 @@ test('the ring is bounded but the session totals are not', () => {
   assert.deepEqual(T.recentOffsets(acc, 2), [10, 10]);
 });
 
-test('a hit past the span folds into the end bucket rather than vanishing', () => {
-  const acc = T.createTiming();
-  T.pushOffset(acc, 'SN', 5000, 0);
-  T.pushOffset(acc, 'SN', -5000, 0);
-  const h = T.histogram(acc, 5, 100);
-  assert.equal(h.reduce((a, b) => a + b, 0), 2, 'no hit is silently dropped');
-  assert.equal(h[0], 1);
-  assert.equal(h[4], 1);
-});
-
-test('the histogram puts zero in the middle bucket', () => {
-  const acc = T.createTiming();
-  T.pushOffset(acc, 'SN', 0, 0);
-  const h = T.histogram(acc, 5, 100);
-  assert.deepEqual(h, [0, 0, 1, 0, 0]);
-});
-
 test('a non-finite offset is refused rather than poisoning the mean', () => {
   const acc = T.createTiming();
   T.pushOffset(acc, 'SN', 10, 0);

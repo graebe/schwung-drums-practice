@@ -915,6 +915,21 @@ function serviceLadder() {
   LAD.beginRung(ladder, run, tp.songBeats);
 }
 
+/*
+ * The footer's fraction for the runs that are endless under the hood: how far
+ * through the current rung of a Ladder, how far through the Clock's rounds.
+ * Undefined for everything else, which the reading view works out itself.
+ */
+function endlessProgress() {
+  if (ladder && ladder.started) {
+    const span = ladder.bars * CH.beatsPerBar(chart);
+    return span > 0 ? Math.max(0, Math.min(1, (tp.songBeats - ladder.windowStart) / span)) : 0;
+  }
+  if (ladder) return 0;
+  if (clockMode) return Math.max(0, Math.min(1, tp.songBeats / clockEnd()));
+  return undefined;
+}
+
 /* How long the Clock runs: this many rounds of click-on then click-off. */
 const CLOCK_ROUNDS = 4;
 
@@ -1414,6 +1429,7 @@ function draw() {
       run, chart, songBeats: tp.songBeats, pxPerBeat: settings.pxPerBeat, view: settings.view,
       title: chart.name, bpm: chart.bpm, lanes: chartLanes,
       dynamics: settings.dynamics, beatFlash, timing: run.timing, paused: tp.paused, blocked: tp.blocked,
+      progress: endlessProgress(),
     });
     if (clockMode) {
       const perBar = CH.beatsPerBar(chart);

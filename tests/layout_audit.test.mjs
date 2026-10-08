@@ -22,7 +22,7 @@ test('the bands run top to bottom without overlapping', () => {
      * tick with a gap above it reads as a stray mark rather than as a
      * graduation. They must still not reach the text row. */
     ['under lane', L.UNDER_LANE_Y, L.UNDER_LANE_Y + L.TEXT_H - 1],
-    ['timing', L.TIMING_BAR_Y, L.TIMING_BAR_Y + L.TIMING_BAR_H - 1],
+    ['footer', L.FOOTER_Y - 2, L.FOOTER_Y - 2 + L.TEXT_H - 1],
   ];
   for (let i = 1; i < bands.length; i++) {
     assert.ok(bands[i][1] > bands[i - 1][2],
@@ -36,10 +36,10 @@ test('the bar ticks graduate the rule and stay inside the lane', () => {
   assert.equal(L.UNDER_TICK_Y, L.UNDER_RULE_Y + 1, 'a tick must touch the rule it graduates');
   /* A tick is two rows and the text row starts on its second, which is fine
    * VERTICALLY — they are separated horizontally, and the render test measures
-   * that. What must not happen is a tick reaching the timing bar. */
+   * that. What must not happen is a tick reaching the footer. */
   assert.ok(L.UNDER_TICK_Y + L.UNDER_TICK_H <= L.UNDER_LANE_Y + L.TEXT_H,
     'the ticks run out of the lane');
-  assert.ok(L.UNDER_TICK_Y + L.UNDER_TICK_H < L.TIMING_BAR_Y, 'the ticks reach the timing bar');
+  assert.ok(L.UNDER_TICK_Y + L.UNDER_TICK_H < L.FOOTER_Y - 2, 'the ticks reach the footer');
 });
 
 test('the whole kit fits between the beams', () => {
@@ -66,35 +66,12 @@ test('a third beam would not fit, which is why there are two', () => {
   assert.ok(third >= top - 1, 'MAX_BEAMS could be raised — the comment is now wrong');
 });
 
-test('the timing bar fits the screen and is centred on it', () => {
-  assert.equal(L.TIMING_CENTER_X, L.SCREEN_W / 2);
-  assert.ok(L.TIMING_CENTER_X - L.TIMING_HALF_W >= 0);
-  assert.ok(L.TIMING_CENTER_X + L.TIMING_HALF_W < L.SCREEN_W);
-  assert.ok(L.TIMING_BAR_Y + L.TIMING_BAR_H <= L.SCREEN_H);
-});
-
-test('the timing band is tiled exactly by its three parts', () => {
-  /* Five rows of histogram, one axis, one row for zero and the mean. If these
-   * stop adding up, a column either overruns into the axis or a row goes
-   * unused — and the band has no spare rows to absorb either. */
-  assert.equal(L.TIMING_HIST_ROWS + 2, L.TIMING_BAR_H,
-    'the histogram, the axis and the mark row do not fill the band');
-  assert.ok(L.TIMING_BAR_Y > L.UNDER_LANE_Y + L.TEXT_H - 1,
-    'the band starts inside the lane under the chart');
-  assert.ok(L.TIMING_HIST_BINS % 2 === 1, 'an even bin count has no bin centred on the beat');
-  /* Every bin must be reachable as a distinct column, or bins are being drawn
-   * on top of each other and the resolution is a fiction. */
-  const axisPx = L.TIMING_HALF_W * 2 + 1;
-  assert.ok(L.TIMING_HIST_BINS <= axisPx, `${L.TIMING_HIST_BINS} bins into ${axisPx}px`);
-  /* And one bin must be finer than the tightest window, or the window is
-   * narrower than a single column and cannot be aimed at. */
-  assert.ok((L.TIMING_SPAN_MS * 2) / L.TIMING_HIST_BINS < 15,
-    'a bin is coarser than the tight goodMs, so the window is sub-column');
-});
-
-test('the timing scale is wider than the worst window it must show', () => {
-  /* Otherwise a disastrous hit pins at the end and reads as merely bad. */
-  assert.ok(L.TIMING_SPAN_MS > 160, 'the loose "gone" window is 160ms');
+test('the footer bar leaves room for the hits and misses beside it', () => {
+  /* Three-digit counts either side of the slash: 7 characters at the 6px
+   * advance, 41px, beside a bar that ends 44px short of the edge. */
+  assert.ok(L.SCREEN_W - (1 + L.FOOTER_BAR_W) - 2 >= 7 * 6 - 1, 'a long count runs into the bar');
+  assert.ok(L.FOOTER_Y + L.PROGRESS_H <= L.SCREEN_H, 'the bar runs off the bottom');
+  assert.ok(L.FOOTER_Y - 2 > L.UNDER_LANE_Y + L.TEXT_H - 1, 'the footer starts inside the lane');
 });
 
 test('the scroll runs the right way and the clef is clear of it', () => {
@@ -195,5 +172,5 @@ test('the ready box fits, in both of its states', () => {
     assert.ok(b.y + dy + L.TEXT_H <= b.y + b.h, `the row at +${dy} ends outside the box`);
   }
   /* And it leaves the timing bar alone. */
-  assert.ok(b.y + b.h < L.TIMING_BAR_Y);
+  assert.ok(b.y + b.h < L.FOOTER_Y - 2);
 });

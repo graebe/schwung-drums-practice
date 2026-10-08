@@ -10,7 +10,7 @@
  *
  *   mean   where you sit against the beat. NEGATIVE IS EARLY, because the
  *          chart scrolls right-to-left and early is already the left-hand
- *          side of the timing bar. One sign convention, used everywhere.
+ *          side of the hit line. One sign convention, used everywhere.
  *   sigma  how consistent you are. This is the number that improves with
  *          practice, and the one worth watching.
  *
@@ -131,8 +131,8 @@ function reduceList(list) {
 /* The last `k` hits — what the header reads. */
 /*
  * Remembered against the sample count, which every push and every drop
- * changes: the running header and the timing bar both ask on every frame, and
- * the answer only changes when a hit lands.
+ * changes: the running header asks on every frame, and the answer only
+ * changes when a hit lands.
  */
 export function recentStats(acc, k = 64) {
   if (acc.recentFor === acc.n && acc.recentK === k && acc.recent) return acc.recent;
@@ -171,27 +171,8 @@ export function voicesBySpread(acc) {
   return Object.keys(pv).sort((a, b) => pv[b].sdMs - pv[a].sdMs);
 }
 
-/*
- * Counts across `bins` buckets spanning +/- spanMs. Anything past the span is
- * folded into the end bucket rather than dropped — a hit 400ms out is still a
- * hit that happened, and silently losing it would make the picture prettier
- * than the playing.
- */
-export function histogram(acc, bins = 15, spanMs = 200, k = DEFAULT_CAP) {
-  const out = new Array(bins).fill(0);
-  const from = Math.max(0, acc.ring.length - k);
-  const width = (spanMs * 2) / bins;
-  for (let i = from; i < acc.ring.length; i++) {
-    const v = acc.ring[i].offsetMs;
-    let b = Math.floor((v + spanMs) / width);
-    if (b < 0) b = 0;
-    if (b >= bins) b = bins - 1;
-    out[b]++;
-  }
-  return out;
-}
 
-/* The last `k` offsets in ms, oldest first — the dots on the timing bar. */
+/* The last `k` offsets in ms, oldest first. */
 export function recentOffsets(acc, k = 24) {
   const from = Math.max(0, acc.ring.length - k);
   const out = [];

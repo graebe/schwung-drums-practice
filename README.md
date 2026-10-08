@@ -5,9 +5,9 @@ A rhythm trainer for [Schwung](https://github.com/charlesvestal/schwung) on the 
 A percussion staff sits still on the left of the 128×64 screen. Notes and bar lines scroll in from
 the right, cross the hit line, and vanish just before the clef. Play the right pad at the right
 moment and the notehead opens into a **ring**. Miss it and it turns into an **✗**. A second ring
-marks where you actually played, so the gap between the two is your timing error — and under the
-staff a **timing bar** collects those errors into the two numbers that matter: whether you rush or
-drag, and how consistent you are.
+marks where you actually played, so the gap between the two is your timing error — and the header
+collects those errors into the two numbers that matter: whether you rush or drag, and how consistent
+you are. Along the bottom, a bar fills as the drill goes, with your hits and misses beside it.
 
 Drums Practice is an independent module for Schwung. It is not made or supported by Ableton.
 
@@ -157,10 +157,10 @@ So every hit's signed error is kept, and the header carries the two numbers that
 - **σ** — the standard deviation, in milliseconds. How *consistent* you are. This is the number
   that improves with practice, and the one to watch.
 
-The **timing bar** under the staff shows the same thing as a picture: zero in the middle, your
-last hits as dots either side, the running mean as a marker. Early is left, late is right. When
-the cloud is centred and narrow you are playing in time; when it is centred and wide you are not,
-whatever the hit count says.
+Both are in the **header** while you play, over your last 48 hits: `+3 s12` is three milliseconds
+late on average with a spread of twelve. The **footer** is the drill's progress — a bar that fills
+from the left, as in the piano trainer — with `hits/misses` beside it. In the Ladder it fills once
+per rung, in the Clock over its four rounds.
 
 The summary at the end of a run breaks both down **per voice**, because limbs have their own
 habits and a drummer usually has one that drags.
@@ -409,8 +409,8 @@ and pull it back rather than only finding out at the end. Then the click returns
 whether you were right.
 
 Nothing else in the module has to change to measure this. The chart's beats are still the truth,
-so your drift is simply the mean offset over the silent bars — which is the number the timing bar
-has been showing you all along.
+so your drift is simply the mean offset over the silent bars — which is the number the header has
+been showing you all along.
 
 Everything else here is played against a metronome, which is a crutch you eventually have to put
 down. This is the drill that tells you whether you can.
