@@ -22,6 +22,14 @@ export const ROWS = [
   /* ---- knobs 1-4 ---- */
   { key: 'bpm',        label: 'Tempo',     type: 'int',  min: 40, max: 240, rebuild: true,
     format: (v) => `${v}` },
+  /*
+   * Every drill at a share of its own tempo — a hand-written one's, or Tempo
+   * for a generated one. Also on knob 8 in a drill. Without it the grooves and
+   * rudiments, written at up to 270, could not be slowed down at all.
+   */
+  { key: 'speed',      label: 'Speed',     type: 'list', rebuild: true,
+    values: [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120],
+    format: (v) => `${v}%` },
   { key: 'pxPerBeat',  label: 'Read ahead', type: 'int', min: 12, max: 48 },
   /*
    * An OVERRIDE, not the source of truth. How long a practice is belongs to
@@ -62,12 +70,16 @@ export const ROWS = [
     format: (v) => `${v} ms` },
   { key: 'midiOut',    label: 'MIDI out',  type: 'list', values: [4, 1, 2, 3],
     format: (v) => ({ 4: 'kit', 1: 'track', 2: 'USB', 3: 'trk+USB' })[v] || `${v}` },
+  /* 0 is General MIDI's drum channel, 10. It said "all", but drum hits are
+   * sent on one channel only: sixteen copies of every hit would swamp the
+   * inject ring at sixteenth notes. */
   { key: 'midiCh',     label: 'MIDI ch',   type: 'int',  min: 0, max: 16,
-    format: (v) => (v === 0 ? 'all' : `${v}`) },
+    format: (v) => (v === 0 ? '10 GM' : `${v}`) },
 ];
 
 export const DEFAULTS = {
   bpm: 90,
+  speed: 100,
   pxPerBeat: 32,
   reps: 0,
   layout: 'kit',
@@ -93,15 +105,12 @@ export const DEFAULTS = {
   roundSize: 20,
   latencyMs: 0,
   midiOut: 4,
-  /* Broadcast. A module cannot read or change which channel a track listens
-   * on, and a mismatch is silent with no clue on screen. */
+  /* General MIDI's drum channel, which a Move drum rack listens on. */
   midiCh: 0,
 };
 
 /* Bumped whenever a migration is added below. */
 export const SETTINGS_VERSION = 2;
-
-export const KNOB_ROWS = [0, 1, 2, 3];
 
 const byKey = {};
 for (let i = 0; i < ROWS.length; i++) byKey[ROWS[i].key] = ROWS[i];

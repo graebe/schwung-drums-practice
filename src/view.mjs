@@ -29,7 +29,7 @@ import { drawPlayGlyph, drawRecordGlyph, drawScrubGlyph } from './glyphs.mjs';
 /* Re-exported so ui.js and the tests have one place to draw from. */
 export { drawHeader, drawTimingBar, drawCountIn, timingX, drawBarRuler };
 export { pruneMarkers } from './scoring.mjs';
-export { drawList, listWindow, LIST_ROWS, drawPlot } from './chrome.mjs';
+export { drawList, listWindow, pageTop, LIST_ROWS, drawPlot } from './chrome.mjs';
 export * from './screens.mjs';
 
 /* ---- The reading view --------------------------------------------------- */

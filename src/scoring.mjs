@@ -27,7 +27,7 @@
 
 import { msToBeats, beatsToMs, beatToX, expandEvents, loopBeats, repeatsOf,
          practiceBeats, visibleRange } from './chart.mjs';
-import { createTiming, pushOffset } from './timing.mjs';
+import { createTiming, pushOffset, dropFrom } from './timing.mjs';
 
 /*
  * `normal` is the default and is roughly a semiquaver's worth of slack at a
@@ -112,6 +112,33 @@ function makeEntry(event, iter) {
   };
 }
 
+/* Undo what judging a note added to the run's counts. */
+function unscore(run, note) {
+  if (note.state === HIT) {
+    run.hits--;
+    if (Math.abs(note.offsetBeats) <= run.perfect) run.perfects--;
+    if (!note.handOk && run.sticking === STICK_STRICT) run.stickErrors--;
+    if (!note.dynOk) run.dynErrors--;
+  } else if (note.state === MISSED) {
+    run.misses--;
+  }
+}
+
+/*
+ * The tempo changed mid-run (the Ladder climbs). Everything the run derived
+ * from the tempo is in beats, so it is worked out again: left alone, a 60ms
+ * window set at 80bpm was a 30ms window at 160, and the Ladder failed early
+ * on hits it should have counted.
+ */
+export function setTempo(run, bpm) {
+  run.bpm = bpm;
+  run.good = msToBeats(run.windows.goodMs, bpm);
+  run.perfect = msToBeats(run.windows.perfectMs, bpm);
+  run.late = msToBeats(run.windows.lateMs, bpm);
+  run.latencyBeats = msToBeats(run.latencyMs, bpm);
+  return run;
+}
+
 export function createRun(chart, opts = {}) {
   const windows = { ...(WINDOWS[opts.strictness] || WINDOWS[DEFAULT_STRICTNESS]),
                     ...(opts.windows || {}) };
@@ -130,6 +157,7 @@ export function createRun(chart, opts = {}) {
      * late and the mean is a lie that no amount of practice can fix — so it
      * is corrected once, at the door, and never thought about again.
      */
+    latencyMs: opts.latencyMs || 0,
     latencyBeats: msToBeats(opts.latencyMs || 0, bpm),
     sticking: opts.sticking || (chart.sticking === undefined ? STICK_OFF : chart.sticking),
     dynamics: opts.dynamics !== false,
@@ -539,12 +567,18 @@ export function seekTo(run, beat) {
   for (let i = 0; i < run.entries.length; i++) {
     const entry = run.entries[i];
     const behind = entry.beat < beat;
+    /* Re-armed notes are sounded again: Listen skipped any entry it had
+     * already played, so its cursor stopped at the first one for good. */
+    if (!behind) entry.sounded = false;
     for (let n = 0; n < entry.notes.length; n++) {
       const note = entry.notes[n];
       if (behind) {
         if (note.state === PENDING) note.state = SKIPPED;
         note.played = true;
       } else {
+        /* What this note was counted as is taken back before it is played
+         * again — otherwise scrubbing back over a bar counted it twice. */
+        unscore(run, note);
         note.state = PENDING;
         note.played = false;
         note.offsetBeats = 0;
@@ -554,6 +588,7 @@ export function seekTo(run, beat) {
     }
     settleEntry(entry);
   }
+  dropFrom(run.timing, beat);
   run.markers.length = 0;
   run.cursor = 0;
   run.waitCursor = 0;
@@ -577,8 +612,13 @@ export function seekTo(run, beat) {
  * Nothing is SCORED here. The notes are marked hit so they open on screen as
  * the drill plays them, but no counter moves: listening is not an attempt.
  */
+/* One buffer, reused: this runs on every tick in Listen, at 500Hz, and the
+ * caller only walks the result before the next call. */
+const due = [];
+
 export function takeDue(run, songBeats) {
-  const out = [];
+  const out = due;
+  out.length = 0;
   for (let i = run.cursor; i < run.entries.length; i++) {
     const entry = run.entries[i];
     if (entry.beat > songBeats) break;
@@ -733,10 +773,10 @@ export function since(run, snap) {
  * the player thought to interrupt it. The file now says how long the practice
  * is, and this is where that length takes effect.
  *
- * `blocked` is true while the scroll is frozen waiting for a note. Without it
- * the run would report finished mid-freeze: the clock is pinned at
- * beat + grace, which already exceeds beat + late, so the summary would pop
- * up over a note you are still being asked to play.
+ * `blocked` is true while the scroll is frozen waiting for a note. The freeze
+ * holds the drawn clock on the note's own beat while the judging clock runs
+ * on past its late window, so without this the summary could pop up over a
+ * note you are still being asked to play.
  */
 export function runFinished(run, songBeats, blocked = false) {
   if (run.repeats === 0) return false;   /* endless, by request */

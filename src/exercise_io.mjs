@@ -61,6 +61,14 @@ export function validateExercise(obj) {
      * event would simply never be reachable. */
     if (e.beat < last) errs.push(`${at} goes backwards in time`);
     last = e.beat;
+    /* An event at or past the loop's length would land in the NEXT repeat and
+     * overlap its first bar — the entries come out of order and every early
+     * exit in the scoring loops stops in the wrong place. */
+    if (obj.loopBars >= 1) {
+      const ts = Array.isArray(obj.timeSig) ? obj.timeSig : [4, 4];
+      const loopLen = obj.loopBars * ((ts[0] * 4) / ts[1]);
+      if (e.beat >= loopLen) errs.push(`${at} is past the ${obj.loopBars}-bar loop`);
+    }
     if (!Array.isArray(e.voices) || e.voices.length === 0) {
       errs.push(`${at} names no voices`);
       continue;
@@ -104,7 +112,10 @@ export function normalizeExercise(obj, id) {
     name: obj.name,
     bpm: obj.bpm || 90,
     timeSig: obj.timeSig || [4, 4],
-    loopBars: obj.loopBars || 1,
+    /* Left out when the file leaves it out: the loop is then worked out from
+     * the events (chart.mjs loopBeats). Forcing 1 made a two-bar file repeat
+     * every bar, on top of itself. */
+    loopBars: obj.loopBars,
     repeats: obj.repeats === undefined ? DEFAULT_REPEATS : obj.repeats,
     sticking: obj.sticking || 'off',
     events,
@@ -128,12 +139,18 @@ export function parseExercise(text, id) {
  * The manifest. There is no directory-listing call in the host, which is the
  * only reason this file has to exist.
  */
-export function parseManifest(text) {
+/*
+ * Always the same shape — { entries, categories, error? } — whatever the file
+ * holds. On a parse error it used to leave `categories` out, the loader
+ * iterated `undefined` at startup, and a typo in user.json (the one file you
+ * are told to edit) put the error screen up on every launch.
+ */
+export function parseManifest(text, name = 'index.json') {
   let obj;
   try {
     obj = JSON.parse(text);
   } catch (e) {
-    return { entries: [], error: 'exercises/index.json is not valid JSON' };
+    return { entries: [], categories: [], error: `exercises/${name} is not valid JSON` };
   }
   const list = obj && Array.isArray(obj.exercises) ? obj.exercises : [];
   const entries = [];

@@ -96,19 +96,48 @@ test('playing nothing is not a clean rung', () => {
   assert.equal(v.reason, 'nothing played');
 });
 
-test('failing ends the ladder with the last clean tempo standing', () => {
+test('a slip is forgiven once; failing the rung again ends it, the last clean tempo standing', () => {
   const run = runFor();
   const l = LAD.createLadder({ bpm: 80, bars: 1, step: 10 });
   LAD.beginRung(l, run, 0);
   playBar(run, 0);
   LAD.applyVerdict(l, LAD.judgeRung(l, run, 4));
   assert.equal(l.topClean, 80);
+  assert.equal(l.bpm, 90);
 
   LAD.beginRung(l, run, 4);
   playBar(run, 4, { hand: false });
   LAD.applyVerdict(l, LAD.judgeRung(l, run, 8));
+  assert.equal(l.failed, false, 'one slip: the rung is played again');
+  assert.equal(l.again, true);
+  assert.equal(l.bpm, 90, 'at the same tempo');
+
+  LAD.beginRung(l, run, 8);
+  playBar(run, 8, { hand: false });
+  LAD.applyVerdict(l, LAD.judgeRung(l, run, 12));
   assert.equal(l.failed, true);
   assert.equal(l.topClean, 80, 'the score is what was actually held, not what was attempted');
+});
+
+test('the climb starts at 70% of the drill, and the drill\'s tempo is the target', () => {
+  assert.equal(LAD.startFor(100, 5), 70);
+  assert.equal(LAD.startFor(270, 5), 190);
+  assert.equal(LAD.startFor(50, 5), 40, 'never below 40');
+  const l = LAD.createLadder({ bpm: 70, target: 100 });
+  assert.equal(LAD.reachedTarget(l), false);
+  l.topClean = 100;
+  assert.equal(LAD.reachedTarget(l), true);
+});
+
+test('the top rung is played before the ladder counts as topped out', () => {
+  const l = LAD.createLadder({ bpm: 230, step: 10, maxBpm: 240 });
+  const clean = { clean: true, reason: '', sdMs: 5, meanMs: 0, n: 8 };
+  LAD.applyVerdict(l, clean);
+  assert.equal(l.bpm, 240);
+  assert.equal(l.failed, false, 'the ceiling has not been played yet');
+  LAD.applyVerdict(l, clean);
+  assert.equal(l.failed, true);
+  assert.equal(l.topClean, 240);
 });
 
 test('the ladder tops out rather than climbing forever', () => {

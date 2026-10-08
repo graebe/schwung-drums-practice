@@ -65,8 +65,8 @@ export function drillLabel(id, names = {}) {
  *   n     hits
  *   err   misses + sticking + dynamic errors, together
  */
-export function makeRecord({ drill, bpm, sd = 0, mean = 0, n = 0, err = 0, at = 0 }) {
-  return {
+export function makeRecord({ drill, bpm, sd = 0, mean = 0, n = 0, err = 0, at = 0, context = null }) {
+  const rec = {
     t: Math.round(at),
     d: drill,
     bpm: Math.round(bpm),
@@ -75,6 +75,18 @@ export function makeRecord({ drill, bpm, sd = 0, mean = 0, n = 0, err = 0, at = 
     n: Math.round(n),
     err: Math.round(err),
   };
+  /*
+   * What the take was played WITH: Speed, and whether Guide pads or Study
+   * helped. Kept on the record rather than in the drill's id, so one drill
+   * keeps one history — but a slow, guided take can still be told apart from
+   * an unaided one at full speed.
+   */
+  if (context) {
+    rec.sp = Math.round(context.speed || 100);
+    if (context.guide) rec.g = 1;
+    if (context.study) rec.s = 1;
+  }
+  return rec;
 }
 
 export function emptyStats() {
@@ -106,7 +118,7 @@ export function parseStats(text) {
   for (const r of obj.records) {
     if (!r || typeof r.d !== 'string') continue;
     if (!Number.isFinite(r.bpm)) continue;
-    records.push({
+    const rec = {
       t: Number.isFinite(r.t) ? r.t : 0,
       d: r.d,
       bpm: r.bpm,
@@ -114,9 +126,27 @@ export function parseStats(text) {
       mean: Number.isFinite(r.mean) ? r.mean : 0,
       n: Number.isFinite(r.n) ? r.n : 0,
       err: Number.isFinite(r.err) ? r.err : 0,
-    });
+    };
+    if (Number.isFinite(r.sp)) rec.sp = r.sp;
+    if (r.g === 1) rec.g = 1;
+    if (r.s === 1) rec.s = 1;
+    records.push(rec);
   }
   return { version: STATS_VERSION, records };
+}
+
+/* { stats, ok }: `ok` is false when there was nothing to read or it would not
+ * parse — which the caller needs to tell apart from an empty history. */
+export function readStats(text) {
+  if (!text) return { stats: emptyStats(), ok: false };
+  let obj;
+  try {
+    obj = JSON.parse(text);
+  } catch (e) {
+    return { stats: emptyStats(), ok: false };
+  }
+  if (!obj || !Array.isArray(obj.records)) return { stats: emptyStats(), ok: false };
+  return { stats: parseStats(text), ok: true };
 }
 
 export function serialiseStats(stats) {
@@ -159,13 +189,20 @@ export function summarise(records) {
  * tempo alone, the first attempt would have been the only best there could
  * ever be.
  */
+/* A spread-judged take needs this many hits to count as a best at all: two
+ * tight hits and thirty misses have a spread of almost nothing. */
+export const BEST_MIN_HITS = 8;
+
 export function isPersonalBest(stats, rec) {
   const prev = forDrill(stats, rec.d);
   const kind = String(rec.d).split(':')[0];
   const bySpread = kind === 'drill' || kind === 'clock';
+  if (bySpread && rec.n < BEST_MIN_HITS) return false;
   for (const r of prev) {
     if (r === rec) continue;
-    if (bySpread ? (r.bpm >= rec.bpm && r.sd <= rec.sd) : r.bpm >= rec.bpm) return false;
+    /* Tighter only counts when it was not bought with more mistakes. */
+    if (bySpread ? (r.bpm >= rec.bpm && r.sd <= rec.sd) || (r.bpm >= rec.bpm && r.err < rec.err)
+      : r.bpm >= rec.bpm) return false;
   }
   return true;
 }

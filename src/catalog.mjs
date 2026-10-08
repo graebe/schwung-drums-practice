@@ -77,13 +77,20 @@ export function chartNode(chart) {
  *   tail        nodes appended at the end
  */
 export function buildCatalog({ charts = [], categories = [], basics = null, tail = [] } = {}) {
+  /*
+   * Charts are only SORTED here; their nodes are made when their folder is
+   * first opened. A groove's node projects all four of its levels to find
+   * which differ, and doing that for every drill at startup — and again on
+   * every rebuild — was the bulk of the time the list took to appear.
+   */
   const byCat = {};
   for (let i = 0; i < categories.length; i++) byCat[categories[i].id] = [];
   const other = [];
   for (let i = 0; i < charts.length; i++) {
     const c = charts[i];
-    (byCat[c.category] || other).push(chartNode(c.chart));
+    (byCat[c.category] || other).push(c.chart);
   }
+  const nodesOf = (list) => () => list.map(chartNode);
   /*
    * A category naming a `folder` nests under it (Grooves › Rock & Pop); one
    * without is a top-level folder of its own. Groups keep the order of their
@@ -93,21 +100,24 @@ export function buildCatalog({ charts = [], categories = [], basics = null, tail
   const byGroup = {};
   for (let i = 0; i < categories.length; i++) {
     const cat = categories[i];
-    const rows = byCat[cat.id];
-    if (!rows.length) continue;
+    const list = byCat[cat.id];
+    if (!list.length) continue;
     if (!cat.folder) {
-      groups.push({ label: cat.name, rows });
+      groups.push({ label: cat.name, lazy: nodesOf(list) });
       continue;
     }
     if (!byGroup[cat.folder]) {
       byGroup[cat.folder] = { label: cat.folder, rows: [] };
       groups.push(byGroup[cat.folder]);
     }
-    byGroup[cat.folder].rows.push(folder(cat.name, rows));
+    byGroup[cat.folder].rows.push(lazyFolder(cat.name, nodesOf(list)));
   }
   const children = basics ? [basics] : [];
-  for (let i = 0; i < groups.length; i++) children.push(folder(groups[i].label, groups[i].rows));
-  if (other.length) children.push(folder('Other', other));
+  for (let i = 0; i < groups.length; i++) {
+    const g = groups[i];
+    children.push(g.lazy ? lazyFolder(g.label, g.lazy) : folder(g.label, g.rows));
+  }
+  if (other.length) children.push(lazyFolder('Other', nodesOf(other)));
   return folder('Drums', children.concat(tail));
 }
 

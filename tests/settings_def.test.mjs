@@ -21,9 +21,10 @@ test('the label fits the screen', () => {
   for (const row of S.ROWS) assert.ok(row.label.length <= 11, `${row.label} is too long`);
 });
 
-test('knobs 1-4 are the first four rows', () => {
-  assert.deepEqual(S.KNOB_ROWS, [0, 1, 2, 3]);
-  assert.deepEqual(S.KNOB_ROWS.map((i) => S.ROWS[i].key), ['bpm', 'pxPerBeat', 'reps', 'layout']);
+test('no settings are fixed to knobs outside the Settings screen', () => {
+  /* Knobs edit the Settings rows on screen; outside Settings they do not
+   * change settings at all. */
+  assert.equal(S.KNOB_ROWS, undefined);
 });
 
 test('an int clamps and never escapes its range', () => {

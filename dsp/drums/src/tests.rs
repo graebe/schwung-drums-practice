@@ -347,3 +347,24 @@ fn nothing_in_the_kit_can_produce_a_non_finite_sample() {
         }
     }
 }
+
+#[test]
+fn the_soft_clip_has_no_step_at_full_scale() {
+    /* Either side of the knee lands in the same place, and the curve never
+     * turns back on itself on the way there. */
+    let below = soft_clip(0.9999);
+    let above = soft_clip(1.0001);
+    assert!((above - below).abs() < 1e-3, "{below} then {above}: a step at the knee");
+    assert!((soft_clip(5.0) - soft_clip(1.0)).abs() < 1e-6, "flat past the knee");
+    assert!((soft_clip(-5.0) + soft_clip(5.0)).abs() < 1e-6, "symmetric");
+    let mut prev = soft_clip(-2.0);
+    let mut x = -2.0f32;
+    while x <= 2.0 {
+        let y = soft_clip(x);
+        assert!(y >= prev - 1e-6, "not monotonic at {x}");
+        prev = y;
+        x += 0.01;
+    }
+    /* Quiet material passes almost untouched. */
+    assert!((soft_clip(0.1) - 0.1).abs() < 0.001);
+}

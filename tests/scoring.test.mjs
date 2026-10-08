@@ -478,3 +478,45 @@ test('the next entry is the first at or after the playhead', () => {
   assert.equal(S.nextEntryIndex(run, 0.75), 3);
   assert.equal(S.nextEntryIndex(run, 0.9), -1, 'past the last');
 });
+
+/* ---- Tempo changes and seeking back (found in review) ------------------------ */
+
+test('setTempo works the windows out again in beats, so they stay the same in milliseconds', async () => {
+  const SC = await import('../src/scoring.mjs');
+  const { beatsToMs } = await import('../src/chart.mjs');
+  const chart = { id: 't', bpm: 80, timeSig: [4, 4], events: [{ beat: 0, voices: ['SN'] }] };
+  const run = SC.createRun(chart, { latencyMs: 20 });
+  const goodMs = beatsToMs(run.good, 80);
+  SC.setTempo(run, 160);
+  assert.equal(run.bpm, 160);
+  assert.ok(Math.abs(beatsToMs(run.good, 160) - goodMs) < 1e-9, 'the good window is still the same milliseconds');
+  assert.ok(Math.abs(beatsToMs(run.latencyBeats, 160) - 20) < 1e-9, 'and so is the latency');
+});
+
+test('seeking back takes back what it re-arms, so a passage is never counted twice', async () => {
+  const SC = await import('../src/scoring.mjs');
+  const { stats } = await import('../src/timing.mjs');
+  const chart = { id: 't', bpm: 120, timeSig: [4, 4], events: [0, 1, 2, 3].map((b) => ({ beat: b, voices: ['SN'] })) };
+  const run = SC.createRun(chart, { repeats: 1 });
+  for (const b of [0, 1, 2]) SC.judgeHit(run, { voice: 'SN', hand: null, velocity: 100 }, b, b);
+  assert.equal(run.hits, 3);
+  SC.expireMissed(run, 10);
+  assert.equal(run.misses, 1);
+  SC.seekTo(run, 1);
+  assert.equal(run.hits, 1, 'the two hits from beat 1 on are taken back');
+  assert.equal(run.misses, 0, 'and the miss');
+  assert.equal(stats(run.timing).n, 1, 'and their timing');
+  SC.judgeHit(run, { voice: 'SN', hand: null, velocity: 100 }, 1, 1);
+  assert.equal(run.hits, 2, 'played again, counted once');
+});
+
+test('seeking back lets Listen play the re-armed notes again', async () => {
+  const SC = await import('../src/scoring.mjs');
+  const chart = { id: 't', bpm: 120, timeSig: [4, 4], events: [0, 1, 2, 3].map((b) => ({ beat: b, voices: ['SN'] })) };
+  const run = SC.createRun(chart, { repeats: 1 });
+  assert.equal(SC.takeDue(run, 2.5).length, 3);
+  SC.seekTo(run, 1);
+  assert.equal(SC.takeDue(run, 2.5).length, 2, 'beats 1 and 2 sound again');
+  assert.equal(SC.takeDue(run, 3.5).length, 1, 'and the cursor carries on to the end');
+  assert.equal(SC.runFinished(run, 99), true);
+});

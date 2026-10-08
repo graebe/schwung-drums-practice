@@ -120,8 +120,9 @@ half repeats the left rather than reflecting it. Every voice is therefore reacha
 hand, which is what makes sticking scoreable, while the Ableton order still reads the right way
 round under both.
 
-**Knob 4** switches to `sticking`, where every pad is the snare and the only questions are which
-hand and when. That is the layout for rudiments.
+**Kit** in settings switches to `sticking`, where every pad is the snare and the only questions are
+which hand and when. That is the layout for rudiments. (The quiz always uses the kit layout: it asks
+about drums, and in `sticking` every pad is the snare.)
 
 ### Colours
 
@@ -222,14 +223,43 @@ and only one of them wants something from you.
 | **Record** | **practice** — you play it, it scores you |
 | **Jog turn** | moves the highlight in the drill list and in settings, and does nothing anywhere else — a knock cannot change what you are playing |
 | **Jog click** | open the highlighted folder, or arm the drill; in settings, edit the selected row |
-| **Menu** | back to the drill list |
-| **Shift + jog click** | settings |
-| **Back** | up one folder, then out of the module from the top |
+| **Menu** | back to the drill list — a run is stopped cleanly on the way |
+| **Shift + jog click** | settings, over whatever is on screen: a run pauses, and leaving settings returns to it |
+| **Back** | from a run or a result, back to the start of the drill; from the ready screen, up one folder; out of the module from the top |
 | **Shift + Back** | close immediately from anywhere |
-| **Knob 1** | tempo, 40–240 |
-| **Knob 2** | read ahead — pixels per beat |
-| **Knob 3** | reps — how many times the drill repeats |
-| **Knob 4** | kit layout |
+| **Knob 1** | scrub, while the music is stopped — on the ready screen or paused |
+| **Knob 8** | **speed**, 50–120% of the drill's tempo — on the ready screen, or live while playing |
+
+**Only Settings changes settings.** Outside it, the knobs do the two things above in a drill and
+nothing anywhere else, so a knob brushed on the way past cannot change a setting, throw a quiz away
+or switch the pad layout mid-run.
+
+### Speed
+
+Every drill plays at its own tempo times **Speed** — a hand-written drill at the tempo it is written
+at, a generated one at the **Tempo** setting. Slow anything down while it is new: Up-tempo swing is
+written at 270. The header shows the tempo you are actually playing, and every take records it,
+with the speed and whether Guide pads or Study helped, so a slow, guided take is never mistaken for
+a full-speed one on the chart.
+
+A change of speed mid-run takes effect at once, and that take is then passage practice rather than
+a whole attempt.
+
+### The result
+
+A run ends on its result: the drill and the tempo it was played at, your timing spread big, your
+bias and a word for it, what went wrong, the two loosest limbs, and a strip of your recent takes at
+this drill — this one last — so the number is read against where you were.
+
+| On a result | |
+| --- | --- |
+| **Record** | another take, straight away |
+| **Play** | listen to it |
+| **Back** | back to the start of the drill |
+| **Click** | on to the next drill in the folder — the next level of a groove, the next rudiment |
+
+Only a whole take is kept: practised from the top and never scrubbed. A take started from a scrubbed
+bar, or scrubbed while paused, is practice on a passage, and its result says **not kept**.
 
 ## The drills
 
@@ -327,9 +357,11 @@ Clock use, and what open playing wants.
 ### The Ladder
 
 In **Training**. It wraps the drill you have armed — arm one first; with nothing armed the list
-says so — starting from that drill's own tempo. Play `Ladder bars` bars clean — no misses, no sticking errors, σ
-inside the strictness threshold — and the tempo goes up by `Ladder step` and it asks again. Fail
-and the ladder ends.
+says so — and climbs **from 70% of that drill's tempo, through it**: the written tempo is the goal,
+not the first rung. Play `Ladder bars` bars clean — no misses, no sticking errors, σ inside the
+strictness threshold — and the tempo goes up by `Ladder step` and it asks again. Slip on a rung and
+it is played once more at the same tempo; slip again and the ladder ends. The timing windows stay
+the same in milliseconds at every tempo, and the count-in is not part of the first rung.
 
 Your score is the **top clean tempo**, kept per drill and plotted over time, the same way a piece
 of sheet music gets a pencilled metronome mark that creeps up over a month. It is a single
@@ -372,7 +404,7 @@ tightest yet at its tempo.
 ### Clock
 
 The exam, in **Training**. Open it on top of the drill you have armed: the click plays for four bars and then **stops**, and you
-keep going. The header shows how far you have drifted, live, so you can hear yourself going wrong
+keep going. Four rounds of that, then it ends on its result like any other take. The header shows how far you have drifted, live, so you can hear yourself going wrong
 and pull it back rather than only finding out at the end. Then the click returns, and you find out
 whether you were right.
 
@@ -387,12 +419,17 @@ down. This is the drill that tells you whether you can.
 
 Click a row to edit it, turn the jog to change the value, click again when done.
 
-**In settings the knobs follow the rows on screen**, not fixed positions — so the mapping survives
-scrolling and a knob can never point at something you cannot see. **Touch a knob** and the cursor
-jumps to the row it edits, which is how you find the mapping rather than having to remember it.
+**In settings the knobs follow the rows on screen**: settings shows a page of five, and knobs 1–5
+are its rows. The page only turns when the cursor leaves it, so a knob keeps its row however far you
+turn it. **Touch a knob** and the cursor jumps to the row it edits, which is how you find the
+mapping rather than having to remember it.
 
 | Setting | Default | |
 | --- | --- | --- |
+| Tempo | 90 | the tempo of the generated drills in Basics |
+| Speed | **100%** | every drill at this share of its own tempo, 50–120%. Also knob 8 in a drill |
+| Read ahead | 32 | pixels per beat: how far ahead the chart shows |
+| Kit | **kit** | the pad layout; `sticking` puts the snare on every pad |
 | View | **grid** | `grid` is drum tab — what a drummer reads; `staff` is real percussion notation, for reading practice |
 | Strict | **normal** | the timing windows, above |
 | Sticking | **strict** | `strict` counts a wrong hand as its own error; `loose` shows it amber but does not count it; `off` ignores hands, which is right for grooves |
@@ -411,7 +448,7 @@ jumps to the row it edits, which is how you find the mapping rather than having 
 | Round | 20 | prompts in a quiz round, or `endless` |
 | Latency | 0 ms | subtract a fixed offset from every hit, if your setup has one |
 | MIDI out | kit | `kit` is the built-in one. Also `track`, `USB`, `trk+USB` |
-| MIDI ch | all | which channel a Move track listens on |
+| MIDI ch | 10 GM | the channel drum hits are sent on: General MIDI's drum channel by default |
 
 ## Hearing it
 

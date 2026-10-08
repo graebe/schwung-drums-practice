@@ -816,3 +816,55 @@ test('the first Hear hint names the drum and still hides the staff', () => {
   assert.ok(after.includes(name), 'the name hint showed no name');
   assert.ok(after.includes('?'), 'and the staff is still withheld');
 });
+
+/* ---- The result screen, worst case ------------------------------------------- */
+
+test('the result screen draws nothing over anything else, at its worst', () => {
+  const chart = { id: 'x', name: 'Seventeen stroke roll L4 everything', bpm: 270, timeSig: [4, 4],
+    loopBars: 1, repeats: 1,
+    events: [0, 0.5, 1, 1.5, 2, 2.5, 3].map((b, i) => ({ beat: b, voices: [i % 2 ? 'SN' : 'KD'] })) };
+  const run = createRun(chart);
+  /* Wild timing on two limbs, then everything else missed: a three-digit
+   * spread, a three-digit bias, the longest verdict, every error. */
+  judgeHit(run, { voice: 'KD' }, 0.2);
+  judgeHit(run, { voice: 'SN' }, 0.3);
+  expireMissed(run, 10);
+  run.stickErrors = 12;
+  run.dynErrors = 9;
+  const texts = [];
+  const c = createScreen();
+  const text = c.text.bind(c);
+  c.text = (x, y, s, v) => { texts.push({ x, y, w: c.textWidth(s), s }); return text(x, y, s, v); };
+  const history = Array.from({ length: 60 }, (_, i) => ({ sd: (i * 7) % 90, bpm: 270 }));
+  drawSummary(c, {
+    run, tightMs: 30, isBest: true, name: chart.name, bpm: 270, history,
+    recorded: true, footer: 'REC again  CLICK next',
+  });
+  const bad = [];
+  for (const t of texts) {
+    if (t.x < 0 || t.x + t.w > L.SCREEN_W || t.y < 0 || t.y + L.TEXT_H > L.SCREEN_H) bad.push(`off screen: ${t.s}`);
+  }
+  for (let i = 0; i < texts.length; i++) {
+    for (let j = i + 1; j < texts.length; j++) {
+      const a = texts[i];
+      const b = texts[j];
+      if (Math.abs(a.y - b.y) >= L.TEXT_H) continue;
+      if (a.x + a.w <= b.x || b.x + b.w <= a.x) continue;
+      bad.push(`${JSON.stringify(a.s)} over ${JSON.stringify(b.s)}`);
+    }
+  }
+  assert.deepEqual(bad, []);
+  assert.ok(texts.some((t) => t.s === 'BEST YET'));
+  assert.ok(texts.some((t) => t.s === '270 bpm'));
+  assert.ok(texts.some((t) => /^Seventeen/.test(t.s)), 'the drill is named');
+});
+
+test('the result screen says when a take was not kept', () => {
+  const chart = { id: 'x', name: 'X', bpm: 90, timeSig: [4, 4], loopBars: 1, repeats: 1,
+    events: [{ beat: 0, voices: ['SN'] }] };
+  const run = createRun(chart);
+  judgeHit(run, { voice: 'SN' }, 0);
+  const { c, seen } = capture();
+  drawSummary(c, { run, tightMs: 30, isBest: false, name: 'X', recorded: false });
+  assert.ok(seen.includes('not kept'), 'a scrubbed take is passage practice, and says so');
+});

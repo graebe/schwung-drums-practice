@@ -67,6 +67,32 @@ export function pushOffset(acc, voice, offsetMs, beat = 0) {
   return acc;
 }
 
+/*
+ * Take back every sample from `beat` on: the playhead was scrubbed back over
+ * them and the notes they judged are being played again, so counting both
+ * takes would weigh that passage twice. The sums are exact; min and max are
+ * left as they were (they cannot be un-taken without the samples the ring has
+ * already let go of) and only colour the result screen's range.
+ */
+export function dropFrom(acc, beat) {
+  let keep = acc.ring.length;
+  while (keep > 0 && acc.ring[keep - 1].beat >= beat) keep--;
+  for (let i = keep; i < acc.ring.length; i++) {
+    const { voice, offsetMs } = acc.ring[i];
+    acc.n--;
+    acc.sum -= offsetMs;
+    acc.sumSq -= offsetMs * offsetMs;
+    const slot = acc.byVoice[voice];
+    if (slot) {
+      slot.n--;
+      slot.sum -= offsetMs;
+      slot.sumSq -= offsetMs * offsetMs;
+    }
+  }
+  acc.ring.length = keep;
+  return acc;
+}
+
 function reduce(n, sum, sumSq, min = Infinity, max = -Infinity) {
   if (n <= 0) return { n: 0, meanMs: 0, sdMs: 0, minMs: 0, maxMs: 0 };
   const mean = sum / n;
@@ -103,9 +129,18 @@ function reduceList(list) {
 }
 
 /* The last `k` hits — what the header reads. */
+/*
+ * Remembered against the sample count, which every push and every drop
+ * changes: the running header and the timing bar both ask on every frame, and
+ * the answer only changes when a hit lands.
+ */
 export function recentStats(acc, k = 64) {
+  if (acc.recentFor === acc.n && acc.recentK === k && acc.recent) return acc.recent;
   const from = Math.max(0, acc.ring.length - k);
-  return reduceList(acc.ring.slice(from));
+  acc.recentFor = acc.n;
+  acc.recentK = k;
+  acc.recent = reduceList(acc.ring.slice(from));
+  return acc.recent;
 }
 
 /* Everything played at or after `beat` — the rolling window, in bars. */

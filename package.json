@@ -1,6 +1,6 @@
 {
   "name": "schwung-drums-practice",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -11,6 +11,7 @@
     "test:package": "sh tests/package/run.sh",
     "test:rust": "cd dsp && cargo test --no-default-features",
     "build": "sh scripts/build.sh",
-    "preview": "node tools/preview.mjs"
+    "preview": "node tools/preview.mjs",
+    "coverage:ui": "node tools/ui_coverage.mjs"
   }
 }

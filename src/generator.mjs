@@ -47,6 +47,9 @@ function chart(id, name, events, opts = {}) {
     repeats: opts.repeats === undefined ? defaultRepeatsFor(opts.bars || 1) : opts.repeats,
     sticking: opts.sticking || 'off',
     generated: true,
+    /* The id its history is kept under. A random drill's id carries its
+     * seed, which is new every time the row is opened; the family does not. */
+    family: opts.family || id,
     events,
   };
 }
@@ -130,7 +133,7 @@ export function readingLine(opts = {}) {
     });
   }
   return chart(`reading:${per}:${opts.seed || 1}`, `Reading ${per === 4 ? '16ths' : '8ths'}`,
-               events, { ...opts, bars });
+               events, { ...opts, bars, family: `reading:${per}` });
 }
 
 /* A random sticking pattern on a steady grid. The rhythm is given; the only
@@ -151,7 +154,7 @@ export function stickingDrill(opts = {}) {
     });
   }
   return chart(`sticking:${opts.seed || 1}`, 'Random sticking', events, {
-    ...opts, bars, sticking: 'strict',
+    ...opts, bars, sticking: 'strict', family: 'sticking',
   });
 }
 
@@ -181,16 +184,10 @@ export function grooveVariation(opts = {}) {
   }
   events.sort((x, y) => x.beat - y.beat);
   return chart(`groove:${opts.seed || 1}`, 'Groove variation', merge(events), {
-    ...opts, bars,
+    ...opts, bars, family: 'groove',
   });
 }
 
-/*
- * Fold hits that land on the same beat into one stack. Downstream everything
- * assumes entries have distinct beats — the scroll draws one column per
- * entry, and the beam engine reads the gap between neighbours — so two events
- * on beat 0 would draw twice and be read as a zero-length note.
- */
 /* Basics › Subdivisions: the same every time, because they are exercises. */
 export function subdivisionDrills(opts = {}) {
   const o = { bpm: opts.bpm || 90, seed: opts.seed || 1 };

@@ -13,13 +13,19 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { createScreen } from '../tools/screen_buffer.mjs';
 import { DRILLS } from '../src/guess.mjs';
 
 const SHARED = '/data/UserData/schwung/shared/';
 
-async function loadUi({ extraFiles = {} } = {}) {
+const STAGED_UI = join(mkdtempSync(join(tmpdir(), 'drums-ui-')), 'ui.js');
+let uiLoads = 0;
+
+async function loadUi({ extraFiles = {}, settings = null } = {}) {
   const src = readFileSync(new URL('../src/ui.js', import.meta.url), 'utf8');
   const log = { leds: [], buttons: [], params: [], midi: [], writes: {}, announces: [], exited: 0 };
   const screen = createScreen();
@@ -50,6 +56,10 @@ async function loadUi({ extraFiles = {} } = {}) {
   for (const [name, text] of Object.entries(extraFiles)) {
     files[`/data/UserData/schwung/modules/tools/drums-practice/exercises/${name}`] = text;
   }
+  if (settings) {
+    files['/data/UserData/schwung/modules/tools/drums-practice/settings.json'] =
+      JSON.stringify({ version: 2, ...settings });
+  }
 
   Object.assign(globalThis, {
     __log: log,
@@ -73,12 +83,15 @@ async function loadUi({ extraFiles = {} } = {}) {
     .replace(/from '\.\/([a-z_]+)\.mjs'/g,
       (_m, n) => `from '${new URL(`../src/${n}.mjs`, import.meta.url).href}'`);
 
-  /* A data: URL is cached by its full text, and ui.js keeps module-level
-   * state — the current screen, the menu selection, the armed drill. Without
-   * a unique suffix every test here shares ONE instance and inherits whatever
-   * the last one left behind. */
-  const unique = `${rewritten}\n//${Math.random()}`;
-  await import(`data:text/javascript,${encodeURIComponent(unique)}`);
+  /*
+   * Staged as a FILE, not a data: URL, so coverage can see it: from a data:
+   * URL the largest and riskiest file in the module was simply missing from
+   * the report. ui.js keeps module-level state — the current screen, the menu
+   * selection, the armed drill — so each load gets its own instance through a
+   * query string, or every test would inherit what the last one left behind.
+   */
+  writeFileSync(STAGED_UI, rewritten);
+  await import(`${pathToFileURL(STAGED_UI).href}?n=${++uiLoads}`);
   return { log, screen };
 }
 
@@ -234,6 +247,11 @@ test('settings persist, and are written lazily rather than every frame', async (
   const { log } = await loadUi();
   globalThis.init();
   ticks(3);
+  /* Knobs change settings only on the Settings screen: open it, then knob 1
+   * is its first row, Tempo. */
+  cc(CC.shift, 127);
+  cc(CC.jogClick, 127);
+  cc(CC.shift, 0);
   cc(CC.knob1, 1);
   cc(CC.knob1, 1);
   ticks(3);
@@ -258,9 +276,7 @@ test('a host unload silences the engine and darkens the pads, synchronously', as
   assert.ok(after.length >= 32, 'the pads were left lit');
   assert.ok(after.every(([, c]) => c === 0), 'a pad was left on');
   assert.equal(log.exited || 0, 0, 'it asked the host to exit while the host was exiting it');
-  assert.ok(log.writes['/data/UserData/schwung/modules/tools/drums-practice/settings.json']
-         || log.writes['/data/UserData/schwung/modules/tools/drums-practice/stats.json']
-         || true);
+
 });
 
 test('back walks out one level at a time and then closes', async () => {
@@ -306,7 +322,7 @@ test('a practice ENDS BY ITSELF and shows the summary — no second press', asyn
   ticks(1600);
   globalThis.print = orig;
 
-  assert.ok(drawn.some((t) => /RESULT/.test(t)),
+  assert.ok(drawn.some((t) => /RESULT|REC again/.test(t)),
     `the practice never finished on its own: ${[...new Set(drawn)].slice(0, 12).join('|')}`);
 });
 
@@ -743,7 +759,7 @@ test('the bars behind a start point are settled, not counted as misses', async (
   ticks(20);
   /* If the skipped bars had been scored, the summary would already be full of
    * them; the run must still be clean. */
-  assert.ok(!drawnText().some((t) => /RESULT/.test(t)), 'it ended immediately');
+  assert.ok(!drawnText().some((t) => /RESULT|REC again/.test(t)), 'it ended immediately');
 });
 
 test('no count-in when starting mid-drill, but there is one from the top', async () => {
@@ -797,21 +813,44 @@ test('the module closes from EVERY screen, and silences everything on the way', 
     ticks(30);
     assert.equal(log.exited, 1, `${name}: shift+Back did not close the module`);
     assert.ok(log.params.some(([k, v]) => k === 'panic' && v === '1'), `${name}: kit left ringing`);
-    /* Every channel swept, not just the one in settings. The stub logs
-     * ['track'|'usb', cable, status, d1, d2], so the CC number is d1. */
+    /* With the built-in kit nothing was ever sent over MIDI, so nothing is
+     * swept there: sweeping unused routes cut Move's own notes. The stub
+     * logs ['track'|'usb', cable, status, d1, d2], so the CC number is d1. */
     const offs = log.midi.filter((m) => m[3] === 120 || m[3] === 123).length;
-    assert.ok(offs >= 32, `${name}: only ${offs} note-offs — channels were missed`);
+    assert.equal(offs, 0, `${name}: ${offs} CCs swept down routes never used`);
     const lastLeds = log.leds.slice(-32);
     assert.ok(lastLeds.every(([, c]) => c === 0), `${name}: pads left lit`);
   }
 });
 
+test('after notes went to a Move track, exit sweeps every channel there, and only there', async () => {
+  const { log } = await loadUi({ settings: { midiOut: 1 } });
+  globalThis.init();
+  ticks(3);
+  globalThis.onMidiMessageInternal([0x90, 68, 100]);   /* a pad: a note to the track */
+  globalThis.onMidiMessageInternal([0x80, 68, 0]);
+  ticks(5);
+  log.midi.length = 0;
+  cc(CC.shift, 127);
+  cc(CC.back, 127);
+  cc(CC.shift, 0);
+  ticks(40);
+  const offs = log.midi.filter((m) => m[3] === 120 || m[3] === 123);
+  assert.equal(offs.length, 32, 'all sixteen channels, both CCs');
+  assert.ok(offs.every((m) => m[0] === 'track'), 'and nothing to USB, which was never used');
+});
+
 test('the exit paces its note-offs rather than flooding the ring', async () => {
   /* The inject ring holds ~64 packets and drains 31 per audio block; dumping
    * the whole sweep at once is how the offs get dropped. */
-  const { log } = await loadUi();
+  /* Both routes in use, so the sweep is at its largest. */
+  const { log } = await loadUi({ settings: { midiOut: 3 } });
   globalThis.init();
   ticks(2);
+  globalThis.onMidiMessageInternal([0x90, 68, 100]);
+  globalThis.onMidiMessageInternal([0x80, 68, 0]);
+  ticks(4);
+  const start = log.midi.length;
   cc(CC.shift, 127); cc(CC.back, 127); cc(CC.shift, 0);
   let worst = 0;
   for (let i = 0; i < 30; i++) {
@@ -819,6 +858,7 @@ test('the exit paces its note-offs rather than flooding the ring', async () => {
     ticks(1);
     worst = Math.max(worst, log.midi.length - before);
   }
+  assert.ok(log.midi.length - start >= 64, 'the sweep went out: 16 channels, 2 CCs, 2 routes');
   assert.ok(worst <= 16, `${worst} packets in one tick is a flood`);
   assert.equal(log.exited, 1);
 });
@@ -1013,8 +1053,11 @@ test('the host may ask to unload as often as it likes; we tear down once', async
    * the stats and settings files — roughly 1700 messages and 53 writes at the
    * moment control goes back to Move.
    */
-  const { log } = await loadUi();
+  const { log } = await loadUi({ settings: { midiOut: 1 } });
   globalThis.init();
+  ticks(6);
+  globalThis.onMidiMessageInternal([0x90, 68, 100]);   /* something went to the track */
+  globalThis.onMidiMessageInternal([0x80, 68, 0]);
   ticks(6);
 
   const midiBefore = log.midi.length;
@@ -1089,7 +1132,7 @@ test('LISTENING ends by itself too, not just practising', async () => {
   ticks(1600);
   globalThis.print = orig;
 
-  assert.ok(drawn.some((t) => /RESULT/.test(t)),
+  assert.ok(drawn.some((t) => /RESULT|REC again/.test(t)),
     `listening never finished: ${[...new Set(drawn)].slice(0, 10).join('|')}`);
   /* And it never counted past its own length while doing so. */
   const overrun = drawn.filter((t) => /^(\d+)\/(\d+)$/.test(t))
@@ -1216,4 +1259,167 @@ test('the Clock stays with the drill it wrapped', async () => {
   cc(CC.record, 127);
   const drawn = drawnText(200);
   assert.ok(!drawn.some((t) => /LISTEN|ON YOUR OWN/.test(t)), 'the Clock banner followed into a plain drill');
+});
+
+/* ---- Regressions from the 1.2.0 review, driven end to end ------------------- */
+
+const SETTINGS_FILE = '/data/UserData/schwung/modules/tools/drums-practice/settings.json';
+const shiftClick = () => { cc(CC.shift, 127); cc(CC.jogClick, 127); cc(CC.shift, 0); };
+const knob = (k, d) => cc(CC.knob1 + k, d);
+/* Arm the first rung of the first groove: Grooves › Rock & Pop › Rock backbeat › L1. */
+function armFirstRung() {
+  toFirstDrill();
+  cc(CC.jogClick, 127);
+  ticks(2);
+  cc(CC.jogClick, 127);
+  ticks(2);
+}
+/* Up to the top of the tree and into Training (the fourth row). */
+function toTraining() {
+  for (let i = 0; i < 4; i++) cc(CC.back, 127);
+  for (let i = 0; i < 10; i++) cc(CC.jogTurn, 127);
+  for (let i = 0; i < 3; i++) cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);
+}
+function runUntil(re, maxTicks) {
+  for (let i = 0; i < maxTicks; i++) {
+    if (drawnText(1).some((t) => re.test(t))) return true;
+  }
+  return false;
+}
+
+test('Record after a result is a new take from the top, not an instant end', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  startFirstDrill();
+  assert.ok(runUntil(/REC again/, 3000), 'the take should end on its result');
+  cc(CC.record, 127);
+  ticks(2);
+  /* A second or two in it must still be running — it used to start at the
+   * end of the last take and finish on the spot. */
+  assert.equal(runUntil(/REC again/, 60), false, 'the new take ended at once');
+});
+
+test('Back from a result goes to the start of the drill, Back again to the list', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  startFirstDrill();
+  assert.ok(runUntil(/REC again/, 3000));
+  cc(CC.back, 127);
+  const ready = drawnText(2);
+  assert.ok(ready.some((t) => /REC/.test(t)) && !ready.some((t) => /REC again/.test(t)),
+    'the ready screen: ' + ready.slice(0, 8).join('|'));
+  cc(CC.back, 127);
+  assert.ok(drawnText(2).some((t) => /ROCK/.test(t)), 'then the list it came from');
+});
+
+test('Settings opened over a run pauses it, and leaving returns to it', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  startFirstDrill();
+  ticks(80);
+  shiftClick();
+  assert.ok(drawnText(2).some((t) => /SETTINGS/.test(t)));
+  shiftClick();
+  assert.ok(drawnText(2).some((t) => /PAUSED/.test(t)), 'back on the run, held where it was');
+  cc(CC.back, 127);                              /* restart: the ready screen */
+  shiftClick();
+  cc(CC.back, 127);                              /* Back leaves Settings too */
+  const back = drawnText(2);
+  assert.ok(!back.some((t) => /SETTINGS/.test(t)) && back.some((t) => /REC/.test(t)),
+    'Back from Settings returns to the ready screen, not the list');
+});
+
+test('knobs change nothing outside Settings', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  for (let k = 0; k < 8; k++) { knob(k, 1); knob(k, 1); }
+  ticks(4);
+  globalThis.onUnload();
+  /* A first start writes the defaults; what matters is that none moved. */
+  const { DEFAULTS } = await import('../src/settings_def.mjs');
+  const saved = log.writes[SETTINGS_FILE] ? JSON.parse(log.writes[SETTINGS_FILE]) : DEFAULTS;
+  for (const k of Object.keys(DEFAULTS)) {
+    assert.deepEqual(saved[k], DEFAULTS[k], `a knob on the list changed ${k}`);
+  }
+});
+
+test('a Settings knob keeps its row however far it is turned, and the jog touch moves nothing', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  shiftClick();
+  globalThis.onMidiMessageInternal([0x90, 9, 127]);   /* jog touch */
+  knob(0, 1);                                         /* row 0 is Tempo, if the cursor stayed */
+  for (let i = 0; i < 6; i++) cc(CC.jogTurn, 1);      /* row 6: the second page */
+  for (let i = 0; i < 3; i++) knob(1, 1);             /* knob 2 is row 6 on that page */
+  ticks(2);
+  globalThis.onUnload();
+  const saved = JSON.parse(log.writes[SETTINGS_FILE]);
+  assert.equal(saved.bpm, 91, 'jog touch must not move the cursor off Tempo');
+  assert.equal(saved.strictness, 'tight', 'three turns of one knob, one row');
+  assert.equal(saved.view, 'grid', 'and not the rows around it');
+  assert.equal(saved.sticking, 'strict');
+});
+
+test('knob 8 slows a hand-written drill', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  armFirstRung();
+  knob(7, 127);
+  knob(7, 127);
+  ticks(2);
+  const said = log.announces.join(' | ');
+  assert.match(said, /speed 90 percent, 83 bpm/, said);
+});
+
+test('the Ladder climbs from 70% of the drill\'s tempo', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  armFirstRung();
+  toTraining();
+  cc(CC.jogClick, 127);                               /* Ladder */
+  ticks(2);
+  assert.match(log.announces.join(' | '), /Ladder: .*, from 65/);
+});
+
+test('the Clock ends by itself on a result', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  armFirstRung();
+  toTraining();
+  cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);                               /* Clock */
+  ticks(2);
+  cc(CC.record, 127);
+  /* Four rounds of 4 bars on, 4 off, at 92bpm: about 85 seconds. */
+  assert.ok(runUntil(/BACK start/, 5000), 'the Clock never ended');
+});
+
+test('Menu stops a run cleanly: back to the list, the Record light out', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  startFirstDrill();
+  ticks(40);
+  cc(CC.menu, 127);
+  ticks(4);
+  const record = log.buttons.filter(([c]) => c === CC.record);
+  assert.equal(record[record.length - 1][1], 0, 'the Record light was left burning');
+  assert.ok(drawnText(2).some((t) => /ROCK|GROOVES|DRUMS/.test(t)));
+});
+
+test('a broken user.json is reported, and the shipped drills still load', async () => {
+  await loadUi({ extraFiles: { 'user.json': '{ "exercises": [ oops' } });
+  globalThis.init();
+  const shown = drawnText(2);
+  assert.ok(shown.some((t) => /BAD USER\.JSON/.test(t)), shown.join('|'));
+  assert.ok(shown.some((t) => /Grooves/.test(t)), 'the list is there underneath');
 });

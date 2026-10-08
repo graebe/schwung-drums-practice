@@ -220,13 +220,24 @@ export function listWindow(count, selected, rows = LIST_ROWS) {
   return top;
 }
 
-export function drawList(ctx, { title, items, selected, right }) {
+/*
+ * A page of rows that only turns when the selection leaves it. Settings uses
+ * this rather than the centred window: its knobs are mapped to the rows on
+ * screen, and a window that re-centred on every step moved a knob onto the
+ * next row with every detent.
+ */
+export function pageTop(count, selected, rows = LIST_ROWS) {
+  if (count <= rows) return 0;
+  return Math.floor(Math.max(0, selected) / rows) * rows;
+}
+
+export function drawList(ctx, { title, items, selected, right, top: fixedTop }) {
   ctx.clear();
   ctx.text(1, 0, title || '', 1);
   if (right) ctx.text(L.SCREEN_W - ctx.textWidth(right) - 1, 0, right, 1);
   ctx.fillRect(0, L.HEADER_RULE_Y, L.SCREEN_W, 1, 1);
 
-  const top = listWindow(items.length, selected);
+  const top = fixedTop === undefined ? listWindow(items.length, selected) : fixedTop;
   for (let i = 0; i < LIST_ROWS && top + i < items.length; i++) {
     const idx = top + i;
     const y = 11 + i * (L.TEXT_H + 2);

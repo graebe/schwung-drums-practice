@@ -1,5 +1,6 @@
 /*
- * led_paint.mjs — what colour every pad is. Pure, and ALLOCATION-FREE.
+ * led_paint.mjs — what colour every pad is. Pure; `paint` allocates nothing.
+ * (guideTargets builds a short list, and only runs with Guide pads on.)
  *
  * Extracted from ui.js and kept pure for two reasons. It is the one piece of
  * host glue with real logic in it, so it is worth testing; and it runs on

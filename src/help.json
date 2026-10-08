@@ -21,8 +21,16 @@
         "Same button pauses; the",
         "other one switches.",
         "MENU   the drill list",
-        "BACK   up, then out",
-        "SHIFT+click  settings"
+        "BACK   to the start,",
+        "       then up, then out",
+        "SHIFT+click  settings;",
+        "  a run pauses under it",
+        "",
+        "A result: REC again,",
+        "BACK to the start,",
+        "CLICK the next drill.",
+        "Only a whole take from",
+        "the top is kept."
       ]
     },
     {
@@ -42,14 +50,20 @@
     {
       "title": "Knobs",
       "lines": [
-        "1  tempo, 40-240",
-        "2  read ahead",
-        "3  reps",
-        "4  kit layout",
+        "In a drill:",
+        "1  scrub, when stopped",
+        "8  speed, 50-120%",
         "",
-        "Stopped, knob 1 scrubs;",
-        "the pads show the drums",
-        "where you landed."
+        "Speed slows any drill,",
+        "grooves and rudiments",
+        "too. The tempo you play",
+        "is what is recorded.",
+        "",
+        "In settings the knobs",
+        "are the rows on screen,",
+        "five to a page.",
+        "Elsewhere they do",
+        "nothing."
       ]
     },
     {
@@ -106,9 +120,13 @@
     {
       "title": "The Ladder",
       "lines": [
-        "Play N bars clean and",
-        "the tempo goes up. Fail",
-        "and it stops.",
+        "Starts at 70% of the",
+        "drill's tempo and climbs",
+        "through it. Play N bars",
+        "clean and it goes up.",
+        "Slip and the rung plays",
+        "again; slip twice and",
+        "it stops.",
         "",
         "Your score is the top",
         "clean tempo, kept per",

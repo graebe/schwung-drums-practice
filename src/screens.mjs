@@ -26,14 +26,26 @@ export { drawList };
  * NOT timing get their own line so a clean-but-mis-stuck run reads as what it
  * is.
  */
+/*
+ * The end of a take. What it was and how fast in the header; the spread, big,
+ * because it is the number to bring down; the bias and a word for it beside
+ * it; what went wrong; the two loosest limbs; and the drill's recent takes as
+ * a strip of spread bars, this one last, so the number is read against where
+ * you were. The bottom line says what each button does next.
+ *
+ * s = { run, tightMs, isBest, name, bpm, history, recorded, footer }
+ */
+export const SUMMARY_STRIP = { x: 3, y: 49, w: L.SCREEN_W - 6, h: 6 };
+
 export function drawSummary(ctx, s) {
   ctx.clear();
   const t = stats(s.run.timing);
   const st = runStatsOf(s.run);
 
-  ctx.text(1, 0, s.isBest ? 'BEST YET' : 'RESULT', 1);
-  const acc = st.total ? `${Math.round(st.accuracy * 100)}%` : '--';
-  ctx.text(L.SCREEN_W - ctx.textWidth(acc) - 1, 0, acc, 1);
+  const right = s.bpm ? `${Math.round(s.bpm)} bpm` : '';
+  const rw = right ? ctx.textWidth(right) : 0;
+  ctx.text(1, 0, fit(ctx, s.name || 'RESULT', L.SCREEN_W - rw - 6), 1);
+  if (right) ctx.text(L.SCREEN_W - rw - 1, 0, right, 1);
   ctx.fillRect(0, L.HEADER_RULE_Y, L.SCREEN_W, 1, 1);
 
   /* Sigma leads: a tight player who sits late has one easy thing to fix, a
@@ -41,33 +53,62 @@ export function drawSummary(ctx, s) {
   const big = `${Math.round(t.sdMs)}`;
   SR.drawBigText(ctx, L.RESULT_LEFT_X, L.RESULT_BIG_Y, big, L.RESULT_BIG_SCALE);
   const w = SR.bigTextWidth(big, L.RESULT_BIG_SCALE);
-  ctx.text(L.RESULT_LEFT_X + w + 3, L.RESULT_BIG_Y + 8, 'ms spread', 1);
-  const bias = `${t.meanMs >= 0 ? '+' : ''}${Math.round(t.meanMs)}ms`;
+  ctx.text(L.RESULT_LEFT_X + w + 3, L.RESULT_BIG_Y + 8, 'ms', 1);
+  const acc = st.total ? `${Math.round(st.accuracy * 100)}%` : '--';
+  const bias = `${t.meanMs >= 0 ? '+' : ''}${Math.round(t.meanMs)}ms  ${acc}`;
   ctx.text(L.SCREEN_W - ctx.textWidth(bias) - 1, L.RESULT_BIG_Y, bias, 1);
   const v = verdict(t, s.tightMs || 30);
   ctx.text(L.SCREEN_W - ctx.textWidth(v) - 1, L.RESULT_BIG_Y + 8, v, 1);
 
   const errs = [];
   if (st.misses) errs.push(`${st.misses} missed`);
-  if (st.stickErrors) errs.push(`${st.stickErrors} sticking`);
-  if (st.dynErrors) errs.push(`${st.dynErrors} dynamics`);
-  ctx.text(L.RESULT_LEFT_X, L.RESULT_ROW_B_Y, (errs.join('  ') || 'clean').slice(0, 21), 1);
+  if (st.stickErrors) errs.push(`${st.stickErrors} stick`);
+  if (st.dynErrors) errs.push(`${st.dynErrors} dyn`);
+  const tag = s.isBest ? 'BEST YET' : s.recorded === false ? 'not kept' : '';
+  const tw = tag ? ctx.textWidth(tag) : 0;
+  ctx.text(L.RESULT_LEFT_X, L.RESULT_ROW_A_Y,
+    fit(ctx, errs.join(' ') || 'clean', L.SCREEN_W - L.RESULT_LEFT_X - tw - 6), 1);
+  if (tag) ctx.text(L.SCREEN_W - tw - 1, L.RESULT_ROW_A_Y, tag, 1);
 
-  /* The limbs, worst first — the loosest one is the one to go and practise. */
+  /* The two loosest limbs — the worst first is the one to go and practise. */
   const pv = perVoice(s.run.timing);
-  const order = voicesBySpread(s.run.timing).slice(0, L.VOICE_TABLE_MAX_ROWS);
+  const order = voicesBySpread(s.run.timing).slice(0, 2);
   for (let i = 0; i < order.length; i++) {
     const id = order[i];
-    const y = L.VOICE_TABLE_Y + 16 + i * L.VOICE_TABLE_ROW_H;
-    if (y + L.TEXT_H > L.SCREEN_H) break;
+    const y = L.RESULT_ROW_B_Y + i * L.VOICE_TABLE_ROW_H;
     const voice = voiceById(id);
     const row = `${voice ? voice.short : id} ${pv[id].meanMs >= 0 ? '+' : ''}${Math.round(pv[id].meanMs)}`;
     ctx.text(L.RESULT_LEFT_X, y, row, 1);
     ctx.text(40, y, `s${Math.round(pv[id].sdMs)}`, 1);
-    /* A bar per limb, so the worst is obvious without reading the numbers. */
     const bw = Math.min(58, Math.round((pv[id].sdMs / L.PLOT_SIGMA_FULL_MS) * 58));
     ctx.fillRect(66, y + 2, Math.max(1, bw), 3, 1);
   }
+
+  drawSpreadStrip(ctx, SUMMARY_STRIP, s.history || []);
+  const hint = s.footer || 'REC again  CLICK next';
+  ctx.text((L.SCREEN_W - ctx.textWidth(hint)) >> 1, L.SCREEN_H - L.TEXT_H, hint, 1);
+}
+
+/* Recent takes as spread bars, oldest left: shorter is tighter. A full bar is
+ * PLOT_SIGMA_FULL_MS, a fixed ceiling, so two visits draw the same history
+ * the same way. */
+export function drawSpreadStrip(ctx, box, records) {
+  ctx.fillRect(box.x, box.y + box.h, box.w, 1, 1);
+  if (!records.length) return;
+  const n = Math.min(records.length, Math.floor(box.w / 3));
+  const use = records.slice(records.length - n);
+  for (let i = 0; i < use.length; i++) {
+    const frac = Math.min(1, (use[i].sd || 0) / L.PLOT_SIGMA_FULL_MS);
+    const h = Math.max(1, Math.round(frac * box.h));
+    const x = box.x + box.w - (use.length - i) * 3;
+    ctx.fillRect(x, box.y + box.h - h, 2, h, 1);
+  }
+}
+
+function fit(ctx, text, maxPx) {
+  let out = String(text);
+  while (out.length > 1 && ctx.textWidth(out) > maxPx) out = out.slice(0, -1);
+  return out;
 }
 
 /* ---- Ladder ------------------------------------------------------------- */

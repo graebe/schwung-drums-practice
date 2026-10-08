@@ -2,7 +2,7 @@
     "id": "drums-practice",
     "name": "Drums Practice",
     "abbrev": "DRM",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "Rhythm trainer: read the chart, play the kit, see your timing.",
     "author": "Torben Gräber",
     "license": "MIT",

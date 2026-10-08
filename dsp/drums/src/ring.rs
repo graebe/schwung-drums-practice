@@ -1,9 +1,7 @@
 /*
  * The event queue: parameter/MIDI thread in, audio thread out.
  *
- * Carried over unchanged from the pitched module apart from the event
- * vocabulary — the orderings are the part that is easy to "improve" into a
- * bug, and this algorithm is correct and has been running.
+ * Carried over from the pitched module apart from the event vocabulary.
  *
  * Single producer, single consumer, lock free, fixed capacity. A direct
  * translation of the C — same algorithm, same memory orders — because the

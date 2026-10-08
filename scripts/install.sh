@@ -51,6 +51,10 @@ fi
 if [ -f "$remote/stats.json" ]; then
   cp "$remote/stats.json" "$stage/stats.json"
 fi
+# Its backup copy, and a damaged file kept aside, travel with it.
+for f in stats.bak.json stats.bad.json; do
+  if [ -f "$remote/$f" ]; then cp "$remote/$f" "$stage/$f"; fi
+done
 # Keep any drills they added by hand, AND the manifest that makes them
 # visible. Preserving the files alone was not enough: index.json is shipped
 # and therefore replaced, so a hand-written drill used to survive an update

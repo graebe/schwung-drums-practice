@@ -150,9 +150,11 @@ impl Drums {
 impl SchwungPlugin for Drums {
     fn create(_module_dir: Option<&[u8]>, _json_defaults: Option<&[u8]>) -> Option<Self> {
         /*
-         * Zeroed on the heap and filled in place. `Box::new(Drums { .. })`
-         * would build the sine table on the stack first and then copy it — on
-         * the SPI callback, where the frame is not ours to spend.
+         * Zeroed on the heap and filled in place, rather than built as a
+         * temporary. The plugin trait returns `Self` by value, so `Some(*d)`
+         * below does copy it out once more and the binding boxes it again —
+         * at load, once, not on the SPI callback. Avoiding that copy would
+         * mean changing the shared trait, which the pitched module uses too.
          */
         let mut d: Box<Drums> = unsafe {
             let layout = alloc::alloc::Layout::new::<Drums>();
@@ -294,17 +296,7 @@ impl SchwungPlugin for Drums {
                 mix += c.tick(sine);
             }
 
-            /* Soft knee rather than a hard clip: a stacked kick, snare and
-             * crash should compress, not buzz. */
-            mix = if mix > 1.0 {
-                1.0
-            } else if mix < -1.0 {
-                -1.0
-            } else {
-                mix - (mix * mix * mix) / 3.0
-            };
-
-            let s = (mix * 26000.0) as i32;
+            let s = (soft_clip(mix) * 26000.0) as i32;
             let s = s.clamp(-32768, 32767);
 
             /* The host zeroes this buffer before the call; ADD so we stay
@@ -312,10 +304,22 @@ impl SchwungPlugin for Drums {
              * generator is mixed into the deferred buffer, so assigning would
              * silence whatever else is in it. */
             for sample in frame.iter_mut() {
-                *sample = (*sample as i32 + s) as i16;
+                /* Saturate rather than wrap: a sum past full scale wrapped
+                 * round to the other rail, which is a loud click. */
+                *sample = (*sample as i32 + s).clamp(-32768, 32767) as i16;
             }
         }
     }
+}
+
+/// Soft knee rather than a hard clip: a stacked kick, snare and crash should
+/// compress, not buzz. The input is clamped FIRST and then shaped, so the
+/// curve meets its ceiling smoothly at ±2/3. It used to shape inside ±1 and
+/// clamp outside it, which put a step from 2/3 straight up to 1.0 at the
+/// knee — exactly the click a soft clipper exists to prevent.
+pub(crate) fn soft_clip(x: f32) -> f32 {
+    let x = x.clamp(-1.0, 1.0);
+    x - (x * x * x) / 3.0
 }
 
 /// Copy `src` into `dst`, truncating. Returns bytes written.
