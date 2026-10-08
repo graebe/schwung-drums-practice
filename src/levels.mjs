@@ -48,10 +48,6 @@ export function levelById(id) {
   return null;
 }
 
-export function levelRows(levels) {
-  return (levels || LEVELS).map((lv) => ({ label: lv.label, value: lv.step, level: lv.id }));
-}
-
 function keeps(lv, voice) {
   return lv.voices === null || lv.voices.indexOf(voice) >= 0;
 }

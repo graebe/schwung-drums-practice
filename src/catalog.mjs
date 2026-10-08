@@ -155,10 +155,6 @@ export function navTop(nav) {
   return nav[nav.length - 1];
 }
 
-export function navRows(nav) {
-  return navTop(nav).node.children;
-}
-
 export function navCurrent(nav) {
   const top = navTop(nav);
   return top.node.children[top.cursor] || null;

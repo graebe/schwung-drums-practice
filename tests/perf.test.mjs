@@ -82,7 +82,7 @@ test('ui.js computes nothing in draw() that a change event could have cached', (
     ['ST.drillsWithHistory(', 'rebuildProgress'],
     ['ST.forDrill(', 'rebuildProgress'],
     ['GR.lanes(', 'armChart'],
-    ['menuItems.map(', 'rebuildMenu'],
+    ['CAT.rowsOf(', 'rebuildMenu'],
     ['IO.practiceLength(', 'armChart'],
     ['ST.summarise(', 'finishQuiz'],
   ]) {

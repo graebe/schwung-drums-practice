@@ -43,7 +43,9 @@ export const ROWS = [
   { key: 'study',      label: 'Study',     type: 'bool' },
   { key: 'click',      label: 'Click',     type: 'bool' },
   { key: 'clickSubdiv', label: 'Click sub', type: 'list', values: [0, 1, 2, 4],
-    format: (v) => (v === 0 ? 'off' : v === 1 ? 'beat' : `${v * 2}ths`) },
+    /* Clicks per beat: 2 is eighths, 4 sixteenths. It read `v * 2` and so
+     * printed 4ths and 8ths for the eighths and sixteenths it plays. */
+    format: (v) => (v === 0 ? 'off' : v === 1 ? 'beat' : `${v * 4}ths`) },
   { key: 'countIn',    label: 'Count in',  type: 'int',  min: 0, max: 8 },
   { key: 'ladderStep', label: 'Ladder +',  type: 'int',  min: 1, max: 20,
     format: (v) => `${v} bpm` },

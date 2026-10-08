@@ -1152,6 +1152,18 @@ function serviceExit() {
  * from a hang, and it is what the first hardware run looked like. The
  * fallback at the bottom makes a stale screen impossible.
  */
+/* The rows of the open folder, made once per folder rather than per frame:
+ * the list is drawn at 50Hz and its rows only change when the folder does. */
+let rowsNode = null;
+let rowsCache = null;
+function menuRows(node) {
+  if (node !== rowsNode) {
+    rowsNode = node;
+    rowsCache = CAT.rowsOf(node);
+  }
+  return rowsCache;
+}
+
 function draw() {
   if (screen === ERROR || safeMode) {
     V.drawError(ctx, {
@@ -1165,7 +1177,7 @@ function draw() {
   if (screen === MENU) {
     const top = CAT.navTop(nav);
     const title = menuNote && now() < menuNoteUntil ? menuNote : top.node.label.toUpperCase();
-    V.drawList(ctx, { title: title.slice(0, 16), items: CAT.rowsOf(top.node), selected: top.cursor });
+    V.drawList(ctx, { title: title.slice(0, 16), items: menuRows(top.node), selected: top.cursor });
     return;
   }
   if (screen === SETTINGS) {

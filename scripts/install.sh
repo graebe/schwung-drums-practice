@@ -15,7 +15,9 @@ REMOTE_OLD="$REMOTE_BASE/.drums-practice.old.$TOKEN"
 REMOTE_ARCHIVE="/tmp/drums-practice-$TOKEN.tar.gz"
 
 test -f "$ROOT/dist/dsp.so"
-test -f "$ROOT/dist/drums-practice-module.tar.gz" || "$ROOT/scripts/package.sh"
+# Always repackage: an old tarball left in dist/ would otherwise be deployed
+# without a word, and the Move would run code that is not the code here.
+"$ROOT/scripts/package.sh"
 
 scp "$ROOT/dist/drums-practice-module.tar.gz" "$MOVE_USER@$MOVE_HOST:$REMOTE_ARCHIVE"
 ssh "$MOVE_USER@$MOVE_HOST" sh -s -- \

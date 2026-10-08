@@ -27,7 +27,9 @@ export function createLadder(opts = {}) {
     startBpm: opts.bpm || 80,
     step: opts.step || DEFAULT_STEP,
     bars: opts.bars || DEFAULT_BARS,
-    maxBpm: opts.maxBpm || 240,
+    /* Never below the drill's own tempo: Up-tempo swing is written at 270,
+     * and a fixed 240 ceiling topped it out on its first clean rung. */
+    maxBpm: opts.maxBpm || Math.max(240, (opts.bpm || 80) + (opts.step || DEFAULT_STEP) * 8),
     rungs: 0,
     topClean: 0,     /* the score: the fastest tempo held clean          */
     topSd: 0,

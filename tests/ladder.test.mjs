@@ -126,3 +126,9 @@ test('a rung spans the bars it was asked for, in the metre it is in', () => {
   assert.equal(LAD.rungEnd(l, 4), 24);
   assert.equal(LAD.rungEnd(l, 3), 20, 'three-four has shorter bars');
 });
+
+test('a drill written faster than 240 still has rungs to climb', () => {
+  const ladder = LAD.createLadder({ bpm: 270, step: 5 });
+  assert.ok(ladder.maxBpm > 270, 'the ceiling sits above the written tempo');
+  assert.equal(LAD.createLadder({ bpm: 80 }).maxBpm, 240, 'and the usual ceiling is unchanged');
+});

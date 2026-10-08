@@ -161,3 +161,8 @@ test('settings dropped between versions simply vanish', () => {
   assert.equal(settings.loopBars, undefined);
   assert.equal(JSON.parse(S.serialiseSettings(settings)).loop, undefined);
 });
+
+test('Click sub names what it plays: eighths and sixteenths', () => {
+  const row = S.rowFor('clickSubdiv');
+  assert.deepEqual(row.values.map((v) => S.formatValue(row, v)), ['off', 'beat', '8ths', '16ths']);
+});
