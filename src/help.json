@@ -26,14 +26,14 @@
         "MENU   the drill list",
         "BACK   to the start,",
         "       then up, then out",
-        "SHIFT+click  settings;",
-        "  a run pauses under it",
+        "SHIFT+click  settings",
         "",
         "A result: REC again,",
         "BACK to the start,",
-        "CLICK the next drill.",
-        "Only a whole take from",
-        "the top is kept."
+        "CLICK the next drill,",
+        "JOG back: look over the",
+        "take as you played it.",
+        "Only whole takes count."
       ]
     },
     {
@@ -184,16 +184,38 @@
     {
       "title": "Progress",
       "lines": [
-        "Each track: learned out",
-        "of all. Then every",
-        "drill you played, last",
-        "first.",
+        "Overall and each track:",
+        "drills learned, as a",
+        "line along real time.",
         "",
-        "CLICK a drill for its",
-        "chart: each take's",
-        "speed, the dotted line",
-        "at 100%. Filled dots",
-        "were clean."
+        "Then every drill you",
+        "played: CLICK for its",
+        "takes' chart, the 100%",
+        "line dotted, clean",
+        "takes filled.",
+        "",
+        "In a chart the JOG goes",
+        "on to the next one."
+      ]
+    },
+    {
+      "title": "The result",
+      "lines": [
+        "Big: the speed you",
+        "played, % of written.",
+        "Beside it: % right and",
+        "the spread; the one",
+        "that stopped the take",
+        "counting is inverted.",
+        "",
+        "The chart: your recent",
+        "takes, this one last.",
+        "",
+        "JOG back: the take as",
+        "you played it - rings",
+        "hit, crosses missed.",
+        "JOG on past the end or",
+        "BACK: the result."
       ]
     },
     {

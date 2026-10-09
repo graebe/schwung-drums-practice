@@ -181,6 +181,10 @@ export function createRun(chart, opts = {}) {
     cursor: 0,       /* first entry with a note still unscored               */
     waitCursor: 0,   /* first entry with a note still unplayed               */
     markers: [],     /* { beat, voice, hand } for every press, at its moment */
+    /* What scrolled off, kept so the take can be looked back over once it is
+     * done (reviewOf): the entries as they were judged, and every press. */
+    past: [],
+    pastMarkers: [],
     timing: createTiming(),
     totalNotes: 0,
     hits: 0,
@@ -251,11 +255,17 @@ function appendIteration(run, iter) {
  * removes entries BEHIND both cursors, so no pointer can be left dangling
  * past the end of the list or pointing at a different note than it did.
  */
+/* How much of a take is kept for review: far more than a practice holds (an
+ * eight-bar drill of sixteenths is 128 entries), bounded for an endless one. */
+export const PAST_MAX = 4096;
+
 export function pruneEntries(run, beforeBeat) {
   let drop = 0;
   const stop = Math.min(run.cursor, run.waitCursor);
   while (drop < stop && run.entries[drop].beat < beforeBeat) drop++;
   if (drop === 0) return 0;
+  for (let i = 0; i < drop; i++) run.past.push(run.entries[i]);
+  if (run.past.length > PAST_MAX) run.past.splice(0, run.past.length - PAST_MAX);
   run.entries.splice(0, drop);
   run.cursor -= drop;
   run.waitCursor -= drop;
@@ -593,6 +603,11 @@ export function seekTo(run, beat) {
   }
   dropFrom(run.timing, beat);
   run.markers.length = 0;
+  /* What is about to be played again is no longer the take's record. */
+  while (run.past.length && run.past[run.past.length - 1].beat >= beat) run.past.pop();
+  while (run.pastMarkers.length && run.pastMarkers[run.pastMarkers.length - 1].beat >= beat) {
+    run.pastMarkers.pop();
+  }
   run.cursor = 0;
   run.waitCursor = 0;
   advanceCursor(run);
@@ -657,13 +672,49 @@ export function resyncWait(run, songBeats) {
 /* Record a press at the exact moment it happened, for the played markers. */
 export function addMarker(run, voice, songBeats, hand = null, limit = 64) {
   run.markers.push({ beat: songBeats, voice, hand });
-  if (run.markers.length > limit) run.markers.splice(0, run.markers.length - limit);
+  if (run.markers.length > limit) retireMarkers(run, run.markers.length - limit);
 }
 
 export function pruneMarkers(run, beforeBeat) {
   let drop = 0;
   while (drop < run.markers.length && run.markers[drop].beat < beforeBeat) drop++;
-  if (drop > 0) run.markers.splice(0, drop);
+  if (drop > 0) retireMarkers(run, drop);
+}
+
+/* Off the live list and into the take's record. */
+function retireMarkers(run, n) {
+  for (let i = 0; i < n; i++) run.pastMarkers.push(run.markers[i]);
+  if (run.pastMarkers.length > PAST_MAX) run.pastMarkers.splice(0, run.pastMarkers.length - PAST_MAX);
+  run.markers.splice(0, n);
+}
+
+/*
+ * The whole take, for looking back over it once it is done: everything that
+ * scrolled off joined to what is still live, as a run the reading view draws
+ * like any other — every note as it was judged, every press where it landed.
+ * Made once, when the take ends.
+ */
+export function reviewOf(run) {
+  return {
+    ...run,
+    entries: run.past.concat(run.entries),
+    markers: run.pastMarkers.concat(run.markers),
+    cursor: 0,
+    waitCursor: 0,
+  };
+}
+
+/* The first entry at or after `beat`: entries are beat-ordered, and a review
+ * holds thousands of them, so they are not walked from the front. */
+function firstFrom(entries, beat) {
+  let lo = 0;
+  let hi = entries.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (entries[mid].beat < beat) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
 }
 
 /*
@@ -677,9 +728,8 @@ export function pruneMarkers(run, beforeBeat) {
 export function visibleEntries(run, songBeats, pxPerBeat) {
   const { fromBeat, toBeat } = visibleRange(songBeats, pxPerBeat);
   const out = [];
-  for (let i = 0; i < run.entries.length; i++) {
+  for (let i = firstFrom(run.entries, fromBeat); i < run.entries.length; i++) {
     const entry = run.entries[i];
-    if (entry.beat < fromBeat) continue;
     if (entry.beat > toBeat) break; /* entries are beat-ordered */
     out.push({
       index: i,

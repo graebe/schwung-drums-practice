@@ -251,12 +251,34 @@ a whole attempt.
 
 ### The result
 
-A run ends on its result: the drill and the tempo it was played at, your timing spread big, your
-bias and a word for it, what went wrong, the two loosest limbs, and a strip of your recent takes at
-this drill — this one last — so the number is read against where you were.
+A run ends on its result, laid out as Piano Practice ends an exercise:
+
+```
+ Flam tap                  CLEAN
+  85 %             94% right
+                    s12 +3ms
+  61 bpm          SN +3 s12
+  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·   ← 100%
+            ■──■─────■          ■
+  ■──□─────                          ← every recent take, this one last
+       REC again  CLICK next
+```
+
+- **The number** is the speed you played at, as a share of the drill's written tempo — the same
+  number the list and the Progress chart track, so the result reads straight against them.
+- **Beside it** the two things that decide whether the take was clean: how much was right, and
+  how tight it was (spread σ, and whether you sat early or late). Whichever one stopped the take
+  counting is drawn **inverted** — that is the one to fix.
+- **Under it** the tempo, and your loosest limb: the one to go and practise.
+- **The chart** is every recent take of this drill, oldest on the left, this one last, against
+  the dotted 100% line. A filled dot was clean, an open one did not count — so a run of slow,
+  clean takes climbing to the line reads as what it is.
+- **The header** says what the take did: **LEARNED** with a tick the first time you play it clean
+  at tempo, **BEST YET**, **CLEAN**, **NOT CLEAN**, **STUDY** (not counted) or **not kept**.
 
 | On a result | |
 | --- | --- |
+| **Jog** or **knob 1**, back | look back over the take you just played (below) |
 | **Record** | another take, straight away |
 | **Play** | listen to it |
 | **Back** | back to the start of the drill |
@@ -265,9 +287,16 @@ this drill — this one last — so the number is read against where you were.
 Only a whole take is kept: practised from the top and never scrubbed. A take started from a scrubbed
 bar, or scrubbed while paused, is practice on a passage, and its result says **not kept**.
 
-Under the limbs, the result says what the take did to your progress — `clean 85%  best 90%`, a tick
-and `learned at 100%` the first time you make it, or why it did not count: `84% right, need 90`,
-`spread 72, max 60ms`.
+### Looking back over a take
+
+Turn the jog back on the result and the drill scrolls back into view, **as you played it**: every
+note you hit opened into a ring, every one you missed crossed out, and a second ring wherever your
+pad actually went down — so a late snare shows as two rings with the gap between them. The header
+says **REVIEW** and the bar along the bottom shows where you are in the take.
+
+The jog moves a beat a detent; knob 1 moves finer, as the scrub does. Turn forward past the end of
+the take and the result comes back; **Back** brings it back at once. Record, Play and Click do what
+they do on the result. A new take forgets the last one.
 
 ## Your progress
 
@@ -350,12 +379,16 @@ practice, not a slip. And it never lowers your best.
 
 ### Progress
 
-The last row of the list. The four tracks first — learned out of all — then every drill you have
-played, most recent first. **Click** a track to open it on the Learning Path, or a drill for its
-chart: every take's speed, oldest on the left, against a dotted line at 100%. A filled dot was
-clean, an open one did not count, so a run of slow clean takes climbing to the line reads as what
-it is. Under it: your best, at what tempo, how many takes, and the last one — its speed, how many
-notes were right and its spread.
+The last row of the list, laid out as Piano Practice's is:
+
+| Row | Opens |
+| --- | --- |
+| **Overall** | every drill on the Learning Path you have learned, as a line along real time that steps up at each tick — flat stretches are weeks off, steep ones are where it clicked |
+| **Time**, **Rudiments**, **Grooves**, **Ear** | the same for one track |
+| a drill | its takes: the chart the result draws, with your best and at what tempo, and how many takes |
+
+Drills come most recent first, with their mark and best clean speed. Once a chart is open the jog
+walks on through the others without going back to the list — **JOG 3/12** says where you are.
 
 Your progress lives in `progress.json` next to the module, with a backup copy, and survives an
 update. The first time a version with progress starts, the takes already in your history are read

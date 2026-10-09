@@ -1790,3 +1790,75 @@ test('Guess: drum keeps the whole kit — its answer is a drum, so there is no b
   assert.ok(row.every((c) => c === 107), `the bottom row is not the kit: ${row}`);
   assert.ok(!drawnText(1).includes('blue'));
 });
+
+/* ---- looking back over a finished take ----------------------------------- */
+
+test('from the result the jog scrolls back through the take, and forward to the result again', async () => {
+  await loadUi({ settings: PLAIN });
+  const sn = await snare();
+  globalThis.init();
+  ticks(2);
+  continuePath();
+  playQuarters(sn, 100);
+  assert.ok(drawnText(1).includes('LEARNED'), 'no result');
+  cc(CC.jogTurn, 127);                          /* one beat back */
+  ticks(1);
+  let shown = drawnText(1);
+  assert.ok(shown.includes('REVIEW'), `not reviewing: ${shown.join('|')}`);
+  assert.ok(!shown.includes('LEARNED'), 'the result is still up');
+  for (let i = 0; i < 12; i++) cc(CC.jogTurn, 127);
+  ticks(1);
+  shown = drawnText(1);
+  assert.ok(shown.some((t) => /^\d+\/\d+$/.test(t)), 'no bar position in the review');
+  for (let i = 0; i < 40; i++) cc(CC.jogTurn, 1);
+  ticks(1);
+  assert.ok(drawnText(1).includes('LEARNED'), 'forward to the end did not bring the result back');
+});
+
+test('the review shows what was played: hits as rings, misses as crosses', async () => {
+  const { screen } = await loadUi({ settings: { ...PLAIN, view: 'staff' } });
+  const sn = await snare();
+  globalThis.init();
+  ticks(2);
+  continuePath();
+  /* Every other beat: half hit, half missed. */
+  cc(CC.record, 127);
+  const beatMs = 600;
+  let t = 0;
+  let next = 0;
+  let k = 0;
+  for (let i = 0; i < (40 * beatMs) / 25 + 40; i++) {
+    if (t >= next) { if (k % 2 === 0) { pad(sn, 100); pad(sn, 0); } k++; next += beatMs; }
+    globalThis.__advance(25);
+    t += 25;
+    globalThis.tick();
+  }
+  assert.ok(drawnText(1).includes('NOT CLEAN'), 'half missed should not be clean');
+  for (let i = 0; i < 6; i++) cc(CC.jogTurn, 127);
+  ticks(1);
+  /* The staff between the clef and the right edge carries the judged notes. */
+  assert.ok(countOn(screen, 30, 10, 98, 34) > 60, 'the review drew no notes');
+  cc(CC.back, 127);
+  ticks(1);
+  assert.ok(drawnText(1).includes('NOT CLEAN'), 'Back from the review is the result');
+});
+
+test('knob 1 scrolls the review too, finer than the jog', async () => {
+  await loadUi({ settings: PLAIN });
+  const sn = await snare();
+  globalThis.init();
+  ticks(2);
+  continuePath();
+  playQuarters(sn, 100);
+  cc(CC.knob1, 127);
+  ticks(1);
+  assert.ok(drawnText(1).includes('REVIEW'));
+  cc(CC.knob1, 1);
+  ticks(1);
+  assert.ok(drawnText(1).includes('LEARNED'), 'one step forward from just before the end is the result');
+  cc(CC.record, 127);
+  ticks(2);
+  cc(CC.jogTurn, 127);
+  ticks(1);
+  assert.ok(!drawnText(1).includes('REVIEW'), 'a new take forgets the last one');
+});

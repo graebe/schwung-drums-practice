@@ -283,6 +283,15 @@ let summaryIsBest = false;
 let summaryInfo = null;
 /* The take just recorded was the first at tempo, clean: the drill is learned. */
 let takeLearned = false;
+/*
+ * Looking back over a finished take: { run, end, at }. `run` is the whole take
+ * as it was judged (SC.reviewOf), `end` the beat it ended on, and `at` where
+ * the review is — null while the result is showing. Turning back from the
+ * result scrolls into the take; turning forward past its end brings the
+ * result back.
+ */
+let review = null;
+const REVIEW_UNITS_PER_BAR = 36;
 let clockMode = false;
 let shiftHeld = false;
 /* Where the playhead is and what moves it: see transport.mjs. */
@@ -770,6 +779,7 @@ function armChart(c) {
   chartLength = IO.practiceLength(chart);
   /* A newly armed drill starts at home, where the box is. */
   T.home(tp);
+  review = null;
   if (ladder) ladder = newLadder();
   screen = READY;
   announce(`${chart.name} ready`);
@@ -908,6 +918,7 @@ function transportPress(want) {
  */
 function enterReady() {
   dspSet('panic', '1');
+  review = null;
   T.home(tp);
   if (ladder) chart = { ...chart, bpm: armedBpm };
   run = SC.createRun(chart, runOpts());
@@ -973,6 +984,9 @@ function stop() {
   takeLearned = false;
   if (whole && !ladder) recordRun();
   summaryInfo = resultOf(whole);
+  const endAt = Number.isFinite(run.endBeat) ? Math.min(run.endBeat, Math.max(0, tp.songBeats))
+    : Math.max(0, tp.songBeats);
+  review = { run: SC.reviewOf(run), end: endAt, at: null };
   T.home(tp);
   screen = ladder ? LADDER : SUMMARY;
 }
@@ -1101,6 +1115,28 @@ function recordIdOf(c) {
  * full-speed one as if they were the same thing. */
 function attemptContext() {
   return { speed: settings.speed, guide: settings.guide, study: settings.study };
+}
+
+/*
+ * A step through the finished take: back from the result into it, forward out
+ * of it. The jog moves a beat a detent; knob 1 moves as the scrub does, in
+ * fractions of a bar.
+ */
+function reviewStep(beats) {
+  if (!review || review.end <= 0) return;
+  const from = review.at === null ? review.end : review.at;
+  const to = Math.max(0, from + beats);
+  if (to >= review.end) {
+    if (review.at !== null) announce('result');
+    review.at = null;
+    return;
+  }
+  if (review.at === null) announce('review');
+  review.at = to;
+}
+
+function reviewing() {
+  return Boolean(review && review.at !== null && (screen === SUMMARY || screen === LADDER));
 }
 
 /* ---- the clock ---------------------------------------------------------- */
@@ -1669,6 +1705,8 @@ function back() {
   if (screen === ERROR || safeMode) return false;
   if (screen === SETTINGS && settingsEditing) { settingsEditing = false; return true; }
   if (screen === SETTINGS) { leaveSettings(); return true; }
+  /* Back from looking over a take is the result again. */
+  if (reviewing()) { review.at = null; return true; }
   /* Back from a result is another go from the top; Back again is the list. */
   if ((screen === SUMMARY || screen === LADDER) && chart) { restart(); return true; }
   /* Up one folder; only the top of the tree is left by Back. */
@@ -1879,6 +1917,16 @@ function draw() {
   }
   if (screen === RESULT && resultCache) {
     V.drawResult(ctx, resultCache);
+    return;
+  }
+  if (reviewing() && chart) {
+    V.drawReadingView(ctx, {
+      run: review.run, chart, songBeats: review.at, pxPerBeat: settings.pxPerBeat,
+      view: settings.view, title: chart.name, bpm: chart.bpm, lanes: chartLanes,
+      dynamics: settings.dynamics, beatFlash: false, timing: review.run.timing,
+      paused: false, blocked: false, rightLabel: 'REVIEW',
+      progress: review.end > 0 ? review.at / review.end : 0,
+    });
     return;
   }
   if (screen === LADDER && ladder) {
@@ -2200,6 +2248,10 @@ function midiInner(data) {
      * screen by a knob brushed on the way past, and Kit switched the pad layout
      * in the middle of a run.
      */
+    if ((screen === SUMMARY || screen === LADDER) && k === 0 && chart) {
+      reviewStep((delta * CH.beatsPerBar(chart)) / REVIEW_UNITS_PER_BAR);
+      return;
+    }
     if (screen === READY || screen === RUNNING) {
       if (k === 0 && (screen === READY || tp.paused)) scrub(delta);
       else if (k === C.KNOB_COUNT - 1) changeSpeed(delta);
@@ -2247,6 +2299,8 @@ function jog(delta) {
     editSetting(SET.ROWS[settingsSel].key, delta);
   } else if (target === 'choice' && quiz) {
     Q.moveChoice(quiz, delta);
+  } else if ((screen === SUMMARY || screen === LADDER) && review) {
+    reviewStep(delta);
   } else if (screen === PROGRESS_ITEM) {
     /* On through the list's charts without going back to it, as in piano. */
     const n = progressRows.length;

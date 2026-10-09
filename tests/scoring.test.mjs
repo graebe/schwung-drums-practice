@@ -523,3 +523,62 @@ test('seeking back lets Listen play the re-armed notes again', async () => {
   assert.equal(SC.takeDue(run, 3.5).length, 1, 'and the cursor carries on to the end');
   assert.equal(SC.runFinished(run, 99), true);
 });
+
+/* ---- the take's record, for looking back over it ------------------------- */
+
+test('what scrolls off is kept, in order, and a review joins it to what is live', () => {
+  const chart = { id: 'r', name: 'R', bpm: 120, timeSig: [4, 4], loopBars: 1, repeats: 4,
+    events: [0, 1, 2, 3].map((b) => ({ beat: b, voices: ['SN'] })) };
+  const run = S.createRun(chart);
+  S.ensureEntries(run, 16);
+  S.judgeHit(run, { voice: 'SN' }, 0);
+  S.addMarker(run, 'SN', 0);
+  S.expireMissed(run, 6);
+  S.pruneEntries(run, 5);
+  S.pruneMarkers(run, 5);
+  assert.deepEqual(run.past.map((e) => e.beat), [0, 1, 2, 3, 4]);
+  assert.equal(run.pastMarkers.length, 1);
+  assert.equal(run.past[0].notes[0].state, 'hit', 'kept as it was judged');
+  const r = S.reviewOf(run);
+  assert.deepEqual(r.entries.slice(0, 6).map((e) => e.beat), [0, 1, 2, 3, 4, 5]);
+  assert.equal(r.markers.length, 1);
+  assert.equal(run.entries[0].beat, 5, 'the live run is untouched');
+  /* The binary search finds the same window a walk from the front would. */
+  const seen = S.visibleEntries(r, 3, 32).map((v) => v.beat);
+  assert.ok(seen.includes(3) && seen.every((b) => b >= 0));
+});
+
+test('markers past the live limit are kept for the review, not lost', () => {
+  const run = S.createRun({ id: 'm', name: 'M', bpm: 120, timeSig: [4, 4], loopBars: 1, repeats: 1,
+    events: [{ beat: 0, voices: ['SN'] }] });
+  for (let i = 0; i < 70; i++) S.addMarker(run, 'SN', i / 10);
+  assert.equal(run.markers.length, 64);
+  assert.equal(run.pastMarkers.length, 6);
+  assert.equal(S.reviewOf(run).markers.length, 70);
+});
+
+test('a seek back takes what will be played again out of the record', () => {
+  const chart = { id: 's', name: 'S', bpm: 120, timeSig: [4, 4], loopBars: 1, repeats: 4,
+    events: [0, 1, 2, 3].map((b) => ({ beat: b, voices: ['SN'] })) };
+  const run = S.createRun(chart);
+  S.ensureEntries(run, 16);
+  S.expireMissed(run, 9);
+  S.addMarker(run, 'SN', 7);
+  S.pruneMarkers(run, 8);
+  S.pruneEntries(run, 8);
+  S.seekTo(run, 6);
+  assert.deepEqual(run.past.map((e) => e.beat), [0, 1, 2, 3, 4, 5]);
+  assert.equal(run.pastMarkers.length, 0);
+});
+
+test('the record is bounded, however long an endless run goes', () => {
+  const run = S.createRun({ id: 'e', name: 'E', bpm: 120, timeSig: [4, 4], loopBars: 1,
+    events: [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5].map((b) => ({ beat: b, voices: ['HH'] })) }, { repeats: 0 });
+  for (let b = 0; b < 2200; b += 8) {
+    S.ensureEntries(run, b + 8);
+    S.expireMissed(run, b + 8);
+    S.pruneEntries(run, b + 7);
+  }
+  assert.ok(run.past.length <= S.PAST_MAX);
+  for (let i = 1; i < run.past.length; i++) assert.ok(run.past[i].beat > run.past[i - 1].beat);
+});

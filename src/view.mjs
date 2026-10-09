@@ -139,9 +139,11 @@ function drawGridBody(ctx, s, visible, px, bars) {
   for (const item of visible) GR.drawStack(ctx, item, laneList);
   if (s.run.markers) {
     for (const m of s.run.markers) {
+      const x = beatToX(m.beat, s.songBeats, px);
+      if (x < L.DESPAWN_X || x >= L.SCREEN_W) continue;
       const lane = GR.laneOf(laneList, m.voice);
       if (!lane) continue;
-      GR.drawMarker(ctx, beatToX(m.beat, s.songBeats, px), lane);
+      GR.drawMarker(ctx, x, lane);
     }
   }
   GR.drawPlayhead(ctx, laneList, s.beatFlash);
