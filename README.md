@@ -57,6 +57,10 @@ fingers, in the same way its sister module is a reading trainer rather than a pi
 - **Climbs.** The Ladder plays a rudiment at a tempo, and if you keep it clean it puts the tempo up
   and asks again. Your score is the fastest tempo you held it together at, kept per drill, plotted
   over time.
+- **Knows how far you have got.** Every drill shows your best **clean speed** — 80% means you can
+  play it clean at 80% of its written tempo — and a tick once you can play it clean at tempo. A
+  **Learning Path** walks you through time, rudiments, grooves and ear training side by side, and
+  **Repetition** brings back what you learned on a schedule, so it stays learned.
 - **Sounds like a kit, with no setup** — the module renders its own drums and its own click and
   mixes them into Move's audio. No track, no instrument, no MIDI channel to match.
 - **A library, in folders.** All forty PAS rudiments, by family, and forty-two grooves across six
@@ -256,10 +260,106 @@ this drill — this one last — so the number is read against where you were.
 | **Record** | another take, straight away |
 | **Play** | listen to it |
 | **Back** | back to the start of the drill |
-| **Click** | on to the next drill in the folder — the next level of a groove, the next rudiment |
+| **Click** | on to the next drill in the folder — the next level of a groove, the next rudiment — or, on the Learning Path, the next step of its track |
 
 Only a whole take is kept: practised from the top and never scrubbed. A take started from a scrubbed
 bar, or scrubbed while paused, is practice on a passage, and its result says **not kept**.
+
+Under the limbs, the result says what the take did to your progress — `clean 85%  best 90%`, a tick
+and `learned at 100%` the first time you make it, or why it did not count: `84% right, need 90`,
+`spread 72, max 60ms`.
+
+## Your progress
+
+### Clean at tempo
+
+A drummer has learned a pattern when they can play it **clean at its written tempo**, so that is
+what Drums Practice measures. A take is **clean** when, played whole from the top with Study off:
+
+- at least **90% of the notes are right** — the right drum, with the right hand and the right
+  dynamic. A wrong hand or a flat accent is not right, and a stray hit counts against you, so
+  sweeping the pads under every note scores nothing;
+- and the **timing spread** σ is inside the good window of your Strict setting — 60 ms on normal.
+
+Its **clean speed** is the tempo you played over the tempo the drill is written at. Play a flam tap
+written at 72 with Speed at 80% and get it clean, and the flam tap reads **80%**. Bring Speed up a
+step at a time and the number follows you; at **100%** the drill is **learned** and gets a tick.
+The Ladder counts too: its top clean rung is a clean speed, and since it climbs past the written
+tempo it can carry a drill beyond 100%.
+
+Every row in the list shows where you are:
+
+| Row | Means |
+| --- | --- |
+| `✓ 100%` | learned — clean at tempo — and your best clean speed |
+| `85%` | your best clean speed so far |
+| `○` | played, but never clean yet |
+| `»` | skipped on purpose |
+| `▸` | the next step on the Learning Path |
+| `12/40` | a folder: learned out of all |
+
+Your best never drops. Practising slowly is how a drummer gets faster, and a slow take must never
+read as going backwards. A **Study** take is never counted at all: Study waits for you, and a take
+that waited has no timing to judge.
+
+A generated drill has no written tempo of its own — it follows the Tempo setting — so each has a
+target to measure against: quarters and eighths at 100, triplets at 90, sixteenths and switching at
+80, sextuplets at 70, reading 8ths at 90, reading 16ths and random sticking at 80.
+
+A quiz has no tempo either. Its number is your best round: answers right first time, out of all
+your answers — an answer you needed a hint for is right but not yet known, so it does not count as
+right here. **90%** is learned.
+
+### The Learning Path
+
+Second in the list, after Basics. It does not hold drills of its own: every step is a row from
+elsewhere in the tree, so **a take anywhere counts** — learn the flam tap from Rudiments › Flams and
+its step on the path is learned too. Nothing is locked; the path only recommends.
+
+Four tracks run side by side, because time, hands, grooves and ears are different skills and a
+session that mixes them beats one that grinds a single list:
+
+| Track | Steps |
+| --- | --- |
+| **Time** | quarters and eighths; triplets, sixteenths, sextuplets and switching between them; reading 8ths and 16ths and random sticking; then the **Clock** on quarters — keep time with the click gone |
+| **Rudiments** | all forty, in the order a teacher brings them in rather than by family: singles and doubles, the short rolls, flams, drags, the paradiddles, the long rolls, then the compound flams and drags |
+| **Grooves** | every groove, family by family from rock to techno, the plainest of each first, and every groove rung by rung, L1 to L4 |
+| **Ear** | name the drum — reading it, hearing it, picking it — then the subdivision, then the groove |
+
+| Row | Does |
+| --- | --- |
+| **Continue** | opens the next step of the track you have left longest, so a session walks Time, Rudiments, Grooves and Ear in turn |
+| **Skip next** | passes that step by; it stays playable and still gets its tick if you play it later |
+| a track | its units and steps, with the next one marked `▸` |
+| **Repetition** | what is due today |
+
+Opening a generated drill from the path sets **Tempo** to its target, so Speed 100% is exactly what
+the step asks for. Click on a result goes on to the next step of the same track — even when the take
+was not good enough yet, so you are never stuck on one drill; Record plays it again.
+
+A groove learned at a higher level ticks the levels below it: if you can play everything, you can
+play the cymbals alone. Someone who can already play a groove plays its top rung once and moves on.
+
+### Repetition
+
+What you have learned comes back after **1, 3, 7, 14 and 30 days** — the spacing that makes
+something stay learned — as a short daily routine of at most five drills. A clean take at tempo
+moves a drill on to its next interval; one that falls apart brings it back tomorrow and puts it at
+the top of the list. Only a take at full speed counts here: working on a learned rudiment slowly is
+practice, not a slip. And it never lowers your best.
+
+### Progress
+
+The last row of the list. The four tracks first — learned out of all — then every drill you have
+played, most recent first. **Click** a track to open it on the Learning Path, or a drill for its
+chart: every take's speed, oldest on the left, against a dotted line at 100%. A filled dot was
+clean, an open one did not count, so a run of slow clean takes climbing to the line reads as what
+it is. Under it: your best, at what tempo, how many takes, and the last one — its speed, how many
+notes were right and its spread.
+
+Your progress lives in `progress.json` next to the module, with a backup copy, and survives an
+update. The first time a version with progress starts, the takes already in your history are read
+into it.
 
 ## The drills
 
@@ -267,6 +367,8 @@ The list is a tree. **Click** opens a folder, **Back** goes up one, and Back at 
 
 ```
 Basics      Subdivisions · Random (reading 8ths/16ths, sticking, groove variation — fresh each time)
+Learning    Continue · Skip next · Time · Rudiments · Grooves · Ear · Repetition
+ Path
 Grooves     Rock & Pop · Funk & Soul · Latin & World · Jazz & Swing · Electronic · Techno
 Rudiments   Rolls · Diddles · Flams · Drags          (the PAS forty)
 Training    Ladder · Clock                           (on the drill you have armed)
@@ -529,7 +631,7 @@ sh scripts/install.sh
 
 `MOVE_HOST` (default `move.local`) and `MOVE_USER` (default `ableton`) override the target. The
 install stages beside the live directory and swaps, so a failed transfer cannot leave a
-half-installed module behind; your settings, your history and any drills listed in
+half-installed module behind; your settings, your history, your progress and any drills listed in
 `exercises/user.json` survive an update.
 
 Open it from the Schwung Tools menu. If it does not appear, trigger a module rescan from
@@ -560,6 +662,9 @@ Everything except `ui.js` is pure and runs under plain `node`.
 | `src/layout.mjs` | every screen coordinate, in one leaf module |
 | `src/notation.mjs` | staff placement and ledger lines |
 | `src/catalog.mjs` | the drill tree and how the list walks it |
+| `src/progress.mjs` | clean takes, clean speed, what is learned, repetition, folder sums |
+| `src/program.mjs` | the Learning Path: its tracks and what to practise next |
+| `src/stats.mjs` | the raw history of every take, capped per drill |
 | `src/beam.mjs` | beat-grouped stems and beams |
 | `src/staff_render.mjs` | the percussion staff: heads, stems, beams, accents, bar lines |
 | `src/grid_render.mjs` | the lane view |

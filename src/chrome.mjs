@@ -13,6 +13,7 @@ import * as L from './layout.mjs';
 import { barBeatOf } from './chart.mjs';
 import { recentStats } from './timing.mjs';
 import * as SR from './staff_render.mjs';
+import { drawMark, MARK_W } from './glyphs.mjs';
 
 /* ---- Header ------------------------------------------------------------- */
 /*
@@ -149,14 +150,16 @@ export function drawList(ctx, { title, items, selected, right, top: fixedTop }) 
     const item = items[idx];
     const label = typeof item === 'string' ? item : item.label;
     const value = typeof item === 'string' ? '' : item.value || '';
-    if (idx === selected) {
-      ctx.fillRect(0, y - 1, L.SCREEN_W, L.TEXT_H + 1, 1);
-      ctx.text(2, y, label, 0);
-      if (value) ctx.text(L.SCREEN_W - ctx.textWidth(value) - 2, y, value, 0);
-    } else {
-      ctx.text(2, y, label, 1);
-      if (value) ctx.text(L.SCREEN_W - ctx.textWidth(value) - 2, y, value, 1);
-    }
+    const mark = typeof item === 'string' ? null : item.mark;
+    const v = idx === selected ? 0 : 1;
+    if (idx === selected) ctx.fillRect(0, y - 1, L.SCREEN_W, L.TEXT_H + 1, 1);
+    /* The label gives way to what the right takes — a progress mark and a
+     * percentage did not exist when every value was a single '>'. */
+    const tw = value ? ctx.textWidth(value) : 0;
+    const vw = tw + (mark ? MARK_W + (tw ? 2 : 0) : 0);
+    ctx.text(2, y, fitText(ctx, label, L.SCREEN_W - 4 - vw - (vw ? 4 : 0)), v);
+    if (mark) drawMark(ctx, L.SCREEN_W - vw - 2, y + 1, mark, v);
+    if (value) ctx.text(L.SCREEN_W - tw - 2, y, value, v);
   }
   /* A scrollbar, so a long list does not look like a short one. */
   if (items.length > LIST_ROWS) {
@@ -164,6 +167,13 @@ export function drawList(ctx, { title, items, selected, right, top: fixedTop }) 
     const y = 10 + Math.round((top / (items.length - LIST_ROWS)) * (44 - h));
     ctx.fillRect(L.SCREEN_W - 1, y, 1, h, 1);
   }
+}
+
+/* `text` cut to fit `maxPx`, so it never runs under what sits beside it. */
+export function fitText(ctx, text, maxPx) {
+  let out = String(text);
+  while (out.length > 1 && ctx.textWidth(out) > maxPx) out = out.slice(0, -1);
+  return out;
 }
 
 /* Tempo as a line, sigma as bars growing from the baseline. */

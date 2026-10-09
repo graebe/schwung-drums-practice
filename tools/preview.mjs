@@ -20,6 +20,8 @@ import { builtins } from '../src/generator.mjs';
 import { parseExercise, parseManifest } from '../src/exercise_io.mjs';
 import { createLadder } from '../src/ladder.mjs';
 import { DEFAULTS } from '../src/settings_def.mjs';
+import * as PROG from '../src/progress.mjs';
+import * as L from '../src/layout.mjs';
 
 const exDir = new URL('../src/exercises/', import.meta.url);
 
@@ -89,7 +91,10 @@ function dump(label, ctx) {
 if (screen) {
   const ctx = createScreen();
   const run = runAt(8, { sloppy: true });
-  if (screen === 'summary') V.drawSummary(ctx, { run, tightMs: 30 });
+  if (screen === 'summary') {
+    V.drawSummary(ctx, { run, tightMs: 30, name: chart.name, bpm: chart.bpm,
+      note: { text: 'clean 85%  best 90%' } });
+  }
   else if (screen === 'ladder') {
     V.drawLadder(ctx, { ladder: Object.assign(createLadder({ bpm: 112 }), { rungs: 6 }), barsDone: 2 });
   } else if (screen === 'ready') {
@@ -101,12 +106,11 @@ if (screen) {
   } else if (screen === 'menu') {
     V.drawList(ctx, { title: 'DRUMS', items: drills.map((d) => d.name), selected: 3 });
   } else if (screen === 'progress') {
-    const records = [90, 95, 100, 98, 105, 110, 108, 115].map((bpm, i) => ({
-      bpm, sd: 24 - i * 2, t: i, d: 'x',
-    }));
+    const h = [70, 75, 80, 78, 85, 90, 95, 100].map((pct, i) => [i, pct, 93, 24 - i * 2, i === 3 ? 4 : 5]);
     V.drawProgress(ctx, {
-      drillLabel: chart.name, records,
-      summary: { best: 115, last: 115 },
+      title: chart.name, best: 100, bpm: chart.bpm, plays: h.length, done: true, isQuiz: false,
+      last: h[h.length - 1],
+      series: PROG.percentSeries(h, L.PROGRESS_PLOT.w - 2, L.PROGRESS_PLOT.h - 2),
     });
   } else {
     console.error(`unknown screen: ${screen}`);

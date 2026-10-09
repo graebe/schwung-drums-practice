@@ -11,48 +11,21 @@
  */
 
 export const STATS_VERSION = 1;
-/* ~200 records is about 14KB. The file cannot be allowed to grow without
- * bound on a device whose storage nobody is watching. */
-export const MAX_RECORDS = 200;
+/*
+ * Capped PER DRILL, and in all. The file cannot be allowed to grow without
+ * bound on a device whose storage nobody is watching — but a single cap of
+ * 200 shared by every drill meant a week on one groove pushed out the history
+ * of all the others. 40 takes a drill is a long chart; 2000 records is about
+ * 150KB, which is the most there can ever be.
+ */
+export const PER_DRILL = 40;
+export const MAX_RECORDS = 2000;
 
 export function drillId(kind, id, opts = {}) {
   const parts = [kind, id];
   if (opts.strictness) parts.push(opts.strictness);
   if (opts.sticking && opts.sticking !== 'off') parts.push(opts.sticking);
   return parts.join(':');
-}
-
-const STRICTNESS = ['loose', 'normal', 'tight'];
-const KIND_PREFIX = { ladder: 'Ladder: ', clock: 'Clock: ' };
-
-/*
- * What the Progress screen calls a drill: "Rock backbeat L2",
- * "Ladder: Single paradiddle tight", "Guess: drum".
- *
- * It used to be the id's second segment and nothing else, so a groove's levels,
- * its strictness variants and every quiz of one kind collapsed onto the same
- * words — three different histories, one label, no way to tell which plot was
- * which. `names` maps a chart id, or a quiz id, to what the list calls it.
- *
- * The chart id itself may hold a colon (a level projection is "<id>:l2"), so
- * the strictness — always recorded — marks where it ends.
- */
-export function drillLabel(id, names = {}) {
-  const str = String(id);
-  if (names[str]) return names[str];
-  const parts = str.split(':');
-  const kind = parts[0];
-  if (!(kind in KIND_PREFIX) && kind !== 'drill') return parts.length > 1 ? parts.slice(1).join(' ') : str;
-  const rest = parts.slice(1);
-  let end = rest.findIndex((p) => STRICTNESS.includes(p));
-  if (end < 0) end = rest.length;
-  const chartId = rest.slice(0, end).join(':');
-  const level = /:l(\d)$/.exec(chartId);
-  const base = level ? chartId.slice(0, -level[0].length) : chartId;
-  let label = (KIND_PREFIX[kind] || '') + (names[base] || base) + (level ? ` L${level[1]}` : '');
-  const strict = rest[end];
-  if (strict && strict !== 'normal') label += ` ${strict}`;
-  return label;
 }
 
 /*
@@ -64,8 +37,11 @@ export function drillLabel(id, names = {}) {
  *   mean  timing bias, ms
  *   n     hits
  *   err   misses + sticking + dynamic errors, together
+ *   tot   notes asked, when known, so a take's accuracy can be worked out
+ *   cl    1 when the take was clean (progress.mjs)
  */
-export function makeRecord({ drill, bpm, sd = 0, mean = 0, n = 0, err = 0, at = 0, context = null }) {
+export function makeRecord({ drill, bpm, sd = 0, mean = 0, n = 0, err = 0, at = 0, context = null,
+  total = 0, clean = false }) {
   const rec = {
     t: Math.round(at),
     d: drill,
@@ -75,6 +51,8 @@ export function makeRecord({ drill, bpm, sd = 0, mean = 0, n = 0, err = 0, at = 
     n: Math.round(n),
     err: Math.round(err),
   };
+  if (total > 0) rec.tot = Math.round(total);
+  if (clean) rec.cl = 1;
   /*
    * What the take was played WITH: Speed, and whether Guide pads or Study
    * helped. Kept on the record rather than in the drill's id, so one drill
@@ -93,8 +71,17 @@ export function emptyStats() {
   return { version: STATS_VERSION, records: [] };
 }
 
-export function addRecord(stats, rec, cap = MAX_RECORDS) {
+export function addRecord(stats, rec, cap = MAX_RECORDS, perDrill = PER_DRILL) {
   stats.records.push(rec);
+  let mine = 0;
+  for (let i = 0; i < stats.records.length; i++) if (stats.records[i].d === rec.d) mine++;
+  /* The drill's own oldest take goes first, so no other drill pays for it. */
+  for (let i = 0; mine > perDrill && i < stats.records.length; i++) {
+    if (stats.records[i].d !== rec.d) continue;
+    stats.records.splice(i, 1);
+    mine--;
+    i--;
+  }
   if (stats.records.length > cap) stats.records.splice(0, stats.records.length - cap);
   return stats;
 }
@@ -130,6 +117,8 @@ export function parseStats(text) {
     if (Number.isFinite(r.sp)) rec.sp = r.sp;
     if (r.g === 1) rec.g = 1;
     if (r.s === 1) rec.s = 1;
+    if (Number.isFinite(r.tot)) rec.tot = r.tot;
+    if (r.cl === 1) rec.cl = 1;
     records.push(rec);
   }
   return { version: STATS_VERSION, records };
@@ -157,12 +146,6 @@ export function forDrill(stats, id) {
   const out = [];
   for (const r of stats.records) if (r.d === id) out.push(r);
   return out;
-}
-
-export function drillsWithHistory(stats) {
-  const seen = [];
-  for (const r of stats.records) if (!seen.includes(r.d)) seen.push(r.d);
-  return seen;
 }
 
 export function summarise(records) {
@@ -205,30 +188,4 @@ export function isPersonalBest(stats, rec) {
       : r.bpm >= rec.bpm) return false;
   }
   return true;
-}
-
-/*
- * A sparkline of recent tempos, as [x, y] pairs inside a w x h box.
- *
- * The y scale spans the series' own min and max rather than starting at zero:
- * every tempo in a drill's history sits in a narrow band near the top, and a
- * zero-based axis would flatten a month of progress into one straight line.
- */
-export function sparkline(records, w, h, limit = 40) {
-  const recs = records.slice(-limit);
-  if (recs.length === 0) return [];
-  let lo = Infinity;
-  let hi = -Infinity;
-  for (const r of recs) {
-    if (r.bpm < lo) lo = r.bpm;
-    if (r.bpm > hi) hi = r.bpm;
-  }
-  const span = hi - lo || 1;
-  const out = [];
-  for (let i = 0; i < recs.length; i++) {
-    const x = recs.length === 1 ? 0 : Math.round((i / (recs.length - 1)) * (w - 1));
-    const y = h - 1 - Math.round(((recs[i].bpm - lo) / span) * (h - 1));
-    out.push([x, y]);
-  }
-  return out;
 }

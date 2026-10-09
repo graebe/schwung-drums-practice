@@ -79,10 +79,12 @@ test('ui.js computes nothing in draw() that a change event could have cached', (
   for (const [call, where] of [
     ['SET.settingsRows(', 'editSetting'],
     ['IO.playabilityWarnings(', 'armChart'],
-    ['ST.drillsWithHistory(', 'rebuildProgress'],
-    ['ST.forDrill(', 'rebuildProgress'],
+    ['PROG.recentIds(', 'openProgress'],
+    ['PROG.folderSummary(', 'decorateRow'],
+    ['PROG.percentSeries(', 'progressChart'],
+    ['ST.forDrill(', 'stop'],
     ['GR.lanes(', 'armChart'],
-    ['CAT.rowsOf(', 'rebuildMenu'],
+    ['decorateRow(', 'menuRows, which caches it'],
     ['IO.practiceLength(', 'armChart'],
     ['ST.summarise(', 'finishQuiz'],
   ]) {

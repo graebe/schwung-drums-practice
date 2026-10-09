@@ -53,6 +53,8 @@ export function createQuiz(opts = {}) {
     eliminated: [],
     hints: 0,
     hintsTaken: 0,
+    /* Questions answered right only after a hint: right, but not known. */
+    hinted: 0,
     correct: 0,
     wrong: 0,
     streak: 0,
@@ -99,6 +101,7 @@ function score(quiz, right, nowMs) {
     quiz.streak++;
     if (quiz.streak > quiz.bestStreak) quiz.bestStreak = quiz.streak;
     quiz.hintsTaken += quiz.hints;
+    if (quiz.hints > 0) quiz.hinted++;
     if (roundComplete(quiz)) quiz.finishedMs = nowMs;
   } else {
     quiz.wrong++;

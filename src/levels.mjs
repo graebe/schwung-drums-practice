@@ -104,7 +104,26 @@ export function projectLevel(chart, levelId) {
  * notes as the one below. A hi-hat drill has one level; a kick-and-hat groove
  * has two, not four with duplicates.
  */
+/*
+ * Remembered per chart object: the drill tree, the Learning Path and the
+ * folder sums all ask for every groove's rungs, and projecting four levels of
+ * forty grooves is most of what opening the module costs. A loaded chart is
+ * never changed afterwards — arming one makes a copy — so the answer holds.
+ */
+const levelCache = new WeakMap();
+
 export function availableLevels(chart) {
+  if (chart && typeof chart === 'object') {
+    const hit = levelCache.get(chart);
+    if (hit) return hit;
+    const out = computeLevels(chart);
+    levelCache.set(chart, out);
+    return out;
+  }
+  return computeLevels(chart);
+}
+
+function computeLevels(chart) {
   const out = [];
   let lastSig = null;
   for (const lv of LEVELS) {

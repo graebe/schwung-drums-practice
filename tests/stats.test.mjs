@@ -18,14 +18,34 @@ test('history is kept per drill and never mixed', () => {
   ST.addRecord(s, rec('a', 110));
   assert.equal(ST.forDrill(s, 'a').length, 2);
   assert.equal(ST.summarise(ST.forDrill(s, 'a')).best, 110);
-  assert.deepEqual(ST.drillsWithHistory(s), ['a', 'b']);
 });
 
 test('the file cannot grow without bound', () => {
   const s = ST.emptyStats();
   for (let i = 0; i < 500; i++) ST.addRecord(s, rec('a', 100 + i));
-  assert.equal(s.records.length, ST.MAX_RECORDS);
+  assert.equal(s.records.length, ST.PER_DRILL, 'one drill keeps PER_DRILL takes');
   assert.equal(s.records[s.records.length - 1].bpm, 599, 'the newest must survive');
+  for (let i = 0; i < 3000; i++) ST.addRecord(s, rec(`d${i % 100}`, 100));
+  assert.equal(s.records.length, ST.MAX_RECORDS, 'and all of them together MAX_RECORDS');
+});
+
+test('a busy drill pushes out its own old takes, not other drills\' history', () => {
+  const s = ST.emptyStats();
+  ST.addRecord(s, rec('quiet', 90));
+  for (let i = 0; i < 100; i++) ST.addRecord(s, rec('busy', 100 + i));
+  assert.equal(ST.forDrill(s, 'quiet').length, 1);
+  assert.equal(ST.forDrill(s, 'busy').length, ST.PER_DRILL);
+  assert.equal(ST.forDrill(s, 'busy')[0].bpm, 100 + 100 - ST.PER_DRILL);
+});
+
+test('a record keeps its note count and whether it was clean', () => {
+  const r = ST.makeRecord({ drill: 'drill:x:normal', bpm: 90, total: 32, clean: true });
+  assert.equal(r.tot, 32);
+  assert.equal(r.cl, 1);
+  const back = ST.parseStats(ST.serialiseStats({ records: [r] })).records[0];
+  assert.equal(back.tot, 32);
+  assert.equal(back.cl, 1);
+  assert.equal(ST.makeRecord({ drill: 'x', bpm: 90 }).cl, undefined);
 });
 
 test('a corrupt file reads as no history rather than failing to open', () => {
@@ -63,25 +83,6 @@ test('a personal best is the first time nothing has matched it', () => {
   assert.equal(ST.isPersonalBest(s, c), true);
 });
 
-test('the sparkline spans the series, not zero', () => {
-  /* Every tempo in a drill sits in a narrow band; a zero-based axis would
-   * flatten a month of progress into one straight line. */
-  const recs = [rec('d', 100), rec('d', 104), rec('d', 108)];
-  const pts = ST.sparkline(recs, 20, 10);
-  assert.equal(pts.length, 3);
-  assert.equal(pts[0][1], 9, 'the lowest sits on the floor');
-  assert.equal(pts[2][1], 0, 'the highest sits on the ceiling');
-  assert.equal(pts[0][0], 0);
-  assert.equal(pts[2][0], 19);
-});
-
-test('a flat or single-point series does not divide by zero', () => {
-  assert.deepEqual(ST.sparkline([], 20, 10), []);
-  assert.equal(ST.sparkline([rec('d', 100)], 20, 10).length, 1);
-  const flat = ST.sparkline([rec('d', 100), rec('d', 100)], 20, 10);
-  assert.ok(flat.every(([, y]) => Number.isFinite(y)));
-});
-
 test('an empty summary is zeros, not NaN', () => {
   assert.deepEqual(ST.summarise([]), { n: 0, best: 0, last: 0, bestSd: 0, lastSd: 0 });
 });
@@ -91,16 +92,6 @@ test('the drill id separates settings that change the task', () => {
     ST.drillId('drill', 'x', { strictness: 'tight', sticking: 'strict' }),
     ST.drillId('drill', 'x', { strictness: 'loose', sticking: 'strict' }),
   );
-  assert.equal(ST.drillLabel('ladder:single-paradiddle:normal'), 'Ladder: single-paradiddle');
-});
-
-test('drill labels keep apart what the old one-segment label merged', () => {
-  const names = { 'rock-backbeat': 'Rock backbeat', 'guess:voice': 'Guess: drum' };
-  assert.equal(ST.drillLabel('drill:rock-backbeat:l2:normal', names), 'Rock backbeat L2');
-  assert.equal(ST.drillLabel('drill:rock-backbeat:l3:tight:strict', names), 'Rock backbeat L3 tight');
-  assert.equal(ST.drillLabel('clock:rock-backbeat:normal', names), 'Clock: Rock backbeat');
-  assert.equal(ST.drillLabel('guess:voice', names), 'Guess: drum');
-  assert.equal(ST.drillLabel('hear:groove'), 'groove', 'an unnamed quiz still reads');
 });
 
 test('a drill\'s best is its tightest take at its tempo, not its tempo', () => {

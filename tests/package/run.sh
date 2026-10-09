@@ -72,10 +72,10 @@ for m in $MODS; do
 done
 ok
 
-# The install must carry the player's settings, history and hand-added drills
+# The install must carry the player's settings, history, progress and hand-added drills
 # across an update.
 INSTALL="$ROOT/scripts/install.sh"
-for keep in settings.json stats.json user.json; do
+for keep in settings.json stats.json progress.json progress.bak.json user.json; do
   grep -q "$keep" "$INSTALL" || fail "install.sh does not preserve $keep"
 done
 # A hand-written drill is only preserved if the manifest that makes it VISIBLE

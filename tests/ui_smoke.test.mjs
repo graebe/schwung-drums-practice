@@ -25,7 +25,7 @@ const SHARED = '/data/UserData/schwung/shared/';
 const STAGED_UI = join(mkdtempSync(join(tmpdir(), 'drums-ui-')), 'ui.js');
 let uiLoads = 0;
 
-async function loadUi({ extraFiles = {}, settings = null } = {}) {
+async function loadUi({ extraFiles = {}, settings = null, dataFiles = {} } = {}) {
   const src = readFileSync(new URL('../src/ui.js', import.meta.url), 'utf8');
   const log = { leds: [], buttons: [], params: [], midi: [], writes: {}, announces: [], exited: 0 };
   const screen = createScreen();
@@ -59,6 +59,10 @@ async function loadUi({ extraFiles = {}, settings = null } = {}) {
   if (settings) {
     files['/data/UserData/schwung/modules/tools/drums-practice/settings.json'] =
       JSON.stringify({ version: 2, ...settings });
+  }
+  /* The module's own data — progress.json, stats.json — as left by a session. */
+  for (const [name, text] of Object.entries(dataFiles)) {
+    files[`/data/UserData/schwung/modules/tools/drums-practice/${name}`] = text;
   }
 
   Object.assign(globalThis, {
@@ -99,11 +103,12 @@ const CC = { jogTurn: 14, jogClick: 3, menu: 50, back: 51, play: 85, record: 86,
              knob1: 71, shift: 49 };
 /*
  * Getting about the tree. Rows are found by facts that hold whatever is
- * bundled: Grooves is the second row and Rock & Pop its first family, and the
- * jog clamps, so the end of the top list is Progress with Quiz just above it.
+ * bundled: Grooves is the third row (after Basics and the Learning Path) and
+ * Rock & Pop its first family, and the jog clamps, so the end of the top list
+ * is Progress with Quiz just above it.
  */
 /* Grooves › Rock & Pop, highlight on its first groove (Rock backbeat). */
-const toFirstDrill = () => { cc(CC.jogTurn, 1); cc(CC.jogClick, 127); cc(CC.jogClick, 127); };
+const toFirstDrill = () => { cc(CC.jogTurn, 2); cc(CC.jogClick, 127); cc(CC.jogClick, 127); };
 /* Into the Quiz folder, highlight on its first drill. */
 const toQuizzes = () => {
   for (let i = 0; i < 60; i++) cc(CC.jogTurn, 1);
@@ -662,7 +667,7 @@ test('a drill listed in user.json loads alongside the shipped ones', async () =>
   const orig = globalThis.print;
   globalThis.print = (x, y, s, v) => { drawn.push(s); orig(x, y, s, v); };
   /* A user drill with no shipped category lands in Other, after Rudiments. */
-  for (let i = 0; i < 3; i++) cc(CC.jogTurn, 1);
+  for (let i = 0; i < 4; i++) cc(CC.jogTurn, 1);
   cc(CC.jogClick, 127);
   ticks(3);
   globalThis.print = orig;
@@ -1274,11 +1279,11 @@ function armFirstRung() {
   cc(CC.jogClick, 127);
   ticks(2);
 }
-/* Up to the top of the tree and into Training (the fourth row). */
+/* Up to the top of the tree and into Training (the fifth row). */
 function toTraining() {
   for (let i = 0; i < 4; i++) cc(CC.back, 127);
   for (let i = 0; i < 10; i++) cc(CC.jogTurn, 127);
-  for (let i = 0; i < 3; i++) cc(CC.jogTurn, 1);
+  for (let i = 0; i < 4; i++) cc(CC.jogTurn, 1);
   cc(CC.jogClick, 127);
 }
 function runUntil(re, maxTicks) {
@@ -1422,4 +1427,273 @@ test('a broken user.json is reported, and the shipped drills still load', async 
   const shown = drawnText(2);
   assert.ok(shown.some((t) => /BAD USER\.JSON/.test(t)), shown.join('|'));
   assert.ok(shown.some((t) => /Grooves/.test(t)), 'the list is there underneath');
+});
+
+/* ---- the Learning Path and progress ---------------------------------------- */
+
+const DATA = '/data/UserData/schwung/modules/tools/drums-practice/';
+/* Easy to play exactly: no count-in, no click, hands not judged. */
+const PLAIN = { countIn: 0, click: false, sticking: 'off' };
+const SNARE = 0;
+let snarePad = 0;
+async function snare() {
+  if (!snarePad) snarePad = (await import('../src/padmap.mjs')).padsForVoice('SN', 'kit')[SNARE];
+  return snarePad;
+}
+
+/* Learning Path › Continue: the root's second row, its first. */
+function continuePath() {
+  for (let i = 0; i < 10; i++) cc(CC.jogTurn, 127);
+  cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);
+  cc(CC.jogClick, 127);
+  ticks(2);
+}
+
+/* Practise quarters at `bpm`, one hit dead on every beat, until the result. */
+function playQuarters(snarePadNo, bpm, beats = 40) {
+  cc(CC.record, 127);
+  const beatMs = 60000 / bpm;
+  let t = 0;
+  let next = 0;
+  for (let i = 0; i < (beats * beatMs) / 25 + 40; i++) {
+    /* On the first tick at or past each beat: never more than 25ms late. */
+    if (t >= next) { pad(snarePadNo, 100); pad(snarePadNo, 0); next += beatMs; }
+    globalThis.__advance(25);
+    t += 25;
+    globalThis.tick();
+  }
+}
+
+test('Continue opens the first step, a clean take at tempo learns it, Click goes on', async () => {
+  const { log } = await loadUi({ settings: PLAIN });
+  const sn = await snare();
+  globalThis.init();
+  ticks(2);
+  continuePath();
+  assert.ok(drawnText(2).some((t) => /Quart/.test(t)), 'Continue did not open Quarters');
+  playQuarters(sn, 100);
+  const shown = drawnText(2);
+  assert.ok(shown.some((t) => /learned at 100%/.test(t)), `no progress line: ${shown.join('|')}`);
+  globalThis.onUnload();
+  const saved = JSON.parse(log.writes[`${DATA}progress.json`]);
+  assert.ok(saved.items['subdiv:quarters'].done > 0, 'the step was not learned');
+  assert.equal(saved.items['subdiv:quarters'].best, 100);
+  /* The path set Tempo to the step's target, so 100% Speed was what it asks. */
+  assert.equal(JSON.parse(log.writes[`${DATA}settings.json`]).bpm, 100);
+});
+
+test('Click on a path result opens the next step of the track', async () => {
+  await loadUi({ settings: PLAIN });
+  const sn = await snare();
+  globalThis.init();
+  ticks(2);
+  continuePath();
+  playQuarters(sn, 100);
+  cc(CC.jogClick, 127);
+  ticks(2);
+  const shown = drawnText(2);
+  assert.ok(shown.some((t) => /Eight/.test(t)), `not on to Eighths: ${shown.join('|')}`);
+});
+
+test('a slow clean take reads as its speed; the row shows it', async () => {
+  await loadUi({ settings: { ...PLAIN, speed: 70 } });
+  const sn = await snare();
+  globalThis.init();
+  ticks(2);
+  continuePath();
+  playQuarters(sn, 70);
+  const shown = drawnText(2);
+  assert.ok(shown.some((t) => /clean 70%  best 70%/.test(t)), shown.join('|'));
+  cc(CC.menu, 127);
+  ticks(2);
+  /* Learning Path › Time › Pulse: Quarters shows its 70%. */
+  cc(CC.jogTurn, 2);
+  cc(CC.jogClick, 127);
+  cc(CC.jogClick, 127);
+  ticks(2);
+  assert.ok(drawnText(2).includes('70%'), 'the row does not show the clean speed');
+});
+
+test('a Study take is not counted', async () => {
+  const { log } = await loadUi({ settings: { ...PLAIN, study: true } });
+  const sn = await snare();
+  globalThis.init();
+  ticks(2);
+  continuePath();
+  playQuarters(sn, 100);
+  assert.ok(drawnText(2).some((t) => /Study: not counted/.test(t)));
+  globalThis.onUnload();
+  const saved = log.writes[`${DATA}progress.json`];
+  assert.ok(!saved || !JSON.parse(saved).items['subdiv:quarters']);
+});
+
+test('Skip next moves Continue on to the next track', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);           /* into the Learning Path */
+  ticks(1);
+  assert.ok(drawnText(1).some((t) => /Next: Quarters/.test(t)));
+  cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);           /* Skip: Quarters */
+  ticks(1);
+  assert.ok(drawnText(1).some((t) => /Next: Eighths/.test(t)), 'skipping did not move on');
+});
+
+test('Repetition lists what is due, and opens it', async () => {
+  const day = 86400;
+  const now = Math.round(Date.now() / 1000);
+  const progress = { version: 1, items: { flam: {
+    best: 100, bpm: 70, plays: 1, t: now - 3 * day, done: now - 3 * day, skip: 0,
+    rep: { due: now - day, step: 0, at: 0, ok: false }, h: [],
+  } } };
+  await loadUi({ dataFiles: { 'progress.json': JSON.stringify(progress) } });
+  globalThis.init();
+  ticks(2);
+  cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);
+  for (let i = 0; i < 10; i++) cc(CC.jogTurn, 1);   /* Repetition, the last row */
+  ticks(1);
+  assert.ok(drawnText(1).includes('1 due'), 'the due count is not on the row');
+  cc(CC.jogClick, 127);
+  ticks(1);
+  assert.ok(drawnText(1).includes('Flam'));
+  cc(CC.jogClick, 127);
+  ticks(2);
+  assert.ok(drawnText(2).some((t) => /Flam/.test(t)) && drawnText(1).some((t) => /bars|\d+\/\d+/.test(t)),
+    'the repetition did not arm its drill');
+});
+
+test('Progress lists the tracks and what was played, and opens a chart', async () => {
+  const now = Math.round(Date.now() / 1000);
+  const progress = { version: 1, items: { 'flam-tap': {
+    best: 85, bpm: 61, plays: 2, t: now, done: 0, skip: 0, rep: null,
+    h: [[now - 60, 70, 95, 20, 1], [now, 85, 93, 18, 1]],
+  } } };
+  await loadUi({ dataFiles: { 'progress.json': JSON.stringify(progress) } });
+  globalThis.init();
+  ticks(2);
+  for (let i = 0; i < 20; i++) cc(CC.jogTurn, 1);    /* Progress, the last row */
+  cc(CC.jogClick, 127);
+  ticks(1);
+  const list = drawnText(1);
+  for (const t of ['PROGRESS', 'Time', 'Rudiments', 'Grooves', 'Ear', 'Flam tap', '85%']) {
+    assert.ok(list.includes(t), `${t} missing: ${list.join('|')}`);
+  }
+  for (let i = 0; i < 4; i++) cc(CC.jogTurn, 1);     /* Flam tap */
+  cc(CC.jogClick, 127);
+  ticks(1);
+  const chart = drawnText(1);
+  assert.ok(chart.includes('Flam tap') && chart.some((t) => /2 takes/.test(t)), chart.join('|'));
+  cc(CC.back, 127);
+  ticks(1);
+  assert.ok(drawnText(1).includes('PROGRESS'), 'Back from a chart returns to the list');
+  /* A track opens the path where it is. */
+  for (let i = 0; i < 10; i++) cc(CC.jogTurn, 127);
+  cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);
+  ticks(1);
+  assert.ok(drawnText(1).includes('RUDIMENTS'), 'a track row did not open the track');
+});
+
+test('takes already in stats.json are read in when there is no progress yet', async () => {
+  const stats = { version: 1, records: [
+    { t: 1000, d: 'ladder:flam:normal', bpm: 75, sd: 12, n: 30, err: 0 },
+  ] };
+  const { log } = await loadUi({ dataFiles: { 'stats.json': JSON.stringify(stats) } });
+  globalThis.init();
+  ticks(2);
+  globalThis.onUnload();
+  const saved = JSON.parse(log.writes[`${DATA}progress.json`]);
+  assert.equal(saved.items.flam.best, 107, 'clean at 75 on a flam written at 70');
+  assert.ok(saved.items.flam.done);
+});
+
+test('a damaged progress.json is kept aside and the backup read', async () => {
+  const good = JSON.stringify({ version: 1, items: { flam: { best: 90, plays: 1, h: [] } } });
+  const { log } = await loadUi({ dataFiles: { 'progress.json': '{"items": {trunc',
+    'progress.bak.json': good } });
+  globalThis.init();
+  ticks(2);
+  assert.equal(log.writes[`${DATA}progress.bad.json`], '{"items": {trunc');
+  for (let i = 0; i < 20; i++) cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);
+  ticks(1);
+  assert.ok(drawnText(1).includes('90%'), 'the backup was not read');
+});
+
+test('an Ear step records its round, and Click goes on to the next quiz', async () => {
+  const PM = await import('../src/padmap.mjs');
+  const { log } = await loadUi({ settings: { roundSize: 10 } });
+  globalThis.init();
+  ticks(2);
+  /* Learning Path › Ear › Know the kit › Guess: drum */
+  cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);
+  cc(CC.jogTurn, 5);
+  cc(CC.jogClick, 127);
+  cc(CC.jogClick, 127);
+  cc(CC.jogClick, 127);
+  ticks(2);
+  assert.ok(drawnText(1).some((t) => /GUESS: DRUM/.test(t)), 'the step did not open its quiz');
+  /* Try every drum in turn until the round is over: right answers and wrong
+   * ones, so the score is somewhere in between. */
+  const pads = PM.layoutVoices('kit').map((v) => PM.padsForVoice(v, 'kit')[0]);
+  let shown = [];
+  for (let k = 0; k < 400 && !shown.some((t) => /score \d+%/.test(t)); k++) {
+    const p = pads[k % pads.length];
+    pad(p, 100); pad(p, 0);
+    ticks(25);
+    shown = drawnText(1);
+  }
+  assert.ok(shown.some((t) => /score \d+%/.test(t)), `no score: ${shown.join('|')}`);
+  cc(CC.jogClick, 127);
+  ticks(2);
+  assert.ok(drawnText(1).some((t) => /HEAR: DRUM/.test(t)), 'Click did not go on to Hear: drum');
+  globalThis.onUnload();
+  assert.equal(JSON.parse(log.writes[`${DATA}progress.json`]).items['quiz:guess:voice'].plays, 1);
+});
+
+test('the Clock step arms the Clock round its drill, at the drill\'s target', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  /* Learning Path › Time › Keep time › Clock: quarters */
+  cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);
+  cc(CC.jogTurn, 2);
+  cc(CC.jogClick, 127);
+  cc(CC.jogTurn, 3);
+  cc(CC.jogClick, 127);
+  cc(CC.jogClick, 127);
+  ticks(2);
+  assert.ok(log.announces.includes('Clock: Quarters'), log.announces.slice(-3).join('|'));
+  /* Eight bars of quarters at 100bpm is 19 seconds; at the default 90 it is 21. */
+  assert.ok(drawnText(1).some((t) => /0:19/.test(t)), 'not at the target tempo');
+});
+
+test('a Ladder that never holds a rung ends, says why, and counts as tried', async () => {
+  const { log } = await loadUi({ settings: { ...PLAIN, ladderBars: 1 } });
+  globalThis.init();
+  ticks(2);
+  /* Basics › Subdivisions › Quarters, then Training › Ladder. */
+  cc(CC.jogClick, 127);
+  cc(CC.jogClick, 127);
+  cc(CC.jogClick, 127);
+  ticks(2);
+  /* Three folders up is the top (four would close the module), then Training. */
+  for (let i = 0; i < 3; i++) cc(CC.back, 127);
+  cc(CC.jogTurn, 4);
+  cc(CC.jogClick, 127);
+  cc(CC.jogClick, 127);
+  ticks(2);
+  cc(CC.record, 127);
+  assert.ok(runUntil(/best clean 0/, 2000), 'the Ladder never ended');
+  assert.ok(drawnText(1).some((t) => /nothing played/.test(t)));
+  globalThis.onUnload();
+  const it = JSON.parse(log.writes[`${DATA}progress.json`]).items['subdiv:quarters'];
+  assert.equal(it.plays, 1);
+  assert.equal(it.best, 0);
 });

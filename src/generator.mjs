@@ -208,10 +208,11 @@ export function subdivisionDrills(opts = {}) {
  * you just played, because the armed chart is kept.
  */
 export const RANDOM_DRILLS = [
-  { name: 'Reading 8ths', make: (o) => readingLine({ ...o, per: 2, bars: 2 }) },
-  { name: 'Reading 16ths', make: (o) => readingLine({ ...o, per: 4, bars: 2, density: 0.4 }) },
-  { name: 'Random sticking', make: (o) => stickingDrill(o) },
-  { name: 'Groove variation', make: (o) => grooveVariation(o) },
+  { name: 'Reading 8ths', family: 'reading:2', make: (o) => readingLine({ ...o, per: 2, bars: 2 }) },
+  { name: 'Reading 16ths', family: 'reading:4',
+    make: (o) => readingLine({ ...o, per: 4, bars: 2, density: 0.4 }) },
+  { name: 'Random sticking', family: 'sticking', make: (o) => stickingDrill(o) },
+  { name: 'Groove variation', family: 'groove', make: (o) => grooveVariation(o) },
 ];
 
 /* Every generated drill at one seed, in list order — for the tests and the

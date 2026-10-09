@@ -8,8 +8,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  FOLDER, folder, lazyFolder, isFolder, chartNode, buildCatalog, drumsTree, rowsOf,
-  navStart, navTop, navCurrent, navPush, navPop, navPath, navRestore, nodeAt,
+  FOLDER, folder, lazyFolder, isFolder, chartNode, buildCatalog, drumsTree,
+  navStart, navTop, navCurrent, navPush, navPop,
 } from '../src/catalog.mjs';
 import { parseExercise, parseManifest } from '../src/exercise_io.mjs';
 import { DRILLS } from '../src/guess.mjs';
@@ -52,7 +52,11 @@ test('every bundled drill is filed, and none lands in Other', () => {
 test('a groove opens its ladder; a rudiment arms straight away', () => {
   const rock = child(child(child(tree(), 'Grooves'), 'Rock & Pop'), 'Rock backbeat');
   assert.ok(isFolder(rock));
-  assert.deepEqual(rock.children.map((c) => c.value), ['L1', 'L2', 'L3']);
+  assert.deepEqual(rock.children.map((c) => c.label.slice(0, 2)), ['L1', 'L2', 'L3']);
+  /* Each rung is an item of its own, under the id its takes are filed by. */
+  assert.deepEqual(rock.children.map((c) => c.id),
+    ['rock-backbeat:l1', 'rock-backbeat:l2', 'rock-backbeat:l3']);
+  assert.equal(rock.children[1].build().id, rock.children[1].id);
   const para = child(child(child(tree(), 'Rudiments'), 'Diddles'), 'Single paradiddle');
   assert.equal(isFolder(para), false);
   assert.equal(para.kind, 'chart');
@@ -104,7 +108,7 @@ test('every leaf can be acted on, and every chart leaf builds a valid chart', ()
 
 test('every row fits the list', () => {
   const walk = (n) => {
-    for (const r of rowsOf(n)) {
+    for (const r of n.children) {
       const w = (r.label.length + (r.value ? r.value.length + 1 : 0));
       assert.ok(w <= 21, `"${r.label}" is ${r.label.length} chars`);
     }
@@ -146,19 +150,6 @@ test('push opens a folder and refuses a leaf; pop stops at the top', () => {
   assert.equal(navPush(nav), false);
   assert.equal(navPop(nav), true);
   assert.equal(navPop(nav), false);
-});
-
-test('a rebuilt tree is walked back to the same place, and a shrunk one clamps', () => {
-  const nav = navStart(small());
-  navPush(nav);
-  navTop(nav).cursor = 1;
-  navPush(nav);
-  const back = navRestore(small(), navPath(nav));
-  assert.deepEqual(back.map((f) => f.node.label), ['Root', 'A', 'A2']);
-  assert.equal(navCurrent(back).label, 'deep');
-  assert.equal(navTop(navRestore(small(), [9, 9])).cursor, 1);
-  assert.equal(nodeAt(small(), [0, 0]).build(), 'a1');
-  assert.equal(nodeAt(small(), [5]), null);
 });
 
 test('a lazy folder is built once, and is a folder before that', () => {

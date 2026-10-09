@@ -41,6 +41,9 @@ import * as ST from './stats.mjs';
 import * as LAD from './ladder.mjs';
 import * as T from './transport.mjs';
 import * as Q from './guess.mjs';
+import * as PROG from './progress.mjs';
+import * as PLAN from './program.mjs';
+import { availableLevels } from './levels.mjs';
 import { paint, flashColor, guideTargets, FLASH_MS } from './led_paint.mjs';
 import { stats as timingStats, statsSince } from './timing.mjs';
 
@@ -52,6 +55,10 @@ const STATS_PATH = `${MODULE_DIR}/stats.json`;
 const STATS_BAK_PATH = `${MODULE_DIR}/stats.bak.json`;
 /* A stats file that would not read, kept rather than overwritten. */
 const STATS_BAD_PATH = `${MODULE_DIR}/stats.bad.json`;
+/* How far you have got with every drill (progress.mjs), kept the same way. */
+const PROGRESS_PATH = `${MODULE_DIR}/progress.json`;
+const PROGRESS_BAK_PATH = `${MODULE_DIR}/progress.bak.json`;
+const PROGRESS_BAD_PATH = `${MODULE_DIR}/progress.bad.json`;
 const CRASH_PATH = `${MODULE_DIR}/crash.log`;
 const EXERCISE_DIR = `${MODULE_DIR}/exercises`;
 
@@ -71,6 +78,7 @@ const LADDER = 'ladder';
 const QUIZ = 'quiz';
 const RESULT = 'result';
 const PROGRESS = 'progress';
+const PROGRESS_ITEM = 'progressItem';
 const SETTINGS = 'settings';
 const ERROR = 'error';
 
@@ -197,6 +205,21 @@ function guard(where, fn) {
 let settings = SET.coerceInto({}, null);
 let stats = ST.emptyStats();
 let statsDirty = false;
+let progress = PROG.emptyProgress();
+let progressDirty = false;
+/* Folder sums over the tree, cached by folder against progress.rev. */
+const agg = PROG.createAggregator();
+/* The Learning Path's tracks, every leaf by item id, and what each item is
+ * called on its own — all made with the tree, once. */
+let tracks = [];
+let pathNode = null;
+let leafIdx = new Map();
+let itemNames = new Map();
+/* The track the armed drill was opened from on the Learning Path, so Click on
+ * its result goes on along that track; null when it came from anywhere else. */
+let pathTrack = null;
+/* What the take just did to the drill's progress, for the result screens. */
+let progressNote = null;
 let settingsDirty = false;
 let lastFlush = 0;
 
@@ -214,6 +237,10 @@ let menuNoteUntil = 0;
 let settingsSel = 0;
 let settingsEditing = false;
 let progressSel = 0;
+let progressRows = [];
+/* The item the Progress chart is showing. */
+let progressItem = null;
+let progressRight = '';
 
 let chart = null;
 let run = null;
@@ -232,7 +259,6 @@ let settingsRowsCache = [];
 let chartWarning = '';
 let chartLanes = null;
 let chartLength = '';
-let progressCache = null;
 let resultCache = null;
 let quiz = null;
 /* The quiz's own name for its header: "PICK: GROOVE", not "pick: groove". */
@@ -478,6 +504,7 @@ function transport() {
  */
 function saveSettings() { settingsDirty = true; }
 function saveStats() { statsDirty = true; }
+function saveProgress() { progressDirty = true; }
 
 function flushFiles(force) {
   const t = now();
@@ -490,6 +517,11 @@ function flushFiles(force) {
     const text = ST.serialiseStats(stats);
     statsDirty = !writeFile(STATS_PATH, text);
     if (!statsDirty) writeFile(STATS_BAK_PATH, text);
+  }
+  if (progressDirty) {
+    const text = PROG.serialiseProgress(progress);
+    progressDirty = !writeFile(PROGRESS_PATH, text);
+    if (!progressDirty) writeFile(PROGRESS_BAK_PATH, text);
   }
 }
 
@@ -505,6 +537,68 @@ function loadStats() {
   if (text) writeFile(STATS_BAD_PATH, text);
   const bak = ST.readStats(readFile(STATS_BAK_PATH));
   return bak.ok ? bak.stats : ST.emptyStats();
+}
+
+/*
+ * Progress, the same way: the main file, else its backup, a damaged main file
+ * kept aside. With neither file there — the first start of a version that
+ * has progress — the takes already in stats.json are read into it, so a week
+ * of practice before the update is not lost to it.
+ */
+function loadProgress() {
+  const text = readFile(PROGRESS_PATH);
+  const main = PROG.readProgress(text);
+  if (main.ok) return main.progress;
+  if (text) writeFile(PROGRESS_BAD_PATH, text);
+  const bakText = readFile(PROGRESS_BAK_PATH);
+  const bak = PROG.readProgress(bakText);
+  if (bak.ok) return bak.progress;
+  if (text || bakText) return PROG.emptyProgress();
+  const fresh = PROG.importStats(PROG.emptyProgress(), stats.records, itemOfRecord, writtenOf);
+  if (fresh.rev) saveProgress();
+  return fresh;
+}
+
+/*
+ * The item a stats record belongs to: its drill id without the kind in front
+ * and the strictness and sticking behind — "drill:rock-backbeat:l2:normal" is
+ * the item "rock-backbeat:l2". A quiz round is filed as "pick:groove".
+ */
+function itemOfRecord(rec) {
+  const parts = String(rec.d).split(':');
+  const kind = parts[0];
+  if (kind === 'guess' || kind === 'hear' || kind === 'pick') return `quiz:${parts[0]}:${parts[1]}`;
+  if (kind === 'clock') return CAT.CLOCK_ID;
+  if (kind !== 'drill' && kind !== 'ladder') return null;
+  let end = parts.length;
+  for (let i = 1; i < parts.length; i++) {
+    if (SC.WINDOWS[parts[i]]) { end = i; break; }
+  }
+  const id = parts.slice(1, end).join(':');
+  return itemNames.has(id) ? id : null;
+}
+
+/*
+ * The tempo an item is written at, which a clean speed is measured against:
+ * a file's own tempo, or for a generated drill its target on the path. A
+ * Clock's is the drill it wraps.
+ */
+function writtenOf(id, rec) {
+  if (id === CAT.CLOCK_ID && rec) {
+    const wrapped = itemOfRecord({ d: `drill:${String(rec.d).split(':').slice(1).join(':')}` });
+    return wrapped ? writtenOf(wrapped) : settings.bpm;
+  }
+  if (PLAN.targetBpm(id)) return PLAN.targetBpm(id);
+  const node = leafIdx.get(id);
+  const c = node && node.kind === 'chart' ? fileChartOf(id) : null;
+  return c ? c.bpm : settings.bpm;
+}
+
+function fileChartOf(id) {
+  const m = /:l[1-4]$/.exec(id);
+  const base = m ? id.slice(0, -m[0].length) : id;
+  for (let i = 0; i < fileCharts.length; i++) if (fileCharts[i].id === base) return fileCharts[i];
+  return null;
 }
 
 /* ---- the drill list ----------------------------------------------------- */
@@ -563,23 +657,68 @@ function loadManifest(path) {
 }
 
 /*
- * THE FIRST THING IN THE LIST IS THE FIRST THING TO PLAY: Basics, then the
- * grooves and rudiments, and the things that are ABOUT practising rather than
- * practice itself — Training, Quiz, Progress — at the bottom. Each is a folder
- * now, so the top of the list is seven rows rather than forty-eight.
+ * THE FIRST THING IN THE LIST IS THE FIRST THING TO PLAY: Basics, the
+ * Learning Path, then the grooves and rudiments, and the things that are
+ * ABOUT practising rather than practice itself — Training, Quiz, Progress —
+ * at the bottom. Each is a folder, so the top of the list is eight rows
+ * rather than forty-eight.
  *
- * Rebuilt whenever the material or the tempo changes; the open folders are
- * carried across by path.
+ * Built once, when the material is loaded. Every leaf is indexed by its item
+ * id here too, which makes the lazy folders: the folder sums need every leaf
+ * anyway, and doing it now keeps that work out of the frames that follow.
  */
 function rebuildMenu() {
+  tracks = PLAN.buildProgram({ entries: fileEntries, categories: fileCategories });
+  pathNode = PLAN.programFolder(tracks, repetitionRows);
   catalog = CAT.drumsTree({
     entries: fileEntries,
     categories: fileCategories,
     bpm: settings.bpm,
     drills: Q.DRILLS,
     newSeed: () => (Date.now() & 0x7fffffff) || 1,
+    path: pathNode,
   });
-  nav = nav.length ? CAT.navRestore(catalog, CAT.navPath(nav)) : CAT.navStart(catalog);
+  nav = CAT.navStart(catalog);
+  leafIdx = CAT.leafIndex(catalog);
+  itemNames = namesOfItems();
+  PROG.resetShape(agg);
+  rowsNode = null;
+}
+
+/* What every item is called on its own, outside the folder that holds it:
+ * "Rock backbeat L2", not "L2 + kick". */
+function namesOfItems() {
+  const names = new Map();
+  for (const e of fileEntries) {
+    const levels = availableLevels(e.chart);
+    if (levels.length > 1) {
+      for (const lv of levels) names.set(`${e.chart.id}:${lv.id}`, `${e.chart.name} ${lv.step}`);
+    } else {
+      names.set(e.chart.id, e.chart.name);
+    }
+  }
+  for (const c of GEN.builtins({})) names.set(c.family, c.name);
+  for (const d of GEN.RANDOM_DRILLS) names.set(d.family, d.name);
+  for (const d of Q.DRILLS) names.set(PLAN.quizItemId(d), d.name);
+  names.set(CAT.CLOCK_ID, 'Clock');
+  return names;
+}
+
+function itemTitle(id) {
+  return itemNames.get(id) || id;
+}
+
+/* The routine due today, as rows; a placeholder when there is none, so the
+ * folder is never an empty screen. */
+function repetitionRows() {
+  const session = PROG.repetitionSession(progress, Date.now());
+  if (!session.length) return [{ label: 'Nothing due today', value: '' }];
+  return session.map((r) => ({
+    label: itemTitle(r.id),
+    value: r.done ? 'today' : 'due',
+    mark: r.done ? PROG.MARK_DONE : null,
+    repId: r.id,
+  }));
 }
 
 /* ---- arming and running ------------------------------------------------- */
@@ -798,6 +937,7 @@ function scrub(delta) {
 function stop() {
   dspSet('panic', '1');
   summaryIsBest = false;
+  if (!ladder) progressNote = null;
   if (ladder) {
     ladderBarsDone = Math.max(0, Math.min(ladder.bars,
       Math.floor((tp.songBeats - ladder.windowStart) / CH.beatsPerBar(chart))));
@@ -809,7 +949,8 @@ function stop() {
     bpm: chart.bpm,
     history: ST.forDrill(stats, ST.drillId(clockMode ? 'clock' : 'drill', recordIdOf(chart), settings)),
     recorded: whole,
-    footer: clockMode ? 'REC again  BACK start' : 'REC again  CLICK next',
+    note: progressNote,
+    footer: clockMode && !pathTrack ? 'REC again  BACK start' : 'REC again  CLICK next',
   };
   T.home(tp);
   screen = ladder ? LADDER : SUMMARY;
@@ -817,6 +958,8 @@ function stop() {
 
 function recordRun() {
   const t = timingStats(run.timing);
+  const st = SC.runStats(run);
+  const judged = PROG.judgeTake(st, t.sdMs, SC.WINDOWS[settings.strictness].goodMs);
   const rec = ST.makeRecord({
     drill: ST.drillId(clockMode ? 'clock' : 'drill', recordIdOf(chart), settings),
     bpm: chart.bpm,
@@ -826,10 +969,55 @@ function recordRun() {
     err: run.misses + run.stickErrors + run.dynErrors,
     at: Date.now() / 1000,
     context: attemptContext(),
+    total: st.total,
+    clean: judged.clean && !settings.study,
   });
   stats = ST.addRecord(stats, rec);
   summaryIsBest = ST.forDrill(stats, rec.d).length > 1 && ST.isPersonalBest(stats, rec);
   saveStats();
+  recordProgress({ clean: judged.clean, reason: judged.reason, accuracy: judged.accuracy,
+    sd: t.sdMs, bpm: chart.bpm });
+}
+
+/* The item the armed drill's takes are filed under. */
+function armedItemId() {
+  return clockMode ? CAT.CLOCK_ID : recordIdOf(chart);
+}
+
+/* The tempo the armed drill is written at: its file's, or its target on the
+ * path for a generated one. A Clock is measured on the drill it wraps. */
+function armedWrittenBpm() {
+  const src = armedSource || chart;
+  if (!src.generated) return src.bpm;
+  return PLAN.targetBpm(recordIdOf(src)) || settings.bpm;
+}
+
+/*
+ * One take into the drill's progress, and a line for the result screen that
+ * says what it did — or why it did not count. A Study take is never counted:
+ * Study waits for you, and a take that waited has no timing to judge.
+ */
+function recordProgress(take) {
+  if (settings.study) {
+    progressNote = { text: 'Study: not counted' };
+    return;
+  }
+  const speed = PROG.speedOf(take.bpm, armedWrittenBpm());
+  const r = PROG.recordTake(progress, armedItemId(), {
+    speed, accuracy: take.accuracy, sd: take.sd, clean: take.clean, bpm: take.bpm, at: Date.now(),
+  });
+  saveProgress();
+  progressNote = noteFor(r, take.clean ? speed : null, take.reason);
+}
+
+function noteFor(r, value, reason) {
+  if (r.learned) {
+    announce('learned');
+    return { mark: PROG.MARK_DONE, text: `learned at ${value}%` };
+  }
+  if (value === null) return { text: reason };
+  const done = PROG.isDone(progress, armedItemId());
+  return { mark: done ? PROG.MARK_DONE : null, text: `clean ${value}%  best ${r.best}%` };
 }
 
 /*
@@ -902,9 +1090,19 @@ function serviceLadder() {
       stats = ST.addRecord(stats, ST.makeRecord({
         drill: ST.drillId('ladder', recordIdOf(chart), settings),
         bpm: ladder.topClean, sd: ladder.topSd, mean: ladder.topMean,
-        n: run.hits, err: 0, at: Date.now() / 1000, context: attemptContext(),
+        n: run.hits, err: 0, at: Date.now() / 1000, context: attemptContext(), clean: true,
       }));
       saveStats();
+    }
+    /* Every rung below the top was clean — the Ladder's rule is stricter than
+     * a take's — so its top clean tempo is a clean speed. A climb that never
+     * held a rung is a take that was not. */
+    if (!tp.scrubbed) {
+      recordProgress(ladder.topClean > 0
+        ? { clean: true, accuracy: 1, sd: ladder.topSd, bpm: ladder.topClean }
+        : { clean: false, reason: verdict.reason, accuracy: 0, sd: verdict.sdMs, bpm: ladder.startBpm });
+    } else {
+      progressNote = null;
     }
     stop();
     return;
@@ -1087,6 +1285,11 @@ function finishQuiz() {
     sd: 0, mean: 0, n: quiz.correct,
     err: quiz.wrong, at: Date.now() / 1000,
   });
+  const round = PROG.recordRound(progress, `quiz:${quiz.mode}:${quiz.kind}`, {
+    correct: quiz.correct, wrong: quiz.wrong, hinted: quiz.hinted, at: Date.now(),
+  });
+  saveProgress();
+  const score = PROG.roundScore(quiz.correct, quiz.wrong, quiz.hinted);
   stats = ST.addRecord(stats, rec);
   /* Asked after the append and only with a history to beat: the first round
    * of a drill is not a best, it is a start. */
@@ -1102,6 +1305,9 @@ function finishQuiz() {
     hints: quiz.hintsTaken,
     series,
     isBest,
+    note: round.learned ? { mark: PROG.MARK_DONE, text: `learned ${score}%` }
+      : { mark: PROG.isDone(progress, `quiz:${quiz.mode}:${quiz.kind}`) ? PROG.MARK_DONE : null,
+        text: `score ${score}%` },
   };
   screen = RESULT;
   announce(`round done, ${Math.round(resultCache.rate)} per minute`);
@@ -1115,21 +1321,106 @@ function openRow() {
     announce(`${item.label}.`);
     return;
   }
+  if (item.continueRow) {
+    const next = PLAN.continueStep(progress, tracks);
+    if (next) openStep(next.step, next.track);
+    else announce('Everything on the path is learned.');
+    return;
+  }
+  if (item.skipRow) {
+    const next = PLAN.continueStep(progress, tracks);
+    if (!next) return;
+    PROG.skipItem(progress, next.step.id, Date.now());
+    saveProgress();
+    announce(`Skipped ${PLAN.stepTitle(next.step)}`);
+    return;
+  }
+  if (item.step) {
+    openStep(item.step, openTrack() || PLAN.trackOf(tracks, item.step.id));
+    return;
+  }
+  pathTrack = null;
+  if (item.repId) {
+    const step = PLAN.findStep(tracks, item.repId);
+    if (step) openStep(step, null);
+    else if (leafIdx.get(item.repId)) openLeaf(leafIdx.get(item.repId));
+    return;
+  }
+  openLeaf(item);
+}
+
+/*
+ * A step of the Learning Path: the row of the tree it points at, opened as if
+ * picked there — with a generated drill's Tempo set to its target, so 100%
+ * Speed is what the step asks for, and the Clock wrapped round its drill.
+ */
+function openStep(step, track) {
+  if (step.quiz) {
+    openQuiz(step.quiz);
+    pathTrack = track;
+    return;
+  }
+  const id = step.wrap || step.id;
+  const node = leafIdx.get(id);
+  if (!node) {
+    announce(`${PLAN.stepTitle(step)} is not installed.`);
+    return;
+  }
+  const target = PLAN.targetBpm(id);
+  if (target && settings.bpm !== target) {
+    settings.bpm = target;
+    settingsRowsCache = SET.settingsRows(settings);
+    saveSettings();
+  }
+  openLeaf(node);
+  if (step.wrap && chart) {
+    clockMode = true;
+    enterReady();
+    announce(`Clock: ${chart.name}`);
+  }
+  pathTrack = track;
+}
+
+/* On from a result along the path: the next open step after this one. */
+function goNext() {
+  const at = screen === RESULT && quiz ? `quiz:${quiz.mode}:${quiz.kind}`
+    : clockMode ? CAT.CLOCK_ID : recordIdOf(chart);
+  const next = PLAN.stepAfter(progress, pathTrack, at);
+  quiz = null;
+  resultCache = null;
+  if (next) {
+    openStep(next, pathTrack);
+    return;
+  }
+  ladder = null;
+  clockMode = false;
+  screen = MENU;
+}
+
+function openQuiz(drill) {
+  /* Nothing a quiz could be wrapped in: a Clock step before it on the path
+   * must not still be armed when the round is over. */
+  ladder = null;
+  clockMode = false;
+  quiz = Q.createQuiz({
+    kind: drill.kind, mode: drill.mode,
+    roundSize: settings.roundSize, charts: grooveCharts(),
+    seed: (Date.now() & 0xffff) || 1,
+  });
+  quizTitle = (drill.name || '').toUpperCase();
+  quizSolvedAt = 0;
+  screen = QUIZ;
+  if (promptIsAudible()) schedulePrompt();
+}
+
+/* Do what a leaf of the tree holds. */
+function openLeaf(item) {
   if (item.kind === 'progress') {
-    screen = PROGRESS;
-    rebuildProgress();
+    openProgress();
     return;
   }
   if (item.kind === 'quiz') {
-    quiz = Q.createQuiz({
-      kind: item.quiz.kind, mode: item.quiz.mode,
-      roundSize: settings.roundSize, charts: grooveCharts(),
-      seed: (Date.now() & 0xffff) || 1,
-    });
-    quizTitle = (item.quiz.name || item.label || '').toUpperCase();
-    quizSolvedAt = 0;
-    screen = QUIZ;
-    if (promptIsAudible()) schedulePrompt();
+    openQuiz(item.quiz);
     return;
   }
   /*
@@ -1161,7 +1452,8 @@ function openRow() {
     return;
   }
   /* A drill. Whatever the Ladder or the Clock was wrapping before, this is not
-   * it. */
+   * it. A row that holds nothing — "Nothing due today" — does nothing. */
+  if (typeof item.build !== 'function') return;
   ladder = null;
   clockMode = false;
   const built = item.build();
@@ -1191,23 +1483,68 @@ function layoutNow() {
   return screen === QUIZ ? 'kit' : settings.layout;
 }
 
-/* The plot for whichever drill the jog is on. Scans the whole history, so it
- * runs when the selection changes and not once a frame. */
-function rebuildProgress() {
-  const drills = ST.drillsWithHistory(stats);
-  const id = drills[progressSel % Math.max(1, drills.length)] || '';
-  const recs = ST.forDrill(stats, id);
-  progressCache = { drillLabel: ST.drillLabel(id, drillNames()), records: recs, summary: ST.summarise(recs) };
+/*
+ * PROGRESS: the four tracks of the path, learned out of all, and then every
+ * drill you have played, most recent first. A track opens where it is on the
+ * Learning Path; a drill opens its chart. Made when the screen opens — it
+ * cannot change while it is up.
+ */
+function openProgress() {
+  const rows = tracks.map((t) => {
+    const sum = PROG.summariseIds(progress, PLAN.trackSteps(t).map((st) => st.id));
+    return { label: t.name, value: `${sum.done}/${sum.count}`, track: t };
+  });
+  for (const id of PROG.recentIds(progress)) {
+    rows.push({ label: itemTitle(id), value: PROG.itemValue(progress, id),
+      mark: PROG.itemMark(progress, id), id });
+  }
+  progressRows = rows;
+  progressSel = Math.max(0, Math.min(progressSel, rows.length - 1));
+  const all = PROG.folderSummary(agg, progress, pathNode);
+  progressRight = `${all.done}/${all.count}`;
+  screen = PROGRESS;
 }
 
-/* What Progress calls each drill: the list's own names, for charts and quizzes. */
-function drillNames() {
-  const names = {};
-  for (const c of fileCharts) names[c.id] = c.name;
-  for (const d of Q.DRILLS) names[`${d.mode}:${d.kind}`] = d.name;
-  /* Random drills are recorded under their family, not their seed. */
-  for (const c of GEN.builtins({})) names[c.family] = c.name;
-  return names;
+function openProgressRow() {
+  const row = progressRows[progressSel];
+  if (!row) return;
+  if (row.track) {
+    showTrack(row.track);
+    return;
+  }
+  progressItem = progressChart(row.id);
+  screen = PROGRESS_ITEM;
+}
+
+/* The list, inside the Learning Path's folder for `track`. */
+function showTrack(track) {
+  nav = CAT.navStart(catalog);
+  const top = CAT.navTop(nav);
+  top.cursor = Math.max(0, catalog.children.indexOf(pathNode));
+  CAT.navPush(nav);
+  const inPath = CAT.navTop(nav);
+  inPath.cursor = Math.max(0, pathNode.children.findIndex((n) => n.track === track));
+  CAT.navPush(nav);
+  screen = MENU;
+  announce(`${track.name}.`);
+}
+
+/* Everything the item's chart draws, worked out once when it opens. */
+function progressChart(id) {
+  const it = PROG.item(progress, id) || { h: [], best: 0, bpm: 0, plays: 0 };
+  const isQuiz = id.indexOf('quiz:') === 0;
+  const box = L.PROGRESS_PLOT;
+  return {
+    title: itemTitle(id),
+    best: it.best,
+    bpm: it.bpm,
+    plays: it.plays,
+    done: PROG.isDone(progress, id),
+    isQuiz,
+    last: it.h.length ? it.h[it.h.length - 1] : null,
+    series: PROG.percentSeries(it.h, box.w - 2, box.h - 2,
+      isQuiz ? { lo: 0, hi: 100, line: PROG.QUIZ_PASS } : {}),
+  };
 }
 
 /* Settings opens over whatever is on screen, pausing a run, and goes back to it. */
@@ -1255,6 +1592,7 @@ function back() {
   if ((screen === SUMMARY || screen === LADDER) && chart) { restart(); return true; }
   /* Up one folder; only the top of the tree is left by Back. */
   if (screen === MENU) return CAT.navPop(nav);
+  if (screen === PROGRESS_ITEM) { screen = PROGRESS; return true; }
   /* Back from a run RESTARTS it. Back again lands on READY, whose own Back
    * goes to the list — so leaving needs no gesture of its own. */
   if (screen === RUNNING) { restart(); return true; }
@@ -1344,16 +1682,75 @@ function serviceExit() {
  * from a hang, and it is what the first hardware run looked like. The
  * fallback at the bottom makes a stale screen impossible.
  */
-/* The rows of the open folder, made once per folder rather than per frame:
- * the list is drawn at 50Hz and its rows only change when the folder does. */
+/*
+ * The rows of the open folder, made once per folder rather than per frame:
+ * the list is drawn at 50Hz and its rows only change when the folder does,
+ * when a take moves your progress on, or when the day turns (Repetition).
+ */
 let rowsNode = null;
 let rowsCache = null;
+let rowsRev = -1;
+let rowsDay = -1;
 function menuRows(node) {
-  if (node !== rowsNode) {
+  const day = Math.floor(Date.now() / 86400000);
+  if (node !== rowsNode || progress.rev !== rowsRev || day !== rowsDay) {
     rowsNode = node;
-    rowsCache = CAT.rowsOf(node);
+    rowsRev = progress.rev;
+    rowsDay = day;
+    rowsCache = decoratedRows(node);
   }
   return rowsCache;
+}
+
+function decoratedRows(node) {
+  const track = openTrack();
+  const next = track ? PLAN.nextStep(progress, track) : null;
+  const kids = node.children;
+  const out = new Array(kids.length);
+  for (let i = 0; i < kids.length; i++) out[i] = decorateRow(kids[i], next ? next.id : '');
+  return out;
+}
+
+/* The Learning Path track the list is inside, if it is inside one. */
+function openTrack() {
+  for (let i = nav.length - 1; i >= 0; i--) if (nav[i].node.track) return nav[i].node.track;
+  return null;
+}
+
+/*
+ * What a row says about your progress, decided here rather than in the tree:
+ * the tree holds what the drills ARE, not how far you have got with them.
+ */
+function decorateRow(row, nextId) {
+  const plain = { label: row.label, value: row.value || '', mark: row.mark || null };
+  if (row.continueRow) {
+    const next = PLAN.continueStep(progress, tracks);
+    return next
+      ? { label: `Next: ${PLAN.stepTitle(next.step)}`, value: '', mark: PROG.MARK_NEXT }
+      : { label: 'All learned', value: '', mark: PROG.MARK_DONE };
+  }
+  if (row.skipRow) {
+    const next = PLAN.continueStep(progress, tracks);
+    return { label: next ? `Skip: ${PLAN.stepTitle(next.step)}` : 'Skip: nothing left', value: '' };
+  }
+  if (row.repetition) {
+    const due = PROG.dueCount(PROG.repetitionSession(progress, Date.now()));
+    return { label: row.label, value: due ? `${due} due` : '>' };
+  }
+  if (row.kind === 'progress') {
+    const sum = PROG.folderSummary(agg, progress, pathNode);
+    return { label: row.label, value: sum.played ? `${sum.done}/${sum.count}` : '' };
+  }
+  if (CAT.isFolder(row)) {
+    if (row.untracked) return plain;
+    const sum = PROG.folderSummary(agg, progress, row);
+    if (!sum.count || !sum.played) return plain;
+    return { label: row.label, value: `${sum.done}/${sum.count}` };
+  }
+  if (!row.id) return plain;
+  let mark = PROG.itemMark(progress, row.id);
+  if (!mark && row.id === nextId) mark = PROG.MARK_NEXT;
+  return { label: row.label, value: PROG.itemValue(progress, row.id) || plain.value, mark };
 }
 
 function draw() {
@@ -1381,7 +1778,11 @@ function draw() {
     return;
   }
   if (screen === PROGRESS) {
-    if (progressCache) V.drawProgress(ctx, progressCache);
+    V.drawList(ctx, { title: 'PROGRESS', right: progressRight, items: progressRows, selected: progressSel });
+    return;
+  }
+  if (screen === PROGRESS_ITEM && progressItem) {
+    V.drawProgress(ctx, progressItem);
     return;
   }
   if (screen === QUIZ && quiz) {
@@ -1398,7 +1799,7 @@ function draw() {
     return;
   }
   if (screen === LADDER && ladder) {
-    V.drawLadder(ctx, { ladder, reason: ladderReason, barsDone: ladderBarsDone });
+    V.drawLadder(ctx, { ladder, reason: ladderReason, barsDone: ladderBarsDone, note: progressNote });
     return;
   }
   if (screen === SUMMARY && run) {
@@ -1482,6 +1883,10 @@ function initInner() {
   manifestError = '';
   loadExercises();
   rebuildMenu();
+  /* After the tree: reading takes in from stats.json needs its item ids. */
+  progress = loadProgress();
+  pathTrack = null;
+  progressNote = null;
   if (manifestError) {
     menuNote = 'BAD USER.JSON';
     if (manifestError.indexOf('index.json') >= 0) menuNote = 'BAD INDEX.JSON';
@@ -1763,9 +2168,7 @@ function jog(delta) {
   } else if (target === 'choice' && quiz) {
     Q.moveChoice(quiz, delta);
   } else if (target === 'drill') {
-    const n = Math.max(1, ST.drillsWithHistory(stats).length);
-    progressSel = (((progressSel + delta) % n) + n) % n;
-    rebuildProgress();
+    progressSel = Math.max(0, Math.min(progressRows.length - 1, progressSel + delta));
   }
 }
 
@@ -1775,6 +2178,12 @@ function click() {
   if (screen === QUIZ && quiz && quiz.mode === 'pick') {
     const r = Q.pickChoice(quiz, now());
     if (r === 'right') quizSolvedAt = now();
+    return;
+  }
+  if (screen === PROGRESS) { openProgressRow(); return; }
+  /* On along the Learning Path, when that is where the drill came from. */
+  if ((screen === RESULT || screen === SUMMARY || screen === LADDER) && pathTrack) {
+    goNext();
     return;
   }
   if (screen === RESULT) { screen = MENU; quiz = null; resultCache = null; return; }

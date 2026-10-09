@@ -226,8 +226,9 @@ export const VOICE_TABLE_ROW_H = 7;
 export const VOICE_TABLE_MAX_ROWS = 4;
 
 /* ---- Progress ----------------------------------------------------------- */
-export const PROGRESS_TITLE_Y = 9;
-export const PROGRESS_PLOT = { x: 3, y: 17, w: SCREEN_W - 6, h: 30 };
+/* A drill's chart: the drill and its best in the header, the takes below it,
+ * the best and the last take on the two rows under the plot. */
+export const PROGRESS_PLOT = { x: 3, y: 10, w: SCREEN_W - 6, h: 37 };
 export const PROGRESS_ROW_Y = 48;
 
 /*

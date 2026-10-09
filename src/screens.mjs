@@ -9,7 +9,8 @@
 
 import * as L from './layout.mjs';
 import * as SR from './staff_render.mjs';
-import { drawHeader, drawList, drawPlot } from './chrome.mjs';
+import { drawHeader, drawList, drawPlot, fitText } from './chrome.mjs';
+import { drawMark, MARK_W } from './glyphs.mjs';
 import { stats, perVoice, voicesBySpread, verdict } from './timing.mjs';
 import { runStats as runStatsOf } from './scoring.mjs';
 import { voiceById } from './kit.mjs';
@@ -33,7 +34,11 @@ export { drawList };
  * a strip of spread bars, this one last, so the number is read against where
  * you were. The bottom line says what each button does next.
  *
- * s = { run, tightMs, isBest, name, bpm, history, recorded, footer }
+ * s = { run, tightMs, isBest, name, bpm, history, recorded, footer, note }
+ *
+ * `note` is what the take did to the drill's progress — "clean 85%  best
+ * 90%", or why it did not count — and takes the second limb's line: the
+ * loosest limb is the one to practise, and the note is the one to read.
  */
 export const SUMMARY_STRIP = { x: 3, y: 49, w: L.SCREEN_W - 6, h: 6 };
 
@@ -72,7 +77,7 @@ export function drawSummary(ctx, s) {
 
   /* The two loosest limbs — the worst first is the one to go and practise. */
   const pv = perVoice(s.run.timing);
-  const order = voicesBySpread(s.run.timing).slice(0, 2);
+  const order = voicesBySpread(s.run.timing).slice(0, s.note ? 1 : 2);
   for (let i = 0; i < order.length; i++) {
     const id = order[i];
     const y = L.RESULT_ROW_B_Y + i * L.VOICE_TABLE_ROW_H;
@@ -83,6 +88,8 @@ export function drawSummary(ctx, s) {
     const bw = Math.min(58, Math.round((pv[id].sdMs / L.PLOT_SIGMA_FULL_MS) * 58));
     ctx.fillRect(66, y + 2, Math.max(1, bw), 3, 1);
   }
+
+  if (s.note) drawNote(ctx, L.RESULT_LEFT_X, L.RESULT_ROW_B_Y + L.VOICE_TABLE_ROW_H, s.note);
 
   drawSpreadStrip(ctx, SUMMARY_STRIP, s.history || []);
   const hint = s.footer || 'REC again  CLICK next';
@@ -105,10 +112,16 @@ export function drawSpreadStrip(ctx, box, records) {
   }
 }
 
-function fit(ctx, text, maxPx) {
-  let out = String(text);
-  while (out.length > 1 && ctx.textWidth(out) > maxPx) out = out.slice(0, -1);
-  return out;
+const fit = fitText;
+
+/* A progress note: an optional mark, then its words. { mark, text } */
+export function drawNote(ctx, x, y, note) {
+  let tx = x;
+  if (note.mark) {
+    drawMark(ctx, x, y + 1, note.mark, 1);
+    tx += MARK_W + 3;
+  }
+  ctx.text(tx, y, fit(ctx, note.text || '', L.SCREEN_W - tx - 1), 1);
 }
 
 /* ---- Ladder ------------------------------------------------------------- */
@@ -127,7 +140,8 @@ export function drawLadder(ctx, s) {
   if (s.ladder.failed) {
     const score = `best clean ${s.ladder.topClean}`;
     ctx.text((L.SCREEN_W - ctx.textWidth(score)) >> 1, 40, score, 1);
-    if (s.reason) ctx.text((L.SCREEN_W - ctx.textWidth(s.reason)) >> 1, 49, s.reason, 1);
+    if (s.reason) ctx.text((L.SCREEN_W - ctx.textWidth(s.reason)) >> 1, 48, s.reason, 1);
+    if (s.note) drawNote(ctx, 1, L.SCREEN_H - L.TEXT_H, s.note);
   } else {
     const bars = `${s.barsDone || 0}/${s.ladder.bars} bars clean`;
     ctx.text((L.SCREEN_W - ctx.textWidth(bars)) >> 1, 40, bars, 1);
@@ -206,28 +220,71 @@ export function drawResult(ctx, s) {
   }
   ctx.text(L.RESULT_LEFT_X, L.RESULT_ROW_A_Y, `${Math.round(s.errorRate * 100)}% wrong`, 1);
   if (s.hints) ctx.text(L.RESULT_LEFT_X, L.RESULT_ROW_B_Y, `${s.hints} hints`, 1);
+  /* The round's score for the path, on the right of the hints. */
+  if (s.note) {
+    const w = ctx.textWidth(s.note.text) + (s.note.mark ? MARK_W + 3 : 0);
+    drawNote(ctx, L.SCREEN_W - w - 1, L.RESULT_ROW_B_Y, s.note);
+  }
   drawPlot(ctx, L.RESULT_PLOT, s.series || []);
 }
 
 /* ---- Progress ----------------------------------------------------------- */
 /*
- * Top clean tempo as a line, timing spread as bars beneath it — so you can
- * see whether a faster tempo came at the cost of holding it together.
+ * One drill's takes: the clean speed of each, oldest left, against the line
+ * to reach — 100% of the written tempo, or a quiz's pass mark. A clean take
+ * is a filled dot, one that did not count an open one, so a run of slow clean
+ * takes climbing to the line reads as what it is.
  *
- * A full-height bar is a FIXED number of milliseconds, not the worst in the
- * series: scaling to the data would redraw the same history differently every
- * time a bad round dropped off the end, and two visits have to be comparable.
+ * The scale is FIXED (progress.mjs percentSeries): two visits to the same
+ * drill must draw the same history the same way.
+ *
+ * s = { title, best, bpm, plays, done, isQuiz, last, series }
  */
 export function drawProgress(ctx, s) {
   ctx.clear();
-  ctx.text(1, 0, 'PROGRESS', 1);
+  const right = s.best ? `${s.best}%` : '';
+  const tw = right ? ctx.textWidth(right) : 0;
+  const rw = tw + (s.done ? MARK_W + (tw ? 2 : 0) : 0);
+  ctx.text(1, 0, fit(ctx, s.title || 'PROGRESS', L.SCREEN_W - rw - 6), 1);
+  if (s.done) drawMark(ctx, L.SCREEN_W - rw - 1, 1, 'done', 1);
+  if (right) ctx.text(L.SCREEN_W - ctx.textWidth(right) - 1, 0, right, 1);
   ctx.fillRect(0, L.HEADER_RULE_Y, L.SCREEN_W, 1, 1);
-  ctx.text(1, L.PROGRESS_TITLE_Y, (s.drillLabel || '').slice(0, 21), 1);
-  drawPlot(ctx, L.PROGRESS_PLOT, s.records || []);
-  const sum = s.summary || { best: 0, last: 0 };
-  ctx.text(1, L.PROGRESS_ROW_Y, `best ${sum.best}`, 1);
-  const last = `last ${sum.last}`;
-  ctx.text(L.SCREEN_W - ctx.textWidth(last) - 1, L.PROGRESS_ROW_Y, last, 1);
+
+  const box = L.PROGRESS_PLOT;
+  ctx.drawRect(box.x, box.y, box.w, box.h, 1);
+  const ox = box.x + 1;
+  const oy = box.y + 1;
+  /* The line to reach, dotted so it never reads as a take. */
+  for (let x = 0; x < box.w - 2; x += 3) ctx.fillRect(ox + x, oy + s.series.lineY, 1, 1, 1);
+  const pts = s.series.points;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    if (i > 0) ctx.line(ox + pts[i - 1].x, oy + pts[i - 1].y, ox + p.x, oy + p.y, 1);
+  }
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const x = Math.max(ox, Math.min(ox + box.w - 5, ox + p.x - 1));
+    const y = Math.max(oy, Math.min(oy + box.h - 5, oy + p.y - 1));
+    if (p.clean) ctx.fillRect(x, y, 3, 3, 1);
+    else {
+      ctx.fillRect(x, y, 3, 3, 0);
+      ctx.drawRect(x, y, 3, 3, 1);
+    }
+  }
+  if (!pts.length) {
+    const none = 'not played yet';
+    ctx.text((L.SCREEN_W - ctx.textWidth(none)) >> 1, box.y + (box.h >> 1) - 3, none, 1);
+  }
+
+  const takes = `${s.plays} ${s.plays === 1 ? 'take' : 'takes'}`;
+  const bestLine = s.isQuiz ? `best ${s.best}%` : s.best ? `best ${s.best}% ${s.bpm}bpm` : 'never clean';
+  ctx.text(1, L.PROGRESS_ROW_Y, bestLine, 1);
+  ctx.text(L.SCREEN_W - ctx.textWidth(takes) - 1, L.PROGRESS_ROW_Y, takes, 1);
+  if (s.last) {
+    const l = s.last;
+    const line = s.isQuiz ? `last ${l[1]}%` : `last ${l[1]}%  ${l[2]}% right  s${l[3]}`;
+    ctx.text(1, L.SCREEN_H - L.TEXT_H, fit(ctx, line, L.SCREEN_W - 2), 1);
+  }
 }
 
 /* ---- Failure ------------------------------------------------------------ */

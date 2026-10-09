@@ -142,7 +142,7 @@ test('the grid label column leaves room for a two-letter name', () => {
 
 test('no result row runs past where the host stops plotting', () => {
   for (const y of [L.RESULT_BIG_Y, L.RESULT_ROW_A_Y, L.RESULT_ROW_B_Y,
-                   L.PROGRESS_TITLE_Y, L.PROGRESS_ROW_Y, L.VOICE_TABLE_Y]) {
+                   L.PROGRESS_ROW_Y, L.VOICE_TABLE_Y]) {
     assert.ok(y + L.TEXT_H <= L.SCREEN_H, `a row at y${y} runs off the bottom`);
   }
   assert.ok(L.RESULT_PLOT.x + L.RESULT_PLOT.w <= L.SCREEN_W);

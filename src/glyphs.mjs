@@ -135,3 +135,30 @@ export const SCRUB_H = SCRUB_ROWS.length;
 export function drawScrubGlyph(ctx, x, y) {
   blit(ctx, SCRUB_RUNS, x, y);
 }
+
+/*
+ * The marks a row of the drill list carries, as Piano Practice draws them:
+ *   done   ✓  learned: clean at tempo
+ *   tried  ○  played, never clean yet
+ *   skip   »  skipped on purpose
+ *   next   ▸  the Learning Path's next step
+ * Drawn in the row's own colour, so they read on the highlight too.
+ */
+const MARK_ROWS = {
+  done: ['....#', '...##', '#.##.', '###..', '.#...'],
+  tried: ['.###.', '#...#', '#...#', '#...#', '.###.'],
+  skip: ['#.#..', '.#.#.', '..#.#', '.#.#.', '#.#..'],
+  next: ['#....', '##...', '###..', '##...', '#....'],
+};
+const MARK_RUNS = {};
+for (const k in MARK_ROWS) MARK_RUNS[k] = rowsToRuns(MARK_ROWS[k]);
+export const MARK_W = 5;
+
+export function drawMark(ctx, x, y, kind, v = 1) {
+  const runs = MARK_RUNS[kind];
+  if (!runs) return;
+  for (let i = 0; i < runs.length; i++) {
+    const r = runs[i];
+    ctx.fillRect(x + r[0], y + r[1], r[2], 1, v);
+  }
+}

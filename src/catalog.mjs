@@ -60,13 +60,14 @@ export function chartNode(chart) {
   const levels = availableLevels(chart);
   if (levels.length > 1) {
     return folder(chart.name, levels.map((lv) => ({
-      label: lv.label,
-      value: lv.step,
+      label: `${lv.step} ${lv.label}`,
+      value: '',
       kind: 'chart',
+      id: `${chart.id}:${lv.id}`,
       build: () => projectLevel(chart, lv.id),
     })));
   }
-  return { label: chart.name, value: '', kind: 'chart', build: () => chart };
+  return { label: chart.name, value: '', kind: 'chart', id: chart.id, build: () => chart };
 }
 
 /*
@@ -76,7 +77,7 @@ export function chartNode(chart) {
  *   basics      a node for Basics, or null
  *   tail        nodes appended at the end
  */
-export function buildCatalog({ charts = [], categories = [], basics = null, tail = [] } = {}) {
+export function buildCatalog({ charts = [], categories = [], basics = null, lead = [], tail = [] } = {}) {
   /*
    * Charts are only SORTED here; their nodes are made when their folder is
    * first opened. A groove's node projects all four of its levels to find
@@ -112,7 +113,7 @@ export function buildCatalog({ charts = [], categories = [], basics = null, tail
     }
     byGroup[cat.folder].rows.push(lazyFolder(cat.name, nodesOf(list)));
   }
-  const children = basics ? [basics] : [];
+  const children = (basics ? [basics] : []).concat(lead);
   for (let i = 0; i < groups.length; i++) {
     const g = groups[i];
     children.push(g.lazy ? lazyFolder(g.label, g.lazy) : folder(g.label, g.rows));
@@ -128,26 +129,53 @@ export function buildCatalog({ charts = [], categories = [], basics = null, tail
  *   newSeed   a source of fresh seeds; without one every build uses seed 1,
  *             which keeps the tests deterministic
  */
-export function drumsTree({ entries = [], categories = [], bpm = 90, drills = [], newSeed = null } = {}) {
+export function drumsTree({ entries = [], categories = [], bpm = 90, drills = [], newSeed = null, path = null } = {}) {
   const o = { bpm };
   const seed = () => (newSeed ? newSeed() : 1);
-  const leaf = (c) => ({ label: c.name, value: '', kind: 'chart', build: () => c });
+  const leaf = (c) => ({ label: c.name, value: '', kind: 'chart', id: c.family, build: () => c });
   const basics = folder('Basics', [
     folder('Subdivisions', subdivisionDrills(o).map(leaf)),
     folder('Random', RANDOM_DRILLS.map((d) => ({
-      label: d.name, value: '', kind: 'chart',
+      label: d.name, value: '', kind: 'chart', id: d.family,
       build: () => ({ ...d.make({ ...o, seed: seed() }), name: d.name }),
     }))),
   ]);
   const tail = [
     folder('Training', [
       { label: 'Ladder', value: '', kind: 'ladder' },
-      { label: 'Clock', value: '', kind: 'clock' },
+      /* The Clock is an item of its own: keeping time without the click is
+       * the skill, whichever drill it wraps. */
+      { label: 'Clock', value: '', kind: 'clock', id: CLOCK_ID },
     ]),
-    folder('Quiz', drills.map((d) => ({ label: d.name, value: '?', kind: 'quiz', quiz: d }))),
+    folder('Quiz', drills.map((d) => ({
+      label: d.name, value: '?', kind: 'quiz', quiz: d, id: `quiz:${d.mode}:${d.kind}`,
+    }))),
     { label: 'Progress', value: '', kind: 'progress' },
   ];
-  return buildCatalog({ charts: entries, categories, basics, tail });
+  return buildCatalog({ charts: entries, categories, basics, lead: path ? [path] : [], tail });
+}
+
+export const CLOCK_ID = 'clock';
+
+/*
+ * Every leaf that opens something, by item id — so a step of the Learning
+ * Path or a repetition can open the row it points at. Walks the whole tree
+ * once, making the lazy folders, and leaves out folders that are only
+ * pointers back into it (the path) or that change with the day.
+ */
+export function leafIndex(root) {
+  const index = new Map();
+  const walk = (node) => {
+    if (isFolder(node)) {
+      if (node.untracked || node.pointers) return;
+      const kids = node.children;
+      for (let i = 0; i < kids.length; i++) walk(kids[i]);
+      return;
+    }
+    if (node && node.id && node.kind && !index.has(node.id)) index.set(node.id, node);
+  };
+  walk(root);
+  return index;
 }
 
 /* ---- Walking the tree --------------------------------------------------- */
@@ -183,38 +211,4 @@ export function navPop(nav) {
   if (nav.length <= 1) return false;
   nav.pop();
   return true;
-}
-
-/* The cursor at every depth — enough to find the same place in a new tree. */
-export function navPath(nav) {
-  return nav.map((f) => f.cursor);
-}
-
-/* The same walk through a REBUILT tree, clamped, stopping early if a folder is
- * gone, so a tree that changed shape lands somewhere valid. */
-export function navRestore(root, path) {
-  const nav = navStart(root);
-  for (let i = 0; i < path.length; i++) {
-    const top = navTop(nav);
-    top.cursor = Math.max(0, Math.min(top.node.children.length - 1, path[i]));
-    if (i === path.length - 1) break;
-    if (!navPush(nav)) break;
-  }
-  return nav;
-}
-
-/* The node a path ends on, or null. */
-export function nodeAt(root, path) {
-  let node = root;
-  for (let i = 0; i < path.length; i++) {
-    if (!isFolder(node)) return null;
-    node = node.children[path[i]];
-    if (!node) return null;
-  }
-  return node;
-}
-
-/* The rows the list draws — label on the left, marker on the right. */
-export function rowsOf(node) {
-  return node.children.map((n) => ({ label: n.label, value: n.value || '' }));
 }
