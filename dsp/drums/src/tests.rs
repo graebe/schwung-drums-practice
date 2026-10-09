@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Torben Gräber
+
 /*
  * Unit tests for the engine, run under `cargo test --no-default-features`
  * (the `rt` feature off, so std supplies the panic handler and allocator).

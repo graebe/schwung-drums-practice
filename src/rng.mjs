@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Torben Gräber
+
 /*
  * rng.mjs — a seeded pseudo-random generator. Pure, and a LEAF.
  *

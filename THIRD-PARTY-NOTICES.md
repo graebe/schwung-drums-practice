@@ -1,7 +1,8 @@
 # Third-party notices
 
-Drums Practice is MIT licensed (see `LICENSE`). It carries very little that is
-not its own, and everything it does carry is MIT.
+Drums Practice is GPL-3.0-or-later (see `LICENSE`). It carries very little
+that is not its own, and everything it does carry is MIT — compatible with the
+GPL, on the condition that the notices below travel with it.
 
 This file exists because `src/vendor/host/plugin_api_v1.h` points at it.
 
@@ -62,8 +63,9 @@ Nothing in `src/exercises/` is transcribed from anyone's recording or book.
 
 ## Everything else
 
-- `dsp/schwung-plugin` — this repository's own crate, MIT, Copyright (c) 2026
-  Torben Gräber. It is shared verbatim with `schwung-piano-practice`.
+- `dsp/schwung-plugin` — this repository's own crate, GPL-3.0-or-later,
+  Copyright (C) 2026 Torben Gräber. It is shared verbatim with
+  `schwung-piano-practice`.
 - The JavaScript has **no dependencies at all**, runtime or development. The
   test suite is `node --test` from the standard library, and the module ships
   as ES modules the host's QuickJS loads directly. There is nothing here to

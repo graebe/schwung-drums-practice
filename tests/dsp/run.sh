@@ -1,4 +1,7 @@
 #!/usr/bin/env sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Torben Gräber
+
 # Build the engine natively and link the C harness against it, so the ABI is
 # exercised the way the Move exercises it.
 set -eu

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Torben Gräber
+
 /*
  * guess.mjs — the quiz engine: rounds, prompts, hints and scoring. Pure.
  *

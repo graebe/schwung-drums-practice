@@ -3,7 +3,7 @@ name = "drums"
 version = "0.1.0"
 edition = "2021"
 authors = ["Torben Gräber"]
-license = "MIT"
+license = "GPL-3.0-or-later"
 description = "The Drums Practice built-in kit and click, as a Schwung DSP plugin."
 
 [lib]

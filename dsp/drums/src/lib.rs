@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Torben Gräber
+
 /*
  * drums — the built-in kit and click for Drums Practice, as a Schwung v2 DSP
  * plugin.

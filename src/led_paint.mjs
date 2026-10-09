@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Torben Gräber
+
 /*
  * led_paint.mjs — what colour every pad is. Pure; `paint` allocates nothing.
  * (guideTargets builds a short list, and only runs with Guide pads on.)

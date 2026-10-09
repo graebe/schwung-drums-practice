@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Torben Gräber
+
 /*
  * Things about ui.js that are true of its TEXT, not of its behaviour.
  * Cheap, and they catch the two mistakes that are invisible on the device.

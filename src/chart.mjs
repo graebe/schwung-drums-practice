@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Torben Gräber
+
 /*
  * chart.mjs — the scroll engine. Pure: no host calls, no mutable state.
  *

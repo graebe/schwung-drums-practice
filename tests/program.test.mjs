@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Torben Gräber
+
 /*
  * The Learning Path, against the drills the module really ships: a step that
  * points at nothing is a row that does nothing on the device.

@@ -1,4 +1,7 @@
 #!/usr/bin/env sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Torben Gräber
+
 # Cross-compile the kit to aarch64. Run inside the Docker image (see
 # build.sh) unless a Rust aarch64-unknown-linux-gnu toolchain is already here.
 set -eu

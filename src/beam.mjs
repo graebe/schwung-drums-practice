@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Torben Gräber
+
 /*
  * beam.mjs — beat grouping, stems and beams. Pure, allocation-free.
  *

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Torben Gräber
+
 /*
  * One drum voice: a swept tone and a filtered noise burst under independent
  * envelopes.
