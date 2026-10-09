@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Torben Gräber
+
 /*
  * ui.js — host glue ONLY: lifecycle, MIDI, LEDs, settings, the state machine.
  *

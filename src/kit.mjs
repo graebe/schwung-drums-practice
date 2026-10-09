@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Torben Gräber
+
 /*
  * kit.mjs — the nine voices. Pure, and a leaf apart from notation.
  *

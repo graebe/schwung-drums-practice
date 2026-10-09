@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Torben Gräber
+
 /*
  * levels.mjs — the lesson ladder. Pure, and a leaf but for the kit.
  *

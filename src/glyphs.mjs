@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Torben Gräber
+
 /*
  * glyphs.mjs — the marks both views draw, and the blitter that puts them on
  * screen. Pure; imports only the layout.

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Torben Gräber
+
 /*
  * controls.mjs — transport colours, the count-in, and where a turn goes.
  * Pure.

@@ -5,7 +5,7 @@
     "version": "1.2.1",
     "description": "Rhythm trainer: read the chart, play the kit, see your timing.",
     "author": "Torben Gräber",
-    "license": "MIT",
+    "license": "GPL-3.0-or-later",
     "ui": "ui.js",
     "api_version": 2,
     "component_type": "tool",

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Torben Gräber
+
 /*
  * events.mjs — operations on a list of events. Pure, and a LEAF: it imports
  * nothing.

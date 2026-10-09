@@ -1,4 +1,7 @@
 #!/usr/bin/env sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Torben Gräber
+
 # What the manifest must say, what the versions must agree on, and what the
 # install must never destroy.
 #
@@ -47,7 +50,7 @@ if (!m.capabilities.midi_in) fail("the pads need midi_in");
  * name differs by type and getting it wrong fails silently. */
 if (m.dsp !== "dsp.so") fail("a tool DSP must be named dsp.so");
 if (!m.abbrev || m.abbrev.length < 2 || m.abbrev.length > 6) fail("abbrev must be 2-6 chars");
-if (m.license !== "MIT") fail("module.json must declare its licence");
+if (m.license !== "GPL-3.0-or-later") fail("module.json must declare its licence");
 
 const rel = JSON.parse(fs.readFileSync(root + "/release.json", "utf8"));
 const pkg = JSON.parse(fs.readFileSync(root + "/package.json", "utf8"));
@@ -91,16 +94,25 @@ ok
 # Licences ship with the binary: libm is MIT and is linked into dsp.so.
 test -f "$ROOT/LICENSE" || fail "no LICENSE"
 test -f "$ROOT/THIRD-PARTY-NOTICES.md" || fail "no THIRD-PARTY-NOTICES.md"
-grep -q 'Torben' "$ROOT/LICENSE" || fail "LICENSE does not name the copyright holder"
+# LICENSE is the FSF's text verbatim -- held to its published checksum, since a
+# reflowed or trimmed copy is no longer the licence -- so the holder is named
+# beside it, in the README and every source file's header.
+[ "$(shasum -a 256 "$ROOT/LICENSE" | cut -d' ' -f1)" = \
+  3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986 ] \
+  || fail "LICENSE is not the GPL v3 text, verbatim"
+grep -q 'Copyright (C) 2026 Torben' "$ROOT/README.md" || fail "the README does not name the copyright holder"
+grep -q '"license": "GPL-3.0-or-later"' "$ROOT/package.json" || fail "package.json declares another licence"
 grep -qi 'libm' "$ROOT/THIRD-PARTY-NOTICES.md" || fail "notices do not cover libm"
 grep -q 'cp "$ROOT/THIRD-PARTY-NOTICES.md"' "$ROOT/scripts/package.sh" \
   || fail "the notices are not packaged"
 ok
 
-# No GPL anywhere, and no accidental dependency creep.
-if grep -rn --include='*.toml' -iE '^\s*(nih.plug|vst3)' "$ROOT/dsp" 2>/dev/null | grep -q .; then
-  fail "a GPL-encumbered plugin framework crept into the DSP"
-fi
+# No accidental dependency creep. Every crate in the DSP is ours or libm (MIT):
+# a new one has to be checked against the licence allowlist and named in
+# THIRD-PARTY-NOTICES.md before this list may grow.
+crates=$(sed -n 's/^name = "\(.*\)"/\1/p' "$ROOT/dsp/Cargo.lock" | sort | tr '\n' ' ')
+[ "$crates" = "drums libm schwung-plugin " ] || fail "unexpected crates in dsp/Cargo.lock: $crates"
+
 node -e '
 const p = require(process.argv[1] + "/package.json");
 if (p.dependencies || p.devDependencies) {

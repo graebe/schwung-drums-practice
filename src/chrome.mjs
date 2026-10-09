@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Torben Gräber
+
 /*
  * chrome.mjs — the furniture every screen shares: the header, the bar ruler,
  * the progress footer, the list, the plot and the count-in.

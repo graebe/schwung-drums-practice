@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Torben Gräber
+
 /*
  * The screen is 128x64 and the bands are tight. These assert the geometry
  * itself rather than any drawing — a band that overlaps its neighbour, or a

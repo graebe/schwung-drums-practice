@@ -598,11 +598,9 @@ takes is settled even though the work is not: the **synthesis stays in Rust behi
 and a second shell links the same crate. One set of constants, so the two builds cannot drift into
 sounding different.
 
-That shell will be **iPlug2**, which is MIT. It is not nih-plug: exporting VST3 from nih-plug pulls
-in Steinberg's VST3 SDK, which is GPLv3-or-commercial, and a plugin built that way could not be
-distributed under this licence. Nothing in this repository depends on either today — the Schwung
-module reaches the host through a C ABI it declares itself — so the choice costs nothing until the
-Live build starts.
+That shell will be **JUCE**, as for the other Neon Ingvy plugins: JUCE is AGPLv3, which section 13
+of the GPLv3 allows this module's licence to be combined with. Nothing in this repository depends on
+it today — the Schwung module reaches the host through a C ABI it declares itself.
 
 ## AI assistance disclaimer
 
@@ -611,11 +609,22 @@ human maintainer. Please validate functionality and licence compatibility before
 
 ## Licence
 
-MIT. Copyright (c) 2026 Torben Gräber. See `LICENSE`.
+**GPL-3.0-or-later.** Copyright (C) 2026 Torben Gräber.
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. It is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. [LICENSE](LICENSE) is the licence's full text.
+
+Releases up to and including v1.2.1 were published under MIT, and those copies
+stay MIT; everything from v1.3.0 on is GPL-3.0-or-later.
 
 ### What it carries that is not its own
 
-Very little, and all of it MIT — the full text of each is in
+Very little, and all of it MIT, which the GPL can carry as long as its notice
+travels with it — the full text of each is in
 [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
 
 | | what | licence |
