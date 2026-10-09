@@ -44,6 +44,7 @@ import * as ST from './stats.mjs';
 import * as LAD from './ladder.mjs';
 import * as T from './transport.mjs';
 import * as Q from './guess.mjs';
+import * as AP from './answer_pads.mjs';
 import * as PROG from './progress.mjs';
 import * as PLAN from './program.mjs';
 import { availableLevels } from './levels.mjs';
@@ -450,9 +451,21 @@ function stuckTargets() {
  * literal on every repaint, fifty times a second. */
 const paintState = {
   layout: 'kit', held: null, flash: null, targets: null, sounding: null,
-  stuck: null, phase: 0, prompt: null, dark: false,
+  stuck: null, phase: 0, prompt: null, answerPads: null, answerColours: null, dark: false,
 };
 const promptBuf = [null];
+const answerColourBuf = [];
+const answerStruck = (i) => Q.isEliminated(quiz, i);
+
+/*
+ * The answer bar: a multiple-choice drill's answers as coloured pads along the
+ * bottom row (answer_pads.mjs), as Piano Practice does it. Only for the Pick
+ * drills, which ask for a NAME — in Guess: drum and Hear: drum the answer is a
+ * drum, and the bottom row holds drums.
+ */
+function answerBarActive() {
+  return screen === QUIZ && Boolean(quiz) && quiz.mode === 'pick' && quiz.options.length > 0;
+}
 
 function paintLeds(t) {
   const st = paintState;
@@ -465,12 +478,21 @@ function paintLeds(t) {
   st.stuck = stuckTargets();
   st.phase = Math.floor(t / 500) % 2;
   /* The second hint lights the pad. Only for the drills whose answer IS a
-   * pad — naming a groove has no pad to light. */
-  if (screen === QUIZ && quiz && quiz.kind === 'voice' && quiz.hints >= 2) {
+   * pad — naming a groove has no pad to light, and a Pick drill's hints strike
+   * out answers instead. */
+  if (screen === QUIZ && quiz && quiz.kind === 'voice' && quiz.mode !== 'pick' && quiz.hints >= 2) {
     promptBuf[0] = quiz.prompt;
     st.prompt = promptBuf;
   } else {
     st.prompt = null;
+  }
+  if (answerBarActive()) {
+    const n = quiz.options.length;
+    st.answerPads = AP.answerPads(n);
+    st.answerColours = AP.answerLeds(n, quiz.revealed ? -1 : quiz.choice, answerStruck,
+      st.phase, answerColourBuf);
+  } else {
+    st.answerPads = null;
   }
   st.dark = false;
   paint(ledBuf, st);
@@ -1244,6 +1266,15 @@ function serviceQuiz() {
 
 /* ---- input -------------------------------------------------------------- */
 function padDown(pad, vel) {
+  /* In a multiple-choice drill the bottom row is answer buttons. They sound
+   * nothing: a press there is a choice, not a drum. */
+  if (answerBarActive() && AP.inAnswerBar(quiz.options.length, pad)) {
+    const r = Q.pickAt(quiz, AP.answerAt(quiz.options.length, pad), now());
+    if (r === 'ignored') return;
+    setFlash([pad], r === 'right' ? PAD.LED_HIT : PAD.LED_MISS);
+    if (r === 'right') quizSolvedAt = now();
+    return;
+  }
   held.add(pad);
   const voice = PAD.padVoice(pad, layoutNow());
   if (!voice) return;
@@ -1791,6 +1822,7 @@ function draw() {
   if (screen === QUIZ && quiz) {
     V.drawQuiz(ctx, {
       quiz, title: quizTitle, progress: Q.roundProgress(quiz),
+      colours: answerBarActive() ? AP.COLOUR_NAMES : null,
       labelFor: (id) => Q.labelFor(quiz, id),
       isEliminated: (i) => Q.isEliminated(quiz, i),
       hintsLeft: Q.hintsLeft(quiz),

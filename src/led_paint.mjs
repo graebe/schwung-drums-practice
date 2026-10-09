@@ -14,6 +14,7 @@
  * PRIORITY, highest first. The order is the whole design:
  *
  *   judgement   what just happened to you        flash > everything
+ *   answers     a multiple-choice drill's bar    the bottom row, nothing else
  *   pressed     where your finger is
  *   stuck       what Study is waiting for         pulsing; only with Guide pads
  *   sounding    what Listen is playing right now
@@ -31,6 +32,7 @@ import { PAD_FIRST, PAD_COUNT, padVoice, padHand,
          LED_PRESSED, LED_HIT, LED_STICK, LED_MISS, LED_PROMPT } from './padmap.mjs';
 
 export const FLASH_MS = 180;
+const ROW = 8;
 
 /* A judgement, for the flash layer. */
 export function flashColor(judgement) {
@@ -68,6 +70,9 @@ function targetColor(beatsAway) {
  *   stuck      [{ voice, hand }] Study is frozen on, or null
  *   phase      0/1, the pulse for `stuck`
  *   prompt     [voice, ...] lit for a quiz prompt, or null
+ *   answerPads    [pad, ...] a multiple-choice drill's answers (answer_pads.mjs),
+ *                 or null; while set, the bottom row is the answer bar
+ *   answerColours [palette index, ...] one per answer pad
  *   dark       true to blank everything (the module is closing)
  */
 export function paint(out, state) {
@@ -117,6 +122,13 @@ export function paint(out, state) {
     }
 
     if (state.held && state.held.has(pad)) c = LED_PRESSED;
+
+    /* The answer bar owns the bottom row: its answers in their colours, the
+     * gaps dark. A drum underneath it is not reachable while it is up. */
+    if (state.answerPads && i < ROW) {
+      const at = state.answerPads.indexOf(pad);
+      c = at >= 0 ? state.answerColours[at] : LED_OFF;
+    }
 
     if (state.flash && state.flash.pads) {
       for (let k = 0; k < state.flash.pads.length; k++) {

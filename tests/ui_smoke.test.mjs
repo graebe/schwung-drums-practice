@@ -1700,3 +1700,67 @@ test('a Ladder that never holds a rung ends, says why, and counts as tried', asy
   assert.equal(it.plays, 1);
   assert.equal(it.best, 0);
 });
+
+/* ---- multiple choice on the pads, as in Piano Practice ------------------- */
+
+/* The latest colour each pad was set to. */
+function padNow(log) {
+  const now = {};
+  for (const [n, c] of log.leds) now[n] = c;
+  return now;
+}
+
+test('a Pick drill puts its answers on the bottom row, named by colour on screen', async () => {
+  const AP = await import('../src/answer_pads.mjs');
+  for (const index of [2, 3, 4]) {
+    const { log } = await loadUi();
+    globalThis.init();
+    ticks(2);
+    openQuiz(index);
+    ticks(2);
+    const leds = padNow(log);
+    const row = [];
+    for (let p = 68; p < 76; p++) row.push(leds[p]);
+    const bright = AP.ANSWER_COLOURS.map((c) => c.bright);
+    const dim = AP.ANSWER_COLOURS.map((c) => c.dim);
+    assert.deepEqual(row.map((c) => c === 0 ? 0 : 1), [0, 1, 0, 1, 0, 1, 0, 0], `${DRILLS[index].name}: ${row}`);
+    for (const c of [row[1], row[3], row[5]]) assert.ok(bright.includes(c) || dim.includes(c), String(c));
+    const shown = drawnText(1);
+    for (const name of ['blue', 'cyan', 'white']) assert.ok(shown.includes(name), `${name}: ${shown.join('|')}`);
+    assert.ok(shown.includes('PAD answer  REC help'));
+  }
+});
+
+test('an answer pad answers and sounds nothing; one of the three is right', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  openQuiz(3);                               /* Hear: subdivision */
+  ticks(120);                                /* the prompt itself sounds: let it finish */
+  const before = log.params.length;
+  const flashes = [];
+  for (const p of [69, 71, 73]) {
+    pad(p, 100); pad(p, 0);
+    ticks(1);
+    flashes.push(padNow(log)[p]);
+    if (flashes[flashes.length - 1] === 126) break;   /* green: right */
+  }
+  assert.ok(flashes.includes(126), `no answer was right: ${flashes}`);
+  assert.equal(log.params.slice(before).filter(([k]) => k === 'n').length, 0,
+    'an answer pad sounded a drum');
+  ticks(30);
+  assert.ok(drawnText(1).some((t) => /^1\//.test(t)), 'the round did not count the answer');
+});
+
+test('Guess: drum keeps the whole kit — its answer is a drum, so there is no bar', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  openQuiz(0);
+  ticks(2);
+  const leds = padNow(log);
+  const row = [];
+  for (let p = 68; p < 76; p++) row.push(leds[p]);
+  assert.ok(row.every((c) => c === 107), `the bottom row is not the kit: ${row}`);
+  assert.ok(!drawnText(1).includes('blue'));
+});

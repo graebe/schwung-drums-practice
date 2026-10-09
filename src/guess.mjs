@@ -164,6 +164,18 @@ export function pickChoice(quiz, nowMs = 0) {
 }
 
 /*
+ * An answer chosen by its pad (answer_pads.mjs) rather than by the jog. The
+ * same as turning to it and clicking, so a pad and the jog can never judge
+ * differently; a struck-out answer cannot be chosen at all.
+ */
+export function pickAt(quiz, index, nowMs = 0) {
+  if (quiz.mode !== 'pick' || index < 0 || index >= quiz.options.length) return 'ignored';
+  if (quiz.revealed || quiz.eliminated.includes(index)) return 'ignored';
+  quiz.choice = index;
+  return pickChoice(quiz, nowMs);
+}
+
+/*
  * Help, two presses deep, and what each press does depends on what the drill
  * is withholding.
  *

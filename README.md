@@ -484,6 +484,25 @@ teaching is.
 | **Hear: subdivision** | a figure plays; is it eighths, triplets or sixteenths? Ear training for *time* |
 | **Pick: groove** | a groove plays; name it from three |
 
+**The naming drills answer on the pads**, as Piano Practice does. In *Pick: drum*, *Hear:
+subdivision* and *Pick: groove* the bottom row of pads becomes the answers — one pad each, every
+other pad so a near miss lands on nothing, each in its own colour — and the screen names the colour
+beside each answer:
+
+```
+ HEAR: SUBDIVISION        3/20
+  Triplets              blue      ← the pad second from the left
+  Quarters              cyan      ← the middle one
+  Sextuplets            white     ← the one after
+      PAD answer  REC help
+```
+
+Press the pad to answer, or turn the jog and click; the answer the jog is on pulses on its pad, and
+one a hint has struck out goes dark. The answer pads sound nothing — a press there is a choice, not
+a drum — and the rows above them are still the kit. *Guess: drum* and *Hear: drum* keep the whole
+kit, because their answer **is** a drum and the bottom row holds drums. The colours are piano's,
+less its orange, which on these pads already means *right drum, wrong hand*.
+
 The wrong options are always near misses — the drum either side of it on the staff, the
 subdivision either side of it, a groove with the same density — because three options where two
 are absurd is a quiz you pass by elimination without ever hearing the answer.

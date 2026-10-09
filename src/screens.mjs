@@ -157,6 +157,8 @@ export function drawLadder(ctx, s) {
 }
 
 /* ---- Quiz --------------------------------------------------------------- */
+const PICK_ROW_Y = 15;
+const PICK_ROW_H = 12;
 export function drawQuiz(ctx, s) {
   ctx.clear();
   const q = s.quiz;
@@ -166,17 +168,29 @@ export function drawQuiz(ctx, s) {
   ctx.fillRect(0, L.HEADER_RULE_Y, L.SCREEN_W, 1, 1);
 
   if (q.mode === 'pick') {
+    /*
+     * One row per answer, as Piano Practice lists them: the answer on the
+     * left, the colour of its pad on the right — the panel is one colour, so
+     * the pad's colour is named rather than shown — and the jog's choice
+     * inverted, as everywhere.
+     */
     for (let i = 0; i < q.options.length; i++) {
-      const y = 13 + i * 11;
-      const label = s.labelFor(q.options[i]);
-      if (i === q.choice) {
-        ctx.drawRect(2, y - 2, L.SCREEN_W - 4, L.TEXT_H + 3, 1);
-      }
-      ctx.text(6, y, label.slice(0, 18), 1);
-      /* A struck-out option stays on screen: seeing what you ruled out is
-       * part of what the hint teaches. */
-      if (s.isEliminated(i)) ctx.fillRect(6, y + 3, ctx.textWidth(label.slice(0, 18)), 1, 1);
+      const y = PICK_ROW_Y + i * PICK_ROW_H;
+      const selected = i === q.choice;
+      const v = selected ? 0 : 1;
+      if (selected) ctx.fillRect(0, y - 1, L.SCREEN_W, PICK_ROW_H, 1);
+      const colour = s.colours ? s.colours[i % s.colours.length] : '';
+      const cw = colour ? ctx.textWidth(colour) : 0;
+      const label = fit(ctx, s.labelFor(q.options[i]), L.SCREEN_W - 8 - cw - (cw ? 6 : 0));
+      ctx.text(4, y, label, v);
+      if (colour) ctx.text(L.SCREEN_W - 4 - cw, y, colour, v);
+      /* A struck-out option stays on screen, and its pad goes dark: seeing
+       * what you ruled out is part of what the hint teaches. */
+      if (s.isEliminated(i)) ctx.fillRect(2, y + 3, L.SCREEN_W - 4, 1, v);
     }
+    const foot = s.hintsLeft > 0 ? 'PAD answer  REC help' : 'PAD or JOG  CLICK ok';
+    ctx.text((L.SCREEN_W - ctx.textWidth(foot)) >> 1, L.SCREEN_H - L.TEXT_H, foot, 1);
+    return;
   } else {
     /* guess: the notation, on its own staff. hear: a question mark until you
      * get it, then the notation is revealed — which is where the teaching is. */

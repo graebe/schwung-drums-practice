@@ -213,6 +213,26 @@
       ]
     },
     {
+      "title": "Quiz",
+      "lines": [
+        "Guess and Hear: drum -",
+        "play the drum asked for.",
+        "",
+        "Pick: drum, Hear:",
+        "subdivision and Pick:",
+        "groove name what you",
+        "heard. Their answers sit",
+        "on the bottom row, one",
+        "coloured pad each; the",
+        "screen names the colour.",
+        "Press it, or JOG and",
+        "CLICK.",
+        "",
+        "REC is help; PLAY plays",
+        "the question again."
+      ]
+    },
+    {
       "title": "Latency",
       "lines": [
         "If every hit reads late",
