@@ -448,6 +448,49 @@ export function percentSeries(history, w, h, { lo = 40, hi = 140, line = LEARNED
   return { points, lineY: yOf(line) };
 }
 
+/*
+ * When an item was learned, in unix seconds, or 0: its own first ✓, or, for a
+ * groove level, the first ✓ of a level above it — the same reading isDone
+ * makes, so the overview never counts something the list does not tick.
+ */
+export function learnedAt(progress, id) {
+  let at = 0;
+  const own = progress.items[id];
+  if (own && own.done) at = own.done;
+  const up = higherLevels(id);
+  for (let i = 0; i < up.length; i++) {
+    const h = progress.items[up[i]];
+    if (h && h.done && (!at || h.done < at)) at = h.done;
+  }
+  return at;
+}
+
+/*
+ * Drills learned over time, for the overview: a step line rising by one at
+ * every ✓. Time runs along x from the first one to `atMs`, and y is scaled to
+ * the count reached, so the shape is the story — steady, a burst, a stall.
+ * Piano Practice's passTimeline, counting learned drills.
+ */
+export function learnedTimeline(progress, ids, w, h, atMs) {
+  const times = [];
+  for (let i = 0; i < ids.length; i++) {
+    const t = learnedAt(progress, ids[i]);
+    if (t) times.push(t);
+  }
+  times.sort((a, b) => a - b);
+  if (!times.length) return { points: [], total: 0 };
+  const t0 = times[0];
+  const t1 = Math.max(Math.round(atMs / 1000), times[times.length - 1]);
+  const span = Math.max(1, t1 - t0);
+  const lastX = w - 1;
+  const lastY = h - 1;
+  const points = times.map((t, i) => ({
+    x: Math.round(((t - t0) / span) * lastX),
+    y: Math.round(lastY - ((i + 1) / times.length) * lastY),
+  }));
+  return { points, total: times.length };
+}
+
 /* ---- From the stats log --------------------------------------------------- */
 
 /*

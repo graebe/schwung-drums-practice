@@ -635,7 +635,8 @@ test('Study names the drum it has stopped for, and the note is on the hit line',
   assert.equal(stuckLabel(run), 'Kick + Hi-hat', 'no hand named where the drill asks none');
 });
 
-import { drawSummary, drawResult, drawQuiz } from '../src/view.mjs';
+import { drawSummary, drawResult, drawQuiz, SUMMARY_PLOT } from '../src/view.mjs';
+import { percentSeries } from '../src/progress.mjs';
 import { createQuiz, takeHint } from '../src/guess.mjs';
 
 function capture() {
@@ -646,20 +647,50 @@ function capture() {
   return { c, seen };
 }
 
-test('a best take says so, on the summary and on a quiz result', () => {
-  const chart = { id: 'x', name: 'X', bpm: 90, timeSig: [4, 4], loopBars: 1, repeats: 1,
-    events: [{ beat: 0, voices: ['SN'] }] };
-  const run = createRun(chart);
-  judgeHit(run, { voice: 'SN' }, 0);
+/* What stop() works out for the result screen (ui.js resultOf). */
+const result = (over = {}) => ({
+  name: 'X', status: 'CLEAN', mark: null, speed: 85, accuracy: 0.94, sdMs: 12, meanMs: 3,
+  failAcc: false, failSd: false, bpm: 90, limb: 'SN +3 s12',
+  series: percentSeries([[0, 70, 95, 20, 1], [1, 85, 94, 12, 1]], SUMMARY_PLOT.w - 2, SUMMARY_PLOT.h - 2),
+  footer: 'REC again  CLICK next', ...over,
+});
+
+test('the result says what the take was and how it stands', () => {
   let { c, seen } = capture();
-  drawSummary(c, { run, tightMs: 30, isBest: true });
-  assert.ok(seen.includes('BEST YET'));
+  drawSummary(c, result({ status: 'BEST YET' }));
+  for (const t of ['BEST YET', '94% right', 's12 +3ms', '90 bpm', 'SN +3 s12']) {
+    assert.ok(seen.includes(t), `${t}: ${seen.join('|')}`);
+  }
   ({ c, seen } = capture());
-  drawSummary(c, { run, tightMs: 30, isBest: false });
-  assert.ok(seen.includes('RESULT') && !seen.includes('BEST YET'));
+  drawSummary(c, result({ status: 'LEARNED', mark: 'done' }));
+  assert.ok(seen.includes('LEARNED'));
   ({ c, seen } = capture());
   drawResult(c, { rate: 30, best: 30, errorRate: 0, hints: 0, series: [], isBest: true });
   assert.ok(seen.includes('BEST YET'));
+});
+
+test('the reason a take did not count is drawn inverted', () => {
+  const lit = (over) => {
+    const c = createScreen();
+    drawSummary(c, result(over));
+    return countOn(c, 60, L.RESULT_BIG_Y - 1, L.SCREEN_W - 60, L.TEXT_H + 1);
+  };
+  const plain = lit({});
+  assert.ok(lit({ failAcc: true }) > plain + 40, 'the accuracy row is not inverted');
+  const c = createScreen();
+  drawSummary(c, result({ failSd: true }));
+  assert.ok(countOn(c, 60, L.RESULT_BIG_Y + 7, L.SCREEN_W - 60, L.TEXT_H + 1) > 60,
+    'the spread row is not inverted');
+});
+
+test('the result chart is the drill\'s takes, this one last', () => {
+  const c = createScreen();
+  drawSummary(c, result());
+  const box = SUMMARY_PLOT;
+  assert.ok(countOn(c, box.x, box.y, box.w, box.h + 1) > box.w, 'no chart drawn');
+  /* The last take is a filled dot at the right edge. */
+  const last = result().series.points[1];
+  assert.ok(isOn(c, box.x + 1 + last.x, box.y + 1 + last.y), 'the last take is not marked');
 });
 
 test('the first Hear hint names the drum and still hides the staff', () => {
@@ -681,26 +712,16 @@ test('the first Hear hint names the drum and still hides the staff', () => {
 /* ---- The result screen, worst case ------------------------------------------- */
 
 test('the result screen draws nothing over anything else, at its worst', () => {
-  const chart = { id: 'x', name: 'Seventeen stroke roll L4 everything', bpm: 270, timeSig: [4, 4],
-    loopBars: 1, repeats: 1,
-    events: [0, 0.5, 1, 1.5, 2, 2.5, 3].map((b, i) => ({ beat: b, voices: [i % 2 ? 'SN' : 'KD'] })) };
-  const run = createRun(chart);
-  /* Wild timing on two limbs, then everything else missed: a three-digit
-   * spread, a three-digit bias, the longest verdict, every error. */
-  judgeHit(run, { voice: 'KD' }, 0.2);
-  judgeHit(run, { voice: 'SN' }, 0.3);
-  expireMissed(run, 10);
-  run.stickErrors = 12;
-  run.dynErrors = 9;
   const texts = [];
   const c = createScreen();
   const text = c.text.bind(c);
   c.text = (x, y, s, v) => { texts.push({ x, y, w: c.textWidth(s), s }); return text(x, y, s, v); };
-  const history = Array.from({ length: 60 }, (_, i) => ({ sd: (i * 7) % 90, bpm: 270 }));
-  drawSummary(c, {
-    run, tightMs: 30, isBest: true, name: chart.name, bpm: 270, history,
-    recorded: true, footer: 'REC again  CLICK next',
-  });
+  /* A three-digit speed, a three-digit spread and bias, the longest name. */
+  drawSummary(c, result({
+    name: 'Seventeen stroke roll L4 everything', status: 'NOT CLEAN', speed: 120,
+    accuracy: 0.07, sdMs: 154, meanMs: -133, failAcc: true, failSd: true, bpm: 270,
+    limb: 'KD -133 s154',
+  }));
   const bad = [];
   for (const t of texts) {
     if (t.x < 0 || t.x + t.w > L.SCREEN_W || t.y < 0 || t.y + L.TEXT_H > L.SCREEN_H) bad.push(`off screen: ${t.s}`);
@@ -715,17 +736,18 @@ test('the result screen draws nothing over anything else, at its worst', () => {
     }
   }
   assert.deepEqual(bad, []);
-  assert.ok(texts.some((t) => t.s === 'BEST YET'));
+  assert.ok(texts.some((t) => t.s === 'NOT CLEAN'));
   assert.ok(texts.some((t) => t.s === '270 bpm'));
   assert.ok(texts.some((t) => /^Seventeen/.test(t.s)), 'the drill is named');
+  /* Nothing written into the chart. */
+  for (const t of texts) {
+    assert.ok(t.y + L.TEXT_H <= SUMMARY_PLOT.y || t.y > SUMMARY_PLOT.y + SUMMARY_PLOT.h,
+      `${t.s} is drawn over the chart`);
+  }
 });
 
 test('the result screen says when a take was not kept', () => {
-  const chart = { id: 'x', name: 'X', bpm: 90, timeSig: [4, 4], loopBars: 1, repeats: 1,
-    events: [{ beat: 0, voices: ['SN'] }] };
-  const run = createRun(chart);
-  judgeHit(run, { voice: 'SN' }, 0);
   const { c, seen } = capture();
-  drawSummary(c, { run, tightMs: 30, isBest: false, name: 'X', recorded: false });
+  drawSummary(c, result({ status: 'not kept' }));
   assert.ok(seen.includes('not kept'), 'a scrubbed take is passage practice, and says so');
 });

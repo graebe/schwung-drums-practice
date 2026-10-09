@@ -20,7 +20,7 @@ import { readFileSync, readdirSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { createScreen } from '../tools/screen_buffer.mjs';
+import { createScreen, countOn } from '../tools/screen_buffer.mjs';
 import { DRILLS } from '../src/guess.mjs';
 
 const SHARED = '/data/UserData/schwung/shared/';
@@ -1477,7 +1477,7 @@ test('Continue opens the first step, a clean take at tempo learns it, Click goes
   assert.ok(drawnText(2).some((t) => /Quart/.test(t)), 'Continue did not open Quarters');
   playQuarters(sn, 100);
   const shown = drawnText(2);
-  assert.ok(shown.some((t) => /learned at 100%/.test(t)), `no progress line: ${shown.join('|')}`);
+  assert.ok(shown.includes('LEARNED'), `not learned: ${shown.join('|')}`);
   globalThis.onUnload();
   const saved = JSON.parse(log.writes[`${DATA}progress.json`]);
   assert.ok(saved.items['subdiv:quarters'].done > 0, 'the step was not learned');
@@ -1507,7 +1507,7 @@ test('a slow clean take reads as its speed; the row shows it', async () => {
   continuePath();
   playQuarters(sn, 70);
   const shown = drawnText(2);
-  assert.ok(shown.some((t) => /clean 70%  best 70%/.test(t)), shown.join('|'));
+  assert.ok(shown.includes('CLEAN') && shown.includes('70 bpm'), shown.join('|'));
   cc(CC.menu, 127);
   ticks(2);
   /* Learning Path › Time › Pulse: Quarters shows its 70%. */
@@ -1525,7 +1525,7 @@ test('a Study take is not counted', async () => {
   ticks(2);
   continuePath();
   playQuarters(sn, 100);
-  assert.ok(drawnText(2).some((t) => /Study: not counted/.test(t)));
+  assert.ok(drawnText(2).includes('STUDY'));
   globalThis.onUnload();
   const saved = log.writes[`${DATA}progress.json`];
   assert.ok(!saved || !JSON.parse(saved).items['subdiv:quarters']);
@@ -1582,23 +1582,48 @@ test('Progress lists the tracks and what was played, and opens a chart', async (
   cc(CC.jogClick, 127);
   ticks(1);
   const list = drawnText(1);
-  for (const t of ['PROGRESS', 'Time', 'Rudiments', 'Grooves', 'Ear', 'Flam tap', '85%']) {
+  for (const t of ['PROGRESS', 'Overall', 'Time', 'Rudiments', 'Grooves', 'Ear']) {
     assert.ok(list.includes(t), `${t} missing: ${list.join('|')}`);
   }
-  for (let i = 0; i < 4; i++) cc(CC.jogTurn, 1);     /* Flam tap */
+  for (let i = 0; i < 5; i++) cc(CC.jogTurn, 1);     /* Flam tap, after the five overviews */
+  const items = drawnText(1);
+  assert.ok(items.includes('Flam tap') && items.includes('85%'), items.join('|'));
   cc(CC.jogClick, 127);
   ticks(1);
   const chart = drawnText(1);
   assert.ok(chart.includes('Flam tap') && chart.some((t) => /2 takes/.test(t)), chart.join('|'));
+  assert.ok(chart.includes('JOG 6/6'), 'the chart does not say where it is in the list');
+  /* The jog goes on through the charts: back one is the Ear overview. */
+  cc(CC.jogTurn, 127);
+  ticks(1);
+  const ear = drawnText(1);
+  assert.ok(ear.includes('EAR') && ear.some((t) => /learned of 5/.test(t)), ear.join('|'));
   cc(CC.back, 127);
   ticks(1);
   assert.ok(drawnText(1).includes('PROGRESS'), 'Back from a chart returns to the list');
-  /* A track opens the path where it is. */
-  for (let i = 0; i < 10; i++) cc(CC.jogTurn, 127);
-  cc(CC.jogTurn, 1);
-  cc(CC.jogClick, 127);
+});
+
+test('the overview draws drills learned over time', async () => {
+  const now = Math.round(Date.now() / 1000);
+  const learned = (t) => ({ best: 100, bpm: 70, plays: 1, t, done: t, skip: 0, rep: null, h: [] });
+  const progress = { version: 1, items: {
+    'flam-tap': learned(now - 86400 * 3), flam: learned(now - 86400), 'rock-backbeat:l3': learned(now),
+  } };
+  const { screen } = await loadUi({ dataFiles: { 'progress.json': JSON.stringify(progress) } });
+  globalThis.init();
+  ticks(2);
+  for (let i = 0; i < 20; i++) cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);                              /* Progress */
+  for (let i = 0; i < 20; i++) cc(CC.jogTurn, 127);
+  cc(CC.jogClick, 127);                              /* Overall */
   ticks(1);
-  assert.ok(drawnText(1).includes('RUDIMENTS'), 'a track row did not open the track');
+  const shown = drawnText(1);
+  /* L3 learned ticks L1 and L2 as well: five of the path's steps. */
+  assert.ok(shown.some((t) => /^5 learned of/.test(t)), shown.join('|'));
+  assert.ok(shown.includes('OVERALL'));
+  const L = await import('../src/layout.mjs');
+  const box = L.PROGRESS_PLOT;
+  assert.ok(countOn(screen, box.x, box.y, box.w, box.h) > 40, 'no step line drawn');
 });
 
 test('takes already in stats.json are read in when there is no progress yet', async () => {
@@ -1623,6 +1648,7 @@ test('a damaged progress.json is kept aside and the backup read', async () => {
   assert.equal(log.writes[`${DATA}progress.bad.json`], '{"items": {trunc');
   for (let i = 0; i < 20; i++) cc(CC.jogTurn, 1);
   cc(CC.jogClick, 127);
+  for (let i = 0; i < 5; i++) cc(CC.jogTurn, 1);   /* past the overviews */
   ticks(1);
   assert.ok(drawnText(1).includes('90%'), 'the backup was not read');
 });

@@ -277,3 +277,17 @@ test('takes in stats.json from before progress existed are read in once', () => 
   assert.equal(P.item(p, 'gone'), null);
   assert.equal(P.item(p, 'flam').t, 100);
 });
+
+test('learned over time: a step per drill, at its first ✓, a higher level carrying the lower', () => {
+  const p = P.emptyProgress();
+  P.recordTake(p, 'a', take(100, true, T0));
+  P.recordTake(p, 'rock:l3', take(100, true, T0 + 2 * DAY));
+  P.recordTake(p, 'b', take(60, true, T0 + DAY));
+  assert.equal(P.learnedAt(p, 'rock:l1'), Math.round((T0 + 2 * DAY) / 1000));
+  assert.equal(P.learnedAt(p, 'b'), 0, 'clean but slow is not learned');
+  const tl = P.learnedTimeline(p, ['a', 'b', 'rock:l1', 'rock:l3'], 101, 41, T0 + 4 * DAY);
+  assert.equal(tl.total, 3);
+  assert.deepEqual(tl.points.map((pt) => pt.x), [0, 50, 50]);
+  assert.equal(tl.points[2].y, 0, 'the last step reaches the top');
+  assert.deepEqual(P.learnedTimeline(p, ['b'], 101, 41, T0), { points: [], total: 0 });
+});

@@ -49,7 +49,7 @@ import * as PROG from './progress.mjs';
 import * as PLAN from './program.mjs';
 import { availableLevels } from './levels.mjs';
 import { paint, flashColor, guideTargets, FLASH_MS } from './led_paint.mjs';
-import { stats as timingStats, statsSince } from './timing.mjs';
+import { stats as timingStats, statsSince, perVoice, voicesBySpread } from './timing.mjs';
 
 const MODULE_DIR = '/data/UserData/schwung/modules/tools/drums-practice';
 const SETTINGS_PATH = `${MODULE_DIR}/settings.json`;
@@ -281,6 +281,8 @@ let summaryIsBest = false;
 /* What the result screen shows beyond the run: worked out once when the run
  * stops, not on every frame of the result. */
 let summaryInfo = null;
+/* The take just recorded was the first at tempo, clean: the drill is learned. */
+let takeLearned = false;
 let clockMode = false;
 let shiftHeld = false;
 /* Where the playhead is and what moves it: see transport.mjs. */
@@ -968,17 +970,57 @@ function stop() {
       Math.floor((tp.songBeats - ladder.windowStart) / CH.beatsPerBar(chart))));
   }
   const whole = tp.mode === C.MODE_PRACTICE && !tp.scrubbed && run && run.hits > 0;
+  takeLearned = false;
   if (whole && !ladder) recordRun();
-  summaryInfo = {
-    name: chart.name,
-    bpm: chart.bpm,
-    history: ST.forDrill(stats, ST.drillId(clockMode ? 'clock' : 'drill', recordIdOf(chart), settings)),
-    recorded: whole,
-    note: progressNote,
-    footer: clockMode && !pathTrack ? 'REC again  BACK start' : 'REC again  CLICK next',
-  };
+  summaryInfo = resultOf(whole);
   T.home(tp);
   screen = ladder ? LADDER : SUMMARY;
+}
+
+/*
+ * Everything the result screen shows, worked out once when the take ends: the
+ * draw only reads it. The chart is the drill's history after this take, so
+ * the take is its last point — or, when it was not kept, the history it was
+ * not added to.
+ */
+function resultOf(whole) {
+  const t = timingStats(run.timing);
+  const st = SC.runStats(run);
+  const goodMs = SC.WINDOWS[settings.strictness].goodMs;
+  const judged = PROG.judgeTake(st, t.sdMs, goodMs);
+  const counted = whole && !settings.study;
+  let status = 'NOT CLEAN';
+  let mark = null;
+  if (!whole) status = 'not kept';
+  else if (settings.study) status = 'STUDY';
+  else if (takeLearned) { status = 'LEARNED'; mark = PROG.MARK_DONE; }
+  else if (summaryIsBest) status = 'BEST YET';
+  else if (judged.clean) status = 'CLEAN';
+  const loosest = voicesBySpread(run.timing)[0];
+  let limb = '';
+  if (loosest) {
+    const v = perVoice(run.timing)[loosest];
+    const k = KIT.voiceById(loosest);
+    const mean = Math.round(v.meanMs);
+    limb = `${k ? k.short : loosest} ${mean >= 0 ? '+' : ''}${mean} s${Math.round(v.sdMs)}`;
+  }
+  const it = PROG.item(progress, armedItemId());
+  const box = V.SUMMARY_PLOT;
+  return {
+    name: chart.name,
+    bpm: chart.bpm,
+    speed: PROG.speedOf(chart.bpm, armedWrittenBpm()),
+    accuracy: judged.accuracy,
+    sdMs: t.sdMs,
+    meanMs: t.meanMs,
+    failAcc: counted && !judged.clean && st.hits > 0 && judged.accuracy < PROG.CLEAN_SHARE,
+    failSd: counted && !judged.clean && st.hits > 0 && t.sdMs > goodMs,
+    status,
+    mark,
+    limb,
+    series: PROG.percentSeries(it ? it.h : [], box.w - 2, box.h - 2),
+    footer: clockMode && !pathTrack ? 'REC again  BACK start' : 'REC again  CLICK next',
+  };
 }
 
 function recordRun() {
@@ -1032,6 +1074,7 @@ function recordProgress(take) {
     speed, accuracy: take.accuracy, sd: take.sd, clean: take.clean, bpm: take.bpm, at: Date.now(),
   });
   saveProgress();
+  takeLearned = r.learned;
   progressNote = noteFor(r, take.clean ? speed : null, take.reason);
 }
 
@@ -1518,56 +1561,60 @@ function layoutNow() {
 }
 
 /*
- * PROGRESS: the four tracks of the path, learned out of all, and then every
- * drill you have played, most recent first. A track opens where it is on the
- * Learning Path; a drill opens its chart. Made when the screen opens — it
- * cannot change while it is up.
+ * PROGRESS, as Piano Practice lays it out: the overview first, then each
+ * track, then every drill you have played, most recent first. The first five
+ * open a chart of drills learned over time; a drill opens the chart of its
+ * takes. Made when the screen opens — it cannot change while it is up.
  */
 function openProgress() {
-  const rows = tracks.map((t) => {
-    const sum = PROG.summariseIds(progress, PLAN.trackSteps(t).map((st) => st.id));
-    return { label: t.name, value: `${sum.done}/${sum.count}`, track: t };
-  });
+  const all = PROG.summariseIds(progress, overviewIds(null));
+  const rows = [{ label: 'Overall', value: `${all.done}/${all.count}`, overview: true, track: null }];
+  for (const t of tracks) {
+    const sum = PROG.summariseIds(progress, overviewIds(t));
+    rows.push({ label: t.name, value: `${sum.done}/${sum.count}`, overview: true, track: t });
+  }
   for (const id of PROG.recentIds(progress)) {
     rows.push({ label: itemTitle(id), value: PROG.itemValue(progress, id),
       mark: PROG.itemMark(progress, id), id });
   }
   progressRows = rows;
   progressSel = Math.max(0, Math.min(progressSel, rows.length - 1));
-  const all = PROG.folderSummary(agg, progress, pathNode);
   progressRight = `${all.done}/${all.count}`;
   screen = PROGRESS;
 }
 
+/* The steps an overview counts: one track's, or the whole path's. */
+function overviewIds(track) {
+  return track ? PLAN.trackSteps(track).map((st) => st.id) : PROG.leafIds(agg, pathNode);
+}
+
 function openProgressRow() {
-  const row = progressRows[progressSel];
-  if (!row) return;
-  if (row.track) {
-    showTrack(row.track);
-    return;
-  }
-  progressItem = progressChart(row.id);
+  if (!progressRows[progressSel]) return;
+  progressItem = progressDetail(progressSel);
   screen = PROGRESS_ITEM;
 }
 
-/* The list, inside the Learning Path's folder for `track`. */
-function showTrack(track) {
-  nav = CAT.navStart(catalog);
-  const top = CAT.navTop(nav);
-  top.cursor = Math.max(0, catalog.children.indexOf(pathNode));
-  CAT.navPush(nav);
-  const inPath = CAT.navTop(nav);
-  inPath.cursor = Math.max(0, pathNode.children.findIndex((n) => n.track === track));
-  CAT.navPush(nav);
-  screen = MENU;
-  announce(`${track.name}.`);
-}
-
-/* Everything the item's chart draws, worked out once when it opens. */
-function progressChart(id) {
+/* The chart a row of the list opens, worked out once: when it opens, or when
+ * the jog moves on to the next row. */
+function progressDetail(index) {
+  const row = progressRows[index];
+  const footer = progressRows.length > 1 ? `JOG ${index + 1}/${progressRows.length}` : '';
+  const box = L.PROGRESS_PLOT;
+  if (row.overview) {
+    const ids = overviewIds(row.track);
+    const sum = PROG.summariseIds(progress, ids);
+    return {
+      overview: true,
+      title: row.track ? row.track.name : 'Overall',
+      done: sum.done,
+      count: sum.count,
+      timeline: PROG.learnedTimeline(progress, ids, box.w, box.h, Date.now()),
+      footer,
+    };
+  }
+  const id = row.id;
   const it = PROG.item(progress, id) || { h: [], best: 0, bpm: 0, plays: 0 };
   const isQuiz = id.indexOf('quiz:') === 0;
-  const box = L.PROGRESS_PLOT;
   return {
     title: itemTitle(id),
     best: it.best,
@@ -1575,9 +1622,9 @@ function progressChart(id) {
     plays: it.plays,
     done: PROG.isDone(progress, id),
     isQuiz,
-    last: it.h.length ? it.h[it.h.length - 1] : null,
     series: PROG.percentSeries(it.h, box.w - 2, box.h - 2,
       isQuiz ? { lo: 0, hi: 100, line: PROG.QUIZ_PASS } : {}),
+    footer,
   };
 }
 
@@ -1816,7 +1863,8 @@ function draw() {
     return;
   }
   if (screen === PROGRESS_ITEM && progressItem) {
-    V.drawProgress(ctx, progressItem);
+    if (progressItem.overview) V.drawOverview(ctx, progressItem);
+    else V.drawProgress(ctx, progressItem);
     return;
   }
   if (screen === QUIZ && quiz) {
@@ -1838,10 +1886,7 @@ function draw() {
     return;
   }
   if (screen === SUMMARY && run) {
-    V.drawSummary(ctx, {
-      run, tightMs: SC.WINDOWS[settings.strictness].perfectMs, isBest: summaryIsBest,
-      ...(summaryInfo || {}),
-    });
+    if (summaryInfo) V.drawSummary(ctx, summaryInfo);
     return;
   }
   if (screen === READY && chart) {
@@ -2202,6 +2247,14 @@ function jog(delta) {
     editSetting(SET.ROWS[settingsSel].key, delta);
   } else if (target === 'choice' && quiz) {
     Q.moveChoice(quiz, delta);
+  } else if (screen === PROGRESS_ITEM) {
+    /* On through the list's charts without going back to it, as in piano. */
+    const n = progressRows.length;
+    const next = Math.max(0, Math.min(n - 1, progressSel + delta));
+    if (next !== progressSel) {
+      progressSel = next;
+      progressItem = progressDetail(progressSel);
+    }
   } else if (target === 'drill') {
     progressSel = Math.max(0, Math.min(progressRows.length - 1, progressSel + delta));
   }
