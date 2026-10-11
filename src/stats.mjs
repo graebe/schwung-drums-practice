@@ -42,9 +42,13 @@ export function drillId(kind, id, opts = {}) {
  *   err   misses + sticking + dynamic errors, together
  *   tot   notes asked, when known, so a take's accuracy can be worked out
  *   cl    1 when the take was clean (progress.mjs)
+ *   st    stray hits        } what `err` and the strays were made of, when
+ *   sk    wrong hands       } known: a take that failed can be explained
+ *   dy    wrong dynamics    } from the record, not only counted
+ *   av    soft accents' mean velocity, and `an` the mean they needed
  */
 export function makeRecord({ drill, bpm, sd = 0, mean = 0, n = 0, err = 0, at = 0, context = null,
-  total = 0, clean = false }) {
+  total = 0, clean = false, breakdown = null }) {
   const rec = {
     t: Math.round(at),
     d: drill,
@@ -56,6 +60,16 @@ export function makeRecord({ drill, bpm, sd = 0, mean = 0, n = 0, err = 0, at = 
   };
   if (total > 0) rec.tot = Math.round(total);
   if (clean) rec.cl = 1;
+  if (breakdown) {
+    rec.st = breakdown.strays;
+    rec.sk = breakdown.stickErrors;
+    rec.dy = breakdown.dynErrors;
+    const a = breakdown.softAccents;
+    if (a && a.n > 0) {
+      rec.av = Math.round(a.vel / a.n);
+      rec.an = Math.round(a.need / a.n);
+    }
+  }
   /*
    * What the take was played WITH: Speed, and whether Guide pads or Study
    * helped. Kept on the record rather than in the drill's id, so one drill
@@ -122,6 +136,7 @@ export function parseStats(text) {
     if (r.s === 1) rec.s = 1;
     if (Number.isFinite(r.tot)) rec.tot = r.tot;
     if (r.cl === 1) rec.cl = 1;
+    for (const k of ['st', 'sk', 'dy', 'av', 'an']) if (Number.isFinite(r[k])) rec[k] = r[k];
     records.push(rec);
   }
   return { version: STATS_VERSION, records };
@@ -179,13 +194,20 @@ export function summarise(records) {
  * tight hits and thirty misses have a spread of almost nothing. */
 export const BEST_MIN_HITS = 8;
 
+/*
+ * And it has to have COUNTED. A take that was not clean is never a best, and
+ * only clean takes are measured against: the tightest spread ever played is
+ * no achievement if a sixth of the notes were wrong. It was judged on spread
+ * alone, and a failed take read "BEST YET".
+ */
 export function isPersonalBest(stats, rec) {
   const prev = forDrill(stats, rec.d);
   const kind = String(rec.d).split(':')[0];
   const bySpread = kind === 'drill' || kind === 'clock';
-  if (bySpread && rec.n < BEST_MIN_HITS) return false;
+  if (bySpread && (rec.n < BEST_MIN_HITS || rec.cl !== 1)) return false;
   for (const r of prev) {
     if (r === rec) continue;
+    if (bySpread && r.cl !== 1) continue;
     /* Tighter only counts when it was not bought with more mistakes. */
     if (bySpread ? (r.bpm >= rec.bpm && r.sd <= rec.sd) || (r.bpm >= rec.bpm && r.err < rec.err)
       : r.bpm >= rec.bpm) return false;

@@ -26,6 +26,15 @@
  * Simultaneous voices are judged PER VOICE, exactly as a chord was in the
  * pitched module: nail the kick and miss the hat and you get one of each in
  * the same stack, which is far more use than a pass/fail on the pair.
+ *
+ * A DYNAMIC IS A CONTRAST, not a number. An accent is a stroke louder than
+ * the strokes around it, so it is judged against the player's own normal
+ * strokes in this take — their running median, plus ACCENT_LIFT — and a ghost
+ * against the same median, minus GHOST_DROP. A fixed velocity was wrong both
+ * ways at once: on pads or hands that rarely reach it every accent failed,
+ * and hitting everything flat out passed every accent without any contrast.
+ * Until the take has TOUCH_MIN normal strokes there is nothing to be louder
+ * than, and a dynamic is not judged.
  */
 
 import { msToBeats, beatsToMs, beatToX, expandEvents, loopBeats, repeatsOf,
@@ -65,6 +74,15 @@ export const STICK_OFF = 'off';
 
 /* See ensureEntries. */
 export const MAX_ENTRIES = 4096;
+
+/* Dynamics, in velocity steps against the take's normal strokes. */
+export const ACCENT_LIFT = 15;
+export const GHOST_DROP = 20;
+/* Normal strokes needed before a dynamic is judged, and how many recent ones
+ * the median is taken over — enough to steady it, few enough to follow a
+ * player who settles in after the first bars. */
+export const TOUCH_MIN = 3;
+export const TOUCH_SPAN = 16;
 
 /*
  * A note carries two independent facts, and conflating them is the trap here.
@@ -111,6 +129,8 @@ function makeEntry(event, iter) {
       offsetBeats: 0,
       handOk: true,
       dynOk: true,
+      velocity: null,  /* as played, once hit                                */
+      need: 0,         /* the velocity its dynamic was judged against, or 0  */
     })),
   };
 }
@@ -121,10 +141,20 @@ function unscore(run, note) {
     run.hits--;
     if (Math.abs(note.offsetBeats) <= run.perfect) run.perfects--;
     if (!note.handOk && run.sticking === STICK_STRICT) run.stickErrors--;
-    if (!note.dynOk) run.dynErrors--;
+    if (!note.dynOk) countDyn(run, note, -1);
   } else if (note.state === MISSED) {
     run.misses--;
   }
+}
+
+/* A dynamic error into (sign 1) or out of (sign -1) the run's counts, split
+ * by kind so the result can say which, and by how much. */
+function countDyn(run, note, sign) {
+  run.dynErrors += sign;
+  const d = note.wantDyn === 'accent' ? run.softAccents : run.loudGhosts;
+  d.n += sign;
+  d.vel += sign * note.velocity;
+  d.need += sign * note.need;
 }
 
 /*
@@ -164,8 +194,12 @@ export function createRun(chart, opts = {}) {
     latencyBeats: msToBeats(opts.latencyMs || 0, bpm),
     sticking: opts.sticking || (chart.sticking === undefined ? STICK_OFF : chart.sticking),
     dynamics: opts.dynamics !== false,
-    accentVel: opts.accentVel === undefined ? 90 : opts.accentVel,
-    ghostVel: opts.ghostVel === undefined ? 45 : opts.ghostVel,
+    accentLift: opts.accentLift === undefined ? ACCENT_LIFT : opts.accentLift,
+    ghostDrop: opts.ghostDrop === undefined ? GHOST_DROP : opts.ghostDrop,
+    /* The last TOUCH_SPAN normal strokes' velocities: what a dynamic is
+     * measured against. Kept across a scrub — it describes the player's
+     * touch, not the score, and it is no less true for a bar played again. */
+    touch: [],
     /*
      * How many times the pattern runs, and therefore where the practice ends.
      * 0 is endless and is only ever set deliberately — by the Ladder and the
@@ -193,6 +227,10 @@ export function createRun(chart, opts = {}) {
     strays: 0,
     stickErrors: 0,
     dynErrors: 0,
+    /* The dynamic errors by kind: how many, and the summed velocity played
+     * and needed, so the result can say "74 against 83". */
+    softAccents: { n: 0, vel: 0, need: 0 },
+    loudGhosts: { n: 0, vel: 0, need: 0 },
     combo: 0,
     bestCombo: 0,
     lastJudgement: null,
@@ -283,12 +321,38 @@ function handOkFor(run, note, hand) {
   return note.wantHand === hand;
 }
 
-function dynOkFor(run, note, velocity) {
-  if (!run.dynamics) return true;
-  if (velocity === undefined || velocity === null) return true;
-  if (note.wantDyn === 'accent') return velocity >= run.accentVel;
-  if (note.wantDyn === 'ghost') return velocity <= run.ghostVel;
-  return true;
+function median(list) {
+  const s = list.slice().sort((a, b) => a - b);
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
+/*
+ * The velocity a dynamic note is judged against, or 0 when it is not judged:
+ * dynamics off, no velocity from the host, a normal stroke, or too few normal
+ * strokes yet to be louder or softer than. An accent may need more than 127 —
+ * a player whose every stroke is near the top has left no room to accent, and
+ * that is the truth, not something to round away.
+ */
+export function dynNeed(run, wantDyn, velocity) {
+  if (!run.dynamics || wantDyn === 'normal') return 0;
+  if (velocity === undefined || velocity === null) return 0;
+  if (run.touch.length < TOUCH_MIN) return 0;
+  const ref = median(run.touch);
+  return Math.round(wantDyn === 'accent' ? ref + run.accentLift : ref - run.ghostDrop);
+}
+
+function dynOk(note, velocity) {
+  if (!note.need) return true;
+  return note.wantDyn === 'accent' ? velocity >= note.need : velocity <= note.need;
+}
+
+/* A normal stroke goes into the reference AFTER it is judged, so a note is
+ * never measured against itself. */
+function learnTouch(run, note, velocity) {
+  if (note.wantDyn !== 'normal' || velocity === undefined || velocity === null) return;
+  run.touch.push(velocity);
+  if (run.touch.length > TOUCH_SPAN) run.touch.shift();
 }
 
 /*
@@ -343,7 +407,7 @@ export function judgeHit(run, hit, rawBeats, displayRaw = rawBeats) {
      * is the note the scroll is frozen on — already scored a miss, but still
      * unplayed. Playing it releases the freeze and scores nothing: the miss
      * was recorded when its window closed and is not taken back. */
-    const late = releaseLate(run, hit, songBeats);
+    const late = releaseLate(run, hit, songBeats) || lateMiss(run, hit, songBeats, displayBeats);
     if (late) return late;
     run.strays++;
     run.combo = 0;
@@ -411,7 +475,10 @@ function hitNote(run, hit, entryIndex, noteIndex, songBeats) {
   note.played = true;
   note.offsetBeats = offsetBeats;
   note.handOk = handOkFor(run, note, hand);
-  note.dynOk = dynOkFor(run, note, velocity);
+  note.velocity = velocity === undefined ? null : velocity;
+  note.need = dynNeed(run, note.wantDyn, velocity);
+  note.dynOk = dynOk(note, velocity);
+  learnTouch(run, note, velocity);
 
   run.hits++;
   run.combo++;
@@ -426,7 +493,7 @@ function hitNote(run, hit, entryIndex, noteIndex, songBeats) {
    * while you are still working out the pattern.
    */
   if (!note.handOk && run.sticking === STICK_STRICT) run.stickErrors++;
-  if (!note.dynOk) run.dynErrors++;
+  if (!note.dynOk) countDyn(run, note, 1);
 
   pushOffset(run.timing, voice, offsetMs, songBeats);
 
@@ -441,12 +508,52 @@ function hitNote(run, hit, entryIndex, noteIndex, songBeats) {
     handOk: note.handOk,
     wantDyn: note.wantDyn,
     dynOk: note.dynOk,
+    need: note.need,
     offsetBeats,
     offsetMs,
     entryIndex,
     noteIndex,
   };
   return run.lastJudgement;
+}
+
+/*
+ * A press after a note's good window closed but before its late window did.
+ * The note is a miss — it would have become one a moment later — and the
+ * press is what made it one, so it costs ONE error, not two: it used to score
+ * a stray here and then the miss on top when the window closed.
+ *
+ * Only ever LATE. A press before an early note's window is still a stray: the
+ * note is ahead, the player may yet hit it properly, and taking it from them
+ * on an early tap would charge a mistake they had not finished making.
+ */
+function lateMiss(run, hit, songBeats, displayBeats) {
+  for (let i = run.cursor; i < run.entries.length; i++) {
+    const entry = run.entries[i];
+    /* The clocks judgeHit uses: past the wait pointer, the one on screen. */
+    const late = (i > run.waitCursor ? displayBeats : songBeats) - entry.beat;
+    if (late <= run.good) break;              /* this one and on are not past */
+    if (late > run.late) continue;            /* already expiring, or gone    */
+    for (let n = 0; n < entry.notes.length; n++) {
+      const note = entry.notes[n];
+      if (note.state !== PENDING || !voiceMatches(note, hit.voice)) continue;
+      note.state = MISSED;
+      note.played = true;
+      run.misses++;
+      run.combo = 0;
+      settleEntry(entry);
+      advanceCursor(run);
+      advanceWaitCursor(run);
+      run.lastJudgement = {
+        result: 'late', voice: hit.voice, hand: hit.hand, velocity: hit.velocity,
+        wantHand: null, handOk: true, wantDyn: 'normal', dynOk: true,
+        offsetBeats: late, offsetMs: beatsToMs(late, run.bpm),
+        entryIndex: i, noteIndex: n,
+      };
+      return run.lastJudgement;
+    }
+  }
+  return null;
 }
 
 /*
@@ -597,6 +704,8 @@ export function seekTo(run, beat) {
         note.offsetBeats = 0;
         note.handOk = true;
         note.dynOk = true;
+        note.velocity = null;
+        note.need = 0;
       }
     }
     settleEntry(entry);
@@ -777,8 +886,16 @@ function advanceWaitCursor(run) {
   }
 }
 
+/*
+ * The counts a take is judged on (progress.mjs verdictOf).
+ *
+ * `asked` is the notes RESOLVED — hit or missed — not `total`, the notes
+ * materialised. A run builds its notes ahead of the playhead, so under an
+ * endless run (the Clock) `total` held up to two loops that never came due,
+ * and a flawless Clock scored 89%: below the line, for ever. For a practice
+ * that ran to its end the two are the same number.
+ */
 export function runStats(run) {
-  const judged = run.hits + run.misses;
   return {
     hits: run.hits,
     perfects: run.perfects,
@@ -786,10 +903,12 @@ export function runStats(run) {
     strays: run.strays,
     stickErrors: run.stickErrors,
     dynErrors: run.dynErrors,
+    softAccents: { ...run.softAccents },
+    loudGhosts: { ...run.loudGhosts },
     combo: run.combo,
     bestCombo: run.bestCombo,
+    asked: run.hits + run.misses,
     total: run.totalNotes,
-    accuracy: judged === 0 ? 0 : run.hits / judged,
   };
 }
 
@@ -803,17 +922,26 @@ export function snapshot(run, beat = 0) {
     strays: run.strays,
     stickErrors: run.stickErrors,
     dynErrors: run.dynErrors,
+    softAccents: { ...run.softAccents },
+    loudGhosts: { ...run.loudGhosts },
   };
 }
 
+const diff = (a, b) => ({ n: a.n - b.n, vel: a.vel - b.vel, need: a.need - b.need });
+
 export function since(run, snap) {
+  const hits = run.hits - snap.hits;
+  const misses = run.misses - snap.misses;
   return {
     bars: 0,
-    hits: run.hits - snap.hits,
-    misses: run.misses - snap.misses,
+    hits,
+    misses,
     strays: run.strays - snap.strays,
     stickErrors: run.stickErrors - snap.stickErrors,
     dynErrors: run.dynErrors - snap.dynErrors,
+    softAccents: diff(run.softAccents, snap.softAccents),
+    loudGhosts: diff(run.loudGhosts, snap.loudGhosts),
+    asked: hits + misses,
   };
 }
 

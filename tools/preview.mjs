@@ -95,8 +95,19 @@ if (screen) {
   const ctx = createScreen();
   const run = runAt(8, { sloppy: true });
   if (screen === 'summary') {
-    V.drawSummary(ctx, { run, tightMs: 30, name: chart.name, bpm: chart.bpm,
-      note: { text: 'clean 85%  best 90%' } });
+    /* The shape ui.js resultOf hands over. By default the reported take —
+     * every note hit at tempo, every accent soft; --clean a take that counted. */
+    const clean = Boolean(arg('clean', false));
+    const h = [[0, 100, 83, 24, 4], [1, 100, 83, 12, 4]];
+    if (clean) h.push([2, 100, 98, 14, 5]);
+    V.drawSummary(ctx, {
+      name: chart.name, bpm: chart.bpm, status: clean ? 'LEARNED' : 'NOT CLEAN',
+      mark: clean ? PROG.MARK_DONE : null, clean, speed: 100, accuracy: clean ? 0.98 : 0.8333,
+      share: 90, sdMs: clean ? 14 : 12, meanMs: 3, failAcc: !clean, failSd: false,
+      cause: clean ? '' : '16 soft accents 74<83', limb: 'SN +3 s12',
+      series: PROG.percentSeries(h, V.SUMMARY_PLOT.w - 2, V.SUMMARY_PLOT.h - 2),
+      footer: 'REC again  CLICK next',
+    });
   }
   else if (screen === 'ladder') {
     V.drawLadder(ctx, { ladder: Object.assign(createLadder({ bpm: 112 }), { rungs: 6 }), barsDone: 2 });

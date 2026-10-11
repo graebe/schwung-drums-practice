@@ -26,6 +26,7 @@
 
 import { snapshot, since, WINDOWS } from './scoring.mjs';
 import { statsSince } from './timing.mjs';
+import { verdictOf } from './progress.mjs';
 
 export const DEFAULT_STEP = 5;
 export const DEFAULT_BARS = 4;
@@ -78,24 +79,17 @@ export function rungEnd(ladder, beatsPerBar) {
 
 /*
  * Judge the rung just completed. Returns
- *   { clean, reason, sd, mean, n }
- * `reason` names the first thing that failed, so the screen can say WHY the
- * ladder stopped rather than only that it did.
+ *   { clean, cause, reason, sdMs, meanMs, n }
+ * The take's verdict (progress.mjs verdictOf), held to the Ladder's stricter
+ * rule: every note right and the spread inside the PERFECT window. `reason`
+ * names what cost most, so the screen can say WHY the ladder stopped.
  */
 export function judgeRung(ladder, run, songBeats) {
   const d = since(run, ladder.snap);
   const t = statsSince(run.timing, ladder.windowStart);
-  const limit = (WINDOWS[run.strictness] || WINDOWS.normal).perfectMs;
-
-  let reason = '';
-  if (d.hits === 0) reason = 'nothing played';
-  else if (d.misses > 0) reason = 'missed';
-  else if (d.strays > 0) reason = 'stray hits';
-  else if (d.stickErrors > 0) reason = 'sticking';
-  else if (d.dynErrors > 0) reason = 'dynamics';
-  else if (t.sdMs > limit) reason = 'too loose';
-
-  return { clean: reason === '', reason, sdMs: t.sdMs, meanMs: t.meanMs, n: t.n };
+  const spreadMs = (WINDOWS[run.strictness] || WINDOWS.normal).perfectMs;
+  const v = verdictOf(d, t.sdMs, { spreadMs, share: 1 });
+  return { clean: v.clean, cause: v.cause, reason: v.reason, sdMs: t.sdMs, meanMs: t.meanMs, n: t.n };
 }
 
 /*

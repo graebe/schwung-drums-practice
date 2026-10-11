@@ -48,8 +48,10 @@ export const ROWS = [
   { key: 'strictness', label: 'Strict',    type: 'list', values: ['loose', 'normal', 'tight'] },
   { key: 'sticking',   label: 'Sticking',  type: 'list', values: ['strict', 'loose', 'off'] },
   { key: 'dynamics',   label: 'Dynamics',  type: 'bool' },
-  { key: 'accentVel',  label: 'Accent vel', type: 'int', min: 40, max: 127 },
-  { key: 'ghostVel',   label: 'Ghost vel', type: 'int',  min: 1,  max: 90 },
+  /* How much louder than your own normal strokes an accent has to be, and
+   * how much softer a ghost — in velocity steps (scoring.mjs dynNeed). */
+  { key: 'accentLift', label: 'Accent +',  type: 'int',  min: 5,  max: 60 },
+  { key: 'ghostDrop',  label: 'Ghost -',   type: 'int',  min: 5,  max: 60 },
   { key: 'guide',      label: 'Guide pads', type: 'bool' },
   { key: 'study',      label: 'Study',     type: 'bool' },
   { key: 'click',      label: 'Click',     type: 'bool' },
@@ -93,8 +95,8 @@ export const DEFAULTS = {
   strictness: 'normal',
   sticking: 'strict',
   dynamics: true,
-  accentVel: 90,
-  ghostVel: 45,
+  accentLift: 15,
+  ghostDrop: 20,
   /* Off by default: this is a reading trainer first, and a lit pad is an
    * answer rather than a hint. */
   guide: false,
@@ -113,7 +115,7 @@ export const DEFAULTS = {
 };
 
 /* Bumped whenever a migration is added below. */
-export const SETTINGS_VERSION = 2;
+export const SETTINGS_VERSION = 3;
 
 const byKey = {};
 for (let i = 0; i < ROWS.length; i++) byKey[ROWS[i].key] = ROWS[i];
@@ -217,6 +219,15 @@ export function migrate(settings, fromVersion) {
     settings.view = DEFAULTS.view;
     changed = true;
   }
+
+  /*
+   * v3 — dynamics are judged against your own strokes. `accentVel` and
+   * `ghostVel` were absolute velocities; a lift over the take's median is a
+   * different quantity and nothing about the old number says what it would
+   * be, so the new keys start at their defaults. coerceInto has already
+   * dropped the old ones; this only rewrites the file once.
+   */
+  if (from < 3) changed = true;
 
   settings.version = SETTINGS_VERSION;
   return changed;

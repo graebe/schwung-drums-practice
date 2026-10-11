@@ -1518,6 +1518,53 @@ test('a slow clean take reads as its speed; the row shows it', async () => {
   assert.ok(drawnText(2).includes('70%'), 'the row does not show the clean speed');
 });
 
+/* Practise eighths at `bpm`, dead on every half beat, at the velocity `vel(i)`
+ * gives the i-th stroke (even i fall on the beat, where the accents are) —
+ * `beats` of them, the drill's length, and then on to the result without
+ * touching a pad on it. */
+function playEighths(snarePadNo, bpm, vel, beats = 32) {
+  cc(CC.record, 127);
+  const stepMs = 30000 / bpm;
+  let t = 0;
+  let next = 0;
+  let i = 0;
+  for (let k = 0; k < (beats * 2 * stepMs) / 25 + 40; k++) {
+    if (t >= next && i < beats * 2) { pad(snarePadNo, vel(i++)); pad(snarePadNo, 0); next += stepMs; }
+    globalThis.__advance(25);
+    t += 25;
+    globalThis.tick();
+  }
+}
+
+test('an even take of an accented drill says its accents were soft, and never BEST YET', async () => {
+  /* The reported take, through the real UI: every note hit at one velocity,
+   * so no accent stood out. It must say so — not headline a 100. */
+  const { log } = await loadUi({ settings: PLAIN });
+  const sn = await snare();
+  globalThis.init();
+  ticks(2);
+  continuePath();
+  playQuarters(sn, 100);
+  cc(CC.jogClick, 127);           /* on to Eighths */
+  ticks(2);
+  playEighths(sn, 100, () => 70);
+  let shown = drawnText(2);
+  assert.ok(shown.includes('NOT CLEAN'), shown.join('|'));
+  assert.ok(!shown.includes('BEST YET'), shown.join('|'));
+  assert.ok(shown.some((t) => /^\d+ soft accents 70<85$/.test(t)), shown.join('|'));
+  assert.ok(shown.includes('right, need 90'), shown.join('|'));
+  /* The same take with the accents lifted counts: Record, from the result. */
+  playEighths(sn, 100, (i) => (i % 2 ? 70 : 90));
+  shown = drawnText(2);
+  assert.ok(shown.includes('LEARNED'), shown.join('|'));
+  globalThis.onUnload();
+  const stats = JSON.parse(log.writes[`${DATA}stats.json`]).records;
+  const even = stats.find((r) => r.d.startsWith('drill:subdiv:eighths') && r.dy > 0);
+  assert.ok(even, 'the record does not say what its errors were');
+  assert.equal(even.av, 70);
+  assert.equal(even.an, 85);
+});
+
 test('a Study take is not counted', async () => {
   const { log } = await loadUi({ settings: { ...PLAIN, study: true } });
   const sn = await snare();

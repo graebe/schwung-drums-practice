@@ -49,7 +49,8 @@ fingers, in the same way its sister module is a reading trainer rather than a pi
 - **Scores your hands.** The pads are split down the middle: left half is your left hand, right
   half your right. So `RLRR LRLL` is not a suggestion printed under the staff — it is checked, and
   a wrong hand is its own kind of error, counted apart from a missed note.
-- **Scores your dynamics.** An accent has to be loud and a ghost note has to be quiet. That is
+- **Scores your dynamics.** An accent has to stand out and a ghost note has to sit back — judged
+  against *your own* strokes, not a fixed number, so it works on any pads and any touch. That is
   most of what separates a groove that feels good from the same notes played flat.
 - **Has a length.** Every drill is a file, and the file says how long the practice is: a one-bar
   beat with `"repeats": 8` is an eight-bar practice that ends by itself and shows you the result.
@@ -143,11 +144,13 @@ the one signal you should never have to read.
 | pale lavender | the drum a quiz is asking for, at its last hint — and, pulsing, the drum **Study** is waiting for (with Guide pads on) |
 | yellow | your finger is on it |
 | green | you got it |
-| **amber** | right voice, **wrong hand**, or wrong dynamic |
+| **amber** | right voice, **wrong hand** |
+| **azure** | right voice, right hand, **wrong dynamic** — an accent too soft, a ghost too loud |
 | red | you missed it |
 
-Amber is its own colour on purpose. "Right note, wrong hand" is a different mistake from "wrong
-note", it is fixed differently, and it must not read as a failure at a glance.
+Amber and azure are their own colours on purpose. "Right note, wrong hand" is a different mistake
+from "wrong note", and "right note, wrong loudness" is a third: each is fixed differently — the
+sticking, the wrist — and none of them should read as a failure at a glance.
 
 ## Timing
 
@@ -270,11 +273,31 @@ A run ends on its result, laid out as Piano Practice ends an exercise:
   how tight it was (spread σ, and whether you sat early or late). Whichever one stopped the take
   counting is drawn **inverted** — that is the one to fix.
 - **Under it** the tempo, and your loosest limb: the one to go and practise.
+
+A take that did **not** count looks different, because its speed is not a score. At the written
+tempo every take is at 100% speed, clean or not, and a big **100** over a take that failed reads
+like a perfect one. So the number becomes **how much was right**, and under it, **what cost the
+most**:
+
+```
+ Rock backbeat · L3    NOT CLEAN
+  83 %      ▐right, need 90▌         ← inverted: this is what stopped it
+                    s12 +3ms
+     16 soft accents 74<83           ← what to fix, counted
+```
+
+`16 soft accents 74<83` says that sixteen accents came in at a velocity of 74 on average, where
+your own strokes asked for 83 (see *Accents and ghost notes* below). It names whichever cost the
+most right notes: **missed** notes, **stray hits**, **soft accents**, **loud ghosts** or **wrong
+hands**. When the take failed on its spread instead, the line keeps the tempo and the loosest limb
+— that is the one to practise.
 - **The chart** is every recent take of this drill, oldest on the left, this one last, against
   the dotted 100% line. A filled dot was clean, an open one did not count — so a run of slow,
   clean takes climbing to the line reads as what it is.
 - **The header** says what the take did: **LEARNED** with a tick the first time you play it clean
-  at tempo, **BEST YET**, **CLEAN**, **NOT CLEAN**, **STUDY** (not counted) or **not kept**.
+  at tempo, **BEST YET** (your tightest clean take yet), **CLEAN**, **NOT CLEAN**, **PRACTICE**
+  (clean, on easier settings — see below), **STUDY** (not counted) or **not kept**. A take that
+  did not count is **NOT CLEAN**, whatever else is true of it: it is never a best.
 
 | On a result | |
 | --- | --- |
@@ -303,7 +326,7 @@ they do on the result. A new take forgets the last one.
 ### Clean at tempo
 
 A drummer has learned a pattern when they can play it **clean at its written tempo**, so that is
-what Drums Practice measures. A take is **clean** when, played whole from the top with Study off:
+what Drums Practice measures. A take is **clean** when, played whole from the top:
 
 - at least **90% of the notes are right** — the right drum, with the right hand and the right
   dynamic. A wrong hand or a flat accent is not right, and a stray hit counts against you, so
@@ -330,6 +353,37 @@ Every row in the list shows where you are:
 Your best never drops. Practising slowly is how a drummer gets faster, and a slow take must never
 read as going backwards. A **Study** take is never counted at all: Study waits for you, and a take
 that waited has no timing to judge.
+
+### What a tick means
+
+A tick means the same thing on every drill: clean at tempo **on the standard settings** — Strict at
+*normal* or *tight*, **Dynamics** on, **Guide pads** and **Study** off. The easier settings are
+there to get you to it, and a take on them still goes on the drill's chart, but it does not move
+your best or earn the tick; its result says **PRACTICE** and `not counted: Loose` (or `Guide`,
+`Dyn off`). Otherwise a tick would mean whatever the settings happened to be that day.
+
+### Accents and ghost notes
+
+An accent is a stroke **louder than the ones around it**, so that is how it is judged: against your
+own normal strokes in this take. Drums Practice keeps the median velocity of your last sixteen
+normal strokes, and an accent has to reach that **plus Accent +** (15 by default). A ghost note has
+to stay under it **minus Ghost -** (20).
+
+Say your normal strokes sit around 68. An accent then needs 83, and a ghost note must stay at 48 or
+under. Play softly overall — strokes around 50 — and an accent at 65 is an accent; hit everything as
+hard as the pad goes and nothing is an accent at all, because nothing stands out.
+
+This is why the pads, the velocity curve and your touch do not matter: only the difference does.
+Until a take has three normal strokes there is nothing to compare against, so a dynamic is not
+judged — and a drill that is accents only, like quarter notes accented on every beat, is not judged
+for dynamics at all.
+
+### One mistake, one error
+
+A stroke that lands after its note's good window (60 ms on normal) but before the note is given up
+(120 ms) is that note, **late**: it counts once, as a miss — not as a stray hit and then the miss
+again when the window closes. A stroke that lands **early**, before a note's window opens, is a
+stray: the note is still ahead, and you may yet play it properly.
 
 A generated drill has no written tempo of its own — it follows the Tempo setting — so each has a
 target to measure against: quarters and eighths at 100, triplets at 90, sixteenths and switching at
@@ -552,8 +606,8 @@ afraid to use is a hint that does not help you learn — but the round records h
 The pad is lit only at the last hint, and never by Guide pads: that setting is a playing aid for
 the reading modes, where the music is moving and a hint keeps you with it.
 
-A round that beats every earlier one says **BEST YET**, and so does a practice that is your
-tightest yet at its tempo.
+A round that beats every earlier one says **BEST YET**, and so does a clean practice that is your
+tightest clean take yet at its tempo.
 
 ### Clock
 
@@ -588,8 +642,8 @@ mapping rather than having to remember it.
 | Strict | **normal** | the timing windows, above |
 | Sticking | **strict** | `strict` counts a wrong hand as its own error; `loose` shows it amber but does not count it; `off` ignores hands, which is right for grooves |
 | Dynamics | on | score accents and ghost notes |
-| Accent vel | 90 | an accent must reach this |
-| Ghost vel | 45 | a ghost note must stay under this |
+| Accent + | 15 | how much louder than your own normal strokes an accent must be |
+| Ghost - | 20 | how much softer than your own normal strokes a ghost note must be |
 | Guide pads | **off** | light the voice you need next. This is a reading trainer first |
 | Reps | **as written** | override how many times the drill repeats. The file is the default, and usually right |
 | Study | off | stop the scroll **on** a note you missed until it is played: the lane under the chart names it, its pads pulse with Guide pads on, and one press carries on. For learning a rudiment, not for keeping time |

@@ -99,5 +99,5 @@ test('only the Settings screen hands a knob to editSetting', () => {
 test('a whole take is recorded once, and a Ladder records itself', () => {
   const stop = body('stop');
   assert.match(stop, /!tp\.scrubbed/);
-  assert.match(stop, /if \(whole && !ladder\) recordRun\(\)/);
+  assert.match(stop, /if \(whole && !ladder\) recordRun\(judged\)/);
 });

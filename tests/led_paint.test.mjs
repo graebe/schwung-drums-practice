@@ -36,11 +36,17 @@ test('the finger outranks the guidance', () => {
   assert.equal(at(out, 80), P.LED_PRESSED);
 });
 
-test('wrong hand has its own colour, told apart from a miss', () => {
+test('wrong hand and wrong dynamic each have their own colour, told apart from a miss', () => {
   /* "Right drum, wrong hand" is a different mistake, fixed differently. If it
-   * shared red you would never learn to tell them apart mid-bar. */
+   * shared red you would never learn to tell them apart mid-bar — and a soft
+   * accent is a third, fixed with the wrist, so it does not share orange. */
   assert.equal(flashColor({ result: 'perfect', handOk: false }), P.LED_STICK);
-  assert.equal(flashColor({ result: 'perfect', handOk: true, dynOk: false }), P.LED_STICK);
+  assert.equal(flashColor({ result: 'perfect', handOk: true, dynOk: false }), P.LED_DYN);
+  assert.equal(flashColor({ result: 'perfect', handOk: false, dynOk: false }), P.LED_STICK,
+    'a wrong hand is named first');
+  for (const c of [P.LED_STICK, P.LED_MISS, P.LED_HIT, P.LED_PRESSED, P.LED_TARGET_NEAR]) {
+    assert.notEqual(P.LED_DYN, c);
+  }
   assert.equal(flashColor({ result: 'good', handOk: true, dynOk: true }), P.LED_HIT);
   assert.equal(flashColor({ result: 'stray' }), P.LED_MISS);
   assert.equal(flashColor({ result: 'late' }), P.LED_MISS);

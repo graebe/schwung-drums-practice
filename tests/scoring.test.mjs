@@ -31,7 +31,8 @@ test('a run starts with every note pending and nothing scored', () => {
   assert.equal(run.totalNotes, 4);
   assert.deepEqual(S.runStats(run), {
     hits: 0, perfects: 0, misses: 0, strays: 0, stickErrors: 0, dynErrors: 0,
-    combo: 0, bestCombo: 0, total: 4, accuracy: 0,
+    softAccents: { n: 0, vel: 0, need: 0 }, loudGhosts: { n: 0, vel: 0, need: 0 },
+    combo: 0, bestCombo: 0, asked: 0, total: 4,
   });
 });
 
@@ -81,23 +82,81 @@ test('sticking off ignores hands entirely — right for a groove', () => {
   assert.equal(run.stickErrors, 0);
 });
 
+/* Three normal strokes then a dynamic one, for the dynamics tests: an accent
+ * or a ghost is judged against the strokes before it. */
+const lastDyn = (dyn) => ({
+  bpm: 120, timeSig: [4, 4], loopBars: 1, repeats: 1,
+  events: [
+    { beat: 0, voices: ['SN'] }, { beat: 1, voices: ['SN'] }, { beat: 2, voices: ['SN'] },
+    { beat: 3, voices: ['SN'], dyn },
+  ],
+});
+function playDyn(dyn, normal, last, opts = {}) {
+  const run = mk(lastDyn(dyn), { dynamics: true, ...opts });
+  for (let b = 0; b < 3; b++) S.judgeHit(run, { voice: 'SN', velocity: normal }, b);
+  return { run, j: S.judgeHit(run, { voice: 'SN', velocity: last }, 3) };
+}
+
 test('an accent played softly is a dynamic error, not a miss', () => {
-  const run = mk(para, { dynamics: true, accentVel: 90 });
-  const j = S.judgeHit(run, { voice: 'SN', hand: 'R', velocity: 40 }, 0);
+  const { run, j } = playDyn('accent', 70, 74);
   assert.equal(j.result, 'perfect');
   assert.equal(j.dynOk, false);
   assert.equal(j.wantDyn, 'accent');
-  assert.equal(run.hits, 1);
+  assert.equal(j.need, 70 + S.ACCENT_LIFT, 'judged against the strokes before it');
+  assert.equal(run.hits, 4);
   assert.equal(run.misses, 0, 'a quiet accent is not a missed note');
   assert.equal(run.dynErrors, 1);
+  assert.deepEqual(run.softAccents, { n: 1, vel: 74, need: 85 });
+});
+
+test('an accent is a CONTRAST: louder than your own strokes, at any level', () => {
+  /* A soft player's accent passes well below the old fixed 90 ... */
+  assert.equal(playDyn('accent', 50, 70).j.dynOk, true);
+  /* ... and hitting everything flat out is no accent at all. */
+  assert.equal(playDyn('accent', 127, 127).j.dynOk, false);
+  assert.equal(playDyn('accent', 127, 127).j.need, 142, 'no room left above to accent');
+  /* The lift is a setting. */
+  assert.equal(playDyn('accent', 70, 80, { accentLift: 10 }).j.dynOk, true);
+  assert.equal(playDyn('accent', 70, 79, { accentLift: 10 }).j.dynOk, false);
 });
 
 test('a ghost note played hard is a dynamic error', () => {
-  const ghosted = { ...para, events: [{ beat: 0, voices: ['SN'], dyn: 'ghost' }] };
-  const run = mk(ghosted, { dynamics: true, ghostVel: 45 });
-  assert.equal(S.judgeHit(run, { voice: 'SN', velocity: 120 }, 0).dynOk, false);
-  const quiet = mk(ghosted, { dynamics: true, ghostVel: 45 });
-  assert.equal(S.judgeHit(quiet, { voice: 'SN', velocity: 20 }, 0).dynOk, true);
+  assert.equal(playDyn('ghost', 80, 75).j.dynOk, false);
+  assert.equal(playDyn('ghost', 80, 60).j.dynOk, true, 'GHOST_DROP under the strokes is a ghost');
+  const { run } = playDyn('ghost', 80, 75);
+  assert.deepEqual(run.loudGhosts, { n: 1, vel: 75, need: 60 });
+});
+
+test('with nothing to be louder than, a dynamic is not judged', () => {
+  /* The first note of a take has no strokes before it. Judging it against a
+   * fixed number instead is what failed every accent on some pads. */
+  const run = mk(para, { dynamics: true });
+  const j = S.judgeHit(run, { voice: 'SN', hand: 'R', velocity: 10 }, 0);
+  assert.equal(j.dynOk, true);
+  assert.equal(j.need, 0);
+  assert.equal(run.dynErrors, 0);
+});
+
+test('the reference is the MEDIAN of the recent normal strokes', () => {
+  const run = mk(lastDyn('accent'), { dynamics: true });
+  /* One wild stroke does not move a median. */
+  for (const [b, v] of [[0, 60], [1, 127], [2, 62]]) S.judgeHit(run, { voice: 'SN', velocity: v }, b);
+  assert.equal(S.dynNeed(run, 'accent', 80), 62 + S.ACCENT_LIFT);
+  assert.equal(S.dynNeed(run, 'normal', 80), 0, 'a normal stroke is not judged for loudness');
+  assert.equal(S.dynNeed(run, 'accent', undefined), 0, 'nor a press the host gave no velocity');
+  for (let i = 0; i < S.TOUCH_SPAN + 4; i++) run.touch.push(i < 4 ? 1 : 100);
+  run.touch.splice(0, run.touch.length - S.TOUCH_SPAN);
+  assert.equal(S.dynNeed(run, 'accent', 80), 100 + S.ACCENT_LIFT, 'and it follows the recent ones');
+});
+
+test('a dynamic error scrubbed back over is taken back with its kind', () => {
+  const { run } = playDyn('accent', 70, 74);
+  S.seekTo(run, 2.5);
+  assert.equal(run.dynErrors, 0);
+  assert.deepEqual(run.softAccents, { n: 0, vel: 0, need: 0 });
+  const note = run.entries[3].notes[0];
+  assert.equal(note.velocity, null);
+  assert.equal(note.need, 0);
 });
 
 test('dynamics off, or a velocity the host did not send, never penalises', () => {
@@ -401,13 +460,14 @@ test('dynamics belong to a voice, not to the stack it arrived in', () => {
     bpm: 120, timeSig: [4, 4], loopBars: 1, repeats: 1,
     events: [{ beat: 0, voices: ['HH', 'SN'], dyn: { SN: 'accent' } }],
   };
-  const run = mk(backbeat, { dynamics: true, accentVel: 90 });
+  const run = mk(backbeat, { dynamics: true });
   const notes = run.entries[0].notes;
   const hh = notes.find((n) => n.voice === 'HH');
   const sn = notes.find((n) => n.voice === 'SN');
   assert.equal(hh.wantDyn, 'normal', 'the hi-hat was accented along with the snare');
   assert.equal(sn.wantDyn, 'accent');
   /* And a quiet hi-hat under a loud snare is not a dynamic error. */
+  run.touch.push(70, 70, 70);
   assert.equal(S.judgeHit(run, { voice: 'HH', velocity: 70 }, 0).dynOk, true);
   assert.equal(S.judgeHit(run, { voice: 'SN', velocity: 70 }, 0).dynOk, false);
 });
@@ -463,7 +523,7 @@ test('listening is not an attempt — nothing is scored', () => {
   S.takeDue(run, 8);
   assert.equal(run.hits, 0, 'listening counted as hits');
   assert.equal(run.misses, 0);
-  assert.equal(S.runStats(run).accuracy, 0);
+  assert.equal(S.runStats(run).asked, 0);
 });
 
 test('an entry only comes due once, however often it is asked for', () => {
@@ -581,4 +641,64 @@ test('the record is bounded, however long an endless run goes', () => {
   }
   assert.ok(run.past.length <= S.PAST_MAX);
   for (let i = 1; i < run.past.length; i++) assert.ok(run.past[i].beat > run.past[i - 1].beat);
+});
+
+test('a press after the good window costs ONE error: the note is missed, no stray', () => {
+  /* 70ms late at 120bpm: past good (60), inside late (120). It used to count
+   * a stray now and the miss when the window closed — twice for one stroke. */
+  const run = mk(groove);
+  const j = S.judgeHit(run, { voice: 'HH' }, 0.14);
+  assert.equal(j.result, 'late');
+  assert.equal(run.strays, 0);
+  assert.equal(run.misses, 1);
+  assert.equal(run.entries[0].notes.find((n) => n.voice === 'HH').state, S.MISSED);
+  S.expireMissed(run, 0.5);
+  assert.equal(run.misses, 2, 'the kick, never played, is the only other miss');
+});
+
+test('an early press stays a stray, and the note can still be hit', () => {
+  /* The note is ahead: taking it on an early tap would charge a mistake the
+   * player has not finished making. */
+  const run = mk(groove);
+  assert.equal(S.judgeHit(run, { voice: 'SN' }, 0.86).result, 'stray');
+  assert.equal(S.judgeHit(run, { voice: 'SN' }, 1).result, 'perfect');
+  assert.equal(run.misses, 0);
+  assert.equal(run.strays, 1);
+});
+
+test('past the late window a press is a stray again', () => {
+  const run = mk(groove);
+  S.judgeHit(run, { voice: 'KK' }, 0);
+  assert.equal(S.judgeHit(run, { voice: 'HH' }, 0.3).result, 'stray', '150ms late is no longer that note');
+});
+
+test('a late miss undoes like any other when scrubbed back over', () => {
+  const run = mk(groove);
+  S.judgeHit(run, { voice: 'HH' }, 0.14);
+  S.seekTo(run, 0);
+  assert.equal(run.misses, 0);
+});
+
+test('a flawless Clock is 100% right: it is judged on the notes that came due', () => {
+  /* Endless under the hood, and built two loops ahead: those notes were in
+   * the count, and a perfect Clock scored 89%. */
+  for (const loopBars of [1, 2]) {
+    const chart = { ...groove, loopBars, repeats: 0,
+      events: loopBars === 1 ? groove.events : groove.events.concat(groove.events.map((e) => ({ ...e, beat: e.beat + 4 }))) };
+    const run = endless(chart);
+    const end = 32 * 4;
+    /* As ui.js stops it: a late window past the end, so its last notes resolve. */
+    for (let b = 0; b <= end + run.late; b += 0.5) {
+      S.ensureEntries(run, b + 8);
+      for (const e of run.entries) {
+        if (Math.abs(e.beat - b) < 1e-9 && e.beat < end) for (const n of e.notes) S.judgeHit(run, { voice: n.voice }, b);
+      }
+      S.expireMissed(run, b);
+      S.pruneEntries(run, b - 4);
+    }
+    const st = S.runStats(run);
+    assert.ok(st.total > st.asked, 'notes were built past the end');
+    assert.equal(st.misses, 0);
+    assert.equal(st.hits, st.asked);
+  }
 });

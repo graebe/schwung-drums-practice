@@ -14,35 +14,124 @@ const take = (speed, clean = true, at = T0) =>
 /* ---- judging a take ------------------------------------------------------- */
 
 test('accuracy: wrong hands, wrong dynamics and strays all count against you', () => {
-  assert.equal(P.takeAccuracy({ total: 10, hits: 10 }), 1);
-  assert.equal(P.takeAccuracy({ total: 10, hits: 10, stickErrors: 1 }), 0.9);
-  assert.equal(P.takeAccuracy({ total: 10, hits: 10, dynErrors: 2 }), 0.8);
+  assert.equal(P.takeAccuracy({ asked: 10, hits: 10 }), 1);
+  assert.equal(P.takeAccuracy({ asked: 10, hits: 10, stickErrors: 1 }), 0.9);
+  assert.equal(P.takeAccuracy({ asked: 10, hits: 10, dynErrors: 2 }), 0.8);
   /* Sweeping the pads under every note is not playing it. */
-  assert.equal(P.takeAccuracy({ total: 10, hits: 10, strays: 10 }), 0.5);
-  assert.equal(P.takeAccuracy({ total: 0, hits: 0 }), 0);
-  assert.equal(P.takeAccuracy({ total: 4, hits: 1, stickErrors: 2, dynErrors: 2 }), 0);
+  assert.equal(P.takeAccuracy({ asked: 10, hits: 10, strays: 10 }), 0.5);
+  assert.equal(P.takeAccuracy({ asked: 0, hits: 0 }), 0);
+  assert.equal(P.takeAccuracy({ asked: 4, hits: 1, stickErrors: 2, dynErrors: 2 }), 0);
 });
 
+test('accuracy is over the notes RESOLVED, not the notes built ahead of the playhead', () => {
+  /* The Clock runs endless and builds two loops ahead; counting those as
+   * asked held a flawless Clock at 89%, below the line for ever. */
+  assert.equal(P.takeAccuracy({ asked: 384, total: 432, hits: 384 }), 1);
+});
+
+const RULE = { spreadMs: 60 };
+
 test('a clean take is 90% right AND inside the good window — exactly on either still counts', () => {
-  const st = { total: 10, hits: 10, stickErrors: 1 };
-  assert.equal(P.judgeTake(st, 60, 60).clean, true, '90% and spread on the window');
-  const sloppy = P.judgeTake({ total: 10, hits: 9, stickErrors: 1 }, 20, 60);
+  assert.equal(P.verdictOf({ asked: 10, hits: 10, stickErrors: 1 }, 60, RULE).clean, true,
+    '90% and spread on the window');
+  const sloppy = P.verdictOf({ asked: 10, hits: 9, misses: 1, stickErrors: 1 }, 20, RULE);
   assert.equal(sloppy.clean, false);
-  assert.match(sloppy.reason, /80% right, need 90/);
-  const loose = P.judgeTake({ total: 10, hits: 10 }, 72, 60);
+  const loose = P.verdictOf({ asked: 10, hits: 10 }, 72, RULE);
   assert.equal(loose.clean, false);
+  assert.equal(loose.cause, 'spread');
   assert.match(loose.reason, /spread 72, max 60ms/);
-  assert.equal(P.judgeTake({ total: 10, hits: 0 }, 0, 60).reason, 'nothing played');
+  const none = P.verdictOf({ asked: 10, hits: 0, misses: 10 }, 0, RULE);
+  assert.equal(none.cause, 'nothing');
+  assert.equal(none.reason, 'nothing played');
+});
+
+test('a take that did not count says what cost the most, with its count', () => {
+  /* The reported take: every note hit, the timing tight, every accented
+   * snare too soft — it read "83% right" and nothing else. */
+  const st = { asked: 96, hits: 96, dynErrors: 16, softAccents: { n: 16, vel: 16 * 74, need: 16 * 83 } };
+  const v = P.verdictOf(st, 12, RULE);
+  assert.equal(v.clean, false);
+  assert.equal(v.cause, 'accents');
+  assert.equal(v.reason, '16 soft accents 74<83');
+  assert.equal(Math.floor(v.accuracy * 100), 83);
+  const ghosts = P.verdictOf({ asked: 10, hits: 10, dynErrors: 2,
+    loudGhosts: { n: 2, vel: 140, need: 100 } }, 0, RULE);
+  assert.equal(ghosts.reason, '2 loud ghosts 70>50');
+  /* The biggest cost is named, not the first in some fixed order. */
+  const many = P.verdictOf({ asked: 20, hits: 19, misses: 1, strays: 4, stickErrors: 1 }, 0, RULE);
+  assert.equal(many.cause, 'strays');
+  assert.equal(many.reason, '4 stray hits');
+  assert.equal(P.verdictOf({ asked: 10, hits: 8, misses: 2 }, 0, RULE).reason, '2 missed');
+  assert.equal(P.verdictOf({ asked: 10, hits: 10, stickErrors: 2 }, 0, RULE).reason, '2 wrong hands');
+  /* A tie goes to the earlier cause: a missed note before a stray. */
+  assert.equal(P.verdictOf({ asked: 10, hits: 9, misses: 1, strays: 1 }, 0, { ...RULE, share: 1 }).cause,
+    'missed');
+});
+
+test('a stricter rule is the same verdict: share and spread are parameters', () => {
+  const st = { asked: 10, hits: 10, stickErrors: 1 };
+  assert.equal(P.verdictOf(st, 20, RULE).clean, true);
+  assert.equal(P.verdictOf(st, 20, { spreadMs: 30, share: 1 }).clean, false);
+  assert.equal(P.verdictOf({ asked: 4, hits: 4 }, 0, { spreadMs: 60, minHits: 8 }).cause, 'few');
 });
 
 test('the reasons fit a result line', () => {
-  for (const r of [P.judgeTake({ total: 100, hits: 89 }, 0, 60).reason,
-    P.judgeTake({ total: 10, hits: 10 }, 199, 100).reason,
+  const big = (n, vel, need) => ({ n, vel: n * vel, need: n * need });
+  for (const r of [
+    P.verdictOf({ asked: 100, hits: 89, misses: 11 }, 0, RULE).reason,
+    P.verdictOf({ asked: 10, hits: 10 }, 199, { spreadMs: 100 }).reason,
     /* Offsets are bounded by the widest late window (160ms), so a spread
      * never runs to four digits. */
-    P.judgeTake({ total: 10, hits: 10 }, 160, 35).reason, 'nothing played']) {
-    assert.ok(r.length <= 21, r);
+    P.verdictOf({ asked: 10, hits: 10 }, 160, { spreadMs: 35 }).reason,
+    P.verdictOf({ asked: 512, hits: 512, dynErrors: 128, softAccents: big(128, 120, 135) }, 0, RULE).reason,
+    P.verdictOf({ asked: 512, hits: 512, dynErrors: 128, loudGhosts: big(128, 100, 90) }, 0, RULE).reason,
+    P.verdictOf({ asked: 512, hits: 512, strays: 300 }, 0, RULE).reason,
+    'nothing played']) {
+    assert.ok(r.length <= P.REASON_MAX, r);
   }
+  /* Too long with its velocities, it keeps the count and the word. */
+  assert.equal(P.verdictOf({ asked: 512, hits: 512, dynErrors: 128, softAccents: big(128, 120, 135) },
+    0, RULE).reason, '128 soft accents');
+});
+
+test('a take is judged on standard settings, or it is practice', () => {
+  const std = { strictness: 'normal', dynamics: true, guide: false, study: false };
+  assert.equal(P.easedBy(std), '');
+  assert.equal(P.easedBy({ ...std, strictness: 'tight' }), '');
+  assert.equal(P.easedBy({ ...std, strictness: 'loose' }), 'Loose');
+  assert.equal(P.easedBy({ ...std, dynamics: false }), 'Dyn off');
+  assert.equal(P.easedBy({ ...std, guide: true }), 'Guide');
+  assert.equal(P.easedBy({ ...std, study: true, guide: true }), 'Study');
+});
+
+test('the status line comes from the verdict: a failed take is never BEST YET', () => {
+  const s = (o) => P.takeStatus({ whole: true, study: false, learned: false, clean: true, best: false, ...o });
+  assert.equal(s({ clean: false, best: true }), 'NOT CLEAN');
+  assert.equal(s({ best: true }), 'BEST YET');
+  assert.equal(s({}), 'CLEAN');
+  assert.equal(s({ learned: true, best: true }), 'LEARNED');
+  assert.equal(s({ study: true }), 'STUDY');
+  assert.equal(s({ whole: false, study: true }), 'not kept');
+  assert.equal(s({ eased: 'Loose', best: true }), 'PRACTICE', 'an eased take moved nothing');
+  assert.equal(s({ eased: 'Loose', clean: false }), 'NOT CLEAN');
+});
+
+test('a take on eased settings is kept for its chart and moves nothing else', () => {
+  const p = P.emptyProgress();
+  const r = P.recordTake(p, 'x', { ...take(100), eased: 'Loose' });
+  assert.equal(r.learned, false, 'a Loose take cannot learn a drill');
+  assert.equal(P.item(p, 'x').best, 0, 'nor set its best');
+  assert.equal(P.item(p, 'x').h.length, 1, 'but it is on the chart');
+  const flags = P.item(p, 'x').h[0][4];
+  assert.equal(flags & P.F_CLEAN, 0, 'drawn as a take that did not count');
+  assert.equal(flags & P.F_STANDARD, 0);
+  assert.equal(P.recordTake(p, 'x', take(100)).learned, true, 'the standard take learns it');
+  assert.ok(P.item(p, 'x').h[1][4] & P.F_STANDARD);
+  /* And an eased take at tempo of a learned item is not a slip. */
+  const due = P.item(p, 'x').rep.due;
+  P.recordTake(p, 'x', { ...take(100, false), eased: 'Guide' });
+  assert.equal(P.item(p, 'x').rep.due, due);
+  assert.equal(P.item(p, 'x').rep.at, 0);
 });
 
 test('clean speed is the tempo played over the tempo written', () => {

@@ -832,8 +832,8 @@ function runOpts() {
     strictness: settings.strictness,
     sticking: chart.sticking === 'off' ? 'off' : settings.sticking,
     dynamics: settings.dynamics,
-    accentVel: settings.accentVel,
-    ghostVel: settings.ghostVel,
+    accentLift: settings.accentLift,
+    ghostDrop: settings.ghostDrop,
     latencyMs: settings.latencyMs,
     /* The Ladder and the Clock outlast the drill they wrap and impose their
      * own ending, so they run it endless. Everything else ends when the
@@ -982,8 +982,9 @@ function stop() {
   }
   const whole = tp.mode === C.MODE_PRACTICE && !tp.scrubbed && run && run.hits > 0;
   takeLearned = false;
-  if (whole && !ladder) recordRun();
-  summaryInfo = resultOf(whole);
+  const judged = judgeRun();
+  if (whole && !ladder) recordRun(judged);
+  summaryInfo = resultOf(whole, judged);
   const endAt = Number.isFinite(run.endBeat) ? Math.min(run.endBeat, Math.max(0, tp.songBeats))
     : Math.max(0, tp.songBeats);
   review = { run: SC.reviewOf(run), end: endAt, at: null };
@@ -992,24 +993,44 @@ function stop() {
 }
 
 /*
+ * The verdict on the run, worked out once when it ends (progress.mjs
+ * verdictOf). The record, the progress and the result screen all read this
+ * one: they each used to judge the take for themselves, and disagreed.
+ */
+function judgeRun() {
+  const t = timingStats(run.timing);
+  const st = SC.runStats(run);
+  const verdict = PROG.verdictOf(st, t.sdMs, { spreadMs: SC.WINDOWS[settings.strictness].goodMs });
+  return { t, st, verdict, eased: PROG.easedBy(judgingContext()) };
+}
+
+/* What the take was judged WITH, for easedBy. */
+function judgingContext() {
+  return {
+    strictness: settings.strictness,
+    dynamics: settings.dynamics,
+    guide: settings.guide,
+    study: settings.study,
+  };
+}
+
+/*
  * Everything the result screen shows, worked out once when the take ends: the
  * draw only reads it. The chart is the drill's history after this take, so
  * the take is its last point — or, when it was not kept, the history it was
  * not added to.
+ *
+ * The headline is the number that DECIDED the take. A clean take is measured
+ * by its speed, so that is its number. A take that did not count headlines
+ * how much of it was right, with what cost the most under it: it used to
+ * headline the speed — 100 for every take at the written tempo — and a failed
+ * take read like a perfect one.
  */
-function resultOf(whole) {
-  const t = timingStats(run.timing);
-  const st = SC.runStats(run);
-  const goodMs = SC.WINDOWS[settings.strictness].goodMs;
-  const judged = PROG.judgeTake(st, t.sdMs, goodMs);
+function resultOf(whole, { t, st, verdict, eased }) {
   const counted = whole && !settings.study;
-  let status = 'NOT CLEAN';
-  let mark = null;
-  if (!whole) status = 'not kept';
-  else if (settings.study) status = 'STUDY';
-  else if (takeLearned) { status = 'LEARNED'; mark = PROG.MARK_DONE; }
-  else if (summaryIsBest) status = 'BEST YET';
-  else if (judged.clean) status = 'CLEAN';
+  const clean = verdict.clean;
+  const status = PROG.takeStatus({ whole, study: settings.study, learned: takeLearned, clean,
+    best: summaryIsBest, eased });
   const loosest = voicesBySpread(run.timing)[0];
   let limb = '';
   if (loosest) {
@@ -1018,46 +1039,52 @@ function resultOf(whole) {
     const mean = Math.round(v.meanMs);
     limb = `${k ? k.short : loosest} ${mean >= 0 ? '+' : ''}${mean} s${Math.round(v.sdMs)}`;
   }
+  /* The cause, when it is not the spread: the spread is already on the side,
+   * and then the loosest limb is the line worth reading. */
+  let cause = '';
+  if (counted && !clean && verdict.cause !== 'spread') cause = verdict.reason;
+  else if (counted && clean && eased) cause = `not counted: ${eased}`;
   const it = PROG.item(progress, armedItemId());
   const box = V.SUMMARY_PLOT;
   return {
     name: chart.name,
     bpm: chart.bpm,
+    clean: !counted || clean,
     speed: PROG.speedOf(chart.bpm, armedWrittenBpm()),
-    accuracy: judged.accuracy,
+    accuracy: verdict.accuracy,
+    share: Math.round(PROG.CLEAN_SHARE * 100),
     sdMs: t.sdMs,
     meanMs: t.meanMs,
-    failAcc: counted && !judged.clean && st.hits > 0 && judged.accuracy < PROG.CLEAN_SHARE,
-    failSd: counted && !judged.clean && st.hits > 0 && t.sdMs > goodMs,
+    failAcc: counted && verdict.cause !== '' && verdict.cause !== 'spread' && st.hits > 0,
+    failSd: counted && verdict.cause === 'spread',
     status,
-    mark,
+    mark: takeLearned ? PROG.MARK_DONE : null,
+    cause,
     limb,
     series: PROG.percentSeries(it ? it.h : [], box.w - 2, box.h - 2),
     footer: clockMode && !pathTrack ? 'REC again  BACK start' : 'REC again  CLICK next',
   };
 }
 
-function recordRun() {
-  const t = timingStats(run.timing);
-  const st = SC.runStats(run);
-  const judged = PROG.judgeTake(st, t.sdMs, SC.WINDOWS[settings.strictness].goodMs);
+function recordRun({ t, st, verdict, eased }) {
   const rec = ST.makeRecord({
     drill: ST.drillId(clockMode ? 'clock' : 'drill', recordIdOf(chart), settings),
     bpm: chart.bpm,
     sd: t.sdMs,
     mean: t.meanMs,
     n: t.n,
-    err: run.misses + run.stickErrors + run.dynErrors,
+    err: st.misses + st.stickErrors + st.dynErrors,
     at: Date.now() / 1000,
     context: attemptContext(),
-    total: st.total,
-    clean: judged.clean && !settings.study,
+    total: st.asked,
+    clean: verdict.clean && !eased,
+    breakdown: st,
   });
   stats = ST.addRecord(stats, rec);
   summaryIsBest = ST.forDrill(stats, rec.d).length > 1 && ST.isPersonalBest(stats, rec);
   saveStats();
-  recordProgress({ clean: judged.clean, reason: judged.reason, accuracy: judged.accuracy,
-    sd: t.sdMs, bpm: chart.bpm });
+  recordProgress({ clean: verdict.clean, reason: verdict.reason, accuracy: verdict.accuracy,
+    sd: t.sdMs, bpm: chart.bpm, eased });
 }
 
 /* The item the armed drill's takes are filed under. */
@@ -1085,19 +1112,21 @@ function recordProgress(take) {
   }
   const speed = PROG.speedOf(take.bpm, armedWrittenBpm());
   const r = PROG.recordTake(progress, armedItemId(), {
-    speed, accuracy: take.accuracy, sd: take.sd, clean: take.clean, bpm: take.bpm, at: Date.now(),
+    speed, accuracy: take.accuracy, sd: take.sd, clean: take.clean, eased: take.eased,
+    bpm: take.bpm, at: Date.now(),
   });
   saveProgress();
   takeLearned = r.learned;
-  progressNote = noteFor(r, take.clean ? speed : null, take.reason);
+  progressNote = noteFor(r, take.clean ? speed : null, take.reason, take.eased);
 }
 
-function noteFor(r, value, reason) {
+function noteFor(r, value, reason, eased) {
   if (r.learned) {
     announce('learned');
     return { mark: PROG.MARK_DONE, text: `learned at ${value}%` };
   }
   if (value === null) return { text: reason };
+  if (eased) return { text: `clean ${value}%, not counted: ${eased}` };
   const done = PROG.isDone(progress, armedItemId());
   return { mark: done ? PROG.MARK_DONE : null, text: `clean ${value}%  best ${r.best}%` };
 }
@@ -1203,8 +1232,10 @@ function serviceLadder() {
      * held a rung is a take that was not. */
     if (!tp.scrubbed) {
       recordProgress(ladder.topClean > 0
-        ? { clean: true, accuracy: 1, sd: ladder.topSd, bpm: ladder.topClean }
-        : { clean: false, reason: verdict.reason, accuracy: 0, sd: verdict.sdMs, bpm: ladder.startBpm });
+        ? { clean: true, accuracy: 1, sd: ladder.topSd, bpm: ladder.topClean,
+          eased: PROG.easedBy(judgingContext()) }
+        : { clean: false, reason: verdict.reason, accuracy: 0, sd: verdict.sdMs, bpm: ladder.startBpm,
+          eased: PROG.easedBy(judgingContext()) });
     } else {
       progressNote = null;
     }
@@ -1232,7 +1263,9 @@ function endlessProgress() {
   return undefined;
 }
 
-/* How long the Clock runs: this many rounds of click-on then click-off. */
+/* How long the Clock runs: this many rounds of click-on then click-off. It
+ * stops a late window past the end, so the last notes are judged — not left
+ * pending, where they would count neither way. */
 const CLOCK_ROUNDS = 4;
 
 function clockEnd() {
@@ -2091,7 +2124,7 @@ function tickInner() {
     if (SC.runFinished(run, tp.songBeats, tp.blocked)) stop();
     /* The Clock runs endless under the hood and ends here, after its rounds:
      * it used to have no end at all, so it never showed a result or recorded. */
-    else if (clockMode && tp.mode === C.MODE_PRACTICE && tp.songBeats >= clockEnd()) stop();
+    else if (clockMode && tp.mode === C.MODE_PRACTICE && tp.songBeats >= clockEnd() + run.late) stop();
   }
 
   if (screen === QUIZ && quiz) {

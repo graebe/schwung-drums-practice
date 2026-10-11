@@ -25,15 +25,19 @@ export { drawList };
  * qualifies it beside it, and under it the chart of every recent take of THIS
  * drill — so the number is read against where you were, not on its own.
  *
- * The number is the speed the take was played at, as a share of the written
- * tempo: the same number the chart and the list track. Beside it the two
- * things that decide whether it was clean — how much was right, and how
- * tight — and whichever one stopped it counting is drawn inverted, so the
- * screen says what to fix without a sentence. Under it the tempo and the
- * loosest limb, the one to go and practise.
+ * The number is the one that decided the take. For a clean take it is the
+ * speed it was played at, as a share of the written tempo: the same number
+ * the chart and the list track. For a take that did not count it is how much
+ * was right — the speed of a failed take is no score, and at the written
+ * tempo it read 100 on every one of them. Beside it the two things that
+ * decide whether it was clean — how much was right, and how tight — and
+ * whichever one stopped it counting is drawn inverted. Under it, what cost
+ * the most ("16 soft accents 74<83"), or else the tempo and the loosest
+ * limb, the one to go and practise.
  *
- * s = { name, status, mark, speed, accuracy, sdMs, meanMs, failAcc, failSd,
- *       bpm, limb, series, footer }   — all worked out once, when the take ends
+ * s = { name, status, mark, clean, speed, accuracy, share, sdMs, meanMs,
+ *       failAcc, failSd, cause, bpm, limb, series, footer }
+ *     — all worked out once, when the take ends
  */
 export const SUMMARY_PLOT = { x: 3, y: 35, w: L.SCREEN_W - 6, h: 19 };
 const SIDE_A_Y = L.RESULT_BIG_Y;
@@ -43,17 +47,28 @@ export function drawSummary(ctx, s) {
   ctx.clear();
   drawTitle(ctx, s.name || 'RESULT', s.status || '', s.mark);
 
-  const big = `${Math.round(s.speed || 0)}`;
+  const counted = s.clean !== false;
+  /* Floored, not rounded: 89.6% did not reach 90 and must not read as if it had. */
+  const right = Math.floor((s.accuracy || 0) * 100);
+  const big = `${counted ? Math.round(s.speed || 0) : right}`;
   SR.drawBigText(ctx, L.RESULT_LEFT_X, L.RESULT_BIG_Y, big, L.RESULT_BIG_SCALE);
   const w = SR.bigTextWidth(big, L.RESULT_BIG_SCALE);
   ctx.text(L.RESULT_LEFT_X + w + 3, L.RESULT_BIG_Y + 8, '%', 1);
   const minX = L.RESULT_LEFT_X + w + 3 + ctx.textWidth('%') + 4;
   const bias = Math.round(s.meanMs || 0);
-  sideText(ctx, SIDE_A_Y, `${Math.round((s.accuracy || 0) * 100)}% right`, minX, s.failAcc);
+  const sideA = counted ? `${right}% right` : (s.failAcc ? `right, need ${s.share}` : 'right');
+  sideText(ctx, SIDE_A_Y, sideA, minX, s.failAcc);
   sideText(ctx, SIDE_B_Y, `s${Math.round(s.sdMs || 0)} ${bias >= 0 ? '+' : ''}${bias}ms`, minX, s.failSd);
 
-  ctx.text(L.RESULT_LEFT_X, L.RESULT_ROW_A_Y, s.bpm ? `${Math.round(s.bpm)} bpm` : '', 1);
-  if (s.limb) ctx.text(L.SCREEN_W - ctx.textWidth(s.limb) - 1, L.RESULT_ROW_A_Y, s.limb, 1);
+  if (s.cause) {
+    /* Centred, as the Ladder's reason is: a full line (progress.mjs
+     * REASON_MAX) is 125px and does not fit from the left margin. */
+    const cause = fit(ctx, s.cause, L.SCREEN_W - 2);
+    ctx.text(Math.max(1, (L.SCREEN_W - ctx.textWidth(cause)) >> 1), L.RESULT_ROW_A_Y, cause, 1);
+  } else {
+    ctx.text(L.RESULT_LEFT_X, L.RESULT_ROW_A_Y, s.bpm ? `${Math.round(s.bpm)} bpm` : '', 1);
+    if (s.limb) ctx.text(L.SCREEN_W - ctx.textWidth(s.limb) - 1, L.RESULT_ROW_A_Y, s.limb, 1);
+  }
 
   drawPercentPlot(ctx, SUMMARY_PLOT, s.series);
   const hint = s.footer || 'REC again  CLICK next';

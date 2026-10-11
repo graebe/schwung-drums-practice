@@ -52,21 +52,25 @@ test('a clean rung climbs and records the tempo', () => {
 
 test('clean means all four axes at once', () => {
   /* A rung climbed on three of the four would put the tempo up on a pattern
-   * the player is not actually playing. */
+   * the player is not actually playing. The bar before the rung is played
+   * clean: an accent is judged against the strokes before it, and the bar's
+   * accent is its first note. */
   const cases = [
-    ['sticking', { hand: false }],
-    ['dynamics', { dyn: false }],
-    ['missed', { skip: 2 }],
+    ['sticking', { hand: false }, /^4 wrong hands$/],
+    ['accents', { dyn: false }, /^1 soft accent 30<105$/],
+    ['missed', { skip: 2 }, /^1 missed$/],
   ];
-  for (const [reason, opts] of cases) {
+  for (const [cause, opts, reason] of cases) {
     const run = runFor();
+    playBar(run, 0);
     const l = LAD.createLadder({ bpm: 80, bars: 1 });
-    LAD.beginRung(l, run, 0);
-    playBar(run, 0, opts);
-    expireMissed(run, 4);
-    const v = LAD.judgeRung(l, run, 4);
-    assert.equal(v.clean, false, `${reason} should have failed the rung`);
-    assert.equal(v.reason, reason);
+    LAD.beginRung(l, run, 4);
+    playBar(run, 4, opts);
+    expireMissed(run, 8);
+    const v = LAD.judgeRung(l, run, 8);
+    assert.equal(v.clean, false, `${cause} should have failed the rung`);
+    assert.equal(v.cause, cause);
+    assert.match(v.reason, reason);
   }
 });
 
@@ -87,7 +91,8 @@ test('a scattered bar fails even with every note hit', () => {
   assert.equal(run.strays, 0);
   const v = LAD.judgeRung(l, run, 4);
   assert.equal(v.clean, false);
-  assert.equal(v.reason, 'too loose');
+  assert.equal(v.cause, 'spread');
+  assert.match(v.reason, /^spread \d+, max 30ms$/);
 });
 
 test('playing nothing is not a clean rung', () => {
@@ -96,6 +101,7 @@ test('playing nothing is not a clean rung', () => {
   LAD.beginRung(l, run, 0);
   const v = LAD.judgeRung(l, run, 4);
   assert.equal(v.clean, false);
+  assert.equal(v.cause, 'nothing');
   assert.equal(v.reason, 'nothing played');
 });
 

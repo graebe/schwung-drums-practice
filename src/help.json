@@ -91,9 +91,10 @@
       "title": "Colours",
       "lines": [
         "green   you got it",
-        "amber   right drum, but",
-        "        WRONG HAND or",
-        "        wrong dynamic",
+        "amber   right drum,",
+        "        WRONG HAND",
+        "azure   right drum, too",
+        "        soft or too loud",
         "red     you missed it",
         "yellow  your finger",
         "violet  now / playing",
@@ -126,6 +127,25 @@
       ]
     },
     {
+      "title": "Accents",
+      "lines": [
+        "An accent is LOUDER",
+        "than your own strokes:",
+        "their median + Accent +",
+        "(15). A ghost: median",
+        "- Ghost - (20).",
+        "",
+        "Strokes around 68: an",
+        "accent needs 83. Hit",
+        "everything hard and",
+        "nothing stands out.",
+        "",
+        "Under the result:",
+        "16 soft accents 74<83",
+        "= played 74, needed 83."
+      ]
+    },
+    {
       "title": "Clean at tempo",
       "lines": [
         "A drill is learned when",
@@ -139,10 +159,10 @@
         "the Strict window.",
         "",
         "Your % is the fastest",
-        "clean take: clean at",
-        "Speed 80% reads 80%.",
-        "100% is learned. Study",
-        "takes do not count."
+        "clean take. 100% earns",
+        "the tick - but not on",
+        "Loose, Guide pads,",
+        "Study or Dynamics off."
       ]
     },
     {
@@ -205,11 +225,11 @@
         "played, % of written.",
         "Beside it: % right and",
         "the spread; the one",
-        "that stopped the take",
-        "counting is inverted.",
-        "",
-        "The chart: your recent",
-        "takes, this one last.",
+        "that stopped it is",
+        "inverted. Not clean:",
+        "big is % right, and",
+        "under it what cost the",
+        "most: 16 soft accents.",
         "",
         "JOG back: the take as",
         "you played it - rings",

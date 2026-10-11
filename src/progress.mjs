@@ -9,10 +9,12 @@
  * lights; a drummer has learned a pattern when they can play it CLEAN AT
  * TEMPO. So an item has one stage, and its number is a speed:
  *
- *   clean take    a whole take, Study off, with at least CLEAN_SHARE of the
- *                 notes right (a wrong hand or a wrong dynamic is not right,
- *                 and stray hits count against you) and the timing spread
- *                 inside the Strict setting's good window
+ *   clean take    a whole take with at least CLEAN_SHARE of the notes right
+ *                 (a wrong hand or a wrong dynamic is not right, and stray
+ *                 hits count against you) and the timing spread inside the
+ *                 Strict setting's good window — judged by verdictOf, on the
+ *                 standard settings (easedBy): no Study, no Guide pads, not
+ *                 Loose, Dynamics on
  *   clean speed   the tempo of a clean take over the drill's written tempo:
  *                 80% is clean at 80% of the written tempo
  *   learned (✓)   clean at LEARNED% or faster
@@ -45,6 +47,9 @@ export const REP_SESSION = 5;
 export const F_CLEAN = 1;
 export const F_REPEAT = 2;
 export const F_TEMPO = 4;
+/* Judged by the standard a ✓ means (easedBy). Absent on takes recorded
+ * before it existed, which is why it is a flag and not its absence. */
+export const F_STANDARD = 8;
 
 /* ---- The store ------------------------------------------------------------ */
 
@@ -122,30 +127,106 @@ export function serialiseProgress(progress) {
 /* ---- Judging a take ------------------------------------------------------- */
 
 /*
+ * ONE VERDICT. Whether a take, a Ladder rung or an imported record was clean
+ * is decided here and nowhere else. It used to be decided in three places with
+ * three rules — and a fourth, the stats log's "best", that did not ask at all
+ * — and every way the result screen misled sat in a seam between them.
+ */
+
+/*
  * The share of a take that was right: notes hit with the right hand and the
  * right dynamic, over the notes asked PLUS stray hits. Without the strays a
  * player could sweep the pads under every note and score full marks.
- *   st = scoring.mjs runStats: { total, hits, strays, stickErrors, dynErrors }
+ *   st = scoring.mjs runStats: { asked, hits, strays, stickErrors, dynErrors }
  */
 export function takeAccuracy(st) {
-  const asked = (st.total || 0) + (st.strays || 0);
+  const asked = (st.asked || 0) + (st.strays || 0);
   const right = Math.max(0, (st.hits || 0) - (st.stickErrors || 0) - (st.dynErrors || 0));
   return asked > 0 ? Math.min(1, right / asked) : 0;
 }
 
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const avg = (d, key) => Math.round(d[key] / d.n);
+/* A reason is one result line: 21 characters of the 6px font across 128. */
+export const REASON_MAX = 21;
+/* The velocities played against needed, when they fit beside the count. */
+const withVel = (text, d, sign) => {
+  const long = `${text} ${avg(d, 'vel')}${sign}${avg(d, 'need')}`;
+  return long.length <= REASON_MAX ? long : text;
+};
+
 /*
- * Whether a take was clean, and if not, the first reason why — so the result
- * screen can say what to fix rather than only that it did not count.
- *   { accuracy, clean, reason }
+ * What cost the most right notes, as a cause and a line that says it with
+ * its count: "16 soft accents 74<83" says what to practise, "83% right" does
+ * not. Ties go to the order below — a missed note before a stray, and so on.
  */
-export function judgeTake(st, sdMs, goodMs) {
+function costliest(st) {
+  const acc = st.softAccents || { n: 0 };
+  const gho = st.loudGhosts || { n: 0 };
+  const causes = [
+    ['missed', st.misses || 0, (n) => `${n} missed`],
+    ['strays', st.strays || 0, (n) => plural(n, 'stray hit', 'stray hits')],
+    ['accents', acc.n, (n) => withVel(plural(n, 'soft accent', 'soft accents'), acc, '<')],
+    ['ghosts', gho.n, (n) => withVel(plural(n, 'loud ghost', 'loud ghosts'), gho, '>')],
+    ['sticking', st.stickErrors || 0, (n) => plural(n, 'wrong hand', 'wrong hands')],
+  ];
+  let best = null;
+  for (const c of causes) if (c[1] > 0 && (!best || c[1] > best[1])) best = c;
+  return best ? { cause: best[0], reason: best[2](best[1]) } : { cause: '', reason: '' };
+}
+
+/*
+ *   st      runStats, or since() for a window of a run
+ *   sdMs    the timing spread over the same notes
+ *   rule    { spreadMs, share = CLEAN_SHARE, minHits = 1 }
+ *           A take allows CLEAN_SHARE right and the good window's spread. A
+ *           Ladder rung is the same verdict, stricter: share 1, perfect window.
+ * Returns { accuracy, clean, cause, reason }: `cause` is a key the screen can
+ * act on, `reason` the line it shows, both '' when clean.
+ */
+export function verdictOf(st, sdMs, { spreadMs, share = CLEAN_SHARE, minHits = 1 }) {
   const accuracy = takeAccuracy(st);
-  let reason = '';
-  if (!st.hits) reason = 'nothing played';
-  else if (accuracy < CLEAN_SHARE) {
-    reason = `${Math.floor(accuracy * 100)}% right, need ${Math.round(CLEAN_SHARE * 100)}`;
-  } else if (sdMs > goodMs) reason = `spread ${Math.round(sdMs)}, max ${Math.round(goodMs)}ms`;
-  return { accuracy, clean: reason === '', reason };
+  let v = { cause: '', reason: '' };
+  if (!st.hits) v = { cause: 'nothing', reason: 'nothing played' };
+  else if (st.hits < minHits) v = { cause: 'few', reason: plural(st.hits, 'hit', 'hits') };
+  else if (accuracy < share) v = costliest(st);
+  else if (sdMs > spreadMs) {
+    v = { cause: 'spread', reason: `spread ${Math.round(sdMs)}, max ${Math.round(spreadMs)}ms` };
+  }
+  return { accuracy, clean: v.cause === '', cause: v.cause, reason: v.reason };
+}
+
+/*
+ * Whether a take was judged by the standard that a ✓ means: Strict at Normal
+ * or Tight, Dynamics on, and no help — Guide pads light the answer and Study
+ * waits for you. Easier settings are for getting there; a take on them is
+ * kept, but it cannot learn a drill, or a ✓ would mean whatever the settings
+ * were that day.
+ *   ctx = { strictness, dynamics, guide, study }
+ * Returns '' when standard, else the first setting that is not, for the screen.
+ */
+export function easedBy(ctx) {
+  if (ctx.study) return 'Study';
+  if (ctx.guide) return 'Guide';
+  if (ctx.strictness === 'loose') return 'Loose';
+  if (!ctx.dynamics) return 'Dyn off';
+  return '';
+}
+
+/*
+ * The result screen's status line, from the verdict alone. A take that did
+ * not count is NOT CLEAN whatever else is true of it: a best spread used to
+ * outrank the verdict, and a failed take read "BEST YET" under a big 100. A
+ * clean take on eased settings is PRACTICE: it moved nothing (recordTake).
+ *   { whole, study, learned, clean, best, eased }
+ */
+export function takeStatus({ whole, study, learned, clean, best, eased = '' }) {
+  if (!whole) return 'not kept';
+  if (study) return 'STUDY';
+  if (learned) return 'LEARNED';
+  if (!clean) return 'NOT CLEAN';
+  if (eased) return 'PRACTICE';
+  return best ? 'BEST YET' : 'CLEAN';
 }
 
 /* The tempo played as a share of the tempo written, in whole percent. */
@@ -166,7 +247,8 @@ export function roundScore(correct, wrong, hinted = 0) {
 
 /*
  * One whole take of a drill.
- *   take = { speed, accuracy, sd, clean, bpm, at (ms) }
+ *   take = { speed, accuracy, sd, clean, eased, bpm, at (ms) }
+ *   eased  '' for standard judging, else what eased it (easedBy)
  * Returns what it changed, for the result screen:
  *   { learned  first time at LEARNED% clean,
  *     best     the item's best after this take,
@@ -175,17 +257,22 @@ export function roundScore(correct, wrong, hinted = 0) {
  *
  * For an item already learned, only a take AT TEMPO counts as a repetition:
  * playing a learned rudiment slowly is practice, not a slip, and must not
- * pull it back into the queue.
+ * pull it back into the queue. A take on eased settings is kept for its chart
+ * and moves nothing else — not the best, not the ✓, not a repetition, where
+ * it would otherwise count as a slip for being "not clean".
  */
 export function recordTake(progress, id, take) {
   const atTempo = take.speed >= LEARNED;
+  const standard = !take.eased;
+  const counted = take.clean && standard;
   return apply(progress, id, {
-    value: take.clean ? take.speed : null,
-    learned: take.clean && atTempo,
-    counts: atTempo,
+    value: counted ? take.speed : null,
+    learned: counted && atTempo,
+    counts: atTempo && standard,
     bpm: take.bpm,
     entry: [Math.round(take.speed), Math.round((take.accuracy || 0) * 100),
-      Math.round(take.sd || 0), (take.clean ? F_CLEAN : 0) | (atTempo ? F_TEMPO : 0)],
+      Math.round(take.sd || 0),
+      (counted ? F_CLEAN : 0) | (atTempo ? F_TEMPO : 0) | (standard ? F_STANDARD : 0)],
     at: take.at,
   });
 }
@@ -516,13 +603,17 @@ export function importStats(progress, records, itemOf, writtenOf) {
       continue;
     }
     if (r.s) continue;  /* a Study take never counted */
-    const ladder = kind === 'ladder';
-    const clean = ladder || (r.err === 0 && r.n >= IMPORT_MIN_HITS && r.sd <= IMPORT_GOOD_MS);
+    /* The record lumps every error into `err`, so it is read as misses: a
+     * take with any error is not clean, which is the most it can say. */
+    const v = verdictOf({ hits: r.n, misses: r.err, asked: r.n + r.err }, r.sd,
+      { spreadMs: IMPORT_GOOD_MS, share: 1, minHits: IMPORT_MIN_HITS });
+    const strictness = String(r.d).split(':')[2];
     recordTake(progress, id, {
       speed: speedOf(r.bpm, writtenOf(id, r)),
-      accuracy: r.n + r.err > 0 ? r.n / (r.n + r.err) : 0,
+      accuracy: v.accuracy,
       sd: r.sd,
-      clean,
+      clean: kind === 'ladder' || v.clean,
+      eased: easedBy({ strictness, dynamics: true, guide: r.g === 1, study: false }),
       bpm: r.bpm,
       at: r.t * 1000,
     });

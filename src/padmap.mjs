@@ -194,6 +194,11 @@ export function layoutForChart(chart) {
  * fixed differently, and if it shared red with a miss you would never learn
  * to tell them apart mid-bar. Orange is far enough from both the green of a
  * hit and the red of a miss to be read without thinking.
+ *
+ * LED_DYN is the same argument once more: "right voice, right hand, WRONG
+ * LOUDNESS" — a soft accent, a heavy ghost — is fixed with the wrist, not the
+ * sticking, and sharing orange with a wrong hand hid which one it was. Azure
+ * is the one hue left that is neither a judgement's nor the music's violet.
  */
 export const LED_OFF = 0;
 export const LED_VOICE = 107;      /* DarkPurple   #220D66 — a voice is here */
@@ -203,4 +208,5 @@ export const LED_PROMPT = 50;      /* LavenderBlue #BBAAF2 — quiz prompt     *
 export const LED_PRESSED = 8;      /* BrightYellow #FFC516 — your finger     */
 export const LED_HIT = 126;        /* Green        #00FF00                   */
 export const LED_STICK = 3;        /* BrightOrange #C93C00 — wrong hand      */
+export const LED_DYN = 16;         /* AzureBlue    #31ADFF — wrong dynamic   */
 export const LED_MISS = 127;       /* Red          #FF0000                   */

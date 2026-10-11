@@ -99,11 +99,49 @@ test('the drill id separates settings that change the task', () => {
 
 test('a drill\'s best is its tightest take at its tempo, not its tempo', () => {
   const s = ST.emptyStats();
-  const r = (bpm, sd) => ST.makeRecord({ drill: 'drill:x:normal', bpm, sd, n: 10 });
+  const r = (bpm, sd) => ST.makeRecord({ drill: 'drill:x:normal', bpm, sd, n: 10, clean: true });
   const a = r(90, 30); ST.addRecord(s, a);
   assert.equal(ST.isPersonalBest(s, a), true);
   const b = r(90, 25); ST.addRecord(s, b);
   assert.equal(ST.isPersonalBest(s, b), true, 'tighter at the same tempo is a best');
   const c = r(90, 28); ST.addRecord(s, c);
   assert.equal(ST.isPersonalBest(s, c), false);
+});
+
+test('a take that did not count is never a best, and is not measured against', () => {
+  /* The reported take: the tightest spread ever on the drill, every accent
+   * soft, 83% right — and it read "BEST YET". Replayed from the device. */
+  const s = ST.emptyStats();
+  const d = 'drill:rock-backbeat:l3:normal:strict';
+  for (const [sd, err] of [[21, 43], [20.4, 16], [18.8, 18], [24.3, 16]]) {
+    ST.addRecord(s, ST.makeRecord({ drill: d, bpm: 92, sd, n: 96, err }));
+  }
+  const failed = ST.makeRecord({ drill: d, bpm: 92, sd: 12, n: 96, err: 16 });
+  ST.addRecord(s, failed);
+  assert.equal(ST.isPersonalBest(s, failed), false);
+  /* The first clean take is a best: the failed ones before it set no bar. */
+  const clean = ST.makeRecord({ drill: d, bpm: 92, sd: 19, n: 96, err: 2, clean: true });
+  ST.addRecord(s, clean);
+  assert.equal(ST.isPersonalBest(s, clean), true);
+  /* A quiz has no clean flag and is still judged on its rate. */
+  const q = ST.emptyStats();
+  const r1 = ST.makeRecord({ drill: 'guess:voice', bpm: 10, n: 20 });
+  ST.addRecord(q, r1);
+  assert.equal(ST.isPersonalBest(q, r1), true);
+});
+
+test('a record says what its errors were made of, and reads back', () => {
+  const s = ST.emptyStats();
+  const rec = ST.makeRecord({ drill: 'drill:x:normal', bpm: 92, sd: 12, n: 96, err: 16,
+    breakdown: { strays: 1, stickErrors: 0, dynErrors: 16, softAccents: { n: 16, vel: 16 * 74, need: 16 * 83 } } });
+  assert.equal(rec.st, 1);
+  assert.equal(rec.sk, 0);
+  assert.equal(rec.dy, 16);
+  assert.equal(rec.av, 74);
+  assert.equal(rec.an, 83);
+  ST.addRecord(s, rec);
+  assert.deepEqual(ST.parseStats(ST.serialiseStats(s)).records, s.records);
+  const none = ST.makeRecord({ drill: 'x', bpm: 1, breakdown: { strays: 0, stickErrors: 0, dynErrors: 0,
+    softAccents: { n: 0, vel: 0, need: 0 } } });
+  assert.equal('av' in none, false, 'no accents missed, no velocity to report');
 });

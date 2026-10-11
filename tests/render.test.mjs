@@ -649,8 +649,8 @@ function capture() {
 
 /* What stop() works out for the result screen (ui.js resultOf). */
 const result = (over = {}) => ({
-  name: 'X', status: 'CLEAN', mark: null, speed: 85, accuracy: 0.94, sdMs: 12, meanMs: 3,
-  failAcc: false, failSd: false, bpm: 90, limb: 'SN +3 s12',
+  name: 'X', status: 'CLEAN', mark: null, clean: true, speed: 85, accuracy: 0.94, share: 90,
+  sdMs: 12, meanMs: 3, failAcc: false, failSd: false, cause: '', bpm: 90, limb: 'SN +3 s12',
   series: percentSeries([[0, 70, 95, 20, 1], [1, 85, 94, 12, 1]], SUMMARY_PLOT.w - 2, SUMMARY_PLOT.h - 2),
   footer: 'REC again  CLICK next', ...over,
 });
@@ -681,6 +681,39 @@ test('the reason a take did not count is drawn inverted', () => {
   drawSummary(c, result({ failSd: true }));
   assert.ok(countOn(c, 60, L.RESULT_BIG_Y + 7, L.SCREEN_W - 60, L.TEXT_H + 1) > 60,
     'the spread row is not inverted');
+});
+
+test('a take that did not count headlines how much was right, and what cost the most', () => {
+  /* The reported take: at the written tempo, so its speed was 100 — and the
+   * screen headlined that 100 over a take that did not count. */
+  const failed = result({ status: 'NOT CLEAN', clean: false, speed: 100, accuracy: 0.8333,
+    failAcc: true, cause: '16 soft accents 74<83' });
+  const { c, seen } = capture();
+  drawSummary(c, failed);
+  for (const t of ['NOT CLEAN', 'right, need 90', '16 soft accents 74<83']) {
+    assert.ok(seen.includes(t), `${t}: ${seen.join('|')}`);
+  }
+  assert.ok(!seen.includes('90 bpm'), 'the cause takes the tempo row');
+  /* The big number is 83, not 100: the same pixels as a take whose number is 83. */
+  const big = (s) => {
+    const k = createScreen();
+    drawSummary(k, s);
+    const out = [];
+    for (let y = L.RESULT_BIG_Y; y < L.RESULT_BIG_Y + 16; y++) {
+      for (let x = 0; x < 40; x++) out.push(isOn(k, x, y) ? 1 : 0);
+    }
+    return out.join('');
+  };
+  assert.equal(big(failed), big(result({ speed: 83 })));
+  assert.notEqual(big(failed), big(result({ speed: 100 })));
+  /* 89.6% did not reach 90, and does not read as if it had. */
+  assert.equal(big(result({ clean: false, accuracy: 0.896 })), big(result({ speed: 89 })));
+});
+
+test('a take that failed on its spread keeps the tempo and the loosest limb', () => {
+  const { c, seen } = capture();
+  drawSummary(c, result({ status: 'NOT CLEAN', clean: false, accuracy: 0.97, failSd: true }));
+  for (const t of ['right', '90 bpm', 'SN +3 s12']) assert.ok(seen.includes(t), `${t}: ${seen.join('|')}`);
 });
 
 test('the result chart is the drill\'s takes, this one last', () => {

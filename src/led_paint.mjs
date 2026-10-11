@@ -29,7 +29,7 @@
 
 import { PAD_FIRST, PAD_COUNT, padVoice, padHand,
          LED_OFF, LED_VOICE, LED_TARGET_FAR, LED_TARGET_NEAR,
-         LED_PRESSED, LED_HIT, LED_STICK, LED_MISS, LED_PROMPT } from './padmap.mjs';
+         LED_PRESSED, LED_HIT, LED_STICK, LED_DYN, LED_MISS, LED_PROMPT } from './padmap.mjs';
 
 export const FLASH_MS = 180;
 const ROW = 8;
@@ -43,7 +43,7 @@ export function flashColor(judgement) {
    * from a wrong drum, it is fixed differently, and sharing red with a miss
    * would make the two indistinguishable mid-bar. */
   if (judgement.handOk === false) return LED_STICK;
-  if (judgement.dynOk === false) return LED_STICK;
+  if (judgement.dynOk === false) return LED_DYN;
   return LED_HIT;
 }
 
