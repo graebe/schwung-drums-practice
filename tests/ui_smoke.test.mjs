@@ -1894,3 +1894,216 @@ test('knob 1 scrolls the review too, finer than the jog', async () => {
   ticks(1);
   assert.ok(!drawnText(1).includes('REVIEW'), 'a new take forgets the last one');
 });
+
+/* ---- L0: own pace ------------------------------------------------------------ */
+/*
+ * The whole groove, no clock: a cursor waits on each stack until it is struck
+ * together. Driven by the bundled rock backbeat, two passes, stack by stack.
+ */
+const ROCK = JSON.parse(readFileSync(new URL('../src/exercises/rock-backbeat.json', import.meta.url), 'utf8'));
+/* Rock backbeat's drums, on the kit layout's left half. */
+const PAD_OF = { HH: 78, KK: 68, SN: 69 };
+/* One stack per entry, beat order, same-beat events merged as the loader does. */
+const ROCK_STACKS = (() => {
+  const by = new Map();
+  for (const e of ROCK.events) {
+    const s = by.get(e.beat) || { beat: e.beat, voices: [], dyn: {} };
+    s.voices.push(...e.voices);
+    if (typeof e.dyn === 'string') for (const v of e.voices) s.dyn[v] = e.dyn;
+    else Object.assign(s.dyn, e.dyn || {});
+    by.set(e.beat, s);
+  }
+  return [...by.values()].sort((a, b) => a.beat - b.beat);
+})();
+
+/* Rock backbeat › L0, armed on its ready screen. */
+function armL0() {
+  toFirstDrill();
+  cc(CC.jogClick, 127); ticks(2);   /* its ladder, highlight on L0 */
+  cc(CC.jogClick, 127); ticks(2);
+}
+/* One stack, struck together. */
+function strike(stack) {
+  for (const v of stack.voices) pad(PAD_OF[v], stack.dyn[v] === 'accent' ? 127 : 80);
+  for (const v of stack.voices) pad(PAD_OF[v], 0);
+}
+/* Every stack of `passes` passes, `gapTicks` apart. */
+function stepThrough(passes = 2, gapTicks = 8) {
+  for (let p = 0; p < passes; p++) {
+    for (const s of ROCK_STACKS) { strike(s); ticks(gapTicks); }
+  }
+}
+
+test('L0 is the first rung, and its ready screen offers own pace with no count-in', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  toFirstDrill();
+  cc(CC.jogClick, 127);
+  assert.ok(drawnText(2).some((t) => /^L0 Own pace/.test(t)), 'the ladder starts at L0');
+  cc(CC.jogClick, 127);
+  const ready = drawnText(2);
+  assert.ok(ready.includes('REC   own pace'), ready.join('|'));
+  assert.ok(ready.includes('PLAY  hear bar'));
+  assert.ok(ready.some((t) => /stacks/.test(t)), 'the length is counted in stacks');
+  cc(CC.record, 127);
+  const running = drawnText(2);
+  assert.ok(running.includes('1/2'), 'at once on the first bar of two: no count-in');
+  assert.ok(running.includes('--'), 'no pace until there is one');
+});
+
+test('stepping L0 through, clean, ends on a result that learns it', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  armL0();
+  cc(CC.record, 127);
+  ticks(2);
+  stepThrough();
+  const shown = drawnText(3);
+  assert.ok(shown.some((t) => /100% 1st try/.test(t)), shown.join('|'));
+  assert.ok(shown.some((t) => /of 92bpm/.test(t)), 'the pace against the written tempo');
+  assert.ok(shown.includes('LEARNED'));
+  globalThis.onUnload();
+  const progress = JSON.parse(log.writes[`${DATA}progress.json`]);
+  const it = progress.items['rock-backbeat:l0'];
+  assert.ok(it && it.done, 'L0 was learned');
+  assert.equal(it.rep, null, 'and never comes back for repetition');
+  const stats = JSON.parse(log.writes[`${DATA}stats.json`]);
+  assert.ok(stats.records.some((r) => r.d.startsWith('untimed:rock-backbeat:l0:normal') && r.cl === 1),
+    JSON.stringify(stats.records));
+});
+
+test('a stack struck apart is asked for again and costs its first try', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  armL0();
+  cc(CC.record, 127);
+  ticks(2);
+  /* Hat, then the kick 100ms later: the window is 60ms on normal. */
+  pad(PAD_OF.HH, 80); pad(PAD_OF.HH, 0);
+  ticks(4);
+  pad(PAD_OF.KK, 80); pad(PAD_OF.KK, 0);
+  ticks(4);
+  stepThrough();
+  const shown = drawnText(3);
+  const n = ROCK_STACKS.length * 2;
+  const pct = Math.floor(((n - 1) * 100) / n);
+  assert.ok(shown.some((t) => t === `${pct}% 1st try`), `${pct}%: ${shown.join('|')}`);
+});
+
+test('Guide pads light the stack L0 waits on, and a guided take is practice', async () => {
+  const { log } = await loadUi({ settings: { guide: true } });
+  globalThis.init();
+  ticks(2);
+  armL0();
+  cc(CC.record, 127);
+  log.leds.length = 0;
+  ticks(2);
+  const PADS = await import('../src/padmap.mjs');
+  const lit = new Map(log.leds);
+  assert.equal(lit.get(PAD_OF.HH), PADS.LED_TARGET_NEAR, 'the hat of the first stack is lit as now');
+  assert.equal(lit.get(PAD_OF.KK), PADS.LED_TARGET_NEAR, 'and the kick with it');
+  stepThrough();
+  assert.ok(drawnText(3).includes('PRACTICE'));
+});
+
+test('Play on L0 sounds the bar, spread over time, and starts nothing', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  armL0();
+  log.params.length = 0;
+  cc(CC.play, 127);
+  ticks(1);
+  const early = log.params.filter(([k]) => k === 'n').length;
+  ticks(120);                                   /* three seconds: past the bar at 92 */
+  const all = log.params.filter(([k]) => k === 'n').length;
+  assert.ok(early >= 1 && all > early, `${early} then ${all}`);
+  assert.ok(drawnText(2).includes('REC   own pace'), 'still on the ready screen');
+});
+
+test('Record pauses an L0 take, and a press while paused is not a stroke', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  armL0();
+  cc(CC.record, 127);
+  ticks(2);
+  cc(CC.record, 127);                           /* pause */
+  assert.ok(drawnText(2).includes('PAUSED'));
+  pad(PAD_OF.SN, 80); pad(PAD_OF.SN, 0);       /* a wrong pad — ignored while paused */
+  cc(CC.record, 127);                           /* resume */
+  ticks(2);
+  stepThrough();
+  assert.ok(drawnText(3).some((t) => /100% 1st try/.test(t)));
+});
+
+test('the Ladder over L0 asks for a timed rung', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  armL0();
+  toTraining();
+  cc(CC.jogClick, 127);                         /* Ladder */
+  assert.ok(drawnText(2).includes('ARM A TIMED RUNG'));
+});
+
+test('Click on an L0 result goes on to L1', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  armL0();
+  cc(CC.record, 127);
+  ticks(2);
+  stepThrough();
+  cc(CC.jogClick, 127);
+  const ready = drawnText(2);
+  assert.ok(ready.includes('REC   practise'), `the timed ready screen: ${ready.join('|')}`);
+});
+
+test('looking back over an L0 take walks its page', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  armL0();
+  cc(CC.record, 127);
+  ticks(2);
+  stepThrough();
+  cc(CC.jogTurn, 127);                          /* back into the take */
+  assert.ok(drawnText(2).includes('REVIEW'));
+  cc(CC.back, 127);
+  assert.ok(drawnText(2).some((t) => /1st try/.test(t)), 'Back is the result again');
+});
+
+test('Speed during an L0 take changes only what Play sounds like; the take stays whole', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  armL0();
+  cc(CC.record, 127);
+  ticks(2);
+  cc(CC.knob1 + 7, 127);                        /* knob 8, a step slower */
+  stepThrough();
+  const shown = drawnText(3);
+  assert.ok(shown.includes('LEARNED'), `still a whole take: ${shown.join('|')}`);
+  assert.ok(shown.some((t) => /of 92bpm/.test(t)), 'measured against the written tempo, not the Speed');
+});
+
+test('an L0 take begun from a scrubbed bar is a passage, and is not kept', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  armL0();
+  for (let i = 0; i < 36; i++) cc(CC.knob1, 1);  /* one bar on */
+  ticks(1);
+  cc(CC.record, 127);
+  ticks(2);
+  assert.ok(drawnText(1).includes('2/2'), 'it starts on the bar scrubbed to');
+  stepThrough(1);
+  assert.ok(drawnText(3).includes('not kept'));
+  globalThis.onUnload();
+  const saved = log.writes[`${DATA}progress.json`];
+  assert.ok(!saved || !JSON.parse(saved).items['rock-backbeat:l0'], 'nothing recorded');
+});

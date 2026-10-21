@@ -581,6 +581,10 @@ export function recentIds(progress) {
  * two visits to the same item would draw the same history differently. The
  * line to beat — 100% speed, or the quiz pass mark — comes back as `lineY`.
  */
+/* L0's chart scale: from nothing, because a first pace of 30% is where
+ * L0 begins, and the default floor of 40 would flatten it into the axis. */
+export const UNTIMED_SCALE = { lo: 0, hi: 120, line: LEARNED };
+
 export function percentSeries(history, w, h, { lo = 40, hi = 140, line = LEARNED } = {}) {
   const use = history.length > HISTORY_CAP ? history.slice(history.length - HISTORY_CAP) : history;
   const lastX = w - 1;

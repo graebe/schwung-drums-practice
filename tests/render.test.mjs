@@ -784,3 +784,105 @@ test('the result screen says when a take was not kept', () => {
   drawSummary(c, result({ status: 'not kept' }));
   assert.ok(seen.includes('not kept'), 'a scrubbed take is passage practice, and says so');
 });
+
+/* ---- L0's still page ---------------------------------------------------------- */
+
+import * as UT from '../src/untimed.mjs';
+import { drawUntimedView, pageGeometry } from '../src/view.mjs';
+import { projectLevel } from '../src/levels.mjs';
+
+const ROCKISH = {
+  id: 'r', name: 'Rockish', bpm: 92, timeSig: [4, 4], loopBars: 1, repeats: 8, sticking: 'off',
+  events: [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5].map((b) => ({
+    beat: b, voices: b % 1 === 0 && b % 2 === 0 ? ['HH', 'KK'] : b % 1 === 0 ? ['HH', 'SN'] : ['HH'],
+  })),
+};
+
+function page(view, upTo, opts = {}) {
+  const c = projectLevel(ROCKISH, 'l0');
+  const run = createRun(c, { sticking: 'off' });
+  const u = UT.createUntimed(run, { togetherMs: 60 });
+  let t = 0;
+  while (!u.finished && u.index < upTo) {
+    for (const n of UT.current(u).notes) UT.press(u, { voice: n.voice, velocity: 90 }, t);
+    t += 500;
+  }
+  const ctx = createScreen();
+  ctx.seen = [];
+  const text = ctx.text.bind(ctx);
+  ctx.text = (x, y, s, v) => { ctx.seen.push(s); text(x, y, s, v); };
+  drawUntimedView(ctx, { run, chart: c, view, dynamics: true, cursor: u.index, done: u.finished,
+    title: c.name, rightLabel: opts.right || '--', progress: UT.progress(u), footerRight: '' });
+  return { ctx, run, u, c };
+}
+
+test('the page holds the whole bar between its bar lines, at even spacing', () => {
+  for (const view of ['grid', 'staff']) {
+    const { left, px } = pageGeometry(view, ROCKISH);
+    assert.ok(left + 7 * 0.5 * px < L.PAGE_BAR_X, `${view}: the last eighth falls inside the bar`);
+    const { ctx } = page(view, 0);
+    assert.ok(countOn(ctx, L.PAGE_BAR_X, 20, 1, 15) > 10, `${view}: the closing bar line`);
+  }
+});
+
+test('the cursor stands on the stack it waits for, in both views', () => {
+  for (const view of ['grid', 'staff']) {
+    const { left, px } = pageGeometry(view, ROCKISH);
+    const { ctx } = page(view, 3);
+    const x = Math.round(left + 1.5 * px);
+    const top = view === 'grid' ? L.GRID_TOP_Y + 2 : L.HIT_LINE_TOP_Y;
+    assert.ok(countOn(ctx, x, top, 2, 20) >= 18, `${view}: no cursor line at x${x}`);
+    assert.ok(isOn(ctx, x, L.UNDER_LANE_Y), `${view}: no caret under the cursor`);
+    /* And nowhere near the scroll's fixed hit line. */
+    assert.ok(countOn(ctx, L.HIT_X, top + 2, 1, 10) < 10, `${view}: a line left at HIT_X`);
+  }
+});
+
+test('the next bar peeks in past the bar line; at the end a double bar stands there', () => {
+  const { ctx } = page('grid', 7);
+  assert.ok(countOn(ctx, L.PAGE_PEEK_X - 3, L.GRID_TOP_Y, 7, 36) > 6, 'the next stack is drawn');
+  const end = page('grid', 99);
+  assert.equal(end.u.finished, true);
+  assert.ok(countOn(end.ctx, L.PAGE_BAR_X + 2, L.GRID_TOP_Y + 4, 1, 20) > 10, 'a double bar');
+});
+
+test('the page turns once the bar is through', () => {
+  const a = page('grid', 7);
+  const b = page('grid', 8);
+  const shown = (r) => drawnText(r.ctx);
+  assert.ok(shown(a).includes('1/2'));
+  assert.ok(shown(b).includes('2/2'));
+});
+
+function drawnText(ctx) {
+  return ctx.seen;
+}
+
+test('the L0 result carries its own side lines in the result layout', () => {
+  const ctx = createScreen();
+  const seen = [];
+  const text = ctx.text.bind(ctx);
+  ctx.text = (x, y, s, v) => { seen.push(s); text(x, y, s, v); };
+  drawSummary(ctx, { name: 'Rock', status: 'LEARNED', clean: true, speed: 47, accuracy: 1,
+    share: 90, sideA: '100% 1st try', sideB: '43 of 92bpm', rowLeft: '16 stacks', cause: '',
+    series: null });
+  for (const s of ['100% 1st try', '43 of 92bpm', '16 stacks']) {
+    assert.ok(seen.includes(s), `${s}: ${seen.join('|')}`);
+  }
+  assert.ok(!seen.some((s) => /ms$/.test(s)), 'no spread on a take with no clock');
+});
+
+test('a page with written hands shows them under the stacks instead of the caret', () => {
+  const c = projectLevel({ ...ROCKISH, sticking: 'strict',
+    events: ROCKISH.events.map((e, i) => ({ ...e, hand: i % 2 ? 'L' : 'R' })) }, 'l0');
+  const run = createRun(c, { sticking: 'strict' });
+  const u = UT.createUntimed(run, { togetherMs: 60 });
+  const ctx = createScreen();
+  const seen = [];
+  const text = ctx.text.bind(ctx);
+  ctx.text = (x, y, s, v) => { seen.push(s); text(x, y, s, v); };
+  drawUntimedView(ctx, { run, chart: c, view: 'grid', dynamics: true, cursor: u.index,
+    title: c.name, rightLabel: '--', progress: 0, footerRight: '' });
+  assert.ok(seen.includes('R') && seen.includes('L'), seen.join('|'));
+  assert.ok(!seen.includes('1'), 'no bar number where the hands are');
+});

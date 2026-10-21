@@ -87,6 +87,13 @@ test('a press is judged only while practising and running', () => {
   assert.match(body('padDown'), /if \(screen !== RUNNING \|\| !T\.judging\(tp\)\) return;/);
 });
 
+test('an L0 press goes through the same guard: not while paused, not from the ready screen', () => {
+  const pad = body('padDown');
+  const guard = pad.indexOf('if (screen !== RUNNING || !T.judging(tp)) return;');
+  const untimed = pad.indexOf('UT.press(');
+  assert.ok(guard > 0 && untimed > guard, 'the untimed branch sits behind the guard');
+});
+
 test('only the Settings screen hands a knob to editSetting', () => {
   const midi = body('midiInner');
   const knobs = midi.slice(midi.indexOf('THE KNOBS ARE CONTEXTUAL'));

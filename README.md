@@ -68,6 +68,9 @@ fingers, in the same way its sister module is a reading trainer rather than a pi
   families from rock to techno, each learned a limb at a time.
 - **Waits for you.** With **Study** on, the scroll stops *on* the note you missed, names it, and one
   press of it carries on.
+- **Takes its time.** Every groove starts at **L0**, the whole groove with no clock: the bar stands
+  still, a cursor waits on the next stack until you strike it, and your pace is measured so you can
+  watch yourself get faster.
 - **Generates its own material** — subdivision drills, and random reading lines, sticking and
   grooves drawn fresh each time you open one — and takes hand-written exercises as JSON,
   interchangeable with the generated ones.
@@ -191,9 +194,9 @@ The ready screen **is the chart**, with the three controls laid over it:
 
 ```
  ┌──────────────────────────────────┐
- │ ▶  PLAY   listen                 │
- │ ●  REC    practise               │
- │ ↺  SCRUB  view                   │
+ │ ▶  PLAY  listen                  │
+ │ ●  REC   practise                │
+ │ ↺  SCRUB view                    │
  └──────────────────────────────────┘
 ```
 
@@ -310,6 +313,24 @@ hands**. When the take failed on its spread instead, the line keeps the tempo an
 Only a whole take is kept: practised from the top and never scrubbed. A take started from a scrubbed
 bar, or scrubbed while paused, is practice on a passage, and its result says **not kept**.
 
+An **L0** take ends on the same screen with its own words in it, because it has no spread to show:
+
+```
+ Rock backbeat         ✓LEARNED
+  47 %           100% 1st try        ← stacks right first time
+                  43 of 92bpm        ← your pace, against the written tempo
+  16 stacks
+  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·   ← 100% of the written tempo
+                    ■────────■
+  □────────■                          ← your pace, take by take, from 0%
+       REC again  CLICK next
+```
+
+The number is your pace as a share of the written tempo. When the take did not count it is how
+much was right first time instead, and the line under it names what cost the most: **wrong pads**,
+stacks **not together**, a drum **struck twice**, **soft accents**, **loud ghosts** or **wrong
+hands**. Click goes on to L1.
+
 ### Looking back over a take
 
 Turn the jog back on the result and the drill scrolls back into view, **as you played it**: every
@@ -406,7 +427,7 @@ session that mixes them beats one that grinds a single list:
 | --- | --- |
 | **Time** | quarters and eighths; triplets, sixteenths, sextuplets and switching between them; reading 8ths and 16ths and random sticking; then the **Clock** on quarters — keep time with the click gone |
 | **Rudiments** | all forty, in the order a teacher brings them in rather than by family: singles and doubles, the short rolls, flams, drags, the paradiddles, the long rolls, then the compound flams and drags |
-| **Grooves** | every groove, family by family from rock to techno, the plainest of each first, and every groove rung by rung, L1 to L4 |
+| **Grooves** | every groove, family by family from rock to techno, the plainest of each first, and every groove rung by rung, L0 to L4 |
 | **Ear** | name the drum — reading it, hearing it, picking it — then the subdivision, then the groove |
 
 | Row | Does |
@@ -421,7 +442,8 @@ the step asks for. Click on a result goes on to the next step of the same track 
 was not good enough yet, so you are never stuck on one drill; Record plays it again.
 
 A groove learned at a higher level ticks the levels below it: if you can play everything, you can
-play the cymbals alone. Someone who can already play a groove plays its top rung once and moves on.
+play the cymbals alone — and you know its notes, which is all L0 asks. Someone who can already play
+a groove plays its top rung once and moves on.
 
 ### Repetition
 
@@ -429,7 +451,9 @@ What you have learned comes back after **1, 3, 7, 14 and 30 days** — the spaci
 something stay learned — as a short daily routine of at most five drills. A clean take at tempo
 moves a drill on to its next interval; one that falls apart brings it back tomorrow and puts it at
 the top of the list. Only a take at full speed counts here: working on a learned rudiment slowly is
-practice, not a slip. And it never lowers your best.
+practice, not a slip. And it never lowers your best. **L0 never comes back** here: repetition asks
+whether something is still clean at tempo, which a take with no clock cannot answer, and the timed
+rungs carry the groove there.
 
 ### Progress
 
@@ -469,6 +493,7 @@ Every groove is **one file**, and the ladder is derived from it:
 
 | | plays | is |
 | --- | --- | --- |
+| **L0** | everything, **no clock** | the notes, at your own pace |
 | **L1** | cymbals only | the timekeeper alone |
 | **L2** | + kick | hat and kick |
 | **L3** | + snare | the backbeat |
@@ -483,6 +508,52 @@ analogy.
 Every bundled groove has a ladder. The fourth rung appears in the grooves that use **toms** — the
 fills, songo, mozambique, tribal techno — because that is the limb it adds. A drill with nothing
 to strip, like a rudiment, has one rung and opens straight away.
+
+### L0: at your own pace
+
+Every other rung asks two things at once — *which drums* and *when* — and a groove that is new to
+your hands fails the second while you are still working out the first. **L0** asks only the first.
+
+```
+ Rock backbeat           1/2  58bpm
+ ────────────────────────────────────
+ HH │ ⊙ · ⊙ · ✗ ┃ ✗ · ✗ · ✗ · ✗ │ ✗     ← the whole bar, standing still
+ SN │ · · · · ● ┃ · · · · ● · · │
+ KK │ ⊙ · · · · ┃ · · ● · · · · │ ●     ← past the bar line: the next bar's first stack
+ ────────────────────────────────────
+ 1              ▲                       ← the cursor waits on this stack
+ ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬            5/1
+```
+
+The whole bar is on one page and nothing moves. A line — the same "now" line the scroll uses —
+stands on the next stack, with a caret under it, and waits. Strike that stack and the line moves on;
+strike the last stack of the bar and the page turns. Past the closing bar line, on its own, is the
+first stack of the **next** bar, so at the end of a bar you can already see where your hands go next.
+Take as long as you like over any of it.
+
+- **A stack is struck together.** Hi-hat and kick written on one beat must land within the Strict
+  setting's good window of each other — **60 ms** on normal. Hit them one after the other and the
+  half you played lapses, flashes red, and the stack is asked for again. This is what keeps L0
+  teaching a unison rather than a flam.
+- **A wrong pad keeps the cursor where it is.** So does striking a drum of the stack twice before
+  the rest. Either way the stack is no longer *right first time*.
+- **Hands and dynamics are still judged.** A wrong hand or a soft accent lets the cursor move on —
+  asking again would only add strokes — but the stack does not count as right first time.
+- **Play sounds the bar** at its written tempo times **Speed**, its pads lighting as it goes, so you
+  can hear the groove before you step it. **Record** begins at once: there is nothing to count in to.
+  Record again pauses; time spent paused never counts against your pace.
+- **An L0 take is two passes** of the pattern, so you practise the seam where it comes round again.
+  `Reps` overrides it.
+
+The footer counts stacks right first time against the rest; the header shows your **pace**: how many
+beats of the groove you get through in a minute, with stops left out — a long look at the page is not
+held against you. L0 is learned at **90% right first time** on the standard settings, at **any**
+pace. Its number in the list, on the chart and on the result is your best pace as a share of the
+written tempo: **✓ 45%** says you know the notes and can step them at 45% of the tempo. When that
+number climbs, go on to L1.
+
+The Ladder and the Clock are about time, so they need a timed rung: armed on L0, they say
+**ARM A TIMED RUNG**.
 
 ### Rudiments
 
@@ -776,6 +847,9 @@ Everything except `ui.js` is pure and runs under plain `node`.
 | `src/grid_render.mjs` | the lane view |
 | `src/view.mjs` | whole screens, composed from the above |
 | `src/chart.mjs` | the scroll engine — beat to x, looping, and what is on screen |
+| `src/untimed.mjs` | L0: the cursor, stacks struck together, right first time, the pace |
+| `src/page_view.mjs` | L0's still page: the whole bar, the cursor, the next stack |
+| `src/levels.mjs` | the ladder of rungs, projected from one groove file |
 | `src/scoring.mjs` | hit windows, sticking, dynamics and run state |
 | `src/timing.mjs` | mean, σ and the per-voice breakdown |
 | `src/generator.mjs` | seeded procedural drills |

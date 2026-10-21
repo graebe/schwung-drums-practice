@@ -160,13 +160,13 @@ export function drawUntimedReady(ctx, s) {
   const gx = b.x + 6;
   const tx = gx + 13;
   drawPlayGlyph(ctx, gx + 1, b.y + 4, 7);
-  ctx.text(tx, b.y + 4, 'PLAY   hear bar', 1);
+  ctx.text(tx, b.y + 4, 'PLAY  hear bar', 1);
   drawRecordGlyph(ctx, gx + 1, b.y + 13, 7);
-  ctx.text(tx, b.y + 13, 'REC    own pace', 1);
+  ctx.text(tx, b.y + 13, 'REC   own pace', 1);
   if (s.warning) {
     ctx.text(gx, b.y + 22, s.warning.slice(0, 17), 1);
   } else {
     drawScrubGlyph(ctx, gx, b.y + 22);
-    ctx.text(tx, b.y + 22, 'SCRUB  view', 1);
+    ctx.text(tx, b.y + 22, 'SCRUB view', 1);
   }
 }

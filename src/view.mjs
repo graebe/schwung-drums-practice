@@ -201,13 +201,14 @@ export function drawReady(ctx, s) {
 
   /* Three controls, three symbols, three words. Which one does what is the
    * thing that has to be readable without being learned — and the knob was
-   * the one you could only find by turning it. */
+   * the one you could only find by turning it. The words share one column,
+   * a space after SCRUB: at two, "practise" ran into the box's right edge. */
   const gx = b.x + 6;
   const tx = gx + 13;
   drawPlayGlyph(ctx, gx + 1, b.y + 4, 7);
-  ctx.text(tx, b.y + 4, 'PLAY   listen', 1);
+  ctx.text(tx, b.y + 4, 'PLAY  listen', 1);
   drawRecordGlyph(ctx, gx + 1, b.y + 13, 7);
-  ctx.text(tx, b.y + 13, 'REC    practise', 1);
+  ctx.text(tx, b.y + 13, 'REC   practise', 1);
 
   /*
    * A drill asking for a voice no pad can reach takes the scrub row: it is
@@ -218,7 +219,7 @@ export function drawReady(ctx, s) {
     ctx.text(gx, b.y + 22, s.warning.slice(0, 17), 1);
   } else {
     drawScrubGlyph(ctx, gx, b.y + 22);
-    ctx.text(tx, b.y + 22, 'SCRUB  view', 1);
+    ctx.text(tx, b.y + 22, 'SCRUB view', 1);
   }
 }
 

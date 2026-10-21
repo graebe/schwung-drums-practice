@@ -380,3 +380,63 @@ test('learned over time: a step per drill, at its first ✓, a higher level carr
   assert.equal(tl.points[2].y, 0, 'the last step reaches the top');
   assert.deepEqual(P.learnedTimeline(p, ['b'], 101, 41, T0), { points: [], total: 0 });
 });
+
+/* ---- L0: own pace ------------------------------------------------------------ */
+
+const counts = (stacks, firstTry, extra = {}) => ({
+  stacks, firstTry, wrong: 0, apart: 0, again: 0, hand: 0,
+  softAccents: { n: 0, vel: 0, need: 0 }, loudGhosts: { n: 0, vel: 0, need: 0 }, ...extra,
+});
+
+test('L0 is clean at 90% right first time, and says what cost the most', () => {
+  assert.equal(P.untimedVerdictOf(counts(20, 18)).clean, true, 'exactly 90% counts');
+  const v = P.untimedVerdictOf(counts(20, 17, { wrong: 1, apart: 2 }));
+  assert.equal(v.clean, false);
+  assert.equal(v.cause, 'apart');
+  assert.equal(v.reason, '2 not together');
+  assert.equal(P.untimedVerdictOf(counts(20, 15, { wrong: 5 })).reason, '5 wrong pads');
+  assert.equal(P.untimedVerdictOf(counts(0, 0)).cause, 'nothing');
+  const acc = P.untimedVerdictOf(counts(16, 12,
+    { softAccents: { n: 4, vel: 4 * 74, need: 4 * 83 } }));
+  assert.equal(acc.reason, '4 soft accents 74<83');
+  for (const r of [acc, v]) assert.ok(r.reason.length <= P.REASON_MAX);
+});
+
+test('L0 is learned at any pace, keeps its best pace, and never comes back for repetition', () => {
+  const p = P.emptyProgress();
+  const r = P.recordUntimed(p, 'rock:l0', { pace: 31, accuracy: 1, clean: true, eased: '', bpm: 28, at: T0 });
+  assert.equal(r.learned, true, 'a slow clean take learns it');
+  const it = P.item(p, 'rock:l0');
+  assert.equal(it.best, 31);
+  assert.equal(it.rep, null, 'no repetition: L0 cannot answer "still clean at tempo?"');
+  P.recordUntimed(p, 'rock:l0', { pace: 25, accuracy: 1, clean: true, eased: '', bpm: 23, at: T0 + DAY });
+  assert.equal(it.best, 31, 'a slower take never lowers the best');
+  P.recordUntimed(p, 'rock:l0', { pace: 60, accuracy: 0.5, clean: false, eased: '', bpm: 55, at: T0 + DAY });
+  assert.equal(it.best, 31, 'a fast take that was not clean is not a best');
+  assert.equal(P.repetitionSession(p, T0 + 40 * DAY).length, 0);
+  assert.equal(it.h[it.h.length - 1][4] & P.F_TEMPO, 0, 'never flagged at tempo');
+});
+
+test('a guided L0 take is practice: kept, but not learned', () => {
+  const p = P.emptyProgress();
+  const r = P.recordUntimed(p, 'rock:l0', { pace: 40, accuracy: 1, clean: true, eased: 'Guide', bpm: 37, at: T0 });
+  assert.equal(r.learned, false);
+  assert.equal(P.item(p, 'rock:l0').best, 0);
+  assert.equal(P.item(p, 'rock:l0').plays, 1);
+});
+
+test('a higher rung learned ticks L0; L0 learned ticks nothing above it', () => {
+  const p = P.emptyProgress();
+  assert.deepEqual(P.higherLevels('rock:l0'), ['rock:l1', 'rock:l2', 'rock:l3', 'rock:l4']);
+  P.recordTake(p, 'rock:l1', take(100));
+  assert.equal(P.isDone(p, 'rock:l0'), true);
+  const q = P.emptyProgress();
+  P.recordUntimed(q, 'rock:l0', { pace: 40, accuracy: 1, clean: true, eased: '', bpm: 37, at: T0 });
+  assert.equal(P.isDone(q, 'rock:l1'), false);
+});
+
+test('the L0 chart scale starts at nothing, so a slow first pace still shows', () => {
+  const s = P.percentSeries([[0, 20, 100, 0, 9], [1, 30, 100, 0, 9]], 50, 20, P.UNTIMED_SCALE);
+  assert.ok(s.points[0].y > s.points[1].y, 'a faster pace is higher');
+  assert.ok(s.points[0].y < 19, 'and 20% is above the floor');
+});

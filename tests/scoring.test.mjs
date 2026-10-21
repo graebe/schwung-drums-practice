@@ -702,3 +702,29 @@ test('a flawless Clock is 100% right: it is judged on the notes that came due', 
     assert.equal(st.hits, st.asked);
   }
 });
+
+/* ---- shared with L0 ------------------------------------------------------- */
+
+test('judgeStroke judges a hand and a dynamic exactly as a timed hit does', () => {
+  const chart = { id: 'x', name: 'x', bpm: 100, timeSig: [4, 4], loopBars: 1, repeats: 1,
+    sticking: 'strict',
+    events: [0, 1, 2].map((b) => ({ beat: b, voices: ['SN'], hand: 'R' }))
+      .concat([{ beat: 3, voices: ['SN'], hand: 'R', dyn: 'accent' }]) };
+  const run = S.createRun(chart, { sticking: 'strict' });
+  for (let i = 0; i < 3; i++) S.judgeStroke(run, run.entries[i].notes[0], 'R', 70);
+  const acc = S.judgeStroke(run, run.entries[3].notes[0], 'L', 80);
+  assert.equal(acc.handOk, false);
+  assert.equal(acc.need, 70 + S.ACCENT_LIFT);
+  assert.equal(acc.dynOk, false);
+  assert.deepEqual(run.touch, [70, 70, 70], 'an accent does not join the touch');
+});
+
+test('entriesIn lays a bar out on a still page', () => {
+  const chart = { id: 'x', name: 'x', bpm: 100, timeSig: [4, 4], loopBars: 1, repeats: 2,
+    events: [0, 1, 2, 3].map((b) => ({ beat: b, voices: ['SN'] })) };
+  const run = S.createRun(chart);
+  const page = S.entriesIn(run, 4, 8, 20, 24);
+  assert.deepEqual(page.map((p) => p.beat), [4, 5, 6, 7], 'the second bar, and only it');
+  assert.deepEqual(page.map((p) => p.x), [20, 44, 68, 92]);
+  assert.equal(page[0].index, 4);
+});

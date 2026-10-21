@@ -46,13 +46,34 @@
         "",
         "Click opens, Back goes",
         "up. A groove opens its",
-        "levels, one limb more",
-        "each rung.",
+        "levels: L0 at your own",
+        "pace, then one limb",
+        "more each rung.",
         "",
         "A row shows your best",
         "clean speed: 80%. A",
         "tick is learned, a ring",
         "played but not clean."
+      ]
+    },
+    {
+      "title": "Own pace (L0)",
+      "lines": [
+        "L0 is the whole groove,",
+        "no clock. The bar stands",
+        "still; a line waits on",
+        "the next stack.",
+        "",
+        "Strike it TOGETHER (60ms",
+        "on normal) and the line",
+        "moves on. A wrong pad",
+        "keeps it there.",
+        "",
+        "PLAY   hear the bar",
+        "REC    begin, or pause",
+        "Learned: 90% right 1st",
+        "time. The % is your",
+        "pace, of the tempo."
       ]
     },
     {

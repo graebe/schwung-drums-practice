@@ -14,6 +14,8 @@
  *   npm run preview -- --exercise rock-backbeat --view grid --film 0,1,2,3
  *   npm run preview -- --screen summary
  *   npm run preview -- --exercise rock-backbeat --beats 20 --sloppy
+ *   npm run preview -- --exercise rock-backbeat --untimed --cursor 0,3,8 --view grid
+ *   npm run preview -- --exercise rock-backbeat --screen untimed-summary
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { createScreen, toAscii } from './screen_buffer.mjs';
@@ -25,6 +27,8 @@ import { createLadder } from '../src/ladder.mjs';
 import { DEFAULTS } from '../src/settings_def.mjs';
 import * as PROG from '../src/progress.mjs';
 import * as L from '../src/layout.mjs';
+import * as UT from '../src/untimed.mjs';
+import { projectLevel } from '../src/levels.mjs';
 
 const exDir = new URL('../src/exercises/', import.meta.url);
 
@@ -85,6 +89,36 @@ function runAt(beats, { sloppy = false } = {}) {
   return run;
 }
 
+/*
+ * An L0 take stepped up to stack `upTo`, each stack struck together 500ms
+ * after the last. With --sloppy the third stack is struck apart first.
+ */
+function untimedAt(upTo, { sloppy = false } = {}) {
+  const c = projectLevel(chart, 'l0') || { ...chart, untimed: true, repeats: 2 };
+  const run = createRun(c, { sticking: c.sticking, strictness: DEFAULTS.strictness, dynamics: true });
+  const u = UT.createUntimed(run, { togetherMs: 60 });
+  let t = 0;
+  while (!u.finished && u.index < upTo) {
+    const e = UT.current(u);
+    if (sloppy && u.index === 2) {
+      UT.press(u, { voice: e.notes[0].voice, velocity: 90 }, t);
+      UT.expire(u, t + 100);
+      t += 200;
+    }
+    for (const n of e.notes) UT.press(u, { voice: n.voice, hand: n.wantHand, velocity: n.wantDyn === 'accent' ? 120 : 90 }, t);
+    t += 500;
+  }
+  return { c, run, u };
+}
+
+function untimedState({ c, run, u }) {
+  return {
+    run, chart: c, view, dynamics: true, cursor: u.index, done: u.finished, title: c.name,
+    rightLabel: u.livePace > 0 ? `${Math.round(u.livePace)}bpm` : '--',
+    footerRight: `${u.firstTry}/${u.stacks - u.firstTry}`, progress: UT.progress(u),
+  };
+}
+
 function dump(label, ctx) {
   console.log(`--- ${label} ---`);
   console.log(toAscii(ctx, { ruler: Boolean(arg('ruler', false)) }));
@@ -109,7 +143,19 @@ if (screen) {
       footer: 'REC again  CLICK next',
     });
   }
-  else if (screen === 'ladder') {
+  else if (screen === 'untimed-summary') {
+    const h = [[0, 31, 81, 0, 8], [1, 38, 94, 0, 9], [2, 47, 100, 0, 9]];
+    V.drawSummary(ctx, {
+      name: chart.name, status: 'LEARNED', mark: PROG.MARK_DONE, clean: true, speed: 47,
+      accuracy: 1, share: 90, failAcc: false, failSd: false, cause: '',
+      sideA: '100% 1st try', sideB: `43 of ${chart.bpm}bpm`, rowLeft: '16 stacks', limb: '',
+      series: PROG.percentSeries(h, V.SUMMARY_PLOT.w - 2, V.SUMMARY_PLOT.h - 2, PROG.UNTIMED_SCALE),
+      footer: 'REC again  CLICK next',
+    });
+  } else if (screen === 'untimed-ready') {
+    const st = untimedState(untimedAt(0));
+    V.drawUntimedReady(ctx, { ...st, rightLabel: '16 stacks', footerRight: '' });
+  } else if (screen === 'ladder') {
     V.drawLadder(ctx, { ladder: Object.assign(createLadder({ bpm: 112 }), { rungs: 6 }), barsDone: 2 });
   } else if (screen === 'ready') {
     V.drawReady(ctx, {
@@ -131,6 +177,12 @@ if (screen) {
     process.exit(1);
   }
   dump(`${screen} (${chart.name})`, ctx);
+} else if (arg('untimed', false)) {
+  for (const upTo of String(arg('cursor', '0')).split(',').map(Number)) {
+    const ctx = createScreen();
+    V.drawUntimedView(ctx, untimedState(untimedAt(upTo, { sloppy })));
+    dump(`${chart.name} L0 @ stack ${upTo} (${view})`, ctx);
+  }
 } else {
   const frames = String(arg('film', arg('beats', '0'))).split(',').map(Number);
   for (const beats of frames) {

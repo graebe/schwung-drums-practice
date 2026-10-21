@@ -212,4 +212,14 @@ export function practiceLength(chart) {
   return `${bars} bars  ${mm}:${ss}`;
 }
 
+/*
+ * The length of an L0 take, for the ready screen. A duration means nothing
+ * with no clock, so it is counted in what you will strike. The header already
+ * says how many bars ("1/2"), and the title needs the rest of the line.
+ */
+export function untimedLength(chart) {
+  const stacks = (chart.events || []).length * Math.max(1, chart.repeats || 1);
+  return `${stacks} stacks`;
+}
+
 export { VOICE_IDS, DEFAULT_REPEATS };

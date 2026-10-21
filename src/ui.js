@@ -47,7 +47,8 @@ import * as Q from './guess.mjs';
 import * as AP from './answer_pads.mjs';
 import * as PROG from './progress.mjs';
 import * as PLAN from './program.mjs';
-import { availableLevels, LEVEL_ID_RE } from './levels.mjs';
+import * as UT from './untimed.mjs';
+import { availableLevels, LEVEL_ID_RE, isUntimedId } from './levels.mjs';
 import { paint, flashColor, guideTargets, FLASH_MS } from './led_paint.mjs';
 import { stats as timingStats, statsSince, perVoice, voicesBySpread } from './timing.mjs';
 
@@ -292,6 +293,13 @@ let takeLearned = false;
  */
 let review = null;
 const REVIEW_UNITS_PER_BAR = 36;
+/*
+ * An L0 take (untimed.mjs) while one is running, else null. L0 has no clock:
+ * the transport is only borrowed for its modes — Record's light, pause,
+ * judging — and the tick never advances it.
+ */
+let untimed = null;
+const isUntimed = () => Boolean(chart && chart.untimed);
 let clockMode = false;
 let shiftHeld = false;
 /* Where the playhead is and what moves it: see transport.mjs. */
@@ -484,8 +492,9 @@ function paintLeds(t) {
   st.held = held;
   st.flash = flash && t < flashUntil ? flash : null;
   st.targets = scrubTargets() || (settings.guide && run && screen === RUNNING
-    ? guideTargets(run, tp.songBeats) : null);
-  st.sounding = tp.mode === C.MODE_LISTEN && screen === RUNNING && t < listenLitUntil ? listenLit : null;
+    ? (untimed ? UT.targets(untimed) : guideTargets(run, tp.songBeats)) : null);
+  st.sounding = t < listenLitUntil && ((tp.mode === C.MODE_LISTEN && screen === RUNNING)
+    || (isUntimed() && (screen === READY || screen === RUNNING))) ? listenLit : null;
   st.stuck = stuckTargets();
   st.phase = Math.floor(t / 500) % 2;
   /* The second hint lights the pad. Only for the drills whose answer IS a
@@ -776,10 +785,11 @@ function armChart(c) {
    * again fifty times a second. */
   chartWarning = IO.playabilityWarnings(chart)[0] || '';
   chartLanes = GR.lanes(KIT.voicesInChart(chart));
-  chartLength = IO.practiceLength(chart);
+  chartLength = chart.untimed ? IO.untimedLength(chart) : IO.practiceLength(chart);
   /* A newly armed drill starts at home, where the box is. */
   T.home(tp);
   review = null;
+  untimed = null;
   if (ladder) ladder = newLadder();
   screen = READY;
   announce(`${chart.name} ready`);
@@ -819,6 +829,10 @@ function changeSpeed(delta) {
   if (screen === READY) {
     chart = { ...chart, bpm: armedBpm };
     run = SC.createRun(chart, runOpts());
+  } else if (untimed) {
+    /* L0 has no tempo to change under you: Speed is only how fast Play
+     * sounds the bar, and the take carries on whole. */
+    chart = { ...chart, bpm: armedBpm };
   } else {
     setTempo(armedBpm);
     tp.scrubbed = true;
@@ -843,6 +857,10 @@ function runOpts() {
 }
 
 function start(practice) {
+  if (isUntimed()) {
+    startUntimed(practice);
+    return;
+  }
   /*
    * Start where the playhead IS, not always at the top: scrubbing the ready
    * screen is how you pick a passage, and resetting would make that pointless.
@@ -878,9 +896,61 @@ function start(practice) {
   announce(practice ? 'practising' : 'listening');
 }
 
+/*
+ * L0. Record begins at once — there is no count-in, because there is nothing
+ * to count in to — from the top, or from the bar the ready screen was scrubbed
+ * to (a passage, so not kept, as on every rung). Play does not start a take:
+ * it sounds the bar at its written tempo, so the groove can be heard before
+ * it is stepped.
+ */
+function startUntimed(practice) {
+  if (!practice) {
+    hearBar();
+    return;
+  }
+  clearPrompt();
+  run = SC.createRun(chart, runOpts());
+  const from = T.start(tp, { mode: C.MODE_PRACTICE, nowMs: now(), bpm: chart.bpm, countInBeats: 0 });
+  let index = 0;
+  if (from > 0) {
+    SC.ensureEntries(run, from + 8);
+    SC.seekTo(run, from);
+    index = Math.max(0, SC.nextEntryIndex(run, from));
+  }
+  untimed = UT.createUntimed(run, { togetherMs: SC.WINDOWS[settings.strictness].goodMs, from: index });
+  screen = RUNNING;
+  announce('own pace');
+}
+
+/*
+ * Play on L0: the bar on the page, sounded once at the drill's tempo times
+ * Speed, its pads lit as it goes. Laid out on the wall clock through the
+ * quiz's prompt queue — it is the same job, a figure sounded with nothing to
+ * keep time with — and nothing about the take changes while it plays.
+ */
+function hearBar() {
+  clearPrompt();
+  if (!run || !chart) return;
+  const perBar = CH.beatsPerBar(chart);
+  const cursor = untimed ? untimed.index : Math.max(0, SC.nextEntryIndex(run, Math.max(0, tp.songBeats)));
+  const from = V.pageBar(run, cursor, perBar) * perBar;
+  const beatMs = 60000 / (chart.bpm || 90);
+  const t = now();
+  for (const e of run.entries) {
+    if (e.beat < from - 1e-9) continue;
+    if (e.beat >= from + perBar - 1e-9) break;
+    for (const n of e.notes) {
+      promptQueue.push({ atMs: t + (e.beat - from) * beatMs, voice: n.voice,
+        vel: n.wantDyn === 'accent' ? 115 : n.wantDyn === 'ghost' ? 45 : 90, lit: true });
+    }
+  }
+  announce('listen');
+}
+
 /* Hold the playhead. The clock stops; the panel does not. */
 function pause() {
   if (!T.pause(tp, now())) return;
+  if (untimed) UT.pause(untimed);
   dspSet('panic', '1');
   announce('paused');
 }
@@ -902,6 +972,13 @@ function togglePause() {
  * practice re-arms the notes ahead, which Listen had marked as played.
  */
 function transportPress(want) {
+  /* L0 has nothing to listen to in place: Play sounds the bar, and Record
+   * pauses and resumes. */
+  if (untimed) {
+    if (want === C.MODE_LISTEN) hearBar();
+    else togglePause();
+    return;
+  }
   if (tp.mode === want) { togglePause(); return; }
   const at = T.switchMode(tp, want, now(), chart.bpm);
   if (want === C.MODE_PRACTICE) SC.seekTo(run, at);
@@ -919,6 +996,7 @@ function transportPress(want) {
 function enterReady() {
   dspSet('panic', '1');
   review = null;
+  untimed = null;
   T.home(tp);
   if (ladder) chart = { ...chart, bpm: armedBpm };
   run = SC.createRun(chart, runOpts());
@@ -990,6 +1068,98 @@ function stop() {
   review = { run: SC.reviewOf(run), end: endAt, at: null };
   T.home(tp);
   screen = ladder ? LADDER : SUMMARY;
+}
+
+/*
+ * An L0 take is through: its own verdict (progress.mjs untimedVerdictOf), its
+ * own record, its own result — with the result screen's layout. Study does
+ * not ease it: L0 already waits for you. Kept only when whole — never
+ * started from a scrubbed bar.
+ */
+function stopUntimed() {
+  dspSet('panic', '1');
+  clearPrompt();
+  summaryIsBest = false;
+  progressNote = null;
+  takeLearned = false;
+  const c = UT.counts(untimed);
+  const judged = {
+    c,
+    verdict: PROG.untimedVerdictOf(c),
+    eased: PROG.easedBy({ ...judgingContext(), study: false }),
+    pace: untimed.pace,
+  };
+  const whole = !tp.scrubbed && c.stacks > 0;
+  if (whole) recordUntimed(judged);
+  summaryInfo = untimedResultOf(whole, judged);
+  review = { run: SC.reviewOf(run), end: run.endBeat, at: null, untimed: true };
+  untimed = null;
+  T.home(tp);
+  screen = SUMMARY;
+}
+
+function recordUntimed({ c, verdict, eased, pace }) {
+  const rec = ST.makeRecord({
+    drill: ST.drillId('untimed', recordIdOf(chart), settings),
+    bpm: pace,
+    n: c.firstTry,
+    err: c.stacks - c.firstTry,
+    at: Date.now() / 1000,
+    context: attemptContext(),
+    total: c.stacks,
+    clean: verdict.clean && !eased,
+    breakdown: { strays: c.wrong, stickErrors: c.hand,
+      dynErrors: c.softAccents.n + c.loudGhosts.n, softAccents: c.softAccents },
+  });
+  stats = ST.addRecord(stats, rec);
+  summaryIsBest = ST.forDrill(stats, rec.d).length > 1 && ST.isPersonalBest(stats, rec);
+  saveStats();
+  const r = PROG.recordUntimed(progress, armedItemId(), {
+    pace: PROG.speedOf(pace, armedWrittenBpm()), accuracy: verdict.accuracy,
+    clean: verdict.clean, eased, bpm: pace, at: Date.now(),
+  });
+  saveProgress();
+  takeLearned = r.learned;
+  if (r.learned) announce('learned');
+}
+
+/*
+ * The result of an L0 take, in the timed result's layout. The headline is the
+ * PACE when the take counted — as a share of the written tempo, so the list,
+ * the chart and the result all read the same number — and how much was right
+ * first time when it did not. Beside it: right first time, and the pace in
+ * beats a minute against the tempo it is written at.
+ */
+function untimedResultOf(whole, { c, verdict, eased, pace }) {
+  const clean = verdict.clean;
+  const counted = whole;
+  const share = Math.round(PROG.CLEAN_SHARE * 100);
+  const right = Math.floor(verdict.accuracy * 100);
+  const failAcc = counted && !clean && c.stacks > 0;
+  let cause = '';
+  if (counted && !clean) cause = verdict.reason;
+  else if (counted && clean && eased) cause = `not counted: ${eased}`;
+  const it = PROG.item(progress, armedItemId());
+  const box = V.SUMMARY_PLOT;
+  return {
+    name: chart.name,
+    clean: !counted || clean,
+    speed: PROG.speedOf(pace, armedWrittenBpm()),
+    accuracy: verdict.accuracy,
+    share,
+    failAcc,
+    failSd: false,
+    status: PROG.takeStatus({ whole, study: false, learned: takeLearned, clean,
+      best: summaryIsBest, eased }),
+    mark: takeLearned ? PROG.MARK_DONE : null,
+    cause,
+    sideA: !counted || clean ? `${right}% 1st try` : (failAcc ? `1st try, need ${share}` : '1st try'),
+    sideB: pace > 0 ? `${Math.round(pace)} of ${armedWrittenBpm()}bpm` : 'pace --',
+    rowLeft: `${c.stacks} stacks`,
+    limb: '',
+    series: PROG.percentSeries(it ? it.h : [], box.w - 2, box.h - 2, PROG.UNTIMED_SCALE),
+    footer: 'REC again  CLICK next',
+  };
 }
 
 /*
@@ -1339,12 +1509,20 @@ function schedulePrompt() {
   }
 }
 
+let litAt = -1;
+
 function servicePrompt() {
   if (!promptQueue.length) return;
   const t = now();
   while (promptQueue.length && promptQueue[0].atMs <= t) {
     const e = promptQueue.shift();
     sound(e.voice, e.vel);
+    /* L0's bar lights its pads as it sounds, a stack at a time. */
+    if (e.lit) {
+      if (e.atMs !== litAt) { listenLit = []; litAt = e.atMs; }
+      listenLit.push(e.voice);
+      listenLitUntil = t + LISTEN_LIT_MS;
+    }
   }
 }
 
@@ -1407,6 +1585,11 @@ function padDown(pad, vel) {
   /* Not while paused: a pad pressed to find your place after a scrub would be
    * scored as a perfect hit on the note under the playhead. */
   if (screen !== RUNNING || !T.judging(tp)) return;
+  if (untimed) {
+    const j = UT.press(untimed, { voice, hand, velocity: vel }, now());
+    if (j) setFlash(PAD.padsForVoice(voice, settings.layout, hand), flashColor(j));
+    return;
+  }
   /* The marker goes where the press was SEEN (songBeats); the judgement is
    * about TIME, so it keeps the honest clock — and is told the frozen one, so
    * a note the scroll has not reached is only as near as it looks. */
@@ -1417,6 +1600,12 @@ function padDown(pad, vel) {
 
 function padUp(pad) {
   held.delete(pad);
+}
+
+function padsOfVoices(voices) {
+  const out = [];
+  for (const v of voices) out.push(...PAD.padsForVoice(v, settings.layout));
+  return out;
 }
 
 function setFlash(pads, color) {
@@ -1580,6 +1769,13 @@ function openLeaf(item) {
     announce('Arm a drill first, then open the ' + item.label + '.');
     return;
   }
+  /* Both are about time, and L0 has none: they wrap a timed rung. */
+  if ((item.kind === 'clock' || item.kind === 'ladder') && chart.untimed) {
+    menuNote = 'ARM A TIMED RUNG';
+    menuNoteUntil = now() + 2000;
+    announce(`The ${item.label} needs a timed rung, L1 to L4.`);
+    return;
+  }
   if (item.kind === 'clock') {
     clockMode = true;
     ladder = null;
@@ -1692,7 +1888,7 @@ function progressDetail(index) {
     done: PROG.isDone(progress, id),
     isQuiz,
     series: PROG.percentSeries(it.h, box.w - 2, box.h - 2,
-      isQuiz ? { lo: 0, hi: 100, line: PROG.QUIZ_PASS } : {}),
+      isQuiz ? { lo: 0, hi: 100, line: PROG.QUIZ_PASS } : isUntimedId(id) ? PROG.UNTIMED_SCALE : {}),
     footer,
   };
 }
@@ -1723,6 +1919,7 @@ function leaveToMenu() {
     dspSet('panic', '1');
     T.home(tp);
   }
+  untimed = null;
   screen = MENU;
   settingsEditing = false;
   quiz = null;
@@ -1952,6 +2149,16 @@ function draw() {
     V.drawResult(ctx, resultCache);
     return;
   }
+  if (reviewing() && chart && review.untimed) {
+    const at = SC.nextEntryIndex(review.run, review.at);
+    V.drawUntimedView(ctx, {
+      run: review.run, chart, view: settings.view, lanes: chartLanes, dynamics: settings.dynamics,
+      cursor: at < 0 ? review.run.entries.length : at, done: at < 0,
+      title: chart.name, rightLabel: 'REVIEW', footerRight: '',
+      progress: review.end > 0 ? review.at / review.end : 0,
+    });
+    return;
+  }
   if (reviewing() && chart) {
     V.drawReadingView(ctx, {
       run: review.run, chart, songBeats: review.at, pxPerBeat: settings.pxPerBeat,
@@ -1968,6 +2175,26 @@ function draw() {
   }
   if (screen === SUMMARY && run) {
     if (summaryInfo) V.drawSummary(ctx, summaryInfo);
+    return;
+  }
+  if (screen === READY && chart && chart.untimed) {
+    const at = Math.max(0, tp.songBeats);
+    V.drawUntimedReady(ctx, {
+      run, chart, view: settings.view, lanes: chartLanes, dynamics: settings.dynamics,
+      cursor: Math.max(0, SC.nextEntryIndex(run, at)), title: chart.name,
+      rightLabel: at > 0 ? `${CH.barBeatOf(chart, at).bar}/${CH.barBeatOf(chart, at).bars}` : chartLength,
+      footerRight: '', progress: 0, warning: chartWarning, scrubbed: at > 0,
+    });
+    return;
+  }
+  if (screen === RUNNING && run && chart && untimed) {
+    V.drawUntimedView(ctx, {
+      run, chart, view: settings.view, lanes: chartLanes, dynamics: settings.dynamics,
+      cursor: untimed.index, done: untimed.finished, title: chart.name,
+      rightLabel: untimed.livePace > 0 ? `${Math.round(untimed.livePace)}bpm` : '--',
+      footerRight: `${untimed.firstTry}/${untimed.stacks - untimed.firstTry}`,
+      progress: UT.progress(untimed), paused: tp.paused,
+    });
     return;
   }
   if (screen === READY && chart) {
@@ -2103,7 +2330,14 @@ function tickInner() {
     return;
   }
 
-  if (screen === RUNNING && run && chart && !tp.paused) {
+  if (screen === RUNNING && run && chart && untimed) {
+    /* No clock: only the together-window of a partly struck stack runs out. */
+    if (!tp.paused) {
+      const lapsed = UT.expire(untimed, t);
+      if (lapsed) setFlash(padsOfVoices(lapsed), PAD.LED_MISS);
+    }
+    if (untimed.finished) stopUntimed();
+  } else if (screen === RUNNING && run && chart && !tp.paused) {
     advanceClock();
     /*
      * Material is generated in EVERY mode, because it is pruned in every mode.
@@ -2127,10 +2361,9 @@ function tickInner() {
     else if (clockMode && tp.mode === C.MODE_PRACTICE && tp.songBeats >= clockEnd() + run.late) stop();
   }
 
-  if (screen === QUIZ && quiz) {
-    servicePrompt();
-    serviceQuiz();
-  }
+  /* The quiz's prompt, or L0's bar: either way a figure on the wall clock. */
+  servicePrompt();
+  if (screen === QUIZ && quiz) serviceQuiz();
 
   flushDsp();
   serviceOutbox(false);
@@ -2286,7 +2519,9 @@ function midiInner(data) {
       return;
     }
     if (screen === READY || screen === RUNNING) {
-      if (k === 0 && (screen === READY || tp.paused)) scrub(delta);
+      /* Not while an L0 take is paused: a seek would move the notes under a
+       * cursor that only the pads move. */
+      if (k === 0 && (screen === READY || (tp.paused && !untimed))) scrub(delta);
       else if (k === C.KNOB_COUNT - 1) changeSpeed(delta);
       return;
     }

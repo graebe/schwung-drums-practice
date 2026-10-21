@@ -145,3 +145,18 @@ test('a record says what its errors were made of, and reads back', () => {
     softAccents: { n: 0, vel: 0, need: 0 } } });
   assert.equal('av' in none, false, 'no accents missed, no velocity to report');
 });
+
+test('an L0 best is its fastest clean pace', () => {
+  const s = ST.emptyStats();
+  const a = ST.makeRecord({ drill: 'untimed:rock:l0:normal', bpm: 40, clean: true });
+  ST.addRecord(s, a);
+  const slow = ST.makeRecord({ drill: 'untimed:rock:l0:normal', bpm: 35, clean: true });
+  ST.addRecord(s, slow);
+  assert.equal(ST.isPersonalBest(s, slow), false);
+  const messy = ST.makeRecord({ drill: 'untimed:rock:l0:normal', bpm: 60, clean: false });
+  ST.addRecord(s, messy);
+  assert.equal(ST.isPersonalBest(s, messy), false, 'a take that was not clean is no best');
+  const fast = ST.makeRecord({ drill: 'untimed:rock:l0:normal', bpm: 48, clean: true });
+  ST.addRecord(s, fast);
+  assert.equal(ST.isPersonalBest(s, fast), true, 'measured against clean takes only');
+});

@@ -177,3 +177,38 @@ test('the ready box fits, in both of its states', () => {
   /* And it leaves the timing bar alone. */
   assert.ok(b.y + b.h < L.FOOTER_Y - 2);
 });
+
+/* ---- L0's still page ---------------------------------------------------------- */
+
+test('the page clears both renderers\' clipping, and the peek stays on screen', () => {
+  /* The staff drops a head left of DESPAWN_X, the grid a cell left of
+   * GRID_LEFT_X - 4; the bar line before the first stack must still draw. */
+  assert.ok(L.PAGE_LEFT_STAFF_X + L.BAR_OFFSET_PX >= L.DESPAWN_X, 'the staff page bar line is clipped');
+  assert.ok(L.PAGE_LEFT_STAFF_X - (L.HEAD_W >> 1) - 1 >= L.DESPAWN_X, 'the first head is clipped');
+  assert.ok(L.PAGE_LEFT_GRID_X + L.BAR_OFFSET_PX >= L.GRID_LEFT_X, 'the grid page bar line is clipped');
+  /* The peek and the double bar never stand together — the double bar is
+   * what stands there when nothing follows — so each is checked on its own. */
+  assert.ok(L.PAGE_PEEK_X - 4 > L.PAGE_BAR_X, 'the widest peek cell runs into the bar line');
+  assert.ok(L.PAGE_PEEK_X + 4 < L.SCREEN_W, 'the widest peek cell runs off the screen');
+  assert.ok(L.PAGE_BAR_X + 2 < L.SCREEN_W, 'the double bar runs off the screen');
+});
+
+test('every bundled groove\'s bar fits a page with its stacks apart', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { parseExercise, parseManifest } = await import('../src/exercise_io.mjs');
+  const { pageGeometry } = await import('../src/page_view.mjs');
+  const { availableLevels } = await import('../src/levels.mjs');
+  const dir = new URL('../src/exercises/', import.meta.url);
+  const man = parseManifest(readFileSync(new URL('index.json', dir), 'utf8'));
+  for (const e of man.entries) {
+    const c = parseExercise(readFileSync(new URL(e.file, dir), 'utf8'), e.id).chart;
+    if (availableLevels(c)[0].id !== 'l0') continue;   /* a rudiment has no page */
+    for (const view of ['grid', 'staff']) {
+      const { px } = pageGeometry(view, c);
+      for (let i = 1; i < c.events.length; i++) {
+        const gap = (c.events[i].beat - c.events[i - 1].beat) * px;
+        assert.ok(gap >= 3, `${e.id} (${view}): stacks ${gap.toFixed(1)}px apart`);
+      }
+    }
+  }
+});
