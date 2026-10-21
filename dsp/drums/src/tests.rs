@@ -371,3 +371,172 @@ fn the_soft_clip_has_no_step_at_full_scale() {
     /* Quiet material passes almost untouched. */
     assert!((soft_clip(0.1) - 0.1).abs() < 0.001);
 }
+
+
+/* ---- the recorded kit -------------------------------------------------- */
+
+/// The module as installed: this repository's root holds samples/.
+fn installed() -> Drums {
+    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+    Drums::create(Some(root.as_bytes()), None).unwrap()
+}
+
+fn answer(d: &mut Drums, key: &[u8]) -> alloc::vec::Vec<u8> {
+    let mut out = [0u8; 32];
+    let n = d.get_param(key, &mut out);
+    out[..n].to_vec()
+}
+
+/// RMS and peak of `blocks` host blocks, each zeroed first as the host does.
+fn listen(d: &mut Drums, blocks: usize) -> (f64, i32) {
+    let (mut sum, mut n, mut peak) = (0.0f64, 0usize, 0i32);
+    for _ in 0..blocks {
+        let mut buf = [0i16; 256];
+        d.render(&mut buf);
+        for s in buf {
+            sum += (s as f64) * (s as f64);
+            peak = peak.max((s as i32).abs());
+            n += 1;
+        }
+    }
+    ((sum / n as f64).sqrt(), peak)
+}
+
+/// RMS over eight strokes of `list`, a quarter of a second apart.
+fn bar(d: &mut Drums, list: &[u8]) -> f64 {
+    let mut sum = 0.0;
+    for _ in 0..8 {
+        d.set_param(b"n", Some(list));
+        let (r, _) = listen(d, 86);
+        sum += r * r;
+    }
+    (sum / 8.0).sqrt()
+}
+
+#[test]
+fn an_installed_module_plays_the_recordings() {
+    let mut d = installed();
+    assert_eq!(answer(&mut d, b"source"), b"sampled");
+    assert_eq!(answer(&mut d, b"click"), b"sampled");
+    d.set_param(b"n", Some(b"7:100,5:100"));
+    assert!(listen(&mut d, 4).0 > 0.0);
+    assert_eq!(answer(&mut d, b"voices"), b"2", "two recorded voices");
+    assert!(d.voices.iter().all(|v| !v.active), "and no synthesized one");
+}
+
+#[test]
+fn without_packs_it_is_the_synth_and_says_so() {
+    let mut d = Drums::create(Some(b"/nonexistent"), None).unwrap();
+    assert_eq!(answer(&mut d, b"source"), b"synth");
+    assert_eq!(answer(&mut d, b"click"), b"synth");
+    d.set_param(b"n", Some(b"7:100,c:1"));
+    listen(&mut d, 1);
+    assert!(d.voices.iter().any(|v| v.active));
+    assert!(d.clicks.iter().any(|c| c.active), "c:1 in the list is the synthesized click");
+}
+
+#[test]
+fn the_recorded_kit_is_as_loud_as_the_synth() {
+    let groove = b"7:100,5:100,1:100";
+    let a = bar(&mut Drums::create(None, None).unwrap(), groove);
+    let b = bar(&mut installed(), groove);
+    let db = 20.0 * (b / a).log10();
+    assert!(db.abs() < 1.5, "a bar of kick, snare and hat is {db:+.1} dB against the synth's");
+}
+
+#[test]
+fn the_recorded_kit_keeps_the_balance() {
+    /* Every voice against the snare, recorded and synthesized: the record's
+     * mix sits hats and cymbals far back; the manifest's trims bring each
+     * within reach of the balance tuned by ear on the device. */
+    let level = |d: &mut Drums, drum: usize| bar(d, alloc::format!("{drum}:100").as_bytes());
+    let (mut syn, mut rec) = (Drums::create(None, None).unwrap(), installed());
+    let (s_sn, r_sn) = (level(&mut syn, 5), level(&mut rec, 5));
+    for drum in [0usize, 1, 2, 3, 4, 6, 7, 8] {
+        let s = level(&mut syn, drum) / s_sn;
+        let r = level(&mut rec, drum) / r_sn;
+        let db = 20.0 * (r / s).log10();
+        assert!(db.abs() < 9.0, "drum {drum} sits {db:+.1} dB off the synthesized kit's balance");
+    }
+}
+
+#[test]
+fn a_stack_at_full_velocity_stays_under_the_knee() {
+    let mut d = installed();
+    d.set_param(b"n", Some(b"7:127,5:127,0:127"));
+    let (_, peak) = listen(&mut d, 100);
+    assert!(peak < (26000.0 * 2.0 / 3.0) as i32, "peak {peak}: the soft clip would flatten it");
+}
+
+#[test]
+fn a_recorded_flam_sounds_twice() {
+    let mut d = installed();
+    d.set_param(b"n", Some(b"5:60"));
+    listen(&mut d, 2);
+    d.set_param(b"n", Some(b"5:110"));
+    listen(&mut d, 1);
+    assert_eq!(answer(&mut d, b"voices"), b"2", "the grace note rings on under the stroke");
+}
+
+#[test]
+fn a_closed_hat_chokes_the_open_one() {
+    let mut d = installed();
+    d.set_param(b"n", Some(b"2:110"));
+    listen(&mut d, 20);
+    d.set_param(b"n", Some(b"1:90"));
+    /* Naked Drums' own choke fade: -60 dB over 200 ms, gone at -80. */
+    listen(&mut d, 100);
+    assert_eq!(answer(&mut d, b"voices"), b"1", "the open hat is gone, the closed one rings");
+}
+
+#[test]
+fn the_click_is_the_claves_in_the_same_write_as_the_hits() {
+    let mut d = installed();
+    d.set_param(b"n", Some(b"7:100,c:1"));
+    listen(&mut d, 2);
+    assert_eq!(answer(&mut d, b"voices"), b"1", "the click is not a kit voice");
+    let claves = d.claves.as_ref().unwrap();
+    assert_eq!(claves.voices.active_voices(), 1);
+    assert!(d.clicks.iter().all(|c| !c.active), "and not the synthesized click");
+    let mut down = installed();
+    let mut beat = installed();
+    down.set_param(b"n", Some(b"c:1"));
+    beat.set_param(b"n", Some(b"c:0"));
+    let (a, b) = (listen(&mut down, 20).0, listen(&mut beat, 20).0);
+    assert!(a > b * 1.2, "the downbeat stands out: {a} against {b}");
+    d.set_param(b"c", Some(b"0"));
+    listen(&mut d, 1);
+    assert_eq!(d.claves.as_ref().unwrap().voices.active_voices(), 2, "the old c parameter still clicks");
+}
+
+#[test]
+fn a_panic_entry_cuts_in_order() {
+    let mut d = installed();
+    d.set_param(b"n", Some(b"0:127,7:127,c:1"));
+    listen(&mut d, 4);
+    d.set_param(b"n", Some(b"x,5:100"));
+    listen(&mut d, 1);
+    assert_eq!(answer(&mut d, b"voices"), b"1", "everything cut, then the snare");
+    assert_eq!(d.claves.as_ref().unwrap().voices.active_voices(), 0, "the click too");
+    d.set_param(b"n", Some(b"x"));
+    assert_eq!(listen(&mut d, 1), (0.0, 0), "a lone x is silence from the next block");
+
+    let mut s = Drums::create(None, None).unwrap();
+    s.set_param(b"n", Some(b"0:127,c:1"));
+    listen(&mut s, 2);
+    s.set_param(b"n", Some(b" x ,5:100"));
+    listen(&mut s, 1);
+    assert_eq!(s.voices.iter().filter(|v| v.active).count(), 1, "the synth kit takes x the same way");
+    assert!(s.clicks.iter().all(|c| !c.active));
+}
+
+#[test]
+fn cues_are_exact() {
+    use parse::{cue, Cue};
+    assert_eq!(cue(b"c:1"), Some(Cue::Click(true)));
+    assert_eq!(cue(b"c:0"), Some(Cue::Click(false)));
+    assert_eq!(cue(b" x"), Some(Cue::Panic));
+    assert_eq!(cue(b"c:2"), None);
+    assert_eq!(cue(b"xx"), None);
+    assert_eq!(cue(b"5:100"), None);
+}

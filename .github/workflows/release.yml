@@ -13,7 +13,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      # lfs: the recorded kit (samples/*.nisp) is in Git LFS, and the tests
+      # and the package read the packs themselves, not their pointers.
       - uses: actions/checkout@v4
+        with:
+          lfs: true
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -27,6 +31,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
       - uses: actions/setup-node@v4
         with:
           node-version: '20'

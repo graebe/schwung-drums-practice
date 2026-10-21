@@ -1185,7 +1185,10 @@ function serviceClick() {
    * over the silent stretch — nothing else has to change to measure it. */
   if (clockMuted()) return;
   const hit = C.clickAt(tp.prevBeats, tp.songBeats, settings.clickSubdiv, CH.beatsPerBar(chart));
-  if (hit) dspSet('c', hit.downbeat ? '1' : '0');
+  /* Into the tick's one write, with its hits: the parameter channel is a
+   * single-slot mailbox, and a separate 'c' write lost either the click or
+   * the hits whenever a stroke landed on the beat. */
+  if (hit) dspNotes = (dspNotes ? dspNotes + ',' : '') + (hit.downbeat ? 'c:1' : 'c:0');
 }
 
 /* Listen mode plays the drill so you can watch it before trying it. */

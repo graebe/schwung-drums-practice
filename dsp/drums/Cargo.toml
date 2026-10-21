@@ -17,3 +17,7 @@ rt = ["schwung-plugin/rt"]
 [dependencies]
 schwung-plugin = { path = "../schwung-plugin", default-features = false }
 libm = "0.2"
+ni-sampler = { path = "../ni-sampler" }
+
+[dev-dependencies]
+ni-sampler = { path = "../ni-sampler", features = ["std"] }

@@ -664,10 +664,19 @@ mapping rather than having to remember it.
 up: no Move track, no drum rack loaded on it, no MIDI channel to match. It is rendered by the Rust
 engine in `dsp/` in the overtake generator slot and *mixed into* Move's audio.
 
+The kit is recorded: Naked Drums, a real kit played through five velocity layers with four
+alternating takes of every stroke, so a ghost note sounds like a ghost note, an accent like an
+accent, and a fast double never machine-guns. A flam's grace note rings on under its stroke, and a
+closed hi-hat chokes an open one. See [Sounds and credits](#sounds-and-credits).
+
 The click gets more care here than anywhere else in the module. It is the thing you are being
-measured against, so it is synthesised on its own path ahead of the kit, it cannot be starved by
-a busy bar, and the downbeat is pitched higher than the other beats so you always know where you
-are without counting.
+measured against, so it plays on its own voices ahead of the kit, it cannot be starved by a busy
+bar, and it travels in the same message as the tick's hits, so a stroke on the beat never costs
+the beat. It is a pair of recorded claves, the brighter one on the downbeat, so you always know
+where you are without counting.
+
+Should the recordings be missing or damaged, the module still plays, with the synthesised kit and
+click it had before.
 
 ## Writing your own drills
 
@@ -847,3 +856,21 @@ The JavaScript has **no dependencies at all**, runtime or development: the
 tests are `node --test` from the standard library and the module ships as ES
 modules the host's QuickJS loads directly. There is nothing to attribute there,
 and so nothing that can go out of date.
+
+## Sounds and credits
+
+The kit and the metronome are recordings, and their makers are credited here as their licences
+ask:
+
+- **Kit:** [Naked Drums](https://github.com/sfzinstruments/WilkinsonAudio.NakedDrums) by
+  **Wilkinson Audio**, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/);
+  the SFZ edition by kinwie. **Modified:** nine pieces of its "CR" mix, folded to mono and
+  rebalanced so every voice is clear on the Move, four of ten round robins, tails shortened with
+  a fade.
+- **Metronome:** claves from the [Versilian Community Sample Library](https://github.com/sgossner/VCSL)
+  by Versilian Studios, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+
+Neither author endorses this module. The licence texts ship in the tarball under
+`samples/LICENSES/`, and [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) has the details. The
+packs live in `samples/`, stored with Git LFS, so a clone needs `git lfs pull` before
+`scripts/build.sh`; `scripts/build-samples.sh` re-cuts the kit from its manifest.
