@@ -26,7 +26,7 @@ import { visibleEntries, runProgress, blockingNotes } from './scoring.mjs';
 import { visibleBars, rulerBars, beatToX, practiceBeats } from './chart.mjs';
 import { voiceById, voicesInChart } from './kit.mjs';
 import { diatonicToY } from './notation.mjs';
-import { drawHeader, drawFooter, drawCountIn, drawBarRuler } from './chrome.mjs';
+import { drawHeader, drawFooter, drawCountIn, drawBarRuler, drawLaneCallout } from './chrome.mjs';
 import { drawPlayGlyph, drawRecordGlyph, drawScrubGlyph } from './glyphs.mjs';
 
 /* Re-exported so ui.js and the tests have one place to draw from. */
@@ -34,6 +34,7 @@ export { drawHeader, drawFooter, drawCountIn, drawBarRuler };
 export { pruneMarkers } from './scoring.mjs';
 export { drawList, listWindow, pageTop, LIST_ROWS, drawPlot } from './chrome.mjs';
 export * from './screens.mjs';
+export { drawUntimedView, drawUntimedReady, pageGeometry, pageBar } from './page_view.mjs';
 
 /* ---- The reading view --------------------------------------------------- */
 export function drawReadingView(ctx, s) {
@@ -83,16 +84,6 @@ export function stuckLabel(run) {
     parts.push((v ? v.label : notes[i].voice) + hand);
   }
   return parts.join(' + ');
-}
-
-/* One knocked-out line, centred in the under-lane. */
-function drawLaneCallout(ctx, text) {
-  if (!text) return;
-  let label = text;
-  while (label.length > 1 && ctx.textWidth(label) > L.SCREEN_W - 6) label = label.slice(0, -1);
-  const w = ctx.textWidth(label);
-  ctx.fillRect((L.SCREEN_W >> 1) - (w >> 1) - 2, L.UNDER_LANE_Y - 1, w + 4, L.TEXT_H, 1);
-  ctx.text((L.SCREEN_W >> 1) - (w >> 1), L.UNDER_LANE_Y, label, 0);
 }
 
 function drawStaffBody(ctx, s, visible, px, bars) {
@@ -191,7 +182,7 @@ function drawUnderLane(ctx, s, visible, bars) {
  * lands on screen row 51, outside a box ending at 46 and across the sticking
  * rule at 47.
  */
-export const READY_BOX = { x: 12, y: 15, w: 104, h: 32 };
+export const READY_BOX = L.READY_BOX;
 
 export function drawReady(ctx, s) {
   drawReadingView(ctx, s);

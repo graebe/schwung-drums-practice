@@ -47,7 +47,7 @@ import * as Q from './guess.mjs';
 import * as AP from './answer_pads.mjs';
 import * as PROG from './progress.mjs';
 import * as PLAN from './program.mjs';
-import { availableLevels } from './levels.mjs';
+import { availableLevels, LEVEL_ID_RE } from './levels.mjs';
 import { paint, flashColor, guideTargets, FLASH_MS } from './led_paint.mjs';
 import { stats as timingStats, statsSince, perVoice, voicesBySpread } from './timing.mjs';
 
@@ -631,7 +631,7 @@ function writtenOf(id, rec) {
 }
 
 function fileChartOf(id) {
-  const m = /:l[1-4]$/.exec(id);
+  const m = LEVEL_ID_RE.exec(id);
   const base = m ? id.slice(0, -m[0].length) : id;
   for (let i = 0; i < fileCharts.length; i++) if (fileCharts[i].id === base) return fileCharts[i];
   return null;

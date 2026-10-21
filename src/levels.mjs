@@ -12,6 +12,12 @@
  *   L3  + snare               the backbeat
  *   L4  everything            as written
  *
+ * and before them, L0: everything as written, with NO CLOCK. The whole bar
+ * stands still on one page and a cursor waits on the next stack until you
+ * strike it — see untimed.mjs. It is the same projection as L4 played in a
+ * different mode, which is exactly why it goes first: the notes are learned
+ * at whatever pace the hands can manage, and only then does a tempo arrive.
+ *
  * Deriving rather than duplicating buys three things. The four levels are
  * provably the same groove — a wrong note is fixed once. The bundle stays
  * fourteen files instead of fifty-six. And, most of all, derivation never
@@ -38,11 +44,32 @@ const FEET = ['KK', 'HF'];
  * a groove using a voice this file has never heard of still plays at L4.
  */
 export const LEVELS = [
+  { id: 'l0', step: 'L0', label: 'Own pace', voices: null, untimed: true },
   { id: 'l1', step: 'L1', label: 'Time only', voices: CYMBALS },
   { id: 'l2', step: 'L2', label: '+ kick', voices: [...CYMBALS, ...FEET] },
   { id: 'l3', step: 'L3', label: '+ snare', voices: [...CYMBALS, ...FEET, 'SN'] },
   { id: 'l4', step: 'L4', label: 'Everything', voices: null },
 ];
+
+/*
+ * How many times an L0 take walks the pattern. Not the file's `repeats`: that
+ * says how long a TIMED practice is, and eight passes of a samba stepped
+ * stack by stack is minutes per take — while the take count is what makes a
+ * rising pace visible. One pass is too few the other way: a one-bar groove is
+ * eight stacks, and a single slip would sink it below 90%. Two practise the
+ * seam where the pattern comes round again, which is where grooves fall apart.
+ * `Reps` still overrides it, because asking for more is explicit.
+ */
+export const UNTIMED_PASSES = 2;
+
+/* A rung's item id, `rock-backbeat:l3` -> 3. One pattern for every reader of
+ * ids — progress, the list, the stats — so a new rung is added here once. */
+export const LEVEL_ID_RE = /:l([0-4])$/;
+
+export function isUntimedId(id) {
+  const m = LEVEL_ID_RE.exec(id || '');
+  return Boolean(m && m[1] === '0');
+}
 
 export function levelById(id) {
   for (let i = 0; i < LEVELS.length; i++) {
@@ -93,13 +120,18 @@ export function projectLevel(chart, levelId) {
   }
   if (!events.length) return null;
 
-  return {
+  const out = {
     ...chart,
     id: `${chart.id}:${lv.id}`,
     name: chart.name,
     level: lv.id,
     events,
   };
+  if (lv.untimed) {
+    out.untimed = true;
+    out.repeats = UNTIMED_PASSES;
+  }
+  return out;
 }
 
 /*
@@ -126,10 +158,18 @@ export function availableLevels(chart) {
   return computeLevels(chart);
 }
 
+/*
+ * L0 is outside the collapse on purpose. It plays the same notes as the top
+ * rung, so a signature cannot tell them apart — they differ in MODE, not in
+ * notes. It is offered exactly when there is a ladder to climb: a groove has
+ * one, a rudiment (all snare) or a hat-only drill does not, and those keep
+ * opening straight away rather than turning into a folder of one.
+ */
 function computeLevels(chart) {
   const out = [];
   let lastSig = null;
   for (const lv of LEVELS) {
+    if (lv.untimed) continue;
     const projected = projectLevel(chart, lv.id);
     if (!projected) continue;
     const sig = signature(projected);
@@ -137,6 +177,7 @@ function computeLevels(chart) {
     lastSig = sig;
     out.push(lv);
   }
+  if (out.length > 1) out.unshift(LEVELS[0]);
   return out;
 }
 

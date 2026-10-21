@@ -38,6 +38,10 @@ export { drawList };
  * s = { name, status, mark, clean, speed, accuracy, share, sdMs, meanMs,
  *       failAcc, failSd, cause, bpm, limb, series, footer }
  *     — all worked out once, when the take ends
+ *
+ * An L0 take is the same screen with other words in it — it has no spread,
+ * and its "right" is right FIRST TIME — so it brings its own side lines and
+ * its own row (`sideA`, `sideB`, `rowLeft`), and leaves the layout alone.
  */
 export const SUMMARY_PLOT = { x: 3, y: 35, w: L.SCREEN_W - 6, h: 19 };
 const SIDE_A_Y = L.RESULT_BIG_Y;
@@ -56,9 +60,12 @@ export function drawSummary(ctx, s) {
   ctx.text(L.RESULT_LEFT_X + w + 3, L.RESULT_BIG_Y + 8, '%', 1);
   const minX = L.RESULT_LEFT_X + w + 3 + ctx.textWidth('%') + 4;
   const bias = Math.round(s.meanMs || 0);
-  const sideA = counted ? `${right}% right` : (s.failAcc ? `right, need ${s.share}` : 'right');
+  const sideA = s.sideA !== undefined ? s.sideA
+    : counted ? `${right}% right` : (s.failAcc ? `right, need ${s.share}` : 'right');
   sideText(ctx, SIDE_A_Y, sideA, minX, s.failAcc);
-  sideText(ctx, SIDE_B_Y, `s${Math.round(s.sdMs || 0)} ${bias >= 0 ? '+' : ''}${bias}ms`, minX, s.failSd);
+  const sideB = s.sideB !== undefined ? s.sideB
+    : `s${Math.round(s.sdMs || 0)} ${bias >= 0 ? '+' : ''}${bias}ms`;
+  sideText(ctx, SIDE_B_Y, sideB, minX, s.failSd);
 
   if (s.cause) {
     /* Centred, as the Ladder's reason is: a full line (progress.mjs
@@ -66,7 +73,8 @@ export function drawSummary(ctx, s) {
     const cause = fit(ctx, s.cause, L.SCREEN_W - 2);
     ctx.text(Math.max(1, (L.SCREEN_W - ctx.textWidth(cause)) >> 1), L.RESULT_ROW_A_Y, cause, 1);
   } else {
-    ctx.text(L.RESULT_LEFT_X, L.RESULT_ROW_A_Y, s.bpm ? `${Math.round(s.bpm)} bpm` : '', 1);
+    const row = s.rowLeft !== undefined ? s.rowLeft : s.bpm ? `${Math.round(s.bpm)} bpm` : '';
+    ctx.text(L.RESULT_LEFT_X, L.RESULT_ROW_A_Y, row, 1);
     if (s.limb) ctx.text(L.SCREEN_W - ctx.textWidth(s.limb) - 1, L.RESULT_ROW_A_Y, s.limb, 1);
   }
 

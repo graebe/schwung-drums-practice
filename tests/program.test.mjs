@@ -44,8 +44,9 @@ test('every groove is on the path rung by rung, family by family', () => {
   assert.equal(g.units.length, grooves.length);
   assert.equal(g.units[0].name, 'Rock backbeat');
   assert.deepEqual(g.units[0].steps.map((s) => s.id),
-    ['rock-backbeat:l1', 'rock-backbeat:l2', 'rock-backbeat:l3']);
-  assert.equal(g.units[0].steps[1].title, 'Rock backbeat L2');
+    ['rock-backbeat:l0', 'rock-backbeat:l1', 'rock-backbeat:l2', 'rock-backbeat:l3']);
+  assert.equal(g.units[0].steps[0].title, 'Rock backbeat L0');
+  assert.equal(g.units[0].steps[2].title, 'Rock backbeat L2');
   const families = [...new Set(g.units.map((u) => u.group))];
   assert.deepEqual(families, ['Rock & Pop', 'Funk & Soul', 'Latin & World', 'Jazz & Swing',
     'Electronic', 'Techno']);
@@ -90,11 +91,11 @@ test('a step id is the id its takes are filed under', () => {
 test('next: the first step neither learned nor skipped; a higher level carries the lower', () => {
   const p = P.emptyProgress();
   const g = tracks().find((t) => t.key === 'grooves');
-  assert.equal(PLAN.nextStep(p, g).id, 'rock-backbeat:l1');
+  assert.equal(PLAN.nextStep(p, g).id, 'rock-backbeat:l0', 'a groove starts with its notes, at your own pace');
   learn(p, 'rock-backbeat:l3');
+  assert.equal(PLAN.nextStep(p, g).id, 'straight-eights:l0', 'the top rung carried L0 too');
+  P.skipItem(p, 'straight-eights:l0');
   assert.equal(PLAN.nextStep(p, g).id, 'straight-eights:l1');
-  P.skipItem(p, 'straight-eights:l1');
-  assert.equal(PLAN.nextStep(p, g).id, 'straight-eights:l2');
 });
 
 test('Continue walks the tracks in turn, the one left longest first', () => {

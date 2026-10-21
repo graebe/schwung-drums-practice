@@ -113,6 +113,18 @@ export function drawFooter(ctx, progress, right) {
   if (right) ctx.text(L.SCREEN_W - ctx.textWidth(right) - 1, L.FOOTER_Y - 2, right, 1);
 }
 
+/* One knocked-out line, centred in the under-lane: PAUSED, or what Study is
+ * waiting for. Paused and stuck both show a still chart, and only one of them
+ * wants something from you, so each says which it is. */
+export function drawLaneCallout(ctx, text) {
+  if (!text) return;
+  let label = text;
+  while (label.length > 1 && ctx.textWidth(label) > L.SCREEN_W - 6) label = label.slice(0, -1);
+  const w = ctx.textWidth(label);
+  ctx.fillRect((L.SCREEN_W >> 1) - (w >> 1) - 2, L.UNDER_LANE_Y - 1, w + 4, L.TEXT_H, 1);
+  ctx.text((L.SCREEN_W >> 1) - (w >> 1), L.UNDER_LANE_Y, label, 0);
+}
+
 /* ---- Lists (the menu and the settings page) ----------------------------- */
 /*
  * One list renderer for both, because they are the same thing: rows, one

@@ -60,11 +60,13 @@ export function drawLanes(ctx, laneList) {
   }
 }
 
-export function drawPlayhead(ctx, laneList, strong = false) {
+/* `x` is the hit line's, unless the line has been moved: L0's cursor is this
+ * same line, standing on the stack it waits for. */
+export function drawPlayhead(ctx, laneList, strong = false, x = L.HIT_X) {
   if (!laneList.length) return;
   const top = laneList[0].top;
   const bottom = laneList[laneList.length - 1].top + laneList[laneList.length - 1].h - 1;
-  ctx.fillRect(L.HIT_X, top, strong ? 2 : 1, bottom - top + 1, 1);
+  ctx.fillRect(Math.round(x), top, strong ? 2 : 1, bottom - top + 1, 1);
 }
 
 export function drawBarLine(ctx, laneList, x) {
@@ -117,11 +119,15 @@ function drawDisc(ctx, cx, cy, w) {
   }
 }
 
-export function cellWidth(dyn, laneH) {
+export function cellWidth(dyn, laneH, spacingPx = undefined) {
   /* A drill with one or two voices gets the whole band between them, so its
    * cells are drawn at the size that room allows rather than at the size a
    * nine-voice chart is forced down to. */
-  const base = laneH >= 14 ? 7 : laneH >= 8 ? 5 : 3;
+  let base = laneH >= 14 ? 7 : laneH >= 8 ? 5 : 3;
+  /* ...and a size smaller when the columns are close, as the staff's heads
+   * are (staff_render headWidth): a whole bar of sixteenths on one still page
+   * puts them under 6px apart, and 7px discs would run into one another. */
+  if (spacingPx !== undefined && spacingPx < L.TIGHT_SPACING_PX) base = Math.max(3, base - 2);
   const step = dyn === 'accent' ? 2 : dyn === 'ghost' ? -2 : 0;
   /*
    * Always odd, and always a size the disc table holds: a blob with no centre
@@ -136,11 +142,11 @@ export function cellWidth(dyn, laneH) {
   return Math.max(1, Math.min(9, base + step));
 }
 
-export function drawCell(ctx, x, lane, state, head = 'note', dyn = 'normal') {
+export function drawCell(ctx, x, lane, state, head = 'note', dyn = 'normal', spacingPx = undefined) {
   const cx = Math.round(x);
   if (cx < L.GRID_LEFT_X - 4 || cx >= L.SCREEN_W) return;
   const cy = lane.mid;
-  const w = cellWidth(dyn, lane.h);
+  const w = cellWidth(dyn, lane.h, spacingPx);
 
   if (state === 'hit') {
     /* It opens. A cymbal keeps a dot of its x inside, so a hit hat and a hit
@@ -179,6 +185,6 @@ export function drawStack(ctx, item, laneList, opts = {}) {
     if (!lane) continue;
     const v = voiceById(note.voice);
     const dyn = opts.dynamics === false ? 'normal' : note.wantDyn;
-    drawCell(ctx, x, lane, note.state, v ? v.head : 'note', dyn);
+    drawCell(ctx, x, lane, note.state, v ? v.head : 'note', dyn, opts.spacingPx);
   }
 }

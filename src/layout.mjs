@@ -159,6 +159,31 @@ export const GRID_LANE_H_MIN = 4;
  */
 export const GRID_LANE_H_MAX = 18;
 
+/* ---- The still page (L0) ------------------------------------------------ */
+/*
+ * L0 draws one whole bar standing still instead of a scroll. Its left edge
+ * differs by view because each renderer clips at its own place — the staff
+ * drops a head left of DESPAWN_X, the grid a cell left of GRID_LEFT_X - 4 —
+ * and the first stack of a bar must clear both with its bar line (BAR_OFFSET_PX
+ * before it) still drawn. The bar closes at PAGE_BAR_X; past it, alone,
+ * PAGE_PEEK_X holds the first stack of the next bar, so at the end of a bar
+ * the next one can already be planned.
+ */
+export const PAGE_LEFT_GRID_X = 19;
+export const PAGE_LEFT_STAFF_X = 24;
+export const PAGE_BAR_X = 118;
+export const PAGE_PEEK_X = 123;
+/* Room kept between the last beat's slot and the closing bar line. */
+export const PAGE_END_PAD = 3;
+/* The caret under the cursor stack, hanging in the under-lane. */
+export const CARET_H = 3;
+
+/* The ready screen's box of controls, laid over the chart (view.mjs drawReady,
+ * page_view.mjs drawUntimedReady). Four rows taller than two lines would
+ * need: at the old geometry a third row landed on screen row 51, outside a
+ * box ending at 46 and across the sticking rule at 47. */
+export const READY_BOX = { x: 12, y: 15, w: 104, h: 32 };
+
 /* ---- The under lane ----------------------------------------------------- */
 /*
  * One band under the chart, and the drill decides what goes in it.

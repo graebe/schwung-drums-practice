@@ -112,6 +112,9 @@ const CC = { jogTurn: 14, jogClick: 3, menu: 50, back: 51, play: 85, record: 86,
  */
 /* Grooves › Rock & Pop, highlight on its first groove (Rock backbeat). */
 const toFirstDrill = () => { cc(CC.jogTurn, 2); cc(CC.jogClick, 127); cc(CC.jogClick, 127); };
+/* Into its ladder, highlight on L1 — the first TIMED rung. L0 above it is the
+ * untimed one, and has flows of its own. */
+const toFirstRung = () => { toFirstDrill(); cc(CC.jogClick, 127); cc(CC.jogTurn, 1); };
 /* Into the Quiz folder, highlight on its first drill. */
 const toQuizzes = () => {
   for (let i = 0; i < 60; i++) cc(CC.jogTurn, 1);
@@ -314,9 +317,8 @@ test('a practice ENDS BY ITSELF and shows the summary — no second press', asyn
   ticks(3);
 
   /* Past the ear training to the rock beat, which opens its LADDER; the first
-   * rung is the hi-hat alone. */
-  toFirstDrill();
-  cc(CC.jogClick, 127);
+   * timed rung is the hi-hat alone. */
+  toFirstRung();
   ticks(3);
   cc(CC.jogClick, 127);
   ticks(3);
@@ -338,8 +340,7 @@ test('a finished practice records a score without being asked', async () => {
   const { log } = await loadUi();
   globalThis.init();
   ticks(3);
-  toFirstDrill();
-  cc(CC.jogClick, 127);
+  toFirstRung();
   ticks(3);
   cc(CC.jogClick, 127);
   ticks(3);
@@ -418,8 +419,7 @@ test('the Ladder with nothing armed asks for a drill instead of picking one', as
 
 /* Open the first drill's first rung and start practising it. */
 function startFirstDrill() {
-  toFirstDrill();
-  cc(CC.jogClick, 127);
+  toFirstRung();
   ticks(2);
   cc(CC.jogClick, 127);          /* the first rung of its ladder */
   ticks(2);
@@ -704,8 +704,7 @@ test('the knob scrubs on READY, and the box gets out of the way', async () => {
   const { screen } = await loadUi();
   globalThis.init();
   ticks(2);
-  toFirstDrill();
-  cc(CC.jogClick, 127); ticks(2);
+  toFirstRung(); ticks(2);
   cc(CC.jogClick, 127); ticks(2);          /* a level, so READY is armed */
 
   assert.ok(drawnText().some((t) => /SCRUB/.test(t)), 'the control box is not on screen');
@@ -723,8 +722,7 @@ test('the box comes back when you scroll home, which is how you find it', async 
   const { screen } = await loadUi();
   globalThis.init();
   ticks(2);
-  toFirstDrill();
-  cc(CC.jogClick, 127); ticks(2);
+  toFirstRung(); ticks(2);
   cc(CC.jogClick, 127); ticks(2);
   for (let i = 0; i < 40; i++) cc(CC.knob1, 1);
   ticks(2);
@@ -738,8 +736,7 @@ test('Play from a scrubbed position starts THERE, not at the top', async () => {
   const { screen } = await loadUi();
   globalThis.init();
   ticks(2);
-  toFirstDrill();
-  cc(CC.jogClick, 127); ticks(2);
+  toFirstRung(); ticks(2);
   cc(CC.jogClick, 127); ticks(2);
   for (let i = 0; i < 72; i++) cc(CC.knob1, 1);     /* two bars */
   ticks(2);
@@ -758,8 +755,7 @@ test('the bars behind a start point are settled, not counted as misses', async (
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  toFirstDrill();
-  cc(CC.jogClick, 127); ticks(2);
+  toFirstRung(); ticks(2);
   cc(CC.jogClick, 127); ticks(2);
   for (let i = 0; i < 72; i++) cc(CC.knob1, 1);
   ticks(2);
@@ -774,8 +770,7 @@ test('no count-in when starting mid-drill, but there is one from the top', async
   const { screen } = await loadUi();
   globalThis.init();
   ticks(2);
-  toFirstDrill();
-  cc(CC.jogClick, 127); ticks(2);
+  toFirstRung(); ticks(2);
   cc(CC.jogClick, 127); ticks(2);
 
   /* From the top: the count-in digit is drawn. */
@@ -802,8 +797,8 @@ test('the module closes from EVERY screen, and silences everything on the way', 
    */
   const routes = {
     menu: () => {},
-    levels: () => { toFirstDrill(); cc(CC.jogClick, 127); ticks(2); },
-    ready: () => { toFirstDrill(); cc(CC.jogClick, 127); ticks(2); cc(CC.jogClick, 127); ticks(2); },
+    levels: () => { toFirstRung(); ticks(2); },
+    ready: () => { toFirstRung(); ticks(2); cc(CC.jogClick, 127); ticks(2); },
     running: () => { startFirstDrill(); ticks(10); },
     paused: () => { startFirstDrill(); ticks(10); cc(CC.play, 127); ticks(2); },
     settings: () => { cc(CC.shift, 127); cc(CC.jogClick, 127); ticks(2); cc(CC.shift, 0); },
@@ -902,8 +897,7 @@ test('72 clicks lands EXACTLY on two bars, with no accumulated drift', async () 
   const { screen } = await loadUi();
   globalThis.init();
   ticks(2);
-  toFirstDrill();
-  cc(CC.jogClick, 127); ticks(2);
+  toFirstRung(); ticks(2);
   cc(CC.jogClick, 127); ticks(2);
   for (let i = 0; i < 72; i++) cc(CC.knob1, 1);
   const drawn = drawnText();
@@ -916,8 +910,7 @@ test('a scrub cannot run past the end of the practice', async () => {
   const { screen } = await loadUi();
   globalThis.init();
   ticks(2);
-  toFirstDrill();
-  cc(CC.jogClick, 127); ticks(2);
+  toFirstRung(); ticks(2);
   cc(CC.jogClick, 127); ticks(2);
   for (let i = 0; i < 2000; i++) cc(CC.knob1, 1);
   ticks(2);
@@ -1129,8 +1122,7 @@ test('LISTENING ends by itself too, not just practising', async () => {
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  toFirstDrill();
-  cc(CC.jogClick, 127); ticks(2);
+  toFirstRung(); ticks(2);
   cc(CC.jogClick, 127); ticks(2);
   cc(CC.play, 127);                        /* listen, not practise */
 
@@ -1159,8 +1151,7 @@ test('the count-in lasts exactly the beats it says', async () => {
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  toFirstDrill();
-  cc(CC.jogClick, 127); ticks(2);
+  toFirstRung(); ticks(2);
   cc(CC.jogClick, 127); ticks(2);          /* Rock backbeat, L1: hi-hat, 92 bpm */
   log.params.length = 0;
   cc(CC.play, 127);                        /* listen, from the top */
@@ -1179,8 +1170,7 @@ test('a start from a scrubbed bar plays from that bar, with no count-in', async 
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  toFirstDrill();
-  cc(CC.jogClick, 127); ticks(2);
+  toFirstRung(); ticks(2);
   cc(CC.jogClick, 127); ticks(2);
   for (let i = 0; i < 36; i++) cc(CC.knob1, 1);   /* one bar */
   ticks(1);
@@ -1209,8 +1199,7 @@ test('a scrub lights the stack it lands on, and running hands the pads back', as
   const P = await import(new URL('../src/padmap.mjs', import.meta.url));
   globalThis.init();
   ticks(2);
-  toFirstDrill();
-  cc(CC.jogClick, 127); ticks(2);
+  toFirstRung(); ticks(2);
   cc(CC.jogClick, 127); ticks(2);          /* Rock backbeat L1: hi-hat eighths */
   const near = () => Object.entries(padColours(log))
     .filter(([, c]) => c === P.LED_TARGET_NEAR).map(([n]) => Number(n)).sort((a, b) => a - b);
@@ -1229,8 +1218,7 @@ test('Listen lights each drum as it plays it', async () => {
   const P = await import(new URL('../src/padmap.mjs', import.meta.url));
   globalThis.init();
   ticks(2);
-  toFirstDrill();
-  cc(CC.jogClick, 127); ticks(2);
+  toFirstRung(); ticks(2);
   cc(CC.jogClick, 127); ticks(2);
   cc(CC.play, 127);                         /* listen */
   const hh = new Set(P.padsForVoice('HH', 'kit'));
@@ -1252,8 +1240,7 @@ test('the Clock stays with the drill it wrapped', async () => {
   await loadUi();
   globalThis.init();
   ticks(2);
-  toFirstDrill();
-  cc(CC.jogClick, 127); cc(CC.jogClick, 127); ticks(2);   /* Rock backbeat L1 armed */
+  toFirstRung(); cc(CC.jogClick, 127); ticks(2);   /* Rock backbeat L1 armed */
   for (let i = 0; i < 4; i++) { cc(CC.back, 127); ticks(1); } /* up to the top */
   for (let i = 0; i < 60; i++) cc(CC.jogTurn, 1);
   cc(CC.jogTurn, 127); cc(CC.jogTurn, 127);                  /* Training */
@@ -1262,8 +1249,7 @@ test('the Clock stays with the drill it wrapped', async () => {
   cc(CC.jogClick, 127); ticks(2);                            /* Clock, on the armed drill */
   for (let i = 0; i < 4; i++) { cc(CC.back, 127); ticks(1); }
   for (let i = 0; i < 60; i++) cc(CC.jogTurn, 127);          /* back to the first row */
-  toFirstDrill();
-  cc(CC.jogClick, 127); cc(CC.jogClick, 127); ticks(2);   /* a plain level again */
+  toFirstRung(); cc(CC.jogClick, 127); ticks(2);   /* a plain level again */
   cc(CC.record, 127);
   const drawn = drawnText(200);
   assert.ok(!drawn.some((t) => /LISTEN|ON YOUR OWN/.test(t)), 'the Clock banner followed into a plain drill');
@@ -1276,8 +1262,7 @@ const shiftClick = () => { cc(CC.shift, 127); cc(CC.jogClick, 127); cc(CC.shift,
 const knob = (k, d) => cc(CC.knob1 + k, d);
 /* Arm the first rung of the first groove: Grooves › Rock & Pop › Rock backbeat › L1. */
 function armFirstRung() {
-  toFirstDrill();
-  cc(CC.jogClick, 127);
+  toFirstRung();
   ticks(2);
   cc(CC.jogClick, 127);
   ticks(2);
@@ -1665,8 +1650,8 @@ test('the overview draws drills learned over time', async () => {
   cc(CC.jogClick, 127);                              /* Overall */
   ticks(1);
   const shown = drawnText(1);
-  /* L3 learned ticks L1 and L2 as well: five of the path's steps. */
-  assert.ok(shown.some((t) => /^5 learned of/.test(t)), shown.join('|'));
+  /* L3 learned ticks L0, L1 and L2 as well: six of the path's steps. */
+  assert.ok(shown.some((t) => /^6 learned of/.test(t)), shown.join('|'));
   assert.ok(shown.includes('OVERALL'));
   const L = await import('../src/layout.mjs');
   const box = L.PROGRESS_PLOT;

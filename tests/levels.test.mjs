@@ -25,7 +25,7 @@ const manifest = parseManifest(read('index.json'));
 const chartOf = (id) => parseExercise(read(`${id}.json`), id).chart;
 
 test('the ladder is ordered, and every rung is a real level', () => {
-  assert.deepEqual(LV.LEVELS.map((l) => l.id), ['l1', 'l2', 'l3', 'l4']);
+  assert.deepEqual(LV.LEVELS.map((l) => l.id), ['l0', 'l1', 'l2', 'l3', 'l4']);
   for (const lv of LV.LEVELS) {
     assert.ok(lv.step && lv.label, `${lv.id} needs a label`);
     assert.equal(LV.levelById(lv.id), lv);
@@ -50,9 +50,12 @@ test('a projection is the same groove with voices removed — nothing moves', ()
   }
 });
 
-test('each rung is a superset of the one below it', () => {
+test('each timed rung is a superset of the one below it', () => {
+  /* L0 is left out: it is the whole groove in another mode, not a step on
+   * the way up to it. */
   const full = chartOf('sixteenth-funk');
-  const rungs = LV.availableLevels(full).map((lv) => LV.projectLevel(full, lv.id));
+  const rungs = LV.availableLevels(full).filter((lv) => !lv.untimed)
+    .map((lv) => LV.projectLevel(full, lv.id));
   for (let i = 1; i < rungs.length; i++) {
     const below = new Set(rungs[i - 1].events.flatMap((e) => e.voices));
     const here = new Set(rungs[i].events.flatMap((e) => e.voices));
@@ -97,7 +100,7 @@ test('availableLevels collapses rungs that would play the same notes', () => {
   assert.equal(LV.availableLevels(hatOnly).length, 1);
 
   const hatKick = { id: 'k', name: 'k', events: [{ beat: 0, voices: ['HH', 'KK'] }] };
-  assert.equal(LV.availableLevels(hatKick).length, 2);
+  assert.deepEqual(LV.availableLevels(hatKick).map((l) => l.id), ['l0', 'l1', 'l2']);
 
   /* And a groove with no cymbal at all still has rungs. */
   const noCym = { id: 'n', name: 'n', events: [{ beat: 0, voices: ['KK'] }, { beat: 1, voices: ['SN'] }] };
@@ -117,12 +120,52 @@ test('every bundled groove has a ladder, and every rung is a valid drill', () =>
     for (const lv of levels) {
       const p = LV.projectLevel(c, lv.id);
       assert.deepEqual(validateExercise(p), [], `${e.id} ${lv.id}`);
-      assert.equal(p.repeats, c.repeats, 'a rung keeps the practice length');
+      if (lv.untimed) assert.equal(p.repeats, LV.UNTIMED_PASSES, 'L0 walks its own number of passes');
+      else assert.equal(p.repeats, c.repeats, 'a timed rung keeps the practice length');
       assert.equal(p.bpm, c.bpm, 'a rung keeps the tempo');
       assert.ok(p.id.endsWith(lv.id), 'a rung is identifiable for the stats');
     }
   }
   assert.equal(withLadder, grooves.length, 'every groove is learned a limb at a time');
+});
+
+/*
+ * L0: the whole groove, no clock. It must survive the collapse that would
+ * otherwise fold it into the top rung (same notes), and it must not turn a
+ * one-rung drill into a folder.
+ */
+test('every groove starts at L0, the whole groove with no clock', () => {
+  for (const e of manifest.entries.filter((x) => !RUDIMENT_CATS.includes(x.category))) {
+    const c = chartOf(e.id);
+    const levels = LV.availableLevels(c);
+    assert.equal(levels[0].id, 'l0', `${e.id} does not start at L0`);
+    const p = LV.projectLevel(c, 'l0');
+    assert.equal(p.untimed, true);
+    assert.equal(p.id, `${c.id}:l0`);
+    assert.equal(p.events.length, c.events.length, 'L0 is everything as written');
+    const top = LV.projectLevel(c, levels[levels.length - 1].id);
+    assert.ok(!top.untimed, 'the timed rungs stay timed');
+  }
+});
+
+test('a rudiment or a hat-only drill gets no L0, and still opens straight away', () => {
+  for (const e of manifest.entries.filter((x) => RUDIMENT_CATS.includes(x.category))) {
+    assert.equal(LV.availableLevels(chartOf(e.id)).length, 1, e.id);
+  }
+  const hatOnly = { id: 'h', name: 'h', events: [{ beat: 0, voices: ['HH'] }] };
+  assert.deepEqual(LV.availableLevels(hatOnly).map((l) => l.id), ['l1']);
+});
+
+test('an endless file still gives L0 an end', () => {
+  const c = { ...chartOf('rock-backbeat'), repeats: 0 };
+  assert.equal(LV.projectLevel(c, 'l0').repeats, LV.UNTIMED_PASSES);
+});
+
+test('isUntimedId reads the rung off an item id', () => {
+  assert.equal(LV.isUntimedId('rock-backbeat:l0'), true);
+  assert.equal(LV.isUntimedId('rock-backbeat:l1'), false);
+  assert.equal(LV.isUntimedId('flam'), false);
+  assert.equal(LV.isUntimedId(null), false);
 });
 
 /*

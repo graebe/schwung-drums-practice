@@ -29,6 +29,8 @@
  * Learning Path, the Grooves folder or a repetition.
  */
 
+import { LEVEL_ID_RE } from './levels.mjs';
+
 export const PROGRESS_VERSION = 1;
 export const CLEAN_SHARE = 0.9;
 export const LEARNED = 100;
@@ -197,6 +199,36 @@ export function verdictOf(st, sdMs, { spreadMs, share = CLEAN_SHARE, minHits = 1
 }
 
 /*
+ * L0's verdict. A take with no clock has no spread to judge, so it is judged
+ * on what it does have: the stacks right FIRST TIME — no wrong pad, no lapsed
+ * partial, no second stroke, the right hands and the right dynamics — over
+ * every stack, against the same CLEAN_SHARE as a timed take. The pace is
+ * measured, not judged: getting faster is what L0 is FOR, and a ✓ that
+ * waited on a tempo would be L1's ✓.
+ *   c = untimed.mjs counts: { stacks, firstTry, wrong, apart, again, hand,
+ *                             softAccents, loudGhosts }
+ */
+export function untimedVerdictOf(c, { share = CLEAN_SHARE } = {}) {
+  const accuracy = c.stacks > 0 ? c.firstTry / c.stacks : 0;
+  if (!c.stacks) return { accuracy, clean: false, cause: 'nothing', reason: 'nothing played' };
+  if (accuracy >= share) return { accuracy, clean: true, cause: '', reason: '' };
+  const acc = c.softAccents || { n: 0 };
+  const gho = c.loudGhosts || { n: 0 };
+  const causes = [
+    ['wrong', c.wrong || 0, (n) => plural(n, 'wrong pad', 'wrong pads')],
+    ['apart', c.apart || 0, (n) => `${n} not together`],
+    ['again', c.again || 0, (n) => `${n} struck twice`],
+    ['accents', acc.n, (n) => withVel(plural(n, 'soft accent', 'soft accents'), acc, '<')],
+    ['ghosts', gho.n, (n) => withVel(plural(n, 'loud ghost', 'loud ghosts'), gho, '>')],
+    ['sticking', c.hand || 0, (n) => plural(n, 'wrong hand', 'wrong hands')],
+  ];
+  let best = null;
+  for (const k of causes) if (k[1] > 0 && (!best || k[1] > best[1])) best = k;
+  return best ? { accuracy, clean: false, cause: best[0], reason: best[2](best[1]) }
+    : { accuracy, clean: false, cause: '', reason: '' };
+}
+
+/*
  * Whether a take was judged by the standard that a ✓ means: Strict at Normal
  * or Tight, Dynamics on, and no help — Guide pads light the answer and Study
  * waits for you. Easier settings are for getting there; a take on them is
@@ -277,6 +309,35 @@ export function recordTake(progress, id, take) {
   });
 }
 
+/*
+ * One whole L0 take.
+ *   take = { pace, accuracy, clean, eased, bpm, at (ms) }
+ *   pace   the pace as a share of the written tempo, in percent
+ *
+ * It is learned the first time it is clean on the standard settings, at ANY
+ * pace — L0 asks whether you know the notes. Its best is the fastest pace of
+ * such a take, so the list keeps reading as a speed against the written
+ * tempo, like every other row: a share right first time would sit at 100 in
+ * a week and could not show anyone getting faster. It never schedules a
+ * repetition — repetition asks whether a drill is still clean AT TEMPO, which
+ * a take with no clock cannot answer, and the timed rungs carry the groove
+ * there.
+ */
+export function recordUntimed(progress, id, take) {
+  const standard = !take.eased;
+  const counted = take.clean && standard;
+  return apply(progress, id, {
+    value: counted ? Math.round(take.pace) : null,
+    learned: counted,
+    counts: false,
+    schedule: false,
+    bpm: take.bpm,
+    entry: [Math.round(take.pace), Math.round((take.accuracy || 0) * 100), 0,
+      (counted ? F_CLEAN : 0) | (standard ? F_STANDARD : 0)],
+    at: take.at,
+  });
+}
+
 /* One finished quiz round. Every round counts: a quiz has no slow version. */
 export function recordRound(progress, id, { correct, wrong, hinted = 0, at = 0 }) {
   const score = roundScore(correct, wrong, hinted);
@@ -310,7 +371,7 @@ function apply(progress, id, r) {
   /* Playing something you skipped means you are working on it after all. */
   it.skip = 0;
   if (repeat && r.counts) scheduleRepeat(it, r.learned, t);
-  else if (learned) startRepeats(it, t);
+  else if (learned && r.schedule !== false) startRepeats(it, t);
 
   const entry = [t].concat(r.entry);
   if (repeat && r.counts) entry[4] |= F_REPEAT;
@@ -331,14 +392,13 @@ export function skipItem(progress, id, at = 0) {
 /*
  * A groove's levels are projections of one file, each adding voices to the
  * one below, so playing a higher level clean at tempo proves the lower ones:
- * if you can play everything, you can play the cymbals alone. This is what
- * keeps four rungs a groove from being a chore for someone who can already
- * play it — and it is only a reading, never written into the lower items.
+ * if you can play everything, you can play the cymbals alone — and you know
+ * its notes, which is all L0 asks. This is what keeps five rungs a groove
+ * from being a chore for someone who can already play it — and it is only a
+ * reading, never written into the lower items.
  */
-const LEVEL_RE = /:l([1-4])$/;
-
 export function higherLevels(id) {
-  const m = LEVEL_RE.exec(id);
+  const m = LEVEL_ID_RE.exec(id);
   if (!m) return [];
   const base = id.slice(0, -m[0].length);
   const out = [];

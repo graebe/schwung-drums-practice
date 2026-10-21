@@ -55,11 +55,12 @@ test('every bundled drill is filed, and none lands in Other', () => {
 test('a groove opens its ladder; a rudiment arms straight away', () => {
   const rock = child(child(child(tree(), 'Grooves'), 'Rock & Pop'), 'Rock backbeat');
   assert.ok(isFolder(rock));
-  assert.deepEqual(rock.children.map((c) => c.label.slice(0, 2)), ['L1', 'L2', 'L3']);
+  assert.deepEqual(rock.children.map((c) => c.label.slice(0, 2)), ['L0', 'L1', 'L2', 'L3']);
   /* Each rung is an item of its own, under the id its takes are filed by. */
   assert.deepEqual(rock.children.map((c) => c.id),
-    ['rock-backbeat:l1', 'rock-backbeat:l2', 'rock-backbeat:l3']);
+    ['rock-backbeat:l0', 'rock-backbeat:l1', 'rock-backbeat:l2', 'rock-backbeat:l3']);
   assert.equal(rock.children[1].build().id, rock.children[1].id);
+  assert.equal(rock.children[0].build().untimed, true, 'L0 arms the untimed mode');
   const para = child(child(child(tree(), 'Rudiments'), 'Diddles'), 'Single paradiddle');
   assert.equal(isFolder(para), false);
   assert.equal(para.kind, 'chart');

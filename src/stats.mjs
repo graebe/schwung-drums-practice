@@ -204,10 +204,14 @@ export function isPersonalBest(stats, rec) {
   const prev = forDrill(stats, rec.d);
   const kind = String(rec.d).split(':')[0];
   const bySpread = kind === 'drill' || kind === 'clock';
-  if (bySpread && (rec.n < BEST_MIN_HITS || rec.cl !== 1)) return false;
+  /* L0 has no spread: its best is the fastest pace, but only of a take that
+   * was clean — a fast take full of wrong pads is not a best of anything. */
+  const cleanOnly = bySpread || kind === 'untimed';
+  if (cleanOnly && rec.cl !== 1) return false;
+  if (bySpread && rec.n < BEST_MIN_HITS) return false;
   for (const r of prev) {
     if (r === rec) continue;
-    if (bySpread && r.cl !== 1) continue;
+    if (cleanOnly && r.cl !== 1) continue;
     /* Tighter only counts when it was not bought with more mistakes. */
     if (bySpread ? (r.bpm >= rec.bpm && r.sd <= rec.sd) || (r.bpm >= rec.bpm && r.err < rec.err)
       : r.bpm >= rec.bpm) return false;

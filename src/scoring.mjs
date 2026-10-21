@@ -463,6 +463,21 @@ function releaseLate(run, hit, songBeats) {
   return run.lastJudgement;
 }
 
+/*
+ * What a stroke says beyond WHEN: the hand and the dynamic, judged against the
+ * take's own touch, which the stroke then joins. One place for it, shared by
+ * the timed judge and the untimed one (untimed.mjs) — two copies of the
+ * relative-dynamics rule would be two rules the first time one was tuned.
+ */
+export function judgeStroke(run, note, hand, velocity) {
+  note.handOk = handOkFor(run, note, hand);
+  note.velocity = velocity === undefined ? null : velocity;
+  note.need = dynNeed(run, note.wantDyn, velocity);
+  note.dynOk = dynOk(note, velocity);
+  learnTouch(run, note, velocity);
+  return note;
+}
+
 /* Score one note a hit, with its hand and dynamic, and move both cursors on. */
 function hitNote(run, hit, entryIndex, noteIndex, songBeats) {
   const { voice, hand, velocity } = hit;
@@ -474,11 +489,7 @@ function hitNote(run, hit, entryIndex, noteIndex, songBeats) {
   note.state = HIT;
   note.played = true;
   note.offsetBeats = offsetBeats;
-  note.handOk = handOkFor(run, note, hand);
-  note.velocity = velocity === undefined ? null : velocity;
-  note.need = dynNeed(run, note.wantDyn, velocity);
-  note.dynOk = dynOk(note, velocity);
-  learnTouch(run, note, velocity);
+  judgeStroke(run, note, hand, velocity);
 
   run.hits++;
   run.combo++;
@@ -850,7 +861,28 @@ export function visibleEntries(run, songBeats, pxPerBeat) {
   return out;
 }
 
-function settleEntry(entry) {
+/*
+ * The entries of a still page: every entry in [fromBeat, toBeat), each with
+ * its x on a page whose left edge is `leftX` at `fromBeat`. The same shape as
+ * visibleEntries, so both renderers draw a page with the code that draws the
+ * scroll.
+ */
+export function entriesIn(run, fromBeat, toBeat, leftX, pxPerBeat) {
+  const out = [];
+  for (let i = firstFrom(run.entries, fromBeat - 1e-9); i < run.entries.length; i++) {
+    const entry = run.entries[i];
+    if (entry.beat >= toBeat - 1e-9) break;
+    out.push({
+      index: i,
+      entry,
+      beat: entry.beat,
+      x: beatToX(entry.beat, fromBeat, pxPerBeat, leftX),
+    });
+  }
+  return out;
+}
+
+export function settleEntry(entry) {
   let pending = 0;
   let missed = 0;
   let skipped = 0;
