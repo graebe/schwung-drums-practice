@@ -126,6 +126,8 @@ const pad = (n, v) => globalThis.onMidiMessageInternal([v > 0 ? 0x90 : 0x80, n, 
 /* A write that strikes a drum. The `n` list also carries the tick's click
  * (`c:1`/`c:0`) and panic (`x`), which are not hits. */
 const isHit = ([k, v]) => k === 'n' && /(^|,)\d+:\d+(,|$)/.test(v);
+/* A panic: in the stroke list as `x`, or the direct write closing still uses. */
+const isPanic = ([k, v]) => (k === 'n' && /(^|,)x(,|$)/.test(v)) || (k === 'panic' && v === '1');
 /* 25ms a tick, so every tick also draws. */
 const ticks = (n) => { for (let i = 0; i < n; i++) { globalThis.__advance(25); globalThis.tick(); } };
 
@@ -573,11 +575,41 @@ test('pausing silences the engine', async () => {
   ticks(2);
   startFirstDrill();
   ticks(60);
-  const before = log.params.filter(([k]) => k === 'panic').length;
+  const before = log.params.filter(isPanic).length;
   cc(CC.play, 127);
   ticks(2);
-  assert.ok(log.params.filter(([k]) => k === 'panic').length > before,
+  assert.ok(log.params.filter(isPanic).length > before,
     'the kit was left ringing through the pause');
+});
+
+/*
+ * The engine reads one parameter a tick and the strokes go last, so a panic
+ * written on its own was lost whenever a stroke was queued in the same tick.
+ * It rides in the stroke list now, as `x`, in order.
+ */
+test('a pause in the same tick as a stroke still silences, and a stroke after it still plays', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  startFirstDrill();
+  ticks(60);
+  let before = log.params.length;
+  pad(78, 100); pad(78, 0);                       /* a hat, queued ... */
+  cc(CC.record, 127);                             /* ... then pause, same tick */
+  ticks(1);
+  let writes = log.params.slice(before).filter(([k]) => k === 'n');
+  assert.deepEqual(writes.map(([, v]) => v), ['x'], 'one write: the cut, the stroke before it dropped');
+  assert.equal(log.params.slice(before).filter(([k]) => k === 'panic').length, 0, 'no separate panic to lose');
+
+  cc(CC.record, 127);                             /* resume */
+  ticks(1);
+  before = log.params.length;
+  cc(CC.back, 127);                               /* restart: a panic ... */
+  pad(78, 100); pad(78, 0);                       /* ... then a hat, same tick */
+  ticks(1);
+  writes = log.params.slice(before).filter(([k]) => k === 'n');
+  assert.equal(writes.length, 1);
+  assert.match(writes[0][1], /^x,\d+:100$/, 'the cut first, then the hat');
 });
 
 test('the panel keeps repainting while paused', async () => {
@@ -2042,9 +2074,9 @@ test('Play on L0 sounds the bar, spread over time, and starts nothing', async ()
   log.params.length = 0;
   cc(CC.play, 127);
   ticks(1);
-  const early = log.params.filter(([k]) => k === 'n').length;
+  const early = log.params.filter(isHit).length;
   ticks(120);                                   /* three seconds: past the bar at 92 */
-  const all = log.params.filter(([k]) => k === 'n').length;
+  const all = log.params.filter(isHit).length;
   assert.ok(early >= 1 && all > early, `${early} then ${all}`);
   assert.ok(drawnText(2).includes('REC   own pace'), 'still on the ready screen');
 });

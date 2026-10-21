@@ -391,6 +391,21 @@ function midiChannel() {
   return settings.midiCh > 0 ? settings.midiCh - 1 : 9; /* 10 is the drum channel */
 }
 
+/*
+ * Silence, in order with the strokes around it.
+ *
+ * The engine's parameter channel holds ONE value per tick, and the strokes go
+ * last (flushDsp). A panic written straight away was overwritten whenever a
+ * pad — or Listen — had queued a stroke earlier in the same tick, and a crash
+ * rang on after Stop. So the panic goes INTO the stroke list, as `x`: what was
+ * queued before it is dropped, what comes after it in this tick plays after
+ * the cut. Closing, unloading and the error path keep the direct write —
+ * nothing flushes after them.
+ */
+function panicDsp() {
+  dspNotes = 'x';
+}
+
 function flushDsp() {
   if (!dspNotes) return;
   dspSet('n', dspNotes);
@@ -984,7 +999,7 @@ function hearBar() {
 function pause() {
   if (!T.pause(tp, now())) return;
   if (untimed) UT.pause(untimed);
-  dspSet('panic', '1');
+  panicDsp();
   announce('paused');
 }
 
@@ -1015,7 +1030,7 @@ function transportPress(want) {
   if (tp.mode === want) { togglePause(); return; }
   const at = T.switchMode(tp, want, now(), chart.bpm);
   if (want === C.MODE_PRACTICE) SC.seekTo(run, at);
-  dspSet('panic', '1');
+  panicDsp();
   if (tp.paused) resume();
   announce(want === C.MODE_PRACTICE ? 'practising' : 'listening');
 }
@@ -1027,7 +1042,7 @@ function transportPress(want) {
  * next attempt at the end of the last one, and it ended on the spot.
  */
 function enterReady() {
-  dspSet('panic', '1');
+  panicDsp();
   review = null;
   untimed = null;
   clearPrompt();
@@ -1081,7 +1096,7 @@ function scrub(delta) {
   T.seek(tp, to, now(), chart.bpm);
   SC.ensureEntries(run, to + 8);
   SC.seekTo(run, to);
-  dspSet('panic', '1');
+  panicDsp();
 }
 
 /*
@@ -1091,7 +1106,7 @@ function scrub(delta) {
  * Ladder records itself (serviceLadder), once.
  */
 function stop() {
-  dspSet('panic', '1');
+  panicDsp();
   summaryIsBest = false;
   if (!ladder) progressNote = null;
   if (ladder) {
@@ -1117,7 +1132,7 @@ function stop() {
  * started from a scrubbed bar.
  */
 function stopUntimed() {
-  dspSet('panic', '1');
+  panicDsp();
   clearPrompt();
   summaryIsBest = false;
   progressNote = null;
@@ -1959,7 +1974,7 @@ function leaveSettings() {
  */
 function leaveToMenu() {
   if (tp.mode !== C.MODE_IDLE) {
-    dspSet('panic', '1');
+    panicDsp();
     T.home(tp);
   }
   untimed = null;
