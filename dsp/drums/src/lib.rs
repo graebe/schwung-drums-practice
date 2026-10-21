@@ -10,7 +10,15 @@
  * channel to match. The pitched module reached the same conclusion the hard
  * way and migrated everyone onto its internal engine; this one starts there.
  *
- * EVERYTHING HERE RUNS ON THE SPI CALLBACK. No allocation after `create`, no
+ * The kit is recorded: Naked Drums (samples/drums.nisp) through ni-sampler,
+ * every hit a velocity layer and a round robin of a real kit, and the click
+ * recorded claves (samples/click.nisp). Both are read in `create`. Without
+ * them — a missing or broken file — the synthesized kit and click below play
+ * instead, so a damaged install is a plainer kit, never silence.
+ *
+ * EVERYTHING HERE BUT `create` RUNS ON THE SPI CALLBACK. `create` runs on
+ * Schwung's worker thread, because this is an overtake tool (see
+ * schwung-plugin), and is where the packs are read. No allocation after `create`, no
  * locks, no I/O, and — see the denies below — no reachable Rust panic: a
  * fault on that thread takes MoveOriginal down with it. All of the `unsafe`
  * lives in schwung-plugin, so there is none in this crate at all.
@@ -25,9 +33,13 @@ mod ring;
 mod voice;
 
 use alloc::boxed::Box;
+use alloc::vec::Vec;
 use core::f32::consts::TAU;
 use libm::sinf;
+use ni_sampler::{Pack, Retrigger, Sampler};
+use parse::Cue;
 use ring::{Event, Ring};
+use schwung_plugin::fs::read_file;
 use schwung_plugin::{schwung_plugin, SchwungPlugin};
 use voice::{Click, Voice, NUM_DRUMS, SINE_SIZE};
 
@@ -51,6 +63,53 @@ const MAX_VOICES: usize = 16;
  */
 const CLICK_SLOTS: usize = 2;
 
+/// Where the kit's nine voices sit in the pack: their General MIDI notes, the
+/// same table ui.js sends down a MIDI route, so a voice is one drum
+/// everywhere — screen, pads, speaker, a drum rack at the other end.
+pub const GM_KEYS: [u8; voice::NUM_DRUMS] = [49, 42, 46, 51, 48, 38, 45, 36, 44];
+
+/// The packs, relative to the module directory.
+const KIT_PACK: &[u8] = b"samples/drums.nisp";
+const CLICK_PACK: &[u8] = b"samples/click.nisp";
+
+/// The recorded kit against the synthesized one, before the kit's gain:
+/// chosen so a bar of kick, snare and hat at velocity 100 is about as loud
+/// either way (tests::the_recorded_kit_is_as_loud_as_the_synth, within
+/// 1.5 dB), with kick, snare and crash at full velocity still under the soft
+/// clip's knee (tests::a_stack_at_full_velocity_stays_under_the_knee).
+pub const KIT_TRIM: f32 = 2.7;
+/// The claves against the synthesized click, before the click's level: as
+/// loud, measured the same way.
+pub const CLICK_TRIM: f32 = 1.5;
+
+/// A recorded instrument: the pack's bytes, and the voices that play them.
+struct Recorded<const V: usize> {
+    bytes: Vec<u8>,
+    voices: Sampler<V>,
+}
+
+impl<const V: usize> Recorded<V> {
+    /// The pack at `rel` in `dir`, if it can be read and validates.
+    fn load(dir: Option<&[u8]>, rel: &[u8]) -> Option<Self> {
+        let bytes = read_file(dir?, rel)?;
+        Pack::validate(&bytes).ok()?;
+        Some(Recorded { bytes, voices: Sampler::new(voice::SAMPLE_RATE, Retrigger::Stack) })
+    }
+
+    fn strike(&mut self, key: u8, vel: u8) {
+        if let Ok(p) = Pack::new(&self.bytes) {
+            self.voices.note_on(&p, key, vel);
+        }
+    }
+
+    fn next(&mut self) -> f32 {
+        match Pack::new(&self.bytes) {
+            Ok(p) => self.voices.next(&p),
+            Err(_) => 0.0,
+        }
+    }
+}
+
 pub struct Drums {
     sine: [f32; SINE_SIZE],
     voices: [Voice; MAX_VOICES],
@@ -60,6 +119,8 @@ pub struct Drums {
     gain: f32,
     click_gain: f32,
     ring: Ring,
+    kit: Option<Recorded<MAX_VOICES>>,
+    claves: Option<Recorded<CLICK_SLOTS>>,
 }
 
 impl Drums {
@@ -105,6 +166,10 @@ impl Drums {
                 if vel == 0 || drum as usize >= NUM_DRUMS {
                     return;
                 }
+                if let (Some(kit), Some(&key)) = (self.kit.as_mut(), GM_KEYS.get(drum as usize)) {
+                    kit.strike(key, vel);
+                    return;
+                }
                 self.counter = self.counter.wrapping_add(1);
                 let age = self.counter;
                 let seed = self.next_seed();
@@ -113,6 +178,10 @@ impl Drums {
                 }
             }
             Event::Click { downbeat } => {
+                if let Some(c) = self.claves.as_mut() {
+                    c.strike(downbeat as u8, 127);
+                    return;
+                }
                 let level = self.click_gain;
                 if let Some(c) = self.pick_click() {
                     c.strike(downbeat, level);
@@ -124,6 +193,12 @@ impl Drums {
                 }
                 for c in self.clicks.iter_mut() {
                     c.cut();
+                }
+                if let Some(k) = self.kit.as_mut() {
+                    k.voices.panic();
+                }
+                if let Some(c) = self.claves.as_mut() {
+                    c.voices.panic();
                 }
             }
             Event::ReleaseAll => {
@@ -143,6 +218,17 @@ impl Drums {
     /// malformed entry mid-list loses only itself.
     fn set_hits(&mut self, list: &[u8]) {
         for entry in parse::hits(list) {
+            match parse::cue(entry) {
+                Some(Cue::Click(downbeat)) => {
+                    self.ring.push(Event::Click { downbeat });
+                    continue;
+                }
+                Some(Cue::Panic) => {
+                    self.ring.push(Event::Panic);
+                    continue;
+                }
+                None => {}
+            }
             if let Some((drum, vel)) = parse::hit(entry) {
                 self.ring.push(Event::Strike { drum, vel });
             }
@@ -151,7 +237,7 @@ impl Drums {
 }
 
 impl SchwungPlugin for Drums {
-    fn create(_module_dir: Option<&[u8]>, _json_defaults: Option<&[u8]>) -> Option<Self> {
+    fn create(module_dir: Option<&[u8]>, _json_defaults: Option<&[u8]>) -> Option<Self> {
         /*
          * Zeroed on the heap and filled in place, rather than built as a
          * temporary. The plugin trait returns `Self` by value, so `Some(*d)`
@@ -182,6 +268,9 @@ impl SchwungPlugin for Drums {
                 gain: 0.45,
                 click_gain: 0.28,
                 ring: Ring::new(),
+                /* Each pack on its own: one failing leaves the other. */
+                kit: Recorded::load(module_dir, KIT_PACK),
+                claves: Recorded::load(module_dir, CLICK_PACK),
             });
             Box::from_raw(raw)
         };
@@ -260,9 +349,12 @@ impl SchwungPlugin for Drums {
         match key {
             b"ping" => write_bytes(out, ENGINE_VERSION),
             b"voices" => {
-                let n = self.voices.iter().filter(|v| v.active).count();
-                write_u32(out, n as u32)
+                let synth = self.voices.iter().filter(|v| v.active).count();
+                let recorded = self.kit.as_ref().map_or(0, |k| k.voices.active_voices());
+                write_u32(out, (synth + recorded) as u32)
             }
+            b"source" => write_bytes(out, if self.kit.is_some() { b"sampled" } else { b"synth" }),
+            b"click" => write_bytes(out, if self.claves.is_some() { b"sampled" } else { b"synth" }),
             b"drums" => write_u32(out, NUM_DRUMS as u32),
             _ => 0,
         }
@@ -275,15 +367,20 @@ impl SchwungPlugin for Drums {
 
         /* Split the borrow: the voices need the sine table while being ticked. */
         let (sine, voices, clicks) = (&self.sine, &mut self.voices, &mut self.clicks);
+        let (kit, claves) = (&mut self.kit, &mut self.claves);
         let gain = self.gain;
+        let click_gain = self.click_gain;
 
-        for frame in out.chunks_exact_mut(2) {
+        for frame in out.as_chunks_mut::<2>().0 {
             let mut mix = 0.0f32;
             for v in voices.iter_mut() {
                 if !v.active {
                     continue;
                 }
                 mix += v.tick(sine);
+            }
+            if let Some(k) = kit.as_mut() {
+                mix += k.next() * KIT_TRIM;
             }
             mix *= gain;
 
@@ -297,6 +394,9 @@ impl SchwungPlugin for Drums {
                     continue;
                 }
                 mix += c.tick(sine);
+            }
+            if let Some(c) = claves.as_mut() {
+                mix += c.next() * CLICK_TRIM * click_gain;
             }
 
             let s = (soft_clip(mix) * 26000.0) as i32;

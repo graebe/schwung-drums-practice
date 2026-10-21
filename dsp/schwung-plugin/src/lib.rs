@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Torben Gräber
-
 /*
  * schwung-plugin — the Schwung native DSP plugin API (v2), in Rust.
  *
@@ -11,11 +10,18 @@
  * its own, which is the actual reason to split the two apart.
  *
  * THE CONTRACT THAT IS NOT NEGOTIABLE, because it is not this crate's to relax:
- * every one of these entry points runs on the SPI callback — create_instance,
- * destroy_instance, set_param, get_param, on_midi and render_block alike. No
- * allocation after construction, no locks, no file I/O, no logging. A module
- * author who infers a control thread has inferred wrong; a 2026-08 audit of
- * the fleet found ~150 violations written by people who assumed one existed.
+ * destroy_instance, set_param, get_param, on_midi and render_block run on the
+ * SPI callback. No allocation after construction, no locks, no file I/O, no
+ * logging. A module author who infers a control thread has inferred wrong; a
+ * 2026-08 audit of the fleet found ~150 violations written by people who
+ * assumed one existed.
+ *
+ * create_instance is the one exception, and only for an OVERTAKE module (a
+ * tool): Schwung loads those on its worker thread — dlopen, then create —
+ * and publishes the instance to the audio thread afterwards
+ * (SHIM_EVT_OVERTAKE_DSP_LOAD, schwung_shim.c). That is what makes `fs::read`
+ * in `create` legal for one. A chain-slot module is still created on the
+ * callback and must not read files there.
  */
 #![cfg_attr(feature = "rt", no_std)]
 #![deny(clippy::indexing_slicing, clippy::unwrap_used, clippy::expect_used, clippy::panic)]
@@ -24,6 +30,7 @@ extern crate alloc;
 
 #[cfg(feature = "rt")]
 mod alloc_shim;
+pub mod fs;
 mod panic_shim;
 
 use core::ffi::{c_char, c_int, c_void};
@@ -41,6 +48,10 @@ pub const MOVE_FRAMES_PER_BLOCK: usize = 128;
  * was never NUL-terminated. Walking it forever is how a bad caller becomes our
  * crash. */
 const MAX_CSTR: usize = 4096;
+/* A VALUE may be far longer: a tool's remote UI hands its whole view model
+ * over as one (docs/MODULES.md), and the host's param channel carries up to
+ * SHADOW_PARAM_VALUE_LEN, 128KB. Still bounded, for the same reason. */
+const MAX_VALUE: usize = 131_072;
 /* frames is a c_int off the wire. The host sends 128. */
 const MAX_FRAMES: c_int = 1 << 16;
 
@@ -135,7 +146,7 @@ pub trait SchwungPlugin: Sized {
 /* ---- helpers the macro uses ---------------------------------------------- */
 #[doc(hidden)]
 pub mod rt {
-    use super::{MAX_CSTR, MAX_FRAMES};
+    use super::{MAX_CSTR, MAX_FRAMES, MAX_VALUE};
     use core::ffi::{c_char, c_int};
 
     /// NUL-terminated C string to bytes, bounded. `None` for NULL.
@@ -143,11 +154,23 @@ pub mod rt {
     /// # Safety
     /// `p` is NULL or points to a NUL-terminated string.
     pub unsafe fn cstr<'a>(p: *const c_char) -> Option<&'a [u8]> {
+        bounded(p, MAX_CSTR)
+    }
+
+    /// A param value: the same, with the longer bound values are allowed.
+    ///
+    /// # Safety
+    /// `p` is NULL or points to a NUL-terminated string.
+    pub unsafe fn value<'a>(p: *const c_char) -> Option<&'a [u8]> {
+        bounded(p, MAX_VALUE)
+    }
+
+    unsafe fn bounded<'a>(p: *const c_char, max: usize) -> Option<&'a [u8]> {
         if p.is_null() {
             return None;
         }
         let mut n = 0usize;
-        while n < MAX_CSTR && *p.add(n) != 0 {
+        while n < max && *p.add(n) != 0 {
             n += 1;
         }
         Some(core::slice::from_raw_parts(p.cast::<u8>(), n))
@@ -220,7 +243,7 @@ macro_rules! schwung_plugin {
         ) {
             let Some(p) = inst.cast::<$ty>().as_mut() else { return };
             let Some(k) = $crate::rt::cstr(key) else { return };
-            <$ty as $crate::SchwungPlugin>::set_param(p, k, $crate::rt::cstr(val));
+            <$ty as $crate::SchwungPlugin>::set_param(p, k, $crate::rt::value(val));
         }
 
         unsafe extern "C" fn __schwung_get_param(
@@ -285,4 +308,81 @@ macro_rules! schwung_plugin {
             &__SCHWUNG_API
         }
     };
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
+mod tests {
+    use super::*;
+    use core::ffi::c_char;
+
+    /* A plugin that implements only what it must, so the defaults answer. */
+    struct Bare;
+    impl SchwungPlugin for Bare {
+        fn create(_: Option<&[u8]>, _: Option<&[u8]>) -> Option<Self> {
+            Some(Bare)
+        }
+        fn render(&mut self, _out: &mut [i16]) {}
+    }
+
+    #[test]
+    fn the_defaults_do_nothing_and_answer_nothing() {
+        let mut p = Bare::create(None, None).unwrap();
+        p.on_midi(&[0xB0, 120, 0], 0);
+        p.set_param(b"x", Some(b"1"));
+        let mut out = [0u8; 8];
+        assert_eq!(p.get_param(b"x", &mut out), 0);
+        p.render(&mut [0; 4]);
+    }
+
+    #[test]
+    fn host_is_none_until_init_says_otherwise() {
+        __set_host(core::ptr::null());
+        assert!(host().is_none());
+    }
+
+    #[test]
+    fn cstr_is_bounded_and_none_for_null() {
+        unsafe {
+            assert_eq!(rt::cstr(core::ptr::null()), None);
+            assert_eq!(rt::cstr(c"ab".as_ptr()), Some(&b"ab"[..]));
+            let long = [b'a'; MAX_CSTR + 8];
+            assert_eq!(rt::cstr(long.as_ptr().cast::<c_char>()).unwrap().len(), MAX_CSTR);
+        }
+    }
+
+    #[test]
+    fn a_value_may_be_longer_than_a_key_but_is_still_bounded() {
+        unsafe {
+            assert_eq!(rt::value(core::ptr::null()), None);
+            let mut view = alloc::vec![b'v'; 100_000];
+            view.push(0);
+            assert_eq!(rt::value(view.as_ptr().cast::<c_char>()).unwrap().len(), 100_000);
+            let long = alloc::vec![b'v'; MAX_VALUE + 8];
+            assert_eq!(rt::value(long.as_ptr().cast::<c_char>()).unwrap().len(), MAX_VALUE);
+        }
+    }
+
+    #[test]
+    fn bytes_refuses_null_empty_and_oversized() {
+        let data = [1u8, 2, 3];
+        unsafe {
+            assert_eq!(rt::bytes(core::ptr::null(), 3), None);
+            assert_eq!(rt::bytes(data.as_ptr(), 0), None);
+            assert_eq!(rt::bytes(data.as_ptr(), -1), None);
+            assert_eq!(rt::bytes(data.as_ptr(), MAX_CSTR as c_int + 1), None);
+            assert_eq!(rt::bytes(data.as_ptr(), 3), Some(&data[..]));
+        }
+    }
+
+    #[test]
+    fn samples_refuses_null_and_impossible_frame_counts() {
+        let mut buf = [0i16; 8];
+        unsafe {
+            assert!(rt::samples(core::ptr::null_mut(), 4).is_none());
+            assert!(rt::samples(buf.as_mut_ptr(), 0).is_none());
+            assert!(rt::samples(buf.as_mut_ptr(), MAX_FRAMES + 1).is_none());
+            assert_eq!(rt::samples(buf.as_mut_ptr(), 4).unwrap().len(), 8);
+        }
+    }
 }

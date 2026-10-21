@@ -90,6 +90,25 @@ pub fn hit(entry: &[u8]) -> Option<(u8, u8)> {
 }
 
 /// Split a comma-separated hit list. Borrows; allocates nothing.
+/// The other things a hit list may carry, in its order: `c:1` / `c:0` a
+/// metronome tick (downbeat or not) and `x` a panic. They ride in the list,
+/// not in parameters of their own, because the parameter channel takes one
+/// write per tick and they fall on the same ticks as the hits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Cue {
+    Click(bool),
+    Panic,
+}
+
+pub fn cue(entry: &[u8]) -> Option<Cue> {
+    match entry.trim_ascii() {
+        b"c:1" => Some(Cue::Click(true)),
+        b"c:0" => Some(Cue::Click(false)),
+        b"x" => Some(Cue::Panic),
+        _ => None,
+    }
+}
+
 pub fn hits(list: &[u8]) -> impl Iterator<Item = &[u8]> {
     list.split(|&c| c == b',')
 }

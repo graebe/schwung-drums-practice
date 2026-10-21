@@ -110,8 +110,17 @@ ok
 # No accidental dependency creep. Every crate in the DSP is ours or libm (MIT):
 # a new one has to be checked against the licence allowlist and named in
 # THIRD-PARTY-NOTICES.md before this list may grow.
+# ni-sampler is ours too: vendored from Piano Practice (scripts/check-vendored.sh).
 crates=$(sed -n 's/^name = "\(.*\)"/\1/p' "$ROOT/dsp/Cargo.lock" | sort | tr '\n' ' ')
-[ "$crates" = "drums libm schwung-plugin " ] || fail "unexpected crates in dsp/Cargo.lock: $crates"
+[ "$crates" = "drums libm ni-sampler schwung-plugin " ] || fail "unexpected crates in dsp/Cargo.lock: $crates"
+grep -q '^#!\[forbid(unsafe_code)\]' "$ROOT/dsp/ni-sampler/src/lib.rs" || fail "ni-sampler must forbid unsafe"
+
+# The recordings ship with their licence texts and credits.
+for f in samples/drums.nisp samples/click.nisp samples/LICENSES/CC-BY-4.0.txt samples/LICENSES/CC0-1.0.txt; do
+  test -f "$ROOT/$f" || fail "no $f"
+done
+grep -q 'Naked Drums' "$ROOT/THIRD-PARTY-NOTICES.md" || fail "the notices do not credit Naked Drums"
+grep -q 'samples/\*.nisp filter=lfs' "$ROOT/.gitattributes" || fail "the packs are not in Git LFS"
 
 node -e '
 const p = require(process.argv[1] + "/package.json");

@@ -17,7 +17,11 @@ for entry in \
   drums-practice/help.json \
   drums-practice/exercises/index.json \
   drums-practice/LICENSE \
-  drums-practice/THIRD-PARTY-NOTICES.md
+  drums-practice/THIRD-PARTY-NOTICES.md \
+  drums-practice/samples/drums.nisp \
+  drums-practice/samples/click.nisp \
+  drums-practice/samples/LICENSES/CC-BY-4.0.txt \
+  drums-practice/samples/LICENSES/CC0-1.0.txt
 do
   echo "$LIST" | grep -qx "$entry" || { echo "missing from package: $entry" >&2; exit 1; }
 done
@@ -48,6 +52,14 @@ for f in "$MODDIR/ui.js" "$MODDIR"/*.mjs; do
          rm -rf "$TMPD"; exit 1 ;;
     esac
   done
+done
+# The packs are packs, not the LFS pointers a checkout without its objects
+# holds.
+for pack in drums click; do
+  if [ "$(head -c 4 "$MODDIR/samples/$pack.nisp")" != NISP ]; then
+    echo "samples/$pack.nisp in the package is not a pack" >&2
+    rm -rf "$TMPD"; exit 1
+  fi
 done
 rm -rf "$TMPD"
 

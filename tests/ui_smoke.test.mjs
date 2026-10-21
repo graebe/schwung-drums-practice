@@ -123,6 +123,9 @@ const toQuizzes = () => {
 };
 const cc = (n, v) => globalThis.onMidiMessageInternal([0xb0, n, v]);
 const pad = (n, v) => globalThis.onMidiMessageInternal([v > 0 ? 0x90 : 0x80, n, v]);
+/* A write that strikes a drum. The `n` list also carries the tick's click
+ * (`c:1`/`c:0`) and panic (`x`), which are not hits. */
+const isHit = ([k, v]) => k === 'n' && /(^|,)\d+:\d+(,|$)/.test(v);
 /* 25ms a tick, so every tick also draws. */
 const ticks = (n) => { for (let i = 0; i < n; i++) { globalThis.__advance(25); globalThis.tick(); } };
 
@@ -173,7 +176,7 @@ test('a pad press reaches the engine as a hit', async () => {
   const before = log.params.length;
   pad(80, 100);
   globalThis.tick();
-  const hits = log.params.slice(before).filter(([k]) => k === 'n');
+  const hits = log.params.slice(before).filter(isHit);
   assert.equal(hits.length, 1, 'the pad never reached the engine');
   assert.match(hits[0][1], /^\d+:100$/, `unexpected payload: ${hits[0][1]}`);
 });
@@ -197,7 +200,7 @@ test('a full session runs without throwing', async () => {
   cc(CC.back, 127);
   ticks(5);
 
-  assert.ok(log.params.some(([k]) => k === 'n'), 'no hits ever reached the engine');
+  assert.ok(log.params.some(isHit), 'no hits ever reached the engine');
   assert.ok(log.exited === 0, 'the module exited early');
 });
 
@@ -217,9 +220,31 @@ test('a hit is batched into ONE parameter write, not one per drum', async () => 
   pad(81, 100);
   pad(68, 100);
   globalThis.tick();
-  const writes = log.params.slice(before).filter(([k]) => k === 'n');
+  const writes = log.params.slice(before).filter(isHit);
   assert.equal(writes.length, 1, 'three pads in one frame must be one write');
   assert.ok(writes[0][1].split(',').length >= 2, 'the write lost hits');
+});
+
+test('the click shares the tick\'s one write with the hits', async () => {
+  /* A stroke on the beat used to send 'c' and then 'n' in the same tick, and
+   * the single-slot mailbox kept only one of them. */
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  startFirstDrill();
+  let both = 0;
+  for (let i = 0; i < 400; i++) {
+    const before = log.params.length;
+    pad(80, 100);
+    globalThis.__advance(16);
+    globalThis.tick();
+    pad(80, 0);
+    const wrote = log.params.slice(before).filter(([k]) => k !== 'vm');
+    assert.ok(wrote.length <= 1, `tick ${i} wrote ${JSON.stringify(wrote)}`);
+    if (wrote.length && /(^|,)c:[01](,|$)/.test(wrote[0][1]) && /(^|,)\d+:100(,|$)/.test(wrote[0][1])) both++;
+  }
+  assert.ok(!log.params.some(([k]) => k === 'c'), 'a separate click write');
+  assert.ok(both > 0, 'no tick carried a hit and the click together');
 });
 
 test('knob touch is not a pad', async () => {
@@ -231,7 +256,7 @@ test('knob touch is not a pad', async () => {
   const before = log.params.length;
   for (let n = 0; n <= 9; n++) { pad(n, 100); pad(n, 0); }
   globalThis.tick();
-  assert.equal(log.params.slice(before).filter(([k]) => k === 'n').length, 0);
+  assert.equal(log.params.slice(before).filter(isHit).length, 0);
 });
 
 test('every screen draws without throwing', async () => {
@@ -490,7 +515,7 @@ test('the OTHER button switches listen and practice in place, without pausing', 
   const atSwitch = screen.pixels.slice();
   ticks(80);
   assert.ok(screen.pixels.some((p, i) => p !== atSwitch[i]), 'the switch stopped the music');
-  assert.ok(log.params.some(([k]) => k === 'n'), 'listening played nothing after the switch');
+  assert.ok(log.params.some(isHit), 'listening played nothing after the switch');
   assert.ok(!drawnText().some((t) => /PAUSED/.test(t)), 'switching paused instead');
   cc(CC.record, 127);               /* and back to practising */
   ticks(40);
@@ -644,7 +669,7 @@ test('knob touch is still never a pad hit', async () => {
     globalThis.onMidiMessageInternal([0x80, n, 0]);
   }
   globalThis.tick();
-  assert.equal(log.params.slice(before).filter(([k]) => k === 'n').length, 0);
+  assert.equal(log.params.slice(before).filter(isHit).length, 0);
 });
 
 test('a drill listed in user.json loads alongside the shipped ones', async () => {
@@ -940,10 +965,10 @@ test('a hearing drill SOUNDS its prompt', async () => {
     const { log } = await loadUi();
     globalThis.init();
     ticks(2);
-    const before = log.params.filter(([k]) => k === 'n').length;
+    const before = log.params.filter(isHit).length;
     openQuiz(i);
     ticks(40);                       /* a rhythm prompt takes a moment */
-    const after = log.params.filter(([k]) => k === 'n').length;
+    const after = log.params.filter(isHit).length;
     assert.ok(after > before, `${d.name} played nothing`);
   }
 });
@@ -1005,10 +1030,10 @@ test('Play repeats the question in a hearing drill', async () => {
   ticks(2);
   openQuiz(hearIdx);
   ticks(20);
-  const before = log.params.filter(([k]) => k === 'n').length;
+  const before = log.params.filter(isHit).length;
   cc(CC.play, 127);
   ticks(20);
-  assert.ok(log.params.filter(([k]) => k === 'n').length > before,
+  assert.ok(log.params.filter(isHit).length > before,
     'Play did not repeat the prompt');
 });
 
@@ -1034,9 +1059,9 @@ test('a rhythm prompt is spread over time, not dumped in one frame', async () =>
   let framesWithSound = 0;
   let notes = 0;
   for (let i = 0; i < 60; i++) {
-    const before = log.params.filter(([k]) => k === 'n').length;
+    const before = log.params.filter(isHit).length;
     ticks(1);
-    const added = log.params.filter(([k]) => k === 'n').slice(before);
+    const added = log.params.filter(isHit).slice(before);
     if (!added.length) continue;
     framesWithSound++;
     for (const [, v] of added) notes += String(v).split(',').filter(Boolean).length;
@@ -1111,9 +1136,9 @@ test('leaving a quiz silences whatever it was still playing', async () => {
   openQuiz(idx);
   ticks(2);
   cc(CC.back, 127);
-  const before = log.params.filter(([k]) => k === 'n').length;
+  const before = log.params.filter(isHit).length;
   ticks(60);
-  assert.equal(log.params.filter(([k]) => k === 'n').length, before,
+  assert.equal(log.params.filter(isHit).length, before,
     'the prompt kept playing after leaving the drill');
 });
 
@@ -1156,7 +1181,7 @@ test('the count-in lasts exactly the beats it says', async () => {
   log.params.length = 0;
   cc(CC.play, 127);                        /* listen, from the top */
   let elapsed = 0;
-  while (elapsed < 10000 && !log.params.some(([k]) => k === 'n')) {
+  while (elapsed < 10000 && !log.params.some(isHit)) {
     globalThis.__advance(5);
     elapsed += 5;
     globalThis.tick();
@@ -1177,7 +1202,7 @@ test('a start from a scrubbed bar plays from that bar, with no count-in', async 
   log.params.length = 0;
   cc(CC.play, 127);
   let elapsed = 0;
-  while (elapsed < 10000 && !log.params.some(([k]) => k === 'n')) {
+  while (elapsed < 10000 && !log.params.some(isHit)) {
     globalThis.__advance(5);
     elapsed += 5;
     globalThis.tick();
@@ -1804,7 +1829,7 @@ test('an answer pad answers and sounds nothing; one of the three is right', asyn
     if (flashes[flashes.length - 1] === 126) break;   /* green: right */
   }
   assert.ok(flashes.includes(126), `no answer was right: ${flashes}`);
-  assert.equal(log.params.slice(before).filter(([k]) => k === 'n').length, 0,
+  assert.equal(log.params.slice(before).filter(isHit).length, 0,
     'an answer pad sounded a drum');
   ticks(30);
   assert.ok(drawnText(1).some((t) => /^1\//.test(t)), 'the round did not count the answer');

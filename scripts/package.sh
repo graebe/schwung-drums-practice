@@ -53,6 +53,20 @@ cp "$ROOT/LICENSE" "$STAGE/LICENSE"
 # this module could actually make.
 cp "$ROOT/THIRD-PARTY-NOTICES.md" "$STAGE/THIRD-PARTY-NOTICES.md"
 
+# The recorded kit and claves, which dsp.so reads in create, with their
+# licence texts. They are Git LFS objects: a checkout without the objects
+# holds ~130-byte pointer files instead, and a module packaged from one would
+# quietly play the synthesized kit. So a file that does not start like a pack
+# stops the build here.
+mkdir -p "$STAGE/samples/LICENSES"
+for pack in drums click; do
+  f="$ROOT/samples/$pack.nisp"
+  [ "$(head -c 4 "$f" 2>/dev/null)" = NISP ] \
+    || { echo "samples/$pack.nisp is not a pack (an LFS pointer? run: git lfs pull)" >&2; exit 1; }
+  cp "$f" "$STAGE/samples/"
+done
+cp "$ROOT/samples/LICENSES/"*.txt "$STAGE/samples/LICENSES/"
+
 # COPYFILE_DISABLE stops macOS bsdtar writing AppleDouble "._*" resource
 # forks into the archive; they unpack onto the Move as junk beside every file.
 (cd "$ROOT/dist" && COPYFILE_DISABLE=1 tar -czf drums-practice-module.tar.gz drums-practice)

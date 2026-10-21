@@ -1,0 +1,85 @@
+# Drums Practice's kit: Naked Drums by Wilkinson Audio (CC-BY-4.0), the
+# "CR" mix (direct mics, overheads, close room) folded to mono, cut down for
+# the Move by nisp-build (Piano Practice's tools/nisp-build; see
+# scripts/build-samples.sh). Credits: THIRD-PARTY-NOTICES.md.
+#
+# Each piece lands on its General MIDI note, the same table src/ui.js sends
+# down a MIDI route (GM_NOTES), and dsp/drums maps the kit's nine voices onto
+# it. All five velocity layers, four of the ten round robins.
+#
+# trim_db rebalances the pieces against the snare. The CR mix is a mix for a
+# record, where hats and cymbals sit well back; a practice kit, heard on the
+# Move's speaker, needs every voice clear. The trims bring each piece to
+# within about 3 dB of the synthesized kit's balance, which was tuned by ear
+# on the device (dsp/drums tests::the_recorded_kit_keeps_the_balance).
+sfz = "Wilkinson Audio/Naked Drums/Stereo/Naked Drums CR.sfz"
+budget_mb = 32
+round_robins = 4
+one_shot = true
+max_seconds = [[0, 2.0]]
+fade_ms = 120
+
+[[piece]]
+name = "CR"
+trim_db = 12
+from = 55            # crash 1, edge
+to = 49
+seconds = 3.5
+
+[[piece]]
+name = "HH"
+trim_db = 12
+from = 42            # hi-hat, closed
+to = 42
+group = 1
+seconds = 0.8
+
+[[piece]]
+name = "HO"
+trim_db = 12
+from = 49            # hi-hat, open: choked by a closed or pedalled hat
+to = 46
+off_by = 1
+seconds = 2.5
+
+[[piece]]
+name = "RD"
+trim_db = 14
+from = 51            # ride, bow
+to = 51
+seconds = 3.0
+
+[[piece]]
+name = "HT"
+trim_db = 6
+from = 47            # tom 2, 12"
+to = 48
+seconds = 1.8
+
+[[piece]]
+name = "SN"
+from = 38            # snare, centre
+to = 38
+seconds = 1.2
+
+[[piece]]
+name = "LT"
+trim_db = 10
+from = 41            # tom 5, 16" floor
+to = 45
+seconds = 2.2
+
+[[piece]]
+name = "KK"
+trim_db = 9
+from = 36            # kick, 22"
+to = 36
+seconds = 1.2
+
+[[piece]]
+name = "HF"
+trim_db = 12
+from = 44            # hi-hat, pedal
+to = 44
+group = 1
+seconds = 0.8

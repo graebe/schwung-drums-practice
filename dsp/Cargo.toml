@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["schwung-plugin", "drums"]
+members = ["schwung-plugin", "ni-sampler", "drums"]
 
 # panic = "abort" is not a size preference. render_block runs ON THE SPI
 # CALLBACK, and unwinding across an `extern "C"` boundary is undefined
