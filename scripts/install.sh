@@ -15,7 +15,10 @@ REMOTE="$REMOTE_BASE/drums-practice"
 TOKEN=$$
 REMOTE_STAGE="$REMOTE_BASE/.drums-practice.install.$TOKEN"
 REMOTE_OLD="$REMOTE_BASE/.drums-practice.old.$TOKEN"
-REMOTE_ARCHIVE="/tmp/drums-practice-$TOKEN.tar.gz"
+# On /data, beside the module: the Move's /tmp sits on a ~460MB root
+# partition that is nearly full, and an archive with the recorded kit
+# (10MB+) can fill it. The stage directory already lives here.
+REMOTE_ARCHIVE="$REMOTE_BASE/.drums-practice.archive.$TOKEN.tar.gz"
 
 test -f "$ROOT/dist/dsp.so"
 # Always repackage: an old tarball left in dist/ would otherwise be deployed

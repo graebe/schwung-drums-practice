@@ -88,6 +88,8 @@ if grep -q 'cp "$remote/exercises/index.json"' "$INSTALL"; then
   fail "install.sh preserves the SHIPPED manifest, which would freeze the bundled list"
 fi
 grep -q 'trap rollback' "$INSTALL" || fail "install.sh has no rollback"
+# The Move's /tmp is on a nearly full root partition: the archive goes to /data.
+if grep -q 'REMOTE_ARCHIVE="/tmp' "$INSTALL"; then fail "install.sh uploads the archive to /tmp"; fi
 grep -q '/data/UserData/schwung/modules/tools' "$INSTALL" || fail "install.sh uses a stale path"
 ok
 
