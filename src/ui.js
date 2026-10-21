@@ -780,16 +780,24 @@ function armChart(c) {
    * so leaving it alone keeps the author's intent.
    */
   if (settings.reps > 0) chart.repeats = settings.reps;
+  /* L0 keeps every stack of the take for its page and its review, so a take
+   * is held under the run's entry ceiling: past it the cursor would reach
+   * the end of what was built and wait there for ever. */
+  if (chart.untimed) {
+    const per = Math.max(1, (chart.events || []).length);
+    chart.repeats = Math.max(1, Math.min(chart.repeats, Math.floor(SC.MAX_ENTRIES / per)));
+  }
   run = SC.createRun(chart, runOpts());
   /* Everything about the armed drill that the draw would otherwise work out
    * again fifty times a second. */
-  chartWarning = IO.playabilityWarnings(chart)[0] || '';
+  chartWarning = warningFor(chart);
   chartLanes = GR.lanes(KIT.voicesInChart(chart));
   chartLength = chart.untimed ? IO.untimedLength(chart) : IO.practiceLength(chart);
   /* A newly armed drill starts at home, where the box is. */
   T.home(tp);
   review = null;
   untimed = null;
+  clearPrompt();
   if (ladder) ladder = newLadder();
   screen = READY;
   announce(`${chart.name} ready`);
@@ -908,6 +916,10 @@ function startUntimed(practice) {
     hearBar();
     return;
   }
+  if (untimedUnplayable()) {
+    announce('L0 needs every drum of the groove: set Kit to kit.');
+    return;
+  }
   clearPrompt();
   run = SC.createRun(chart, runOpts());
   const from = T.start(tp, { mode: C.MODE_PRACTICE, nowMs: now(), bpm: chart.bpm, countInBeats: 0 });
@@ -920,6 +932,27 @@ function startUntimed(practice) {
   untimed = UT.createUntimed(run, { togetherMs: SC.WINDOWS[settings.strictness].goodMs, from: index });
   screen = RUNNING;
   announce('own pace');
+}
+
+/*
+ * Whether the pads cannot reach a drum this L0 chart asks for. A timed rung
+ * scores such a note a miss and the clock moves on; L0 has no clock, so the
+ * cursor would wait on it for ever. On the `sticking` kit every pad is the
+ * snare, so this is any groove with a hat or a kick in it.
+ */
+const UNTIMED_KIT_WARNING = 'SET KIT TO KIT';
+
+/* The one line the ready box gives a drill that cannot be played as it is. */
+function warningFor(c) {
+  return IO.playabilityWarnings(c)[0] || (untimedUnplayable() ? UNTIMED_KIT_WARNING : '');
+}
+
+function untimedUnplayable() {
+  if (!chart || !chart.untimed) return false;
+  for (const v of KIT.voicesInChart(chart)) {
+    if (!PAD.padsForVoice(v, settings.layout).length) return true;
+  }
+  return false;
 }
 
 /*
@@ -997,6 +1030,7 @@ function enterReady() {
   dspSet('panic', '1');
   review = null;
   untimed = null;
+  clearPrompt();
   T.home(tp);
   if (ladder) chart = { ...chart, bpm: armedBpm };
   run = SC.createRun(chart, runOpts());
@@ -1033,7 +1067,13 @@ function scrub(delta) {
    */
   const base = Math.max(0, tp.songBeats);
   const units = Math.round((base * SCRUB_UNITS_PER_BAR) / perBar) + delta;
-  const limit = Number.isFinite(run.endBeat) ? run.endBeat : base + perBar;
+  let limit = Number.isFinite(run.endBeat) ? run.endBeat : base + perBar;
+  /* L0 starts on a stack, so its scrub stops at the last bar that holds one:
+   * an empty last bar has nothing to start on. */
+  if (isUntimed() && run.entries.length) {
+    const last = run.entries[run.entries.length - 1].beat;
+    limit = Math.min(limit, (Math.floor(last / perBar) + 1) * perBar);
+  }
   let to = (units * perBar) / SCRUB_UNITS_PER_BAR;
   to = Math.max(0, Math.min(Math.max(0, limit - perBar), to));
   tp.scrubCue = true;
@@ -2629,6 +2669,8 @@ function editSetting(key, delta) {
   if (key === 'study' && settings.study && !wasStudying && run && screen === RUNNING) {
     SC.resyncWait(run, tp.songBeats);
   }
+  /* Kit does not rebuild the drill, but it decides whether L0 can be played. */
+  if (key === 'layout' && chart) chartWarning = warningFor(chart);
   /* Re-armed from the chart it was built from, so a level, a random drill or a
    * drill wrapped by the Ladder or Clock is rebuilt too — and the Settings
    * screen you are editing in stays up. */

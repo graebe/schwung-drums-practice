@@ -2107,3 +2107,72 @@ test('an L0 take begun from a scrubbed bar is a passage, and is not kept', async
   const saved = log.writes[`${DATA}progress.json`];
   assert.ok(!saved || !JSON.parse(saved).items['rock-backbeat:l0'], 'nothing recorded');
 });
+
+test('L0 on the sticking kit says what to change instead of a take that cannot move', async () => {
+  /* Every pad is the snare there: the hat and the kick of a groove cannot be
+   * struck, and with no clock nothing would ever move the cursor on. */
+  const { log } = await loadUi({ settings: { layout: 'sticking' } });
+  globalThis.init();
+  ticks(2);
+  armL0();
+  assert.ok(drawnText(2).includes('SET KIT TO KIT'), 'the ready box says so');
+  cc(CC.record, 127);
+  ticks(2);
+  assert.ok(drawnText(2).includes('SET KIT TO KIT'), 'and Record does not start a take');
+  assert.ok(log.announces.some((a) => /Kit/.test(a)));
+});
+
+test('an L0 scrub stops at the last bar with notes in it', async () => {
+  /* A user groove of two bars with notes only in the first: the scrub used to
+   * reach the empty last bar, and the take then began from the top with every
+   * stack already spoiled. */
+  const groove = { id: 'half', name: 'Half', bpm: 90, timeSig: [4, 4], loopBars: 2, repeats: 2,
+    sticking: 'off', events: [0, 1, 2, 3].map((b) => ({ beat: b, voices: b % 2 ? ['HH'] : ['HH', 'KK'] })) };
+  await loadUi({ extraFiles: {
+    'half.json': JSON.stringify(groove),
+    'user.json': JSON.stringify({ exercises: [{ id: 'half', name: 'Half', file: 'half.json', category: 'rock' }] }),
+  } });
+  globalThis.init();
+  ticks(2);
+  cc(CC.jogTurn, 2); cc(CC.jogClick, 127); cc(CC.jogClick, 127);  /* Rock & Pop */
+  for (let i = 0; i < 40; i++) cc(CC.jogTurn, 1);                 /* its last groove: Half */
+  cc(CC.jogClick, 127); ticks(2);                                  /* its ladder, on L0 */
+  cc(CC.jogClick, 127); ticks(2);
+  for (let i = 0; i < 400; i++) cc(CC.knob1, 1);                   /* as far as it goes */
+  ticks(1);
+  assert.ok(drawnText(1).includes('3/4'), 'the last bar that holds notes');
+  cc(CC.record, 127);
+  ticks(2);
+  for (let k = 0; k < 4; k++) {
+    const voices = k % 2 ? ['HH'] : ['HH', 'KK'];
+    for (const v of voices) pad(PAD_OF[v], 80);
+    for (const v of voices) pad(PAD_OF[v], 0);
+    ticks(8);
+  }
+  const shown = drawnText(3);
+  assert.ok(shown.includes('not kept') && shown.includes('100% 1st try'), shown.join('|'));
+});
+
+test('switching Kit back in Settings clears the L0 warning', async () => {
+  await loadUi({ settings: { layout: 'sticking' } });
+  globalThis.init();
+  ticks(2);
+  armL0();
+  assert.ok(drawnText(2).includes('SET KIT TO KIT'));
+  const SET = await import('../src/settings_def.mjs');
+  const row = SET.ROWS.findIndex((r) => r.key === 'layout');
+  shiftClick();
+  for (let i = 0; i < 40; i++) cc(CC.jogTurn, 127);
+  for (let i = 0; i < row; i++) cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);                          /* edit Kit */
+  cc(CC.jogTurn, 1);                             /* sticking -> ... */
+  cc(CC.jogTurn, 127);
+  cc(CC.jogTurn, 127);                           /* clamp at the first value: kit */
+  cc(CC.jogClick, 127);
+  shiftClick();
+  assert.ok(!drawnText(2).includes('SET KIT TO KIT'), 'the warning went with the kit');
+  cc(CC.record, 127);
+  ticks(2);
+  stepThrough();
+  assert.ok(drawnText(3).some((t) => /1st try/.test(t)), 'and the take runs');
+});
