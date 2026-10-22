@@ -47,26 +47,27 @@ export function laneOf(laneList, voice) {
   return null;
 }
 
-export function drawLanes(ctx, laneList) {
+export function drawLanes(ctx, laneList, rule = true) {
   for (let i = 0; i < laneList.length; i++) {
     const lane = laneList[i];
     const v = voiceById(lane.voice);
     ctx.text(L.GRID_LABEL_X, lane.mid - 3, v ? v.short : lane.voice, 1);
     /* A dotted rule down the middle of each lane: enough to follow the row
-     * across the screen, faint enough not to compete with the hits. */
+     * across the screen, faint enough not to compete with the hits. Not on
+     * L0's page: a whole bar on one screen packs its notes close, and there a
+     * dot every 4px reads as a note (page_view.mjs). */
+    if (!rule) continue;
     for (let x = L.GRID_LEFT_X; x < L.SCREEN_W; x += 4) {
       ctx.fillRect(x, lane.mid, 1, 1, 1);
     }
   }
 }
 
-/* `x` is the hit line's, unless the line has been moved: L0's cursor is this
- * same line, standing on the stack it waits for. */
-export function drawPlayhead(ctx, laneList, strong = false, x = L.HIT_X) {
+export function drawPlayhead(ctx, laneList, strong = false) {
   if (!laneList.length) return;
   const top = laneList[0].top;
   const bottom = laneList[laneList.length - 1].top + laneList[laneList.length - 1].h - 1;
-  ctx.fillRect(Math.round(x), top, strong ? 2 : 1, bottom - top + 1, 1);
+  ctx.fillRect(L.HIT_X, top, strong ? 2 : 1, bottom - top + 1, 1);
 }
 
 export function drawBarLine(ctx, laneList, x) {

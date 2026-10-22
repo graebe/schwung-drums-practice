@@ -4,11 +4,16 @@
 /*
  * L0: a groove with no clock. What a press does to the cursor, what counts as
  * right first time, and how the pace is measured.
+ *
+ * A stack is judged when its together-window closes (settle), not on the
+ * stroke that completes it — so a pad too many inside the window spoils it.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as SC from '../src/scoring.mjs';
 import * as UT from '../src/untimed.mjs';
+
+const WIN = 60;
 
 /* One bar: hat+kick, hat, hat+snare (accented snare), hat. Two passes. */
 function chart(extra = {}) {
@@ -27,60 +32,97 @@ function chart(extra = {}) {
 
 function setup(opts = {}, chartExtra = {}) {
   const run = SC.createRun(chart(chartExtra), { dynamics: opts.dynamics !== false, sticking: opts.sticking });
-  return UT.createUntimed(run, { togetherMs: 60 });
+  return UT.createUntimed(run, { togetherMs: WIN });
 }
 
 const hit = (u, voice, at, vel = 80, hand = null) => UT.press(u, { voice, hand, velocity: vel }, at);
+/* Strike these drums together at `at`, then let the window close. */
+function stack(u, voices, at, vel = 80, hand = null) {
+  for (const v of voices) hit(u, v, at, typeof vel === 'function' ? vel(v) : vel, hand);
+  return UT.settle(u, at + WIN + 1);
+}
+const accentSn = (v) => (v === 'SN' ? 127 : 80);
 
 /* Strike stack after stack, correctly, `stepMs` apart. */
-function playClean(u, stepMs, from = 0, vel = 80) {
+function playClean(u, stepMs, from = 0, n = Infinity) {
   let t = from;
-  while (!u.finished) {
+  for (let k = 0; k < n && !u.finished; k++) {
     const e = UT.current(u);
-    for (const n of e.notes) hit(u, n.voice, t, n.wantDyn === 'accent' ? 127 : vel);
+    stack(u, e.notes.map((x) => x.voice), t,
+      (v) => (e.notes.find((x) => x.voice === v).wantDyn === 'accent' ? 127 : 80));
     t += stepMs;
   }
   return t;
 }
 
-test('a one-drum stack moves the cursor on', () => {
+test('a stack moves the cursor on when its window closes, not on its last stroke', () => {
   const u = setup();
   hit(u, 'HH', 0); hit(u, 'KK', 0);
+  assert.equal(u.index, 0, 'still open: another pad could yet spoil it');
+  assert.equal(UT.settle(u, WIN), null, 'not before the window has passed');
+  assert.deepEqual(UT.settle(u, WIN + 1), { complete: true });
   assert.equal(u.index, 1);
-  const j = hit(u, 'HH', 500);
-  assert.equal(j.complete, true);
+  assert.equal(u.firstTry, 1);
+  stack(u, ['HH'], 500);
   assert.equal(u.index, 2);
-  assert.equal(u.firstTry, 2);
 });
 
-test('a stack struck together moves on; struck apart it is asked for again', () => {
+test('pressing every drum at once never moves the cursor', () => {
+  /* The owner's report: kick, snare and hat mashed together advanced through
+   * every stack, even a hat alone, because the matching pad completed it. */
+  const u = setup();
+  stack(u, ['HH', 'KK'], 0);
+  for (let t = 1000; t < 10000; t += 500) stack(u, ['KK', 'SN', 'HH'], t);
+  assert.equal(u.index, 1, 'the hat alone was never taken by a mash');
+  stack(u, ['HH'], 20000);
+  assert.equal(u.index, 2, 'only the hat moves it on');
+  assert.equal(u.firstTry, 1);
+  assert.equal(u.causes.wrong, 1, 'one stack, one cause');
+});
+
+test('a pad too many after the stack is complete spoils it inside the window', () => {
+  const u = setup();
+  hit(u, 'HH', 0); hit(u, 'KK', 0);
+  hit(u, 'SN', 30);
+  UT.settle(u, 1000);
+  assert.equal(u.index, 0, 'asked for again');
+  assert.equal(UT.current(u).notes[0].state, SC.PENDING);
+  stack(u, ['HH', 'KK'], 2000);
+  assert.equal(u.index, 1);
+  assert.equal(u.firstTry, 0);
+  assert.equal(u.causes.wrong, 1);
+});
+
+test('a stack struck apart lapses and is asked for again', () => {
   const u = setup();
   hit(u, 'HH', 0);
-  assert.equal(u.index, 0, 'half a stack is not a stack');
   assert.equal(UT.current(u).notes[0].state, SC.HIT, 'the struck half shows');
-  hit(u, 'KK', 40);
-  assert.equal(u.index, 1, 'inside the window: one stack');
-
-  const v = setup();
-  hit(v, 'HH', 0);
-  assert.deepEqual(UT.expire(v, 70), ['HH'], 'the lapsed half is handed back for the flash');
-  assert.equal(UT.current(v).notes[0].state, SC.PENDING, 'and taken back');
-  assert.equal(v.index, 0);
-  hit(v, 'HH', 1000); hit(v, 'KK', 1010);
-  assert.equal(v.index, 1);
-  assert.equal(v.firstTry, 0, 'apart is not right first time');
-  assert.equal(v.causes.apart, 1);
-  assert.equal(v.run.entries[0].notes[1].state, SC.MISSED, 'it shows struck out');
+  assert.deepEqual(UT.settle(u, 70), { lapsed: ['HH'] }, 'the lapsed half, for the flash');
+  assert.equal(UT.current(u).notes[0].state, SC.PENDING, 'and taken back');
+  assert.equal(u.index, 0);
+  stack(u, ['HH', 'KK'], 1000);
+  assert.equal(u.index, 1);
+  assert.equal(u.firstTry, 0, 'apart is not right first time');
+  assert.equal(u.causes.apart, 1);
+  assert.equal(u.run.entries[0].notes[1].state, SC.MISSED, 'it shows struck out');
 });
 
-test('a press after the window closes the old partial before it counts', () => {
+test('a press after the window settles the open stack first', () => {
   const u = setup();
   hit(u, 'HH', 0);
   hit(u, 'KK', 100);        /* lapsed: HH is taken back, KK opens a new partial */
   assert.equal(u.index, 0);
   hit(u, 'HH', 120);
+  UT.settle(u, 200);
   assert.equal(u.index, 1);
   assert.equal(u.causes.apart, 1);
+
+  const v = setup();
+  hit(v, 'HH', 0); hit(v, 'KK', 0);
+  hit(v, 'HH', 500);         /* the complete stack settles, then this opens the next */
+  assert.equal(v.index, 1);
+  UT.settle(v, 600);
+  assert.equal(v.index, 2);
 });
 
 test('a wrong pad keeps the cursor and spoils the stack; so does a second stroke', () => {
@@ -88,15 +130,16 @@ test('a wrong pad keeps the cursor and spoils the stack; so does a second stroke
   const j = hit(u, 'SN', 0);
   assert.equal(j.result, 'stray');
   assert.equal(u.index, 0);
-  hit(u, 'HH', 500); hit(u, 'KK', 500);
+  stack(u, ['HH', 'KK'], 500);
   assert.equal(u.index, 1);
   assert.equal(u.causes.wrong, 1);
 
   const v = setup();
   hit(v, 'HH', 0); hit(v, 'HH', 10);
-  assert.equal(v.index, 0);
-  assert.equal(UT.current(v).notes[0].state, SC.PENDING, 'the partial was reset');
-  hit(v, 'HH', 500); hit(v, 'KK', 500);
+  UT.settle(v, 100);
+  assert.equal(UT.current(v).notes[0].state, SC.PENDING, 'the partial was taken back');
+  stack(v, ['HH', 'KK'], 500);
+  assert.equal(v.index, 1);
   assert.equal(v.causes.again, 1);
   assert.equal(v.firstTry, 0);
 });
@@ -104,11 +147,12 @@ test('a wrong pad keeps the cursor and spoils the stack; so does a second stroke
 test('a wrong hand under strict sticking moves on, but is not first time', () => {
   const run = SC.createRun(chart({ events: [{ beat: 0, voices: ['SN'], hand: 'R' },
     { beat: 1, voices: ['SN'], hand: 'L' }] }), { sticking: 'strict' });
-  const u = UT.createUntimed(run, { togetherMs: 60 });
+  const u = UT.createUntimed(run, { togetherMs: WIN });
   const j = hit(u, 'SN', 0, 80, 'L');
   assert.equal(j.handOk, false);
+  UT.settle(u, 100);
   assert.equal(u.index, 1);
-  hit(u, 'SN', 400, 80, 'L');
+  stack(u, ['SN'], 400, 80, 'L');
   assert.equal(u.firstTry, 1);
   assert.equal(u.causes.hand, 1);
   assert.equal(run.entries[0].notes[0].state, SC.HIT, 'a wrong hand is a ring, not a cross');
@@ -116,19 +160,19 @@ test('a wrong hand under strict sticking moves on, but is not first time', () =>
 
 test('a soft accent, once the touch is known, is counted against the dynamics', () => {
   const u = setup();
-  hit(u, 'HH', 0, 70); hit(u, 'KK', 0, 70);
-  hit(u, 'HH', 500, 70);
+  stack(u, ['HH', 'KK'], 0, 70);
+  stack(u, ['HH'], 500, 70);
   /* Three normal strokes known: the accent needs 70 + 15. */
-  hit(u, 'HH', 1000, 70); hit(u, 'SN', 1000, 72);
+  stack(u, ['HH', 'SN'], 1000, (v) => (v === 'SN' ? 72 : 70));
   assert.equal(u.firstTry, 2);
   assert.equal(u.causes.accents.n, 1);
   assert.equal(u.causes.accents.vel, 72);
   assert.equal(u.causes.accents.need, 85);
 
   const off = setup({ dynamics: false });
-  hit(off, 'HH', 0, 70); hit(off, 'KK', 0, 70);
-  hit(off, 'HH', 500, 70);
-  hit(off, 'HH', 1000, 70); hit(off, 'SN', 1000, 72);
+  stack(off, ['HH', 'KK'], 0, 70);
+  stack(off, ['HH'], 500, 70);
+  stack(off, ['HH', 'SN'], 1000, (v) => (v === 'SN' ? 72 : 70));
   assert.equal(off.firstTry, 3, 'Dynamics off judges no accent');
 });
 
@@ -142,6 +186,7 @@ test('the take runs both passes, across the seam, and then is through', () => {
   assert.equal(UT.progress(u), 1);
   assert.equal(u.run.entries[7].beat, 7, 'the second pass sits a loop on');
   assert.equal(hit(u, 'HH', 1e6), null, 'a press after the end does nothing');
+  assert.equal(UT.settle(u, 2e6), null);
 });
 
 test('Guide targets: the next stack first, what is left of this one last', () => {
@@ -169,37 +214,27 @@ test('pace: a stop is left out, and too few gaps are no pace at all', () => {
 
 test('a pause drops a partial without blame, and its time never reaches the pace', () => {
   const u = setup();
-  hit(u, 'HH', 0); hit(u, 'KK', 0);
-  hit(u, 'HH', 500);
+  stack(u, ['HH', 'KK'], 0);
+  stack(u, ['HH'], 500);
   hit(u, 'HH', 1000);
   UT.pause(u);
   assert.equal(UT.current(u).notes[0].state, SC.PENDING);
   assert.equal(u.fault, '', 'a pause is not a mistake');
-  hit(u, 'HH', 60000); hit(u, 'SN', 60000, 127);
-  hit(u, 'HH', 60500);
-  hit(u, 'HH', 61000); hit(u, 'KK', 61000);
+  stack(u, ['HH', 'SN'], 60000, accentSn);
+  stack(u, ['HH'], 60500);
+  stack(u, ['HH', 'KK'], 61000);
   assert.equal(u.gaps.length, 3, 'the gap across the pause is not measured');
   assert.equal(Math.round(u.pace), 120);
 });
 
 test('the live pace follows the recent stacks', () => {
   const u = setup({}, { repeats: 10 });
-  let t = playCleanUntil(u, 1000, 0, 16);
+  const t = playClean(u, 1000, 0, 16);
   /* Seventeen: the first gap of the faster run still spans the change. */
-  playCleanUntil(u, 400, t, 17);
+  playClean(u, 400, t, 17);
   assert.ok(u.livePace > u.pace, `${u.livePace} vs ${u.pace}`);
   assert.equal(Math.round(u.livePace), 150);
 });
-
-function playCleanUntil(u, stepMs, from, n) {
-  let t = from;
-  for (let k = 0; k < n && !u.finished; k++) {
-    const e = UT.current(u);
-    for (const note of e.notes) hit(u, note.voice, t, note.wantDyn === 'accent' ? 127 : 80);
-    t += stepMs;
-  }
-  return t;
-}
 
 test('counts carry what the verdict needs', () => {
   const u = setup();
@@ -215,7 +250,7 @@ test('counts carry what the verdict needs', () => {
 test('a scrubbed start asks from where it was scrubbed to', () => {
   const run = SC.createRun(chart());
   SC.seekTo(run, 2);
-  const u = UT.createUntimed(run, { togetherMs: 60, from: SC.nextEntryIndex(run, 2) });
+  const u = UT.createUntimed(run, { togetherMs: WIN, from: SC.nextEntryIndex(run, 2) });
   assert.equal(UT.current(u).beat, 2);
   assert.equal(u.total, 6);
 });

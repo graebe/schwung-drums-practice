@@ -2389,10 +2389,11 @@ function tickInner() {
   }
 
   if (screen === RUNNING && run && chart && untimed) {
-    /* No clock: only the together-window of a partly struck stack runs out. */
+    /* No clock: only the window of the stack being struck runs out — and
+     * that is when the stack is judged. */
     if (!tp.paused) {
-      const lapsed = UT.expire(untimed, t);
-      if (lapsed) setFlash(padsOfVoices(lapsed), PAD.LED_MISS);
+      const r = UT.settle(untimed, t);
+      if (r && r.lapsed && r.lapsed.length) setFlash(padsOfVoices(r.lapsed), PAD.LED_MISS);
     }
     if (untimed.finished) stopUntimed();
   } else if (screen === RUNNING && run && chart && !tp.paused) {

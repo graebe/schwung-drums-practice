@@ -2233,3 +2233,23 @@ test('switching Kit back in Settings clears the L0 warning', async () => {
   stepThrough();
   assert.ok(drawnText(3).some((t) => /1st try/.test(t)), 'and the take runs');
 });
+
+test('mashing kick, snare and hat at once never steps L0 on', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  armL0();
+  cc(CC.record, 127);
+  ticks(2);
+  for (let k = 0; k < 40; k++) {
+    for (const p of [PAD_OF.KK, PAD_OF.SN, PAD_OF.HH]) pad(p, 90);
+    for (const p of [PAD_OF.KK, PAD_OF.SN, PAD_OF.HH]) pad(p, 0);
+    ticks(8);
+  }
+  const shown = drawnText(1);
+  assert.ok(shown.includes('1/2') && shown.includes('0/0'), `still on the first stack: ${shown.join('|')}`);
+  /* The right drums, and only those, move it. */
+  strike(ROCK_STACKS[0]);
+  ticks(8);
+  assert.ok(drawnText(1).includes('0/1'), 'the first stack is through, not first time');
+});

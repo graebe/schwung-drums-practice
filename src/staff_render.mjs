@@ -39,9 +39,9 @@ export function drawStaff(ctx) {
 }
 
 /* The "now" line. `strong` thickens it on the beat. */
-export function drawHitLine(ctx, strong = false, x = L.HIT_X) {
+export function drawHitLine(ctx, strong = false) {
   const h = L.HIT_LINE_BOTTOM_Y - L.HIT_LINE_TOP_Y + 1;
-  ctx.fillRect(Math.round(x), L.HIT_LINE_TOP_Y, strong ? 2 : 1, h, 1);
+  ctx.fillRect(L.HIT_X, L.HIT_LINE_TOP_Y, strong ? 2 : 1, h, 1);
 }
 
 export function drawBarLine(ctx, x) {

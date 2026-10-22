@@ -7,9 +7,15 @@
  *
  * The scroll shows three beats of what is coming and moves them past a fixed
  * line. With no clock there is nothing to move, so L0 shows the WHOLE BAR,
- * standing still, and moves the line instead: the cursor is the same "now"
- * line the scroll uses, standing on the stack it waits for. When the bar's
- * last stack is struck, the page turns.
+ * standing still, and moves a cursor instead, from stack to stack. When the
+ * bar's last stack is struck, the page turns.
+ *
+ * THE CURSOR NEVER COVERS WHAT IT POINTS AT. It is an arrow above the stack
+ * and a caret below it, and nothing between them: a line through the stack
+ * hid the very drum it was asking for (the owner's first test on the Move).
+ * The grid's lanes carry no dotted rule here either: a whole bar on one screen packs the notes close enough that a dot
+ * every 4px read as a note. The beats are ticked on the rule under the chart
+ * instead.
  *
  * At the end of a bar the next one is already in view: past the closing bar
  * line sits the first stack of the next bar, alone — a cue rather than a
@@ -71,20 +77,20 @@ export function drawUntimedView(ctx, s) {
   drawHeader(ctx, { chart: s.chart, songBeats: cur ? cur.beat : from, title: s.title,
     rightLabel: s.rightLabel });
 
-  if (s.view === 'grid') drawGridPage(ctx, s, page, peek, left, px, curItem);
-  else drawStaffPage(ctx, s, page, peek, left, px, curItem);
+  if (s.view === 'grid') drawGridPage(ctx, s, page, peek, left, px);
+  else drawStaffPage(ctx, s, page, peek, left, px);
+  if (curItem) drawArrow(ctx, Math.round(curItem.x));
 
-  drawUnder(ctx, s, page, bar, curItem, px);
+  drawUnder(ctx, s, page, bar, curItem, left, px, perBar);
   drawFooter(ctx, s.progress || 0, s.footerRight || '');
   if (s.paused) drawLaneCallout(ctx, 'PAUSED');
 }
 
-function drawStaffPage(ctx, s, page, peek, left, px, curItem) {
+function drawStaffPage(ctx, s, page, peek, left, px) {
   SR.drawStaff(ctx);
   SR.drawClef(ctx);
   SR.drawBarLine(ctx, left + L.BAR_OFFSET_PX);
   closeBar(ctx, peek, (x) => SR.drawBarLine(ctx, x));
-  if (curItem) SR.drawHitLine(ctx, true, curItem.x);
 
   const gb = B.groupBeats(s.chart);
   const entries = s.run.entries;
@@ -98,12 +104,11 @@ function drawStaffPage(ctx, s, page, peek, left, px, curItem) {
   if (peek) SR.drawStack(ctx, peek, { dynamics: s.dynamics, spacingPx: L.TIGHT_SPACING_PX, beams: 0 });
 }
 
-function drawGridPage(ctx, s, page, peek, left, px, curItem) {
+function drawGridPage(ctx, s, page, peek, left, px) {
   const laneList = s.lanes || GR.lanes(s.voices || voicesInChart(s.chart));
-  GR.drawLanes(ctx, laneList);
+  GR.drawLanes(ctx, laneList, false);
   GR.drawBarLine(ctx, laneList, left + L.BAR_OFFSET_PX);
   closeBar(ctx, peek, (x) => GR.drawBarLine(ctx, laneList, x));
-  if (curItem) GR.drawPlayhead(ctx, laneList, true, curItem.x);
   for (let i = 0; i < page.length; i++) {
     const next = page[i + 1];
     const spacingPx = next ? next.x - page[i].x : px * 0.5;
@@ -124,9 +129,14 @@ function closeBar(ctx, peek, line) {
  * drill with written hands gets its R and L there instead of the number, as
  * on the scroll; the header already says which bar it is.
  */
-function drawUnder(ctx, s, page, bar, curItem, px) {
+function drawUnder(ctx, s, page, bar, curItem, left, px, perBar) {
   const sticking = s.run && s.run.sticking !== 'off';
   drawBarRuler(ctx, [{ bar: bar + 1, x: -1 }], !sticking);
+  /* The beats, ticked on the rule: the lanes have no rule of their own here.
+   * The downbeat is the longer tick, as on a ruler. */
+  for (let b = 0; b < Math.ceil(perBar - 1e-9); b++) {
+    ctx.fillRect(Math.round(left + b * px), L.UNDER_TICK_Y, 1, b === 0 ? L.UNDER_TICK_H : 1, 1);
+  }
   if (sticking) {
     for (let i = 0; i < page.length; i++) {
       const note = page[i].entry.notes[0];
@@ -139,9 +149,20 @@ function drawUnder(ctx, s, page, bar, curItem, px) {
   if (curItem && !sticking) drawCaret(ctx, Math.round(curItem.x));
 }
 
+/* Up from the under-lane, tip first. */
 function drawCaret(ctx, x) {
   for (let r = 0; r < L.CARET_H; r++) {
     ctx.fillRect(x - r, L.UNDER_LANE_Y + r, 2 * r + 1, 1, 1);
+  }
+}
+
+/* Down from under the header rule, tip last: the caret's mirror. Above the
+ * top lane in the grid; on the staff its tip can touch the stack's own first
+ * beam, which reads as pointing at it. */
+function drawArrow(ctx, x) {
+  for (let r = 0; r < L.CARET_H; r++) {
+    const w = L.CARET_H - 1 - r;
+    ctx.fillRect(x - w, L.CURSOR_TOP_Y + r, 2 * w + 1, 1, 1);
   }
 }
 

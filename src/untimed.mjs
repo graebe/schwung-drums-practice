@@ -25,6 +25,13 @@
  * of the first — the Strict setting's good window, 60ms on normal — or the
  * partial stack lapses and is asked for again.
  *
+ * AND ONLY THAT STACK. It is judged when its window CLOSES (settle), not on
+ * the stroke that completes it: judged on that stroke, every pad pressed at
+ * once moved the cursor on — the right drum completed the stack and the rest
+ * fell on the next one (the owner's second report from the Move). Now a pad
+ * too many inside the window spoils the stack and it is asked for again, so
+ * only the drums written there, and nothing else, move the cursor.
+ *
  * FIRST TIME RIGHT is the score: a stack struck with no wrong pad, no lapsed
  * partial and no second stroke on the way, with the right hands (when the
  * sticking is strict) and the right dynamics. A wrong hand or a soft accent
@@ -62,7 +69,7 @@ export function createUntimed(run, { togetherMs = 60, from = 0 } = {}) {
     run,
     togetherMs,
     index: from,
-    open: null,          /* { at } while a stack is partly struck            */
+    open: null,          /* { at, spoiled } while a stack's window is open   */
     fault: '',           /* the first pad fault on the current stack         */
     stacks: 0,           /* stacks completed                                  */
     firstTry: 0,         /* ...of which right first time                      */
@@ -85,12 +92,13 @@ export function current(u) {
 
 /*
  * A pad went down. Returns a judgement in the shape led_paint.flashColor
- * reads, plus `complete` when the press finished the stack. Null when the take
- * is already through.
+ * reads, or null when the take is already through. It never moves the cursor
+ * by itself: settle does, once the stack's window has closed.
  */
 export function press(u, { voice, hand = null, velocity = null }, atMs) {
   if (u.finished) return null;
-  expire(u, atMs);
+  settle(u, atMs);
+  if (u.finished) return null;
   const entry = current(u);
   if (!entry) return null;
 
@@ -102,45 +110,49 @@ export function press(u, { voice, hand = null, velocity = null }, atMs) {
     inStack = true;
     if (!n.played) { note = n; break; }
   }
+  /* Any stroke opens the window — a wrong one too, so that the right drum a
+   * moment later in the same mash is part of the same, spoiled, attempt. */
+  if (!u.open) u.open = { at: atMs, spoiled: false };
   if (!note) {
-    /* No drum of this stack, or one already struck: either way the strokes
-     * so far no longer make a stack, and it is asked for again whole. */
+    /* No drum of this stack, or one already struck: the strokes in this
+     * window no longer make the stack, and when it closes it is asked for
+     * again whole. */
     fault(u, inStack ? 'again' : 'wrong');
-    resetPartial(u);
+    u.open.spoiled = true;
     return { ...STRAY, voice, hand, velocity };
   }
 
-  if (!u.open) u.open = { at: atMs };
   note.state = HIT;
   note.played = true;
   note.offsetBeats = 0;
   judgeStroke(u.run, note, hand, velocity);
 
-  const judgement = {
+  return {
     result: 'good', voice, hand, velocity,
     wantHand: note.wantHand, handOk: note.handOk,
     wantDyn: note.wantDyn, dynOk: note.dynOk, need: note.need,
-    complete: false,
   };
-  for (let i = 0; i < entry.notes.length; i++) {
-    if (!entry.notes[i].played) return judgement;
-  }
-  complete(u, entry);
-  judgement.complete = true;
-  return judgement;
 }
 
 /*
- * Called every tick. A partial stack whose window has closed is taken back —
- * its drums are asked for again — and the stack is no longer right first
- * time. Returns the voices that had been struck, for the red flash, or null.
+ * Called every tick, and before every press. Once the window of the stack
+ * being struck has closed it is judged: every drum in → the stack is done and
+ * the cursor moves on, `{ complete: true }`; some missing → the struck ones
+ * are taken back and asked for again, and the stack is no longer right first
+ * time, `{ lapsed: [voices] }` for the red flash. Null while the window is
+ * open, or nothing is being struck.
  */
-export function expire(u, nowMs) {
-  if (!u.open || nowMs - u.open.at <= u.togetherMs) return null;
+export function settle(u, nowMs) {
+  if (u.finished || !u.open || nowMs - u.open.at <= u.togetherMs) return null;
+  const entry = current(u);
+  if (!u.open.spoiled && entry && entry.notes.every((n) => n.played)) {
+    complete(u, entry);
+    return { complete: true };
+  }
   const voices = struckVoices(u);
-  fault(u, 'apart');
+  if (!u.open.spoiled) fault(u, 'apart');
   resetPartial(u);
-  return voices;
+  return { lapsed: voices };
 }
 
 /*

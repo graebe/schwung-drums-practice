@@ -175,8 +175,11 @@ export const PAGE_BAR_X = 118;
 export const PAGE_PEEK_X = 123;
 /* Room kept between the last beat's slot and the closing bar line. */
 export const PAGE_END_PAD = 3;
-/* The caret under the cursor stack, hanging in the under-lane. */
+/* The cursor is two arrows and nothing between them: one pointing down from
+ * the row under the header rule, one pointing up from the under-lane. A
+ * line through the stack hid the drum it was asking for. */
 export const CARET_H = 3;
+export const CURSOR_TOP_Y = HEADER_RULE_Y + 1;
 
 /* The ready screen's box of controls, laid over the chart (view.mjs drawReady,
  * page_view.mjs drawUntimedReady). Four rows taller than two lines would

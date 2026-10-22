@@ -516,18 +516,19 @@ your hands fails the second while you are still working out the first. **L0** as
 
 ```
  Rock backbeat           1/2  58bpm
- ────────────────────────────────────
- HH │ ⊙ · ⊙ · ✗ ┃ ✗ · ✗ · ✗ · ✗ │ ✗     ← the whole bar, standing still
- SN │ · · · · ● ┃ · · · · ● · · │
- KK │ ⊙ · · · · ┃ · · ● · · · · │ ●     ← past the bar line: the next bar's first stack
- ────────────────────────────────────
- 1              ▲                       ← the cursor waits on this stack
+ ────────────────────────────▼───────
+ HH │ ⊙   ⊙   ✗   ✗   ✗   ✗   ✗   ✗ │ ✗   ← the whole bar, standing still
+ SN │         ●               ●     │
+ KK │ ⊙                 ●           │ ●   ← past the bar line: the next bar's first stack
+ ─────┴───────┴───────┴───────┴──────
+ 1                           ▲            ← the arrows mark the stack it waits for
  ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬            5/1
 ```
 
-The whole bar is on one page and nothing moves. A line — the same "now" line the scroll uses —
-stands on the next stack, with a caret under it, and waits. Strike that stack and the line moves on;
-strike the last stack of the bar and the page turns. Past the closing bar line, on its own, is the
+The whole bar is on one page and nothing moves. An arrow above the chart and a caret below it mark
+the next stack — nothing is drawn across the notes, so the drums you are asked for stay in plain
+sight. Strike that stack and the arrows move on; strike the last stack of the bar and the page
+turns. The beats are ticked on the rule under the chart. Past the closing bar line, on its own, is the
 first stack of the **next** bar, so at the end of a bar you can already see where your hands go next.
 Take as long as you like over any of it.
 
@@ -535,8 +536,10 @@ Take as long as you like over any of it.
   setting's good window of each other — **60 ms** on normal. Hit them one after the other and the
   half you played lapses, flashes red, and the stack is asked for again. This is what keeps L0
   teaching a unison rather than a flam.
-- **A wrong pad keeps the cursor where it is.** So does striking a drum of the stack twice before
-  the rest. Either way the stack is no longer *right first time*.
+- **Only the drums written there, and nothing else.** A stack is judged the moment its window
+  closes, so a pad too many in that moment — or a drum struck twice — spoils it and it is asked
+  for again. Pressing every pad at once never moves the cursor. Either way the stack is no longer
+  *right first time*.
 - **Hands and dynamics are still judged.** A wrong hand or a soft accent lets the cursor move on —
   asking again would only add strokes — but the stack does not count as right first time.
 - **Play sounds the bar** at its written tempo times **Speed**, its pads lighting as it goes, so you

@@ -825,16 +825,16 @@ test('the page holds the whole bar between its bar lines, at even spacing', () =
   }
 });
 
-test('the cursor stands on the stack it waits for, in both views', () => {
+test('the cursor is an arrow above the stack and a caret below it, in both views', () => {
   for (const view of ['grid', 'staff']) {
     const { left, px } = pageGeometry(view, ROCKISH);
     const { ctx } = page(view, 3);
     const x = Math.round(left + 1.5 * px);
-    const top = view === 'grid' ? L.GRID_TOP_Y + 2 : L.HIT_LINE_TOP_Y;
-    assert.ok(countOn(ctx, x, top, 2, 20) >= 18, `${view}: no cursor line at x${x}`);
+    assert.ok(isOn(ctx, x, L.CURSOR_TOP_Y + L.CARET_H - 1), `${view}: no arrow tip above x${x}`);
+    assert.ok(isOn(ctx, x - 2, L.CURSOR_TOP_Y) && isOn(ctx, x + 2, L.CURSOR_TOP_Y), `${view}: the arrow is not 5 wide`);
     assert.ok(isOn(ctx, x, L.UNDER_LANE_Y), `${view}: no caret under the cursor`);
     /* And nowhere near the scroll's fixed hit line. */
-    assert.ok(countOn(ctx, L.HIT_X, top + 2, 1, 10) < 10, `${view}: a line left at HIT_X`);
+    assert.ok(countOn(ctx, L.HIT_X, L.HIT_LINE_TOP_Y + 4, 1, 10) < 10, `${view}: a line left at HIT_X`);
   }
 });
 
@@ -885,4 +885,68 @@ test('a page with written hands shows them under the stacks instead of the caret
     title: c.name, rightLabel: '--', progress: 0, footerRight: '' });
   assert.ok(seen.includes('R') && seen.includes('L'), seen.join('|'));
   assert.ok(!seen.includes('1'), 'no bar number where the hands are');
+});
+
+/*
+ * What the owner saw on the Move: the cursor covered the notes it stood on,
+ * and the lane rule's dots read like notes on a page this dense.
+ */
+function pageAt(view, upTo, done) {
+  const c = projectLevel(ROCKISH, 'l0');
+  const run = createRun(c, { sticking: 'off' });
+  const u = UT.createUntimed(run, { togetherMs: 60 });
+  let t = 0;
+  while (u.index < upTo) {
+    for (const n of UT.current(u).notes) UT.press(u, { voice: n.voice, velocity: 90 }, t);
+    t += 500;
+  }
+  const ctx = createScreen();
+  drawUntimedView(ctx, { run, chart: c, view, dynamics: true, cursor: u.index, done,
+    title: c.name, rightLabel: '--', progress: 0, footerRight: '' });
+  return { ctx, run, u, c };
+}
+
+test('the cursor leaves the notes it stands on exactly as they are drawn', () => {
+  for (const view of ['grid', 'staff']) {
+    for (const k of [0, 2, 3]) {            /* hat+kick, hat+snare, hat alone */
+      const withCursor = pageAt(view, k, false);
+      const without = pageAt(view, k, true);
+      const { left, px } = pageGeometry(view, ROCKISH);
+      const x = Math.round(left + ROCKISH.events[k].beat * px);
+      const laneList = GR.lanes(['HH', 'SN', 'KK']);
+      for (const n of withCursor.run.entries[k].notes) {
+        const y = view === 'grid' ? GR.laneOf(laneList, n.voice).mid : yOf(n.voice);
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            assert.equal(isOn(withCursor.ctx, x + dx, y + dy), isOn(without.ctx, x + dx, y + dy),
+              `${view} stack ${k} ${n.voice}: the cursor drew over its note at ${dx},${dy}`);
+          }
+        }
+      }
+      /* No line at all between the arrows: the whole column is as drawn. */
+      for (let y = L.CURSOR_TOP_Y + L.CARET_H; y < L.UNDER_RULE_Y; y++) {
+        assert.equal(isOn(withCursor.ctx, x, y), isOn(without.ctx, x, y),
+          `${view} stack ${k}: the cursor drew in its column at y${y}`);
+      }
+    }
+  }
+});
+
+test('the page draws no rule dots in its lanes, only its notes', () => {
+  const { ctx } = pageAt('grid', 0, true);
+  const laneList = GR.lanes(['HH', 'SN', 'KK']);
+  const { left, px } = pageGeometry('grid', ROCKISH);
+  const sn = GR.laneOf(laneList, 'SN');
+  /* Between the snares on 2 and 4 there is nothing in the snare lane. */
+  const from = Math.round(left + 1 * px) + 5;
+  const to = Math.round(left + 3 * px) - 5;
+  assert.equal(countOn(ctx, from, sn.mid, to - from, 1), 0, 'dots in the snare lane');
+});
+
+test('the page marks its beats on the rule under the chart', () => {
+  const { ctx } = pageAt('grid', 0, true);
+  const { left, px } = pageGeometry('grid', ROCKISH);
+  for (let b = 0; b < 4; b++) {
+    assert.ok(isOn(ctx, Math.round(left + b * px), L.UNDER_TICK_Y), `no tick on beat ${b + 1}`);
+  }
 });
