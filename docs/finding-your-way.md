@@ -29,7 +29,7 @@ go on.
 3. **New to drums?** — turn the jog to pick, click to go on:
    - **From the start** puts the path at its first stage and the cursor on **Continue**. Click it
      and your first lesson begins.
-   - **I already play** opens the **Path** with a tip: *Know a stage already? SHIFT+CLICK a stage,
+   - **I already play** opens the **Path** — the map — with a tip: *Know a stage already? SHIFT+CLICK a stage,
      then Test out: checkpoint. Pass it and the path moves on.* See
      [Skipping what you already know](#skipping-what-you-already-know) below.
 
@@ -55,7 +55,7 @@ Turn the jog past Quiz and two more rows come into view:
 | Row | What is in it |
 | --- | --- |
 | **Continue** | the one button: opens the next step for you (below) |
-| **Path** | the course: seven stages from *0 Hello, kit* to *6 Pro*, then **Review** while something is due |
+| **Path** | the course, as a map: seven stages from *0 Hello, kit* to *6 Pro* (see [The map](#the-map)) |
 | **Practice** | the free library: **Subdivisions**, **Grooves** by style, **Rudiments** by family, **Random** |
 | **Quiz** | five ear and reading drills |
 | **Progress** | how far you have got: overall, per track, and every drill you played |
@@ -125,6 +125,51 @@ Open a stage and its places are listed in the order a lesson takes them:
 Nothing is locked. Every step can be opened at any time, and a take anywhere counts — play a flam
 tap from Practice › Rudiments and the step that asks for it is done.
 
+## The map
+
+**Path** opens as a map: the sea, with an island for each stage and a dotted route between them.
+The screen is the pad grid — each island sits right above its pad — and the pads of the places are
+lit, so *lit means you can go there*:
+
+| Pad colour | Means |
+| --- | --- |
+| green | done |
+| white, pulsing | where Continue is taking you |
+| dim yellow | started |
+| dim | not yet begun, or still ahead |
+| blue | skipped, or assumed known |
+| bright white | where you stand |
+
+**Press a lit pad** and your avatar walks there along the route; press it again to go in. The jog
+walks too — one place a click — and **CLICK** goes in. **BACK** goes up a level, and the avatar is
+back on the island you came from. **PLAY** is Continue. On the map the pads make no sound; in a
+list they are the kit again.
+
+The title bar names the place you stand on and how much of it is learned — `1 Eighth notes  12%` —
+and how many reviews are due there when it fits: `Time  33% 2 due`. On the map, an island's ground
+rises as you learn it, a flag flies on a finished one, a dotted outline is a stage you skipped, and
+a small dot says reviews are due.
+
+Go in and the stage is an island of its own, its places in the order a lesson takes them:
+
+| Place | Is |
+| --- | --- |
+| hut | the stage's **Lessons** |
+| a place each | **Ear**, **Time**, **Hands**, **Grooves** |
+| cove | the **Electives** |
+| fort | the **Checkpoint** |
+
+Going into a place opens its list, exactly as before — the hut opens the cards, the fort plays the
+checkpoint.
+
+**The list is one option away.** SHIFT+CLICK on the map and choose **Show as list**: the folder is
+a list again until you leave it, and BACK returns to the map. That is also where **Review** is, the
+row after the stages while something is due — it is no island. **MENU** on the map explains it, with
+the lesson card of the place you stand on.
+
+Example: to go straight to the Grooves of stage 2 — open **Path**, press the pad lit under island 2,
+press it again, then press the Grooves place's pad twice.
+
 ## The action sheet: options for a row
 
 **Hold SHIFT and click** a row of the list for its options. Only the ones that fit the row are
@@ -140,6 +185,7 @@ shown, and **Settings...** is always last:
 | **Lessons** | a stage with cards | its lesson cards |
 | **Practise: Ladder** | a drill with a tempo | climbs from 70% of its tempo, a rung at a time |
 | **Practise: Clock** | a drill with a tempo | the click drops out and you keep the time |
+| **Show as list** / **Show as map** | the Path and its stages | the map's folder as a list, and back |
 | **Settings...** | every row | the Settings folder; Back comes back here |
 
 Turn the jog to choose, **CLICK** to do it, **BACK** to close the sheet without doing anything.
@@ -170,11 +216,14 @@ stage's or step's lesson card, so the *why* of a step is one press away. Turn th
 
 ## Tips
 
-The first time you open a sheet, a drill and a quiz, a short tip appears — one card, once:
+The first time you open a sheet, a drill, a quiz, the map and an island, a short tip appears — one card, once:
 
 - *Options for this row. JOG choose, CLICK do it, BACK close.*
 - *REC plays and scores it, PLAY lets you listen first. MENU: help.*
 - *Answer with the lit pads or the jog. MENU: help.*
+- on the map: *Lit pads are places. Press one to walk there, again to go in. PLAY continues.*
+- on the first island: *Each place is part of the stage. The fort is its checkpoint, the hut its
+  lessons.*
 
 Click or Back and it is gone. *Settings › Help › Show tips again* brings them all back.
 

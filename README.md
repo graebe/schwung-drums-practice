@@ -518,6 +518,15 @@ the Clock), **Hands** (hand patterns, rudiments, dynamics), **Grooves** (beats r
 phrases) and **Ear**. Continue only recommends the stage you are in, so the tracks stay in step:
 what the hands are asked, the ears and eyes have been given.
 
+**The Path is a map.** It opens on the sea, an island per stage above its pad; a lit pad is a place
+you can walk to — green done, pulsing white where Continue goes, dim yellow started, blue skipped,
+bright white where you stand. Press a pad and the avatar walks there, press it again to go in; the
+jog walks too and Click goes in, Back goes up, Play is Continue, and the pads make no sound there.
+A stage is an island of its own — the Lessons hut, a place per track, the Electives cove, the
+Checkpoint fort — and going into a place opens its list. *Show as list* on the sheet shows the
+folder as a list for the session (that is where Review is); Back returns to the map. See
+[Finding your way](docs/finding-your-way.md#the-map).
+
 A stage folder lists its places in the order a lesson takes them — orient, hear, pattern, apply,
 show:
 
@@ -555,6 +564,7 @@ offers that instead — `Review   Flam tap` — one review, then one new step, i
 | **Test out: checkpoint** | a stage: plays its checkpoint. Pass it and the path moves on |
 | **Lessons** | a stage: its lesson cards |
 | **Practise: Ladder**, **Practise: Clock** | any drill with a tempo — see the Ladder and the Clock below |
+| **Show as list**, **Show as map** | the Path and a stage: the folder as a list for the session, and the map again |
 | **Settings...** | always: the Settings folder, on top of where you are, so Back comes back |
 
 **Settings › Path** decides what Continue offers: **Tracks** and **Styles** on or off, **Rungs**
@@ -999,6 +1009,8 @@ Everything except `ui.js` is pure and runs under plain `node`.
 | `src/hints.mjs` | every screen's keys, for its hint line and its help |
 | `src/help.mjs` | Menu's help page, from the hints and `help.json` |
 | `src/tips.mjs` | the welcome, the placement question and the first-visit tips |
+| `src/map_places.mjs` | the Path as places on the map: islands, places, their states |
+| `src/pathmap/` | the Path map engine — layout, walk, render, pad colours — vendored from Piano Practice (`scripts/check-vendored.sh`) |
 | `src/stats.mjs` | the raw history of every take, capped per drill |
 | `src/beam.mjs` | beat-grouped stems and beams |
 | `src/staff_render.mjs` | the percussion staff: heads, stems, beams, accents, bar lines |
