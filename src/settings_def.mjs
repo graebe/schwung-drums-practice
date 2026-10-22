@@ -21,80 +21,101 @@
  *   wrap  like list, but wraps around
  *   action  a row that opens something rather than holding a value — Click
  *           on it does what `action` names; it is never saved
+ *
+ * group: which Settings folder the row is filed in (GROUPS). The menu's
+ * Settings opens one group at a time; Settings over a drill shows them all.
  */
 
 export const ROWS = [
   /* ---- knobs 1-4 ---- */
-  { key: 'bpm',        label: 'Tempo',     type: 'int',  min: 40, max: 240, rebuild: true,
+  { key: 'bpm',        group: 'practice', label: 'Tempo',     type: 'int',  min: 40, max: 240, rebuild: true,
     format: (v) => `${v}` },
   /*
    * Every drill at a share of its own tempo — a hand-written one's, or Tempo
    * for a generated one. Also on knob 8 in a drill. Without it the grooves and
    * rudiments, written at up to 270, could not be slowed down at all.
    */
-  { key: 'speed',      label: 'Speed',     type: 'list', rebuild: true,
+  { key: 'speed',      group: 'practice', label: 'Speed',     type: 'list', rebuild: true,
     values: [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120],
     format: (v) => `${v}%` },
-  { key: 'pxPerBeat',  label: 'Read ahead', type: 'int', min: 12, max: 48 },
+  { key: 'pxPerBeat',  group: 'practice', label: 'Read ahead', type: 'int', min: 12, max: 48 },
   /*
    * An OVERRIDE, not the source of truth. How long a practice is belongs to
    * the file that defines it; this is here so you can decide to play
    * something twice as long today without editing it. `0` is "as written".
    */
-  { key: 'reps',       label: 'Reps',      type: 'list', values: [0, 4, 8, 16, 32], rebuild: true,
+  { key: 'reps',       group: 'practice', label: 'Reps',      type: 'list', values: [0, 4, 8, 16, 32], rebuild: true,
     format: (v) => (v === 0 ? 'as written' : `${v}x`) },
   /*
    * The pad layout (padmap.mjs). MPC Classic is the default: it is what most
    * finger drummers learnt on. Chromatic is Move's own drum mode, note for
    * note; Sticking puts the snare on every pad, for rudiments.
    */
-  { key: 'layout',     label: 'Pads',      type: 'list',
+  { key: 'layout',     group: 'pads',     label: 'Pads',      type: 'list',
     values: ['mpc', 'family', 'centre', 'gm', 'mirror', 'custom', 'sticking'],
     format: (v) => ({ mpc: 'MPC', family: 'Family', centre: 'Centre', gm: 'GM', mirror: 'Mirror',
       custom: 'Custom', sticking: 'Sticking' })[v] || `${v}` },
   /* Mirror the layout left to right, for a left-hander. The hands stay the
    * physical halves. */
-  { key: 'flip',       label: 'Flip',      type: 'bool' },
-  { key: 'padMap',     label: 'Pad map',   type: 'action', action: 'padmap', format: () => '>' },
+  { key: 'flip',       group: 'pads',     label: 'Flip',      type: 'bool' },
+  { key: 'padMap',     group: 'pads',     label: 'Pad map',   type: 'action', action: 'padmap', format: () => '>' },
 
   /* ---- the rest ---- */
-  { key: 'view',       label: 'View',      type: 'list', values: ['staff', 'grid'] },
-  { key: 'strictness', label: 'Strict',    type: 'list', values: ['loose', 'normal', 'tight'] },
-  { key: 'sticking',   label: 'Sticking',  type: 'list', values: ['strict', 'loose', 'off'] },
-  { key: 'dynamics',   label: 'Dynamics',  type: 'bool' },
+  { key: 'view',       group: 'practice', label: 'View',      type: 'list', values: ['staff', 'grid'] },
+  { key: 'strictness', group: 'practice', label: 'Strict',    type: 'list', values: ['loose', 'normal', 'tight'] },
+  { key: 'sticking',   group: 'practice', label: 'Sticking',  type: 'list', values: ['strict', 'loose', 'off'] },
+  { key: 'dynamics',   group: 'practice', label: 'Dynamics',  type: 'bool' },
   /* How much louder than your own normal strokes an accent has to be, and
    * how much softer a ghost — in velocity steps (scoring.mjs dynNeed). */
-  { key: 'accentLift', label: 'Accent +',  type: 'int',  min: 5,  max: 60 },
-  { key: 'ghostDrop',  label: 'Ghost -',   type: 'int',  min: 5,  max: 60 },
-  { key: 'guide',      label: 'Guide pads', type: 'bool' },
-  { key: 'study',      label: 'Study',     type: 'bool' },
-  { key: 'click',      label: 'Click',     type: 'bool' },
-  { key: 'clickSubdiv', label: 'Click sub', type: 'list', values: [0, 1, 2, 4],
+  { key: 'accentLift', group: 'practice', label: 'Accent +',  type: 'int',  min: 5,  max: 60 },
+  { key: 'ghostDrop',  group: 'practice', label: 'Ghost -',   type: 'int',  min: 5,  max: 60 },
+  { key: 'guide',      group: 'practice', label: 'Guide pads', type: 'bool' },
+  { key: 'study',      group: 'practice', label: 'Study',     type: 'bool' },
+  { key: 'click',      group: 'sound',    label: 'Click',     type: 'bool' },
+  { key: 'clickSubdiv',group: 'sound',    label: 'Click sub', type: 'list', values: [0, 1, 2, 4],
     /* Clicks per beat: 2 is eighths, 4 sixteenths. It read `v * 2` and so
      * printed 4ths and 8ths for the eighths and sixteenths it plays. */
     format: (v) => (v === 0 ? 'off' : v === 1 ? 'beat' : `${v * 4}ths`) },
-  { key: 'countIn',    label: 'Count in',  type: 'int',  min: 0, max: 8 },
-  { key: 'ladderStep', label: 'Ladder +',  type: 'int',  min: 1, max: 20,
+  { key: 'countIn',    group: 'practice', label: 'Count in',  type: 'int',  min: 0, max: 8 },
+  { key: 'ladderStep', group: 'practice', label: 'Ladder +',  type: 'int',  min: 1, max: 20,
     format: (v) => `${v} bpm` },
-  { key: 'ladderBars', label: 'Ladder bars', type: 'int', min: 1, max: 16 },
-  { key: 'clockBars',  label: 'Clock bars', type: 'int',  min: 1, max: 8 },
-  { key: 'roundSize',  label: 'Round',     type: 'list', values: [0, 10, 20, 30],
+  { key: 'ladderBars', group: 'practice', label: 'Ladder bars', type: 'int', min: 1, max: 16 },
+  { key: 'clockBars',  group: 'practice', label: 'Clock bars', type: 'int',  min: 1, max: 8 },
+  { key: 'roundSize',  group: 'practice', label: 'Round',     type: 'list', values: [0, 10, 20, 30],
     format: (v) => (v === 0 ? 'endless' : `${v}`) },
   /*
    * The one number that can invalidate every other number in the module. If
    * the rig is 15ms late everywhere, the mean is a lie no amount of practice
    * can fix, and the player would be chasing a bias that is not theirs.
    */
-  { key: 'latencyMs',  label: 'Latency',   type: 'int',  min: 0, max: 60,
+  { key: 'latencyMs',  group: 'sound',    label: 'Latency',   type: 'int',  min: 0, max: 60,
     format: (v) => `${v} ms` },
-  { key: 'midiOut',    label: 'MIDI out',  type: 'list', values: [4, 1, 2, 3],
+  { key: 'midiOut',    group: 'midi',     label: 'MIDI out',  type: 'list', values: [4, 1, 2, 3],
     format: (v) => ({ 4: 'kit', 1: 'track', 2: 'USB', 3: 'trk+USB' })[v] || `${v}` },
   /* 0 is General MIDI's drum channel, 10. It said "all", but drum hits are
    * sent on one channel only: sixteen copies of every hit would swamp the
    * inject ring at sixteenth notes. */
-  { key: 'midiCh',     label: 'MIDI ch',   type: 'int',  min: 0, max: 16,
+  { key: 'midiCh',     group: 'midi',     label: 'MIDI ch',   type: 'int',  min: 0, max: 16,
     format: (v) => (v === 0 ? '10 GM' : `${v}`) },
 ];
+
+/*
+ * The groups of the Settings folder, in its order, as the editor shows them.
+ * Path and Help are folders of the menu, not rows of this table — the path's
+ * choices are the learner's progress (progress.mjs) and Help's rows are
+ * actions — so only these four open the editor.
+ */
+export const GROUPS = [
+  { key: 'practice', label: 'Practice' },
+  { key: 'sound', label: 'Sound' },
+  { key: 'pads', label: 'Pads' },
+  { key: 'midi', label: 'MIDI' },
+];
+
+/* The rows of one group, in table order; every row with no group given. */
+export function rowsIn(group) {
+  return group ? ROWS.filter((r) => r.group === group) : ROWS;
+}
 
 export const DEFAULTS = {
   bpm: 90,
@@ -145,8 +166,8 @@ export function formatValue(row, value) {
   return String(value);
 }
 
-export function settingsRows(settings) {
-  return ROWS.map((r) => ({ key: r.key, label: r.label, value: formatValue(r, settings[r.key]),
+export function settingsRows(settings, rows = ROWS) {
+  return rows.map((r) => ({ key: r.key, label: r.label, value: formatValue(r, settings[r.key]),
     action: r.action || null }));
 }
 

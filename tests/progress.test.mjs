@@ -304,6 +304,26 @@ test('it survives a round trip, and a damaged file reads as not ok', () => {
   }
 });
 
+test('the tips already shown are saved with the progress, and can be cleared', () => {
+  const p = P.emptyProgress();
+  assert.deepEqual(p.tips, []);
+  const rev = p.rev;
+  P.addTip(p, 'welcome');
+  P.addTip(p, 'welcome');
+  P.addTip(p, 'sheet');
+  assert.deepEqual(p.tips, ['welcome', 'sheet'], 'a tip is recorded once');
+  assert.ok(p.rev > rev, 'a new tip moves rev on, so it is saved');
+  const back = P.readProgress(P.serialiseProgress(p)).progress;
+  assert.equal(P.hasTip(back, 'sheet'), true);
+  assert.equal(P.hasTip(back, 'quiz'), false);
+  P.clearTips(back);
+  assert.deepEqual(back.tips, []);
+  /* A file from before tips, or with junk in them, reads as none seen. */
+  const old = P.readProgress(JSON.stringify({ version: P.PROGRESS_VERSION, items: {}, tips: [1, 'quiz'] }));
+  assert.deepEqual(old.progress.tips, ['quiz']);
+  assert.deepEqual(P.readProgress(JSON.stringify({ version: P.PROGRESS_VERSION, items: {} })).progress.tips, []);
+});
+
 test('bad fields read as defaults rather than failing the file', () => {
   const r = P.readProgress(JSON.stringify({ version: P.PROGRESS_VERSION, items: {
     a: { best: 'x', plays: 3, h: [[1, 50, 90, 20, 1, -1], 'junk', [1], [1, 50, 90, 20, 1]],

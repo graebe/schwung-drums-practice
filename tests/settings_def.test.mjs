@@ -25,6 +25,21 @@ test('every row is complete and every default is in range', () => {
   }
 });
 
+test('every row is filed in exactly one group, and every group holds rows', () => {
+  const keys = S.GROUPS.map((g) => g.key);
+  for (const row of S.ROWS) assert.ok(keys.includes(row.group), `${row.key} is in no group`);
+  let total = 0;
+  for (const g of S.GROUPS) {
+    const rows = S.rowsIn(g.key);
+    assert.ok(rows.length > 0, `${g.label} is empty`);
+    total += rows.length;
+  }
+  assert.equal(total, S.ROWS.length);
+  assert.equal(S.rowsIn(null), S.ROWS, 'no group is every row, for Settings over a drill');
+  assert.deepEqual(S.rowsIn('pads').map((r) => r.key), ['layout', 'flip', 'padMap']);
+  assert.deepEqual(S.settingsRows(S.DEFAULTS, S.rowsIn('midi')).map((r) => r.label), ['MIDI out', 'MIDI ch']);
+});
+
 test('the label fits the screen', () => {
   for (const row of S.ROWS) assert.ok(row.label.length <= 11, `${row.label} is too long`);
 });

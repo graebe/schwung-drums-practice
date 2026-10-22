@@ -28,7 +28,7 @@
  *
  * Every playable row is an ITEM, keyed by the id catalog.mjs stamps on it —
  * the same id wherever the row appears, so a take counts the same from the
- * Learning Path, the Grooves folder or a repetition.
+ * Path, the Grooves folder or a repetition.
  */
 
 import { parseDrillId, higherLevelIds } from './ids.mjs';
@@ -63,11 +63,11 @@ export const F_STANDARD = 8;
 export function emptyProgress() {
   /* `rev` is not saved: it moves on every change, so a cache can tell whether
    * what it holds is still true without comparing the whole store. */
-  return { version: PROGRESS_VERSION, items: {}, path: defaultPath(), rev: 0 };
+  return { version: PROGRESS_VERSION, items: {}, path: defaultPath(), tips: [], rev: 0 };
 }
 
 /*
- * How the learner has shaped the Learning Path (program.mjs reads it): which
+ * How the learner has shaped the Path (program.mjs reads it): which
  * tracks and styles Continue offers, the full ladder of a groove or only its
  * first and last rung, the stage it starts at, how the lesson cards show, and
  * the cards already read. Kept with the progress because it is the learner's,
@@ -122,6 +122,28 @@ export function markSeen(progress, cardId) {
   progress.rev++;
 }
 
+/*
+ * The first-visit tips already shown (tips.mjs), by key: the welcome, the
+ * sheet, the first practice and the first quiz. Kept with the progress, and
+ * saved with it, so a tip read once stays read across an update.
+ */
+export function hasTip(progress, key) {
+  return progress.tips.indexOf(key) >= 0;
+}
+
+export function addTip(progress, key) {
+  if (hasTip(progress, key)) return;
+  progress.tips.push(key);
+  progress.rev++;
+}
+
+/* Settings › Help › Show tips again. */
+export function clearTips(progress) {
+  if (!progress.tips.length) return;
+  progress.tips = [];
+  progress.rev++;
+}
+
 function emptyItem() {
   return {
     best: 0,       /* best clean speed, or best round, in percent; 0 = none */
@@ -173,6 +195,7 @@ export function readProgress(text) {
   const out = emptyProgress();
   out.items = readItems(obj.items, 6);
   out.path = readPath(obj.path);
+  if (Array.isArray(obj.tips)) out.tips = obj.tips.filter((x) => typeof x === 'string');
   return { progress: out, ok: true, stale: false };
 }
 
@@ -231,7 +254,8 @@ export function mergeLegacy(progress, legacy) {
 }
 
 export function serialiseProgress(progress) {
-  return JSON.stringify({ version: PROGRESS_VERSION, items: progress.items, path: progress.path });
+  return JSON.stringify({ version: PROGRESS_VERSION, items: progress.items, path: progress.path,
+    tips: progress.tips });
 }
 
 /* ---- Judging a take ------------------------------------------------------- */
@@ -615,7 +639,7 @@ export function itemValue(progress, id) {
   return it && it.best ? `${it.best}%` : '';
 }
 
-/* ---- Repetition ----------------------------------------------------------- */
+/* ---- Review (repetition) -------------------------------------------------- */
 
 function startRepeats(it, t) {
   it.rep = { due: t + REP_INTERVALS[0] * DAY_S, step: 0, at: 0, ok: false };

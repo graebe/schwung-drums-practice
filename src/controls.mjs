@@ -50,9 +50,10 @@ export function transportColors(mode, armed, phase) {
 }
 
 /*
- * Where a jog turn goes. It moves the highlight in the list and in settings
- * and does nothing anywhere else — a knock while you are playing must not
- * change what you are playing.
+ * Where a jog turn goes. It moves the highlight in the list, the action sheet
+ * and settings, scrolls help and turns the welcome's pages, and does nothing
+ * anywhere else — a knock while you are playing must not change what you are
+ * playing.
  */
 export function jogTarget(screen, editing) {
   if (screen === 'settings') return editing ? 'value' : 'row';
@@ -61,6 +62,9 @@ export function jogTarget(screen, editing) {
   if (screen === 'progress') return 'drill';
   if (screen === 'card') return 'page';
   if (screen === 'padmap') return 'padmap';
+  if (screen === 'sheet') return 'sheet';
+  if (screen === 'help') return 'scroll';
+  if (screen === 'welcome') return 'welcome';
   return 'none';
 }
 
