@@ -63,7 +63,63 @@ export const F_STANDARD = 8;
 export function emptyProgress() {
   /* `rev` is not saved: it moves on every change, so a cache can tell whether
    * what it holds is still true without comparing the whole store. */
-  return { version: PROGRESS_VERSION, items: {}, rev: 0 };
+  return { version: PROGRESS_VERSION, items: {}, path: defaultPath(), rev: 0 };
+}
+
+/*
+ * How the learner has shaped the Learning Path (program.mjs reads it): which
+ * tracks and styles Continue offers, the full ladder of a groove or only its
+ * first and last rung, the stage it starts at, how the lesson cards show, and
+ * the cards already read. Kept with the progress because it is the learner's,
+ * like the progress, and must survive an update with it.
+ */
+export const PATH_TRACKS = ['time', 'hands', 'grooves', 'ear'];
+export const PATH_STYLES = ['rock', 'funk', 'latin', 'jazz', 'electronic', 'techno'];
+export const RUNGS = ['full', 'short'];
+export const INTROS = ['new', 'always', 'off'];
+
+export function defaultPath() {
+  const on = (keys) => Object.fromEntries(keys.map((k) => [k, true]));
+  return { tracks: on(PATH_TRACKS), styles: on(PATH_STYLES), rungs: 'full', start: 0,
+    intros: 'new', seen: [] };
+}
+
+function readPath(src) {
+  const out = defaultPath();
+  if (!src || typeof src !== 'object') return out;
+  for (const group of ['tracks', 'styles']) {
+    const g = src[group];
+    if (!g || typeof g !== 'object') continue;
+    for (const k in out[group]) if (typeof g[k] === 'boolean') out[group][k] = g[k];
+  }
+  if (!PATH_TRACKS.some((k) => out.tracks[k])) out.tracks = defaultPath().tracks;
+  if (RUNGS.indexOf(src.rungs) >= 0) out.rungs = src.rungs;
+  if (INTROS.indexOf(src.intros) >= 0) out.intros = src.intros;
+  out.start = Math.max(0, Math.round(num(src.start)));
+  if (Array.isArray(src.seen)) out.seen = src.seen.filter((x) => typeof x === 'string');
+  return out;
+}
+
+/* A track or style switched on or off. The last track on stays on: a path
+ * with nothing in it is not a choice anyone makes on purpose. */
+export function togglePath(progress, group, key) {
+  const g = progress.path[group];
+  if (!g || !(key in g)) return false;
+  if (group === 'tracks' && g[key] && PATH_TRACKS.filter((k) => g[k]).length === 1) return false;
+  g[key] = !g[key];
+  progress.rev++;
+  return true;
+}
+
+export function setPath(progress, key, value) {
+  progress.path[key] = value;
+  progress.rev++;
+}
+
+export function markSeen(progress, cardId) {
+  if (progress.path.seen.indexOf(cardId) >= 0) return;
+  progress.path.seen.push(cardId);
+  progress.rev++;
 }
 
 function emptyItem() {
@@ -75,6 +131,7 @@ function emptyItem() {
     t: 0,          /* last take, unix seconds                               */
     done: 0,       /* when it was first learned, or 0                       */
     skip: 0,       /* when you chose to skip it, or 0                       */
+    park: 0,       /* when the path parked it after a run of failed takes   */
     rep: null,     /* { due, step, at, ok } once learned                    */
     h: [],
   };
@@ -120,6 +177,7 @@ export function readProgress(text) {
     it.t = num(src.t);
     it.done = num(src.done);
     it.skip = num(src.skip);
+    it.park = num(src.park);
     if (src.rep && typeof src.rep === 'object') {
       it.rep = { due: num(src.rep.due), step: num(src.rep.step), at: num(src.rep.at), ok: Boolean(src.rep.ok) };
     }
@@ -129,11 +187,12 @@ export function readProgress(text) {
     }
     out.items[id] = it;
   }
+  out.path = readPath(obj.path);
   return { progress: out, ok: true, stale: false };
 }
 
 export function serialiseProgress(progress) {
-  return JSON.stringify({ version: PROGRESS_VERSION, items: progress.items });
+  return JSON.stringify({ version: PROGRESS_VERSION, items: progress.items, path: progress.path });
 }
 
 /* ---- Judging a take ------------------------------------------------------- */
@@ -412,6 +471,8 @@ function apply(progress, id, r) {
   it.t = t;
   /* Playing something you skipped means you are working on it after all. */
   it.skip = 0;
+  /* A clean take is the plateau broken: the step is no longer parked. */
+  if (r.value !== null) it.park = 0;
   if (repeat && r.counts) scheduleRepeat(it, r.learned, t);
   else if (learned && r.schedule !== false) startRepeats(it, t);
 
@@ -427,6 +488,40 @@ export function skipItem(progress, id, at = 0) {
   const it = ensure(progress, id);
   it.skip = Math.round(at / 1000) || 1;
   progress.rev++;
+}
+
+export function unskipItem(progress, id) {
+  const it = progress.items[id];
+  if (!it || !it.skip) return;
+  it.skip = 0;
+  progress.rev++;
+}
+
+/*
+ * A step that will not come is parked for a while — "come back to it
+ * tomorrow" is how a teacher meets a plateau — and Continue offers something
+ * else meanwhile. It stays playable; a clean take, or the time running out,
+ * ends it.
+ */
+export const PARK_HOURS = 20;
+export function parkItem(progress, id, at = 0) {
+  const it = ensure(progress, id);
+  it.park = Math.round(at / 1000) || 1;
+  progress.rev++;
+}
+
+export function isParked(progress, id, atMs) {
+  const it = progress.items[id];
+  return Boolean(it && it.park && Math.round(atMs / 1000) - it.park < PARK_HOURS * 3600);
+}
+
+/* The takes since the last clean one: how long the learner has been stuck. */
+export function failStreak(progress, id) {
+  const it = progress.items[id];
+  if (!it) return 0;
+  let n = 0;
+  for (let i = it.h.length - 1; i >= 0 && !(it.h[i][4] & F_CLEAN); i--) n++;
+  return n;
 }
 
 /* ---- Reading an item ------------------------------------------------------ */

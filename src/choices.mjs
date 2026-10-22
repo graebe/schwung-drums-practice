@@ -37,10 +37,10 @@ export function voiceChoices(answer, pool = VOICE_IDS, n = 2) {
 }
 
 /* Subdivisions either side — triplets against sixteenths is the whole point. */
-export function subdivChoices(answer, n = 2) {
-  const at = SUBDIV_ORDER.indexOf(answer);
+export function subdivChoices(answer, n = 2, order = SUBDIV_ORDER) {
+  const at = order.indexOf(answer);
   if (at < 0) return [answer];
-  return [answer, ...nearest(SUBDIV_ORDER, at, n)];
+  return [answer, ...nearest(order, at, n)];
 }
 
 /*

@@ -110,8 +110,11 @@ const CC = { jogTurn: 14, jogClick: 3, menu: 50, back: 51, play: 85, record: 86,
  * Rock & Pop its first family, and the jog clamps, so the end of the top list
  * is Progress with Quiz just above it.
  */
-/* Grooves › Rock & Pop, highlight on its first groove (Rock backbeat). */
-const toFirstDrill = () => { cc(CC.jogTurn, 2); cc(CC.jogClick, 127); cc(CC.jogClick, 127); };
+/* Grooves › Rock & Pop, highlight on Rock backbeat — the third groove, after
+ * First beat and the Eighth-note beat. */
+const toFirstDrill = () => {
+  cc(CC.jogTurn, 2); cc(CC.jogClick, 127); cc(CC.jogClick, 127); cc(CC.jogTurn, 2);
+};
 /* Into its ladder, highlight on L1 — the first TIMED rung. L0 above it is the
  * untimed one, and has flows of its own. */
 const toFirstRung = () => { toFirstDrill(); cc(CC.jogClick, 127); cc(CC.jogTurn, 1); };
@@ -1517,15 +1520,17 @@ test('Continue opens the first step, a clean take at tempo learns it, Click goes
   ticks(2);
   continuePath();
   assert.ok(drawnText(2).some((t) => /Quart/.test(t)), 'Continue did not open Quarters');
-  playQuarters(sn, 100);
+  /* The first step asks for quarters at 60% of their 100: Speed is set to it. */
+  playQuarters(sn, 60);
   const shown = drawnText(2);
-  assert.ok(shown.includes('LEARNED'), `not learned: ${shown.join('|')}`);
+  assert.ok(shown.includes('CLEAN') && shown.includes('60 bpm'), `not clean: ${shown.join('|')}`);
   globalThis.onUnload();
   const saved = JSON.parse(log.writes[`${DATA}progress.json`]);
-  assert.ok(saved.items['subdiv:quarters'].done > 0, 'the step was not learned');
-  assert.equal(saved.items['subdiv:quarters'].best, 100);
-  /* The path set Tempo to the step's target, so 100% Speed was what it asks. */
-  assert.equal(JSON.parse(log.writes[`${DATA}settings.json`]).bpm, 100);
+  assert.equal(saved.items['subdiv:quarters'].best, 60, 'clean at the step\'s target');
+  assert.equal(saved.items['subdiv:quarters'].done, 0, 'a ✓ is still 100%: the spiral comes back for it');
+  const settingsSaved = JSON.parse(log.writes[`${DATA}settings.json`]);
+  assert.equal(settingsSaved.bpm, 100, 'Tempo is the drill\'s target');
+  assert.equal(settingsSaved.speed, 60, 'Speed is the step\'s');
 });
 
 test('Click on a path result opens the next step of the track', async () => {
@@ -1534,30 +1539,35 @@ test('Click on a path result opens the next step of the track', async () => {
   globalThis.init();
   ticks(2);
   continuePath();
-  playQuarters(sn, 100);
+  playQuarters(sn, 60);
   cc(CC.jogClick, 127);
   ticks(2);
+  /* Time has nothing more installed in this stage: on to the track left longest. */
   const shown = drawnText(2);
-  assert.ok(shown.some((t) => /Eight/.test(t)), `not on to Eighths: ${shown.join('|')}`);
+  assert.ok(shown.some((t) => /First bea/.test(t)) && shown.includes('REC   own pace'), `not on to the first beat: ${shown.join('|')}`);
 });
 
-test('a slow clean take reads as its speed; the row shows it', async () => {
-  await loadUi({ settings: { ...PLAIN, speed: 70 } });
+test('a take short of the step\'s target reads as its speed; the row shows it against the target', async () => {
+  await loadUi({ settings: PLAIN });
   const sn = await snare();
   globalThis.init();
   ticks(2);
   continuePath();
-  playQuarters(sn, 70);
+  knob(7, 127);                     /* Speed 60 -> 55 */
+  knob(7, 127);                     /* -> 50 */
+  ticks(2);
+  playQuarters(sn, 50);
   const shown = drawnText(2);
-  assert.ok(shown.includes('CLEAN') && shown.includes('70 bpm'), shown.join('|'));
+  assert.ok(shown.includes('CLEAN') && shown.includes('50 bpm'), shown.join('|'));
   cc(CC.menu, 127);
   ticks(2);
-  /* Learning Path › Time › Pulse: Quarters shows its 70%. */
-  cc(CC.jogTurn, 2);
+  /* Learning Path › 0 Hello, kit › Time: Quarters reads 50 of its 60. */
+  cc(CC.jogTurn, 3);
   cc(CC.jogClick, 127);
+  cc(CC.jogTurn, 3);
   cc(CC.jogClick, 127);
   ticks(2);
-  assert.ok(drawnText(2).includes('70%'), 'the row does not show the clean speed');
+  assert.ok(drawnText(2).includes('50/60'), `the row does not show the speed: ${drawnText(2).join('|')}`);
 });
 
 /* Practise eighths at `bpm`, dead on every half beat, at the velocity `vel(i)`
@@ -1582,13 +1592,15 @@ test('an even take of an accented drill counts, and its dynamics say the accents
   /* The reported take, through the real UI: every note hit on time at one
    * velocity, so no accent stood out. The notes were right, so it is
    * learned; the dynamics are their own score beside it, with what to fix. */
-  const { log } = await loadUi({ settings: PLAIN });
+  const { log } = await loadUi({ settings: { ...PLAIN, bpm: 100 } });
   const sn = await snare();
   globalThis.init();
   ticks(2);
-  continuePath();
-  playQuarters(sn, 100);
-  cc(CC.jogClick, 127);           /* on to Eighths */
+  /* Basics › Subdivisions › Eighths, at 100: its written tempo. */
+  cc(CC.jogClick, 127);
+  cc(CC.jogClick, 127);
+  cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);
   ticks(2);
   playEighths(sn, 100, () => 70);
   let shown = drawnText(2);
@@ -1620,7 +1632,7 @@ test('a Study take is not counted', async () => {
   globalThis.init();
   ticks(2);
   continuePath();
-  playQuarters(sn, 100);
+  playQuarters(sn, 60);
   assert.ok(drawnText(2).includes('STUDY'));
   globalThis.onUnload();
   const saved = log.writes[`${DATA}progress.json`];
@@ -1638,7 +1650,50 @@ test('Skip next moves Continue on to the next track', async () => {
   cc(CC.jogTurn, 1);
   cc(CC.jogClick, 127);           /* Skip: Quarters */
   ticks(1);
-  assert.ok(drawnText(1).some((t) => /Next: Eighths/.test(t)), 'skipping did not move on');
+  assert.ok(drawnText(1).some((t) => /Next: First beat L0/.test(t)), 'skipping did not move on');
+});
+
+test('a folder skips everything in it with one row, and takes it back with the same row', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);           /* Learning Path */
+  cc(CC.jogTurn, 3);
+  cc(CC.jogClick, 127);           /* 0 Hello, kit */
+  cc(CC.jogTurn, 5);
+  cc(CC.jogClick, 127);           /* Ear */
+  cc(CC.jogTurn, 1);
+  ticks(1);
+  assert.ok(drawnText(1).includes('Skip all here'));
+  cc(CC.jogClick, 127);
+  ticks(1);
+  assert.ok(drawnText(1).includes('Unskip all here'), 'the row did not turn round');
+  assert.match(log.announces.join('|'), /Skipped 2/);
+  cc(CC.jogClick, 127);
+  ticks(1);
+  assert.ok(drawnText(1).includes('Skip all here'), 'the skips were not taken back');
+});
+
+test('Your path: a track switched off, and Continue no longer offers it', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);           /* Learning Path */
+  cc(CC.jogTurn, 2);
+  cc(CC.jogClick, 127);           /* Your path */
+  cc(CC.jogClick, 127);           /* Tracks */
+  ticks(1);
+  assert.ok(drawnText(1).includes('on'));
+  cc(CC.jogClick, 127);           /* Time: off */
+  ticks(1);
+  assert.ok(drawnText(1).includes('off'), drawnText(1).join('|'));
+  cc(CC.back, 127);
+  cc(CC.back, 127);
+  for (let i = 0; i < 5; i++) cc(CC.jogTurn, 127);
+  ticks(1);
+  assert.ok(drawnText(1).some((t) => /Next: First beat L0/.test(t)), drawnText(1).join('|'));
 });
 
 test('Repetition lists what is due, and opens it', async () => {
@@ -1678,7 +1733,7 @@ test('Progress lists the tracks and what was played, and opens a chart', async (
   cc(CC.jogClick, 127);
   ticks(1);
   const list = drawnText(1);
-  for (const t of ['PROGRESS', 'Overall', 'Time', 'Rudiments', 'Grooves', 'Ear']) {
+  for (const t of ['PROGRESS', 'Overall', 'Time', 'Hands', 'Grooves', 'Ear']) {
     assert.ok(list.includes(t), `${t} missing: ${list.join('|')}`);
   }
   for (let i = 0; i < 5; i++) cc(CC.jogTurn, 1);     /* Flam tap, after the five overviews */
@@ -1693,7 +1748,7 @@ test('Progress lists the tracks and what was played, and opens a chart', async (
   cc(CC.jogTurn, 127);
   ticks(1);
   const ear = drawnText(1);
-  assert.ok(ear.includes('EAR') && ear.some((t) => /learned of 5/.test(t)), ear.join('|'));
+  assert.ok(ear.includes('EAR') && ear.some((t) => /learned of 7/.test(t)), ear.join('|'));
   cc(CC.back, 127);
   ticks(1);
   assert.ok(drawnText(1).includes('PROGRESS'), 'Back from a chart returns to the list');
@@ -1775,12 +1830,14 @@ test('an Ear step records its round, and Click goes on to the next quiz', async 
   const { log } = await loadUi({ settings: { roundSize: 10 } });
   globalThis.init();
   ticks(2);
-  /* Learning Path › Ear › Know the kit › Guess: drum */
+  /* Learning Path › 0 Hello, kit › Ear › Guess: drum (kick, snare, hat) */
   cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);
+  cc(CC.jogTurn, 3);
   cc(CC.jogClick, 127);
   cc(CC.jogTurn, 5);
   cc(CC.jogClick, 127);
-  cc(CC.jogClick, 127);
+  cc(CC.jogTurn, 2);
   cc(CC.jogClick, 127);
   ticks(2);
   assert.ok(drawnText(1).some((t) => /GUESS: DRUM/.test(t)), 'the step did not open its quiz');
@@ -1799,20 +1856,22 @@ test('an Ear step records its round, and Click goes on to the next quiz', async 
   ticks(2);
   assert.ok(drawnText(1).some((t) => /HEAR: DRUM/.test(t)), 'Click did not go on to Hear: drum');
   globalThis.onUnload();
-  assert.equal(JSON.parse(log.writes[`${DATA}progress.json`]).items['quiz:guess:voice'].plays, 1);
+  /* Three drums are not the kit: the round is filed under its pool. */
+  assert.equal(JSON.parse(log.writes[`${DATA}progress.json`]).items['quiz:guess:voice:kit3'].plays, 1);
 });
 
 test('the Clock step arms the Clock round its drill, at the drill\'s target', async () => {
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  /* Learning Path › Time › Keep time › Clock: quarters */
+  /* Learning Path › 1 Eighth notes › Time › Clock (round quarters) */
   cc(CC.jogTurn, 1);
   cc(CC.jogClick, 127);
-  cc(CC.jogTurn, 2);
+  cc(CC.jogTurn, 4);
   cc(CC.jogClick, 127);
   cc(CC.jogTurn, 3);
   cc(CC.jogClick, 127);
+  cc(CC.jogTurn, 4);
   cc(CC.jogClick, 127);
   ticks(2);
   assert.ok(log.announces.includes('Clock: Quarters'), log.announces.slice(-3).join('|'));
@@ -1916,20 +1975,20 @@ test('from the result the jog scrolls back through the take, and forward to the 
   globalThis.init();
   ticks(2);
   continuePath();
-  playQuarters(sn, 100);
-  assert.ok(drawnText(1).includes('LEARNED'), 'no result');
+  playQuarters(sn, 60);
+  assert.ok(drawnText(1).includes('CLEAN'), 'no result');
   cc(CC.jogTurn, 127);                          /* one beat back */
   ticks(1);
   let shown = drawnText(1);
   assert.ok(shown.includes('REVIEW'), `not reviewing: ${shown.join('|')}`);
-  assert.ok(!shown.includes('LEARNED'), 'the result is still up');
+  assert.ok(!shown.includes('CLEAN'), 'the result is still up');
   for (let i = 0; i < 12; i++) cc(CC.jogTurn, 127);
   ticks(1);
   shown = drawnText(1);
   assert.ok(shown.some((t) => /^\d+\/\d+$/.test(t)), 'no bar position in the review');
   for (let i = 0; i < 40; i++) cc(CC.jogTurn, 1);
   ticks(1);
-  assert.ok(drawnText(1).includes('LEARNED'), 'forward to the end did not bring the result back');
+  assert.ok(drawnText(1).includes('CLEAN'), 'forward to the end did not bring the result back');
 });
 
 test('the review shows what was played: hits as rings, misses as crosses', async () => {
@@ -1940,7 +1999,7 @@ test('the review shows what was played: hits as rings, misses as crosses', async
   continuePath();
   /* Every other beat: half hit, half missed. */
   cc(CC.record, 127);
-  const beatMs = 600;
+  const beatMs = 1000;              /* the first step: quarters at 60 */
   let t = 0;
   let next = 0;
   let k = 0;
@@ -1966,13 +2025,13 @@ test('knob 1 scrolls the review too, finer than the jog', async () => {
   globalThis.init();
   ticks(2);
   continuePath();
-  playQuarters(sn, 100);
+  playQuarters(sn, 60);
   cc(CC.knob1, 127);
   ticks(1);
   assert.ok(drawnText(1).includes('REVIEW'));
   cc(CC.knob1, 1);
   ticks(1);
-  assert.ok(drawnText(1).includes('LEARNED'), 'one step forward from just before the end is the result');
+  assert.ok(drawnText(1).includes('CLEAN'), 'one step forward from just before the end is the result');
   cc(CC.record, 127);
   ticks(2);
   cc(CC.jogTurn, 127);

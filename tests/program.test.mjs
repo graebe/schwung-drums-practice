@@ -13,146 +13,233 @@ import * as P from '../src/progress.mjs';
 import { drumsTree, leafIndex, isFolder, CLOCK_ID } from '../src/catalog.mjs';
 import { parseExercise, parseManifest } from '../src/exercise_io.mjs';
 import { DRILLS } from '../src/guess.mjs';
-import { builtins } from '../src/generator.mjs';
+import { builtins, RANDOM_DRILLS } from '../src/generator.mjs';
 
 const dir = new URL('../src/exercises/', import.meta.url);
 const read = (f) => readFileSync(new URL(f, dir), 'utf8');
 const manifest = parseManifest(read('index.json'));
 const entries = manifest.entries.map((e) => ({ chart: parseExercise(read(e.file), e.id).chart, category: e.category }));
-const tracks = () => PLAN.buildProgram({ entries, categories: manifest.categories });
+/* What ui.js says is installed beside the files: the generated drills and the Clock. */
+const generated = new Set([...builtins({}).map((c) => c.family), ...RANDOM_DRILLS.map((d) => d.family), CLOCK_ID]);
+const build = (extra = {}) => PLAN.buildProgram({
+  entries, categories: manifest.categories, has: (id) => generated.has(id), ...extra,
+});
 const T0 = Date.UTC(2026, 9, 1, 12);
-const learn = (p, id, at = T0) =>
-  P.recordTake(p, id, { speed: 100, accuracy: 1, sd: 10, clean: true, bpm: 90, at });
+const take = (p, id, speed = 100, at = T0, o = {}) =>
+  P.recordTake(p, id, { speed, accuracy: 1, sd: 10, clean: true, bpm: 90, at, ...o });
+const all = (prog, part = 'core') => prog.stages.flatMap((s) =>
+  (part === 'core' ? PLAN.coreSteps(s) : PLAN.electiveSteps(s)).map((st) => ({ ...st, stageIndex: s.index })));
+const RUDIMENTS = manifest.entries.filter((e) => ['rolls', 'diddles', 'flams', 'drags'].includes(e.category));
+const GROOVES = manifest.entries.filter((e) => !['rolls', 'diddles', 'flams', 'drags'].includes(e.category));
 
-test('four tracks, in the order a first session walks them', () => {
-  assert.deepEqual(tracks().map((t) => t.key), ['time', 'rudiments', 'grooves', 'ear']);
+test('seven stages, four tracks in the order a first session walks them', () => {
+  const prog = build();
+  assert.equal(prog.stages.length, 7);
+  assert.deepEqual(prog.tracks.map((t) => t.key), ['time', 'hands', 'grooves', 'ear']);
+  for (const s of prog.stages) assert.ok(s.checkpoint, `stage ${s.index} has no checkpoint installed`);
 });
 
-test('every one of the forty rudiments is on the path, once, in teaching order', () => {
-  const rud = tracks().find((t) => t.key === 'rudiments');
-  const ids = PLAN.trackSteps(rud).map((s) => s.id);
-  const shipped = entries.filter((e) => ['rolls', 'diddles', 'flams', 'drags'].includes(e.category));
-  assert.equal(ids.length, 40);
-  assert.equal(new Set(ids).size, 40);
-  assert.deepEqual([...ids].sort(), shipped.map((e) => e.chart.id).sort());
-  assert.deepEqual(ids.slice(0, 3), ['single-stroke-roll', 'double-stroke-roll', 'single-paradiddle']);
+test('every one of the forty rudiments and every groove is on the path', () => {
+  const prog = build();
+  const ids = new Set([...all(prog), ...all(prog, 'elective')].map((st) => st.id.replace(/:l[0-4]$/, '')));
+  assert.equal(RUDIMENTS.length, 40);
+  for (const e of RUDIMENTS.concat(GROOVES)) assert.ok(ids.has(e.id), `${e.id} is not on the path`);
 });
 
-test('every groove is on the path rung by rung, family by family', () => {
-  const g = tracks().find((t) => t.key === 'grooves');
-  const grooves = entries.filter((e) => PLAN.GROOVE_FAMILIES.includes(e.category));
-  assert.equal(g.units.length, grooves.length);
-  assert.equal(g.units[0].name, 'Rock backbeat');
-  assert.deepEqual(g.units[0].steps.map((s) => s.id),
-    ['rock-backbeat:l0', 'rock-backbeat:l1', 'rock-backbeat:l2', 'rock-backbeat:l3']);
-  assert.equal(g.units[0].steps[0].title, 'Rock backbeat L0');
-  assert.equal(g.units[0].steps[2].title, 'Rock backbeat L2');
-  const families = [...new Set(g.units.map((u) => u.group))];
-  assert.deepEqual(families, ['Rock & Pop', 'Funk & Soul', 'Latin & World', 'Jazz & Swing',
-    'Electronic', 'Techno']);
+test('a drill is never asked before the stage that teaches what it is made of', () => {
+  /* The old path asked for sixteenth-note single strokes before an eighth
+   * note, and triplet rudiments long before triplets. */
+  const at = (id) => Math.min(...all(build()).filter((st) => st.id === id).map((st) => st.stageIndex));
+  const triplets = at('subdiv:triplets');
+  for (const id of ['single-stroke-four', 'single-stroke-seven', 'triple-stroke-roll', 'flam-accent',
+    'swiss-army-triplet', 'paradiddle-diddle', 'double-paradiddle', 'shuffle:l1', 'jazz-ride:l1']) {
+    assert.ok(at(id) >= triplets, `${id} comes before triplets`);
+  }
+  const sixteenths = at('subdiv:sixteenths');
+  for (const id of ['single-stroke-roll', 'single-paradiddle', 'sixteenth-funk:l1', 'house:l1']) {
+    assert.ok(at(id) >= sixteenths, `${id} comes before sixteenths`);
+  }
+  assert.ok(at('subdiv:eighths') > at('subdiv:quarters'));
+  assert.equal(at('first-beat:l0'), 0, 'the first beat is in the first stage');
 });
 
-test('a groove the order does not name joins the end of its family', () => {
-  const mine = { ...entries[0].chart, id: 'mine', name: 'Mine' };
-  const t = PLAN.buildProgram({ entries: [{ chart: mine, category: 'rock' }, entries[0]],
-    categories: manifest.categories });
-  const g = t.find((x) => x.key === 'grooves');
-  assert.deepEqual(g.units.map((u) => u.name), ['Rock backbeat', 'Mine']);
+test('a drill new to the path arrives slow and comes back faster', () => {
+  const singles = all(build()).filter((st) => st.id === 'single-stroke-roll');
+  assert.deepEqual(singles.map((st) => [st.stageIndex, st.target]), [[2, 75], [3, 100], [5, 120]]);
+  for (const st of all(build())) {
+    assert.ok(st.target <= PLAN.MAX_TARGET, `${st.id} asks more than Speed can be set to`);
+  }
+});
+
+test('a groove the table does not name joins the last stage, as an elective', () => {
+  const mine = { chart: { ...entries[2].chart, id: 'mine', name: 'Mine' }, category: 'rock' };
+  const prog = PLAN.buildProgram({ entries: entries.concat([mine]), categories: manifest.categories });
+  const last = prog.stages[prog.stages.length - 1];
+  assert.ok(PLAN.electiveSteps(last).some((st) => st.id === 'mine:l0'));
+});
+
+test('a step whose drill is not installed is left out; an alternative stands in', () => {
+  const prog = build();
+  const ids = all(prog).map((st) => st.id);
+  assert.ok(!ids.includes('read:1'), 'read:1 is not written yet');
+  /* Stage 1's Clock with one bar off is not written yet: the Clock stands in. */
+  const clock = all(prog).find((st) => st.id === CLOCK_ID);
+  assert.equal(clock.stageIndex, 1);
+  assert.equal(clock.wrap, 'subdiv:quarters');
+  /* Stage 1's checkpoint, a phrase, is not written yet: the backbeat stands in. */
+  assert.equal(PLAN.checkpointSteps(prog.stages[1])[0].id, 'rock-backbeat:l3', 'its top rung');
 });
 
 test('every step opens a row of the real tree', () => {
   const tree = drumsTree({ entries, categories: manifest.categories, drills: DRILLS });
   const index = leafIndex(tree);
-  for (const t of tracks()) {
-    for (const s of PLAN.trackSteps(t)) {
-      if (s.quiz) {
-        assert.equal(index.get(s.id).kind, 'quiz', s.id);
-        continue;
-      }
-      assert.ok(index.get(s.wrap || s.id), `${t.name}: ${s.id} opens nothing`);
+  for (const st of all(build()).concat(all(build(), 'elective'))) {
+    if (st.quiz) {
+      assert.equal(st.quiz.kind, st.id.split(':')[2], st.id);
+      continue;
     }
+    assert.ok(index.get(st.wrap || st.id), `${st.id} opens nothing`);
   }
-  assert.equal(index.get(CLOCK_ID).kind, 'clock');
 });
 
-test('a step id is the id its takes are filed under', () => {
-  /* A generated drill files under its family, a level under "<id>:l<n>". */
-  for (const c of builtins({})) assert.ok(c.family, c.id);
-  const time = tracks().find((t) => t.key === 'time');
-  const fams = new Set(builtins({}).map((c) => c.family));
-  for (const s of PLAN.trackSteps(time)) assert.ok(fams.has(s.wrap || s.id), s.id);
-  for (const id of Object.keys(PLAN.BASIC_TARGETS)) {
-    assert.ok(fams.has(id), `${id} has a target but no drill`);
-    assert.ok(PLAN.targetBpm(id) >= 60);
+test('a pooled quiz is its own item: three drums are not the whole kit', () => {
+  const steps = all(build()).filter((st) => st.quiz);
+  const guess = steps.find((st) => st.quiz.mode === 'guess');
+  assert.equal(guess.id, 'quiz:guess:voice:kit3');
+  assert.deepEqual(guess.pool.voices, ['KK', 'SN', 'HH']);
+  const subdivs = steps.filter((st) => st.quiz.kind === 'subdiv').map((st) => st.id);
+  assert.deepEqual(subdivs, ['quiz:pick:subdiv:qe', 'quiz:pick:subdiv:qes', 'quiz:pick:subdiv']);
+});
+
+test('Continue: the current stage only, the track left longest first', () => {
+  const prog = build();
+  const p = P.emptyProgress();
+  const first = PLAN.continueStep(p, prog, T0);
+  assert.equal(first.stage.index, 0);
+  assert.equal(first.step.id, 'subdiv:quarters', 'Time first on a first session');
+  assert.equal(first.step.target, 60);
+  take(p, 'subdiv:quarters', 60, T0);
+  assert.equal(PLAN.continueStep(p, prog, T0).step.id, 'first-beat:l0', 'then the track left longest');
+});
+
+test('a stage is through when its checkpoint is passed — testing out of it', () => {
+  const prog = build();
+  const p = P.emptyProgress();
+  take(p, 'first-beat:l3', 100);
+  assert.equal(PLAN.currentStage(p, prog).index, 1, 'the checkpoint closes stage 0');
+  assert.ok(!PLAN.stepDone(p, PLAN.coreSteps(prog.stages[0]).find((st) => st.quiz)),
+    'and ticks nothing it did not play');
+});
+
+test('a stage is through when its core is done or skipped', () => {
+  const prog = build();
+  const p = P.emptyProgress();
+  for (const st of PLAN.coreSteps(prog.stages[0])) P.skipItem(p, st.id, T0);
+  assert.equal(PLAN.currentStage(p, prog).index, 1);
+});
+
+test('the step target is the speed it asks; a higher rung or a ✓ carries it', () => {
+  const prog = build();
+  const p = P.emptyProgress();
+  const rb = all(prog).filter((st) => st.id.startsWith('rock-backbeat:'));
+  const l1 = rb.find((st) => st.id === 'rock-backbeat:l1');
+  assert.equal(l1.target, 90);
+  take(p, 'rock-backbeat:l1', 85);
+  assert.ok(!PLAN.stepDone(p, l1), '85 is short of 90');
+  take(p, 'rock-backbeat:l3', 90);
+  assert.ok(PLAN.stepDone(p, l1), 'the top rung at 90 carries L1');
+  assert.ok(PLAN.stepDone(p, rb.find((st) => st.id === 'rock-backbeat:l0')), 'and L0');
+});
+
+test('a dynamics target needs the dynamics as well as the speed', () => {
+  const prog = build();
+  const cp = PLAN.checkpointSteps(prog.stages[3])[0];
+  assert.equal(cp.id, 'ghost-note-funk:l3');
+  assert.equal(cp.dyn, 80);
+  const p = P.emptyProgress();
+  take(p, cp.id, 100, T0, { dyn: 60 });
+  assert.ok(!PLAN.stepDone(p, cp), 'clean at tempo, but the ghosts were not there yet');
+  take(p, cp.id, 100, T0 + 1000, { dyn: 85 });
+  assert.ok(PLAN.stepDone(p, cp));
+});
+
+test('Your path: a track switched off leaves Continue, the short ladder drops L1-L3', () => {
+  const prog = build();
+  const p = P.emptyProgress();
+  P.togglePath(p, 'tracks', 'time');
+  assert.equal(PLAN.continueStep(p, prog, T0).step.track, 'grooves');
+  P.togglePath(p, 'tracks', 'grooves');
+  P.togglePath(p, 'tracks', 'ear');
+  assert.equal(P.togglePath(p, 'tracks', 'hands'), false, 'the last track stays on');
+  const p2 = P.emptyProgress();
+  P.setPath(p2, 'rungs', 'short');
+  const fb = PLAN.coreSteps(prog.stages[0], p2.path).filter((st) => st.id.startsWith('first-beat'));
+  assert.deepEqual(fb.map((st) => st.id), ['first-beat:l0', 'first-beat:l3']);
+});
+
+test('Your path: a style switched off swaps a checkpoint for its alternative', () => {
+  const prog = build();
+  const p = P.emptyProgress();
+  assert.equal(PLAN.checkpointSteps(prog.stages[4], p.path)[0].id, 'jazz-ride:l2');
+  P.togglePath(p, 'styles', 'jazz');
+  assert.equal(PLAN.checkpointSteps(prog.stages[4], p.path)[0].id, 'half-time-shuffle:l3');
+});
+
+test('Your path: start at a later stage; earlier stages stay open, nothing is ticked', () => {
+  const prog = build();
+  const p = P.emptyProgress();
+  P.setPath(p, 'start', 3);
+  assert.equal(PLAN.currentStage(p, prog).index, 3);
+  assert.equal(PLAN.continueStep(p, prog, T0).stage.index, 3);
+  assert.ok(!PLAN.stageComplete(p, prog.stages[0]));
+});
+
+test('a parked step leaves Continue for a day, then comes back', () => {
+  const prog = build();
+  const p = P.emptyProgress();
+  P.parkItem(p, 'subdiv:quarters', T0);
+  assert.notEqual(PLAN.continueStep(p, prog, T0).step.id, 'subdiv:quarters');
+  const later = T0 + (P.PARK_HOURS + 1) * 3600 * 1000;
+  assert.equal(PLAN.continueStep(p, prog, later).step.id, 'subdiv:quarters');
+});
+
+test('stuck: suggest after three failed takes in a row, park after six', () => {
+  const p = P.emptyProgress();
+  for (let i = 0; i < 6; i++) {
+    take(p, 'x', 100, T0 + i, { clean: false });
+    assert.equal(PLAN.stuckLevel(P.failStreak(p, 'x')), i + 1 >= 6 ? 2 : i + 1 >= 3 ? 1 : 0);
   }
-  assert.equal(PLAN.targetBpm('rock-backbeat'), 0, 'a file has its own tempo');
+  take(p, 'x', 100, T0 + 9);
+  assert.equal(P.failStreak(p, 'x'), 0, 'a clean take ends the streak');
 });
 
-test('next: the first step neither learned nor skipped; a higher level carries the lower', () => {
+test('on from a step: the next open one of its track in its stage, never itself', () => {
+  const prog = build();
   const p = P.emptyProgress();
-  const g = tracks().find((t) => t.key === 'grooves');
-  assert.equal(PLAN.nextStep(p, g).id, 'rock-backbeat:l0', 'a groove starts with its notes, at your own pace');
-  learn(p, 'rock-backbeat:l3');
-  assert.equal(PLAN.nextStep(p, g).id, 'straight-eights:l0', 'the top rung carried L0 too');
-  P.skipItem(p, 'straight-eights:l0');
-  assert.equal(PLAN.nextStep(p, g).id, 'straight-eights:l1');
+  const quarters = PLAN.continueStep(p, prog, T0).step;
+  const next = PLAN.stepAfter(p, prog, quarters, T0);
+  assert.notEqual(next.key, quarters.key);
+  const fb0 = PLAN.coreSteps(prog.stages[0]).find((st) => st.id === 'first-beat:l0');
+  assert.equal(PLAN.stepAfter(p, prog, fb0, T0).id, 'first-beat:l1', 'the next rung');
 });
 
-test('Continue walks the tracks in turn, the one left longest first', () => {
-  const p = P.emptyProgress();
-  const ts = tracks();
-  const seen = [];
-  for (let i = 0; i < 4; i++) {
-    const c = PLAN.continueStep(p, ts);
-    seen.push(c.track.key);
-    P.recordTake(p, c.step.id, { speed: 60, accuracy: 1, sd: 10, clean: true, bpm: 60, at: T0 + i * 1000 });
-  }
-  assert.deepEqual(seen, ['time', 'rudiments', 'grooves', 'ear']);
-  assert.equal(PLAN.continueStep(p, ts).track.key, 'time', 'and round again');
-});
-
-test('a learned track drops out of Continue; all learned is null', () => {
-  const p = P.emptyProgress();
-  const ts = tracks().slice(3);
-  for (const s of PLAN.trackSteps(ts[0])) learn(p, s.id);
-  assert.equal(PLAN.continueStep(p, ts), null);
-  assert.equal(PLAN.nextStep(p, ts[0]), null);
-});
-
-test('on from a step: the next open one after it, wrapping, never itself', () => {
-  const p = P.emptyProgress();
-  const time = tracks().find((t) => t.key === 'time');
-  assert.equal(PLAN.stepAfter(p, time, 'subdiv:quarters').id, 'subdiv:eighths');
-  learn(p, 'subdiv:triplets');
-  assert.equal(PLAN.stepAfter(p, time, 'subdiv:eighths').id, 'subdiv:sixteenths');
-  assert.equal(PLAN.stepAfter(p, time, CLOCK_ID).id, 'subdiv:quarters', 'wraps to the top');
-  const one = { units: [{ steps: [{ id: 'only' }] }] };
-  assert.equal(PLAN.stepAfter(p, one, 'only'), null);
-});
-
-test('steps and tracks are found by id', () => {
-  const ts = tracks();
-  assert.equal(PLAN.trackOf(ts, 'flam-tap').key, 'rudiments');
-  assert.equal(PLAN.trackOf(ts, 'nope'), null);
-  assert.equal(PLAN.stepTitle(PLAN.findStep(ts, 'samba:l2')), 'Samba L2');
-  assert.equal(PLAN.findStep(ts, 'nope'), null);
-  assert.equal(PLAN.quizItemId(DRILLS[0]), 'quiz:guess:voice');
-});
-
-test('the folder: Continue, Skip, the tracks, Repetition — and every row fits', () => {
-  const f = PLAN.programFolder(tracks(), () => [{ label: 'due', repId: 'x' }]);
-  assert.deepEqual(f.children.map((c) => c.label),
-    ['Continue', 'Skip next', 'Time', 'Rudiments', 'Grooves', 'Ear', 'Repetition']);
-  assert.equal(f.children[6].children[0].repId, 'x', 'asked for each time');
-  const grooves = f.children[4];
-  assert.equal(grooves.children[0].label, 'Rock & Pop', 'grooves are grouped by family');
+test('the folder: Continue, Skip, Your path, the stages, Repetition — and every row fits', () => {
+  const f = PLAN.programFolder(build(), () => [{ label: 'due', repId: 'x' }],
+    manifest.categories.filter((c) => c.folder === 'Grooves'));
+  assert.deepEqual(f.children.map((c) => c.label), ['Continue', 'Skip next', 'Your path',
+    '0 Hello, kit', '1 Eighth notes', '2 Sixteenths', '3 Ghosts & flams',
+    '4 Triplets/swing', '5 Clave & world', '6 Pro', 'Repetition']);
+  assert.equal(f.children[10].children[0].repId, 'x', 'asked for each time');
+  const s0 = f.children[3];
+  assert.deepEqual(s0.children.slice(0, 3).map((c) => c.label),
+    ['Skip next', 'Skip all here', 'Checkpoint: First beat L3']);
+  assert.equal(f.children[2].children[1].children.length, 6, 'one row a style');
+  /* A row is fitted to the screen; a folder's label is its title when open. */
   const walk = (n) => {
     for (const c of n.children) {
-      assert.ok(c.label.length <= 21, `"${c.label}" is ${c.label.length} chars`);
-      if (isFolder(c) && !c.untracked) {
-        assert.ok(c.label.length <= 16, `folder "${c.label}" overflows its title`);
-        walk(c);
-      }
+      if (!isFolder(c) || c.repetition) continue;
+      assert.ok(c.label.length <= 16, `folder "${c.label}" overflows its title`);
+      walk(c);
     }
   };
   walk(f);
