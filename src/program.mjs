@@ -104,7 +104,7 @@ export const STAGES = [
   {
     key: 's0', name: 'Hello, kit', card: 'stage-0',
     core: [
-      quiz('guess', 'voice', 'kit3', { card: 'kit-on-paper' }),
+      quiz('guess', 'voice', 'kit3', { card: ['kit-on-paper', 'your-pads'] }),
       quiz('hear', 'voice', 'kit3'),
       time('subdiv:quarters', 60, { card: ['pulse', 'result'] }),
       time('read:1', 100, { card: 'rests' }),

@@ -193,6 +193,33 @@ test('a pad press reaches the engine as a hit', async () => {
   assert.match(hits[0][1], /^\d+:100$/, `unexpected payload: ${hits[0][1]}`);
 });
 
+test('a pad sounds as its voice\'s GM note, in the engine and down a MIDI route alike', async () => {
+  const KIT = await import('../src/kit.mjs');
+  const pads = [[68, 'KK'], [69, 'SN'], [70, 'HH'], [PADMAP.padAt(3, 2), 'P1']];
+  let { log } = await loadUi();
+  globalThis.init();
+  ticks(3);
+  for (const [p, voice] of pads) {
+    assert.equal(PADMAP.padVoice(p), voice, `MPC Classic pad ${p}`);
+    const before = log.params.length;
+    pad(p, 100);
+    pad(p, 0);
+    globalThis.tick();
+    assert.equal(log.params.slice(before).filter(isHit)[0][1], `${KIT.gmOf(voice)}:100`, `${voice} to the engine`);
+  }
+  ({ log } = await loadUi({ settings: { midiOut: 1 } }));
+  globalThis.init();
+  ticks(3);
+  for (const [p, voice] of pads) {
+    const before = log.midi.length;
+    pad(p, 100);
+    pad(p, 0);
+    ticks(2);
+    const ons = log.midi.slice(before).filter((m) => (m[2] & 0xf0) === 0x90);
+    assert.ok(ons.some((m) => m[3] === KIT.gmOf(voice)), `${voice} down the route`);
+  }
+});
+
 test('a full session runs without throwing', async () => {
   const { log } = await loadUi();
   globalThis.init();
@@ -1759,6 +1786,147 @@ test('stuck on a step: a hint after three failed takes, parked after six', async
   assert.ok(drawnText(1).some((t) => /Next: First beat L0/.test(t)), 'Continue still offers the parked step');
   globalThis.onUnload();
   assert.ok(JSON.parse(log.writes[`${DATA}progress.json`]).items['subdiv:quarters'].park > 0);
+});
+
+/* ---- pad layouts and the Pad map ------------------------------------------- */
+
+/* Settings, cursor on the Pad map row. */
+async function toPadMap() {
+  const SET = await import('../src/settings_def.mjs');
+  shiftClick();
+  for (let i = 0; i < 40; i++) cc(CC.jogTurn, 127);
+  const row = SET.ROWS.findIndex((r) => r.key === 'padMap');
+  for (let i = 0; i < row; i++) cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);
+  ticks(1);
+}
+
+test('the Pad map names every pad, sounds it, and steps through the layouts', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  await toPadMap();
+  let shown = drawnText(1);
+  assert.ok(shown.includes('MPC Classic') && shown.includes('PAD hear CLICK edit'), shown.join('|'));
+  assert.equal(shown.filter((t) => /^[A-Z0-9]{2}$/.test(t)).length, 32);
+  const before = log.params.length;
+  pad(68, 100); pad(68, 0);
+  ticks(1);
+  assert.ok(drawnText(1).includes('Kick'), 'the pad was not named');
+  assert.ok(log.params.slice(before).some(isHit), 'nor heard');
+  cc(CC.jogTurn, 1);
+  ticks(1);
+  assert.ok(drawnText(1).includes('MPC Family Rows'), drawnText(1).join('|'));
+  cc(CC.back, 127);
+  ticks(1);
+  assert.ok(drawnText(1).includes('SETTINGS'), 'Back returns to Settings');
+  globalThis.onUnload();
+  assert.equal(JSON.parse(log.writes[SETTINGS_FILE]).layout, 'family');
+});
+
+test('Click on a preset makes Custom a copy of it; an edit lands on both halves; Back saves pads.json', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  await toPadMap();
+  cc(CC.jogClick, 127);           /* edit a copy of MPC Classic */
+  ticks(1);
+  assert.ok(drawnText(1).includes('Custom'), drawnText(1).join('|'));
+  pad(68, 100); pad(68, 0);       /* pick the kick pad */
+  ticks(1);
+  assert.ok(drawnText(1).includes('JOG sound KNOB1 both'));
+  cc(CC.jogTurn, 1);              /* KK -> the next voice in staff order: K2 */
+  ticks(1);
+  assert.ok(drawnText(1).includes('Kick 2'), drawnText(1).join('|'));
+  cc(CC.back, 127);
+  ticks(1);
+  globalThis.onUnload();
+  const saved = JSON.parse(log.writes['/data/UserData/schwung/modules/tools/drums-practice/pads.json']);
+  assert.equal(saved.pair, 'twin');
+  assert.deepEqual(saved.rows[3].split(' ').slice(0, 1), ['K2']);
+  assert.equal(saved.rows[3].split(' ')[4], 'K2', 'and its twin under the right hand');
+  assert.equal(JSON.parse(log.writes[SETTINGS_FILE]).layout, 'custom');
+});
+
+test('knob 1 on Custom edits one half only', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  await toPadMap();
+  cc(CC.jogClick, 127);
+  pad(68, 100); pad(68, 0);
+  knob(0, 1);                     /* both -> one */
+  ticks(1);
+  assert.ok(drawnText(1).includes('one'));
+  cc(CC.jogTurn, 1);
+  cc(CC.back, 127);
+  globalThis.onUnload();
+  const saved = JSON.parse(log.writes['/data/UserData/schwung/modules/tools/drums-practice/pads.json']);
+  assert.deepEqual([saved.rows[3].split(' ')[0], saved.rows[3].split(' ')[4]], ['K2', 'KK']);
+});
+
+test('a Custom from pads.json is what the pads play; a broken one is said and falls back', async () => {
+  const rows = ['CR CR CR CR CR CR CR CR', 'HH HH HH HH HH HH HH HH', 'SN SN SN SN SN SN SN SN', 'SH KK KK KK KK KK KK KK'];
+  let loaded = await loadUi({ settings: { layout: 'custom' },
+    dataFiles: { 'pads.json': JSON.stringify({ version: 1, pair: 'twin', rows }) } });
+  globalThis.init();
+  ticks(2);
+  let before = loaded.log.params.length;
+  pad(68, 100); pad(68, 0);
+  globalThis.tick();
+  assert.equal(loaded.log.params.slice(before).filter(isHit)[0][1], '70:100', 'the shaker, as pads.json says');
+  loaded = await loadUi({ settings: { layout: 'custom' }, dataFiles: { 'pads.json': '{"rows": 3}' } });
+  globalThis.init();
+  ticks(2);
+  assert.ok(drawnText(1).includes('BAD PADS.JSON'), drawnText(1).join('|'));
+  before = loaded.log.params.length;
+  pad(68, 100); pad(68, 0);
+  globalThis.tick();
+  assert.equal(loaded.log.params.slice(before).filter(isHit)[0][1], '36:100', 'MPC Classic until it is saved');
+});
+
+test('Flip puts the kick under the left hand\'s right finger', async () => {
+  const { log } = await loadUi({ settings: { flip: true } });
+  globalThis.init();
+  ticks(2);
+  const before = log.params.length;
+  pad(PADMAP.padAt(0, 3), 100); pad(PADMAP.padAt(0, 3), 0);
+  globalThis.tick();
+  assert.equal(log.params.slice(before).filter(isHit)[0][1], '36:100');
+});
+
+test('a drum quiz under Sticking plays on MPC Classic, so every prompt can be answered', async () => {
+  const { log } = await loadUi({ settings: { layout: 'sticking', roundSize: 10 } });
+  globalThis.init();
+  ticks(2);
+  openQuiz(0);                     /* Guess: drum */
+  const pads = PADMAP.layoutVoices('mpc').map((v) => PADMAP.padsForVoice(v, 'mpc')[0]);
+  let shown = [];
+  for (let k = 0; k < 600 && !shown.some((t) => /score \d+%/.test(t)); k++) {
+    const p = pads[k % pads.length];
+    pad(p, 100); pad(p, 0);
+    ticks(25);
+    shown = drawnText(1);
+  }
+  assert.ok(shown.some((t) => /score \d+%/.test(t)), 'the round could not be finished on Sticking');
+  assert.ok(log.writes);
+});
+
+test('a drill a layout cannot fully play names the drum on the ready screen', async () => {
+  /* Chromatic is GM 36-51 and has no cowbell, which songo's bell is on. */
+  await loadUi({ settings: { layout: 'gm' }, extraFiles: {
+    'bell.json': JSON.stringify({ id: 'bell', name: 'Bell', bpm: 90, timeSig: [4, 4], loopBars: 1, repeats: 2,
+      sticking: 'off', events: [{ beat: 0, voices: ['P1', 'KK'] }, { beat: 1, voices: ['P1'] }] }),
+    'user.json': JSON.stringify({ exercises: [{ id: 'bell', name: 'Bell', file: 'bell.json', category: 'latin' }] }),
+  } });
+  globalThis.init();
+  ticks(2);
+  cc(CC.jogTurn, 2); cc(CC.jogClick, 127);          /* Grooves */
+  cc(CC.jogTurn, 2); cc(CC.jogClick, 127);          /* Latin & World */
+  for (let i = 0; i < 40; i++) cc(CC.jogTurn, 1);   /* its last groove: Bell */
+  cc(CC.jogClick, 127); ticks(2);                    /* its ladder */
+  cc(CC.jogTurn, 1); cc(CC.jogClick, 127); ticks(2); /* L1, the timed rung with the bell */
+  assert.ok(drawnText(2).includes('NO P1 ON PADS'), drawnText(2).join('|'));
 });
 
 /* ---- lesson cards ---------------------------------------------------------- */

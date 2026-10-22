@@ -33,8 +33,16 @@
 
 import { VOICE_IDS } from './kit.mjs';
 
-const CYMBALS = ['CR', 'HH', 'HO', 'RD'];
-const FEET = ['KK', 'HF'];
+/*
+ * The timekeepers are the cymbals and the hand percussion that does a
+ * cymbal's job — the cowbell carries songo and mozambique, the shaker and the
+ * tambourine a pop chorus. The snare family is the snare with its rim, clap
+ * and second snare: a backbeat on a clap is still the backbeat. The toms are
+ * what L4 adds.
+ */
+const TIME = ['CR', 'FX', 'P1', 'HH', 'HO', 'P2', 'SH', 'RD'];
+const FEET = ['KK', 'K2', 'HF'];
+const SNARES = ['SN', 'RM', 'CL', 'S2'];
 
 /*
  * `step` is what the list prints in its value column, `label` what the row
@@ -45,9 +53,9 @@ const FEET = ['KK', 'HF'];
  */
 export const LEVELS = [
   { id: 'l0', step: 'L0', label: 'Own pace', voices: null, untimed: true },
-  { id: 'l1', step: 'L1', label: 'Time only', voices: CYMBALS },
-  { id: 'l2', step: 'L2', label: '+ kick', voices: [...CYMBALS, ...FEET] },
-  { id: 'l3', step: 'L3', label: '+ snare', voices: [...CYMBALS, ...FEET, 'SN'] },
+  { id: 'l1', step: 'L1', label: 'Time only', voices: TIME },
+  { id: 'l2', step: 'L2', label: '+ kick', voices: [...TIME, ...FEET] },
+  { id: 'l3', step: 'L3', label: '+ snare', voices: [...TIME, ...FEET, ...SNARES] },
   { id: 'l4', step: 'L4', label: 'Everything', voices: null },
 ];
 

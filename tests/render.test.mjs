@@ -867,6 +867,26 @@ test('the Progress chart dots the dynamics under the speed', async () => {
   assert.ok(seen.includes('dyn 100%  JOG 1/2'), seen.join('|'));
 });
 
+test('the Pad map draws all 32 pads, the hand split and the selection, inside the screen', async () => {
+  const { drawPadMap, PADMAP } = await import('../src/view.mjs');
+  const { resolveLayout } = await import('../src/padmap.mjs');
+  const texts = [];
+  const c = createScreen();
+  const text = c.text.bind(c);
+  c.text = (x, y, str, v) => { texts.push({ x, y, w: c.textWidth(str), s: str }); return text(x, y, str, v); };
+  drawPadMap(c, { title: 'MPC Classic', right: 'flip', grid: resolveLayout('mpc').grid, selected: [0],
+    footer: 'PAD hear CLICK edit' });
+  const cells = texts.filter((t) => /^[A-Z0-9]{2}$/.test(t.s));
+  assert.equal(cells.length, 32);
+  for (const t of texts) {
+    assert.ok(t.x >= 0 && t.x + t.w <= L.SCREEN_W && t.y + L.TEXT_H <= L.SCREEN_H, `off screen: ${t.s}`);
+  }
+  for (const t of cells) assert.ok(t.w <= PADMAP.cellW - 2, `${t.s} overflows its cell`);
+  /* The bottom-left cell, KK, is drawn inverted. */
+  assert.ok(isOn(c, PADMAP.x + 1, PADMAP.y + 3 * PADMAP.cellH + 1), 'the selected cell is not inverted');
+  assert.ok(isOn(c, PADMAP.x + 4 * PADMAP.cellW - 1, PADMAP.y + 5), 'no hand split');
+});
+
 test('the result screen says when a take was not kept', () => {
   const { c, seen } = capture();
   drawSummary(c, result({ status: 'not kept' }));

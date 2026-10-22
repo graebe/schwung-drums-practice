@@ -30,9 +30,8 @@
     {
       "beat": 0.5,
       "voices": [
-        "SN"
-      ],
-      "dyn": "ghost"
+        "RM"
+      ]
     },
     {
       "beat": 0.75,
@@ -55,9 +54,8 @@
     {
       "beat": 1.5,
       "voices": [
-        "SN"
-      ],
-      "dyn": "ghost"
+        "RM"
+      ]
     },
     {
       "beat": 1.5,
@@ -74,9 +72,8 @@
     {
       "beat": 2.0,
       "voices": [
-        "SN"
-      ],
-      "dyn": "ghost"
+        "RM"
+      ]
     },
     {
       "beat": 2.0,
@@ -105,9 +102,8 @@
     {
       "beat": 3.0,
       "voices": [
-        "SN"
-      ],
-      "dyn": "ghost"
+        "RM"
+      ]
     },
     {
       "beat": 3.5,

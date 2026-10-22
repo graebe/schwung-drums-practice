@@ -73,6 +73,8 @@ function targetColor(beatsAway) {
  *   answerPads    [pad, ...] a multiple-choice drill's answers (answer_pads.mjs),
  *                 or null; while set, the bottom row is the answer bar
  *   answerColours [palette index, ...] one per answer pad
+ *   selected   [pad, ...] the pads a Custom layout is being edited at (the
+ *              Pad map screen), or null — lit even when they hold no voice
  *   dark       true to blank everything (the module is closing)
  */
 export function paint(out, state) {
@@ -120,6 +122,8 @@ export function paint(out, state) {
         c = state.phase ? LED_PROMPT : LED_OFF;
       }
     }
+
+    if (state.selected && state.selected.indexOf(pad) >= 0) c = state.phase ? LED_PROMPT : LED_TARGET_NEAR;
 
     if (state.held && state.held.has(pad)) c = LED_PRESSED;
 

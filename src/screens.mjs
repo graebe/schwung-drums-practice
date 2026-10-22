@@ -185,6 +185,40 @@ export function drawNote(ctx, x, y, note) {
   ctx.text(tx, y, fit(ctx, note.text || '', L.SCREEN_W - tx - 1), 1);
 }
 
+/* ---- Pad map -------------------------------------------------------------- */
+/*
+ * The layout in force as a picture of the grid: 4 rows of 8 cells, each with
+ * its voice's two letters, top row first as it sits under your hands, a rule
+ * down the middle where the hands divide. The selected cell (Custom, while it
+ * is edited) is drawn inverted.
+ *
+ * s = { title, right, grid (pad index -> voice id | null), selected: [index],
+ *       footer }
+ */
+export const PADMAP = { x: 0, y: 10, cellW: 16, cellH: 11 };
+
+export function drawPadMap(ctx, s) {
+  ctx.clear();
+  drawTitle(ctx, s.title || 'PAD MAP', s.right || '', null);
+  const g = PADMAP;
+  const sel = s.selected || [];
+  for (let row = 0; row < 4; row++) {
+    const y = g.y + (3 - row) * g.cellH;
+    for (let col = 0; col < 8; col++) {
+      const i = row * 8 + col;
+      const x = g.x + col * g.cellW;
+      const label = (s.grid && s.grid[i]) || '.';
+      const on = sel.indexOf(i) >= 0;
+      if (on) ctx.fillRect(x, y, g.cellW, g.cellH - 1, 1);
+      ctx.text(x + ((g.cellW - ctx.textWidth(label)) >> 1), y + 2, label, on ? 0 : 1);
+    }
+  }
+  /* The hands divide here: left half the left hand. */
+  ctx.fillRect(g.x + 4 * g.cellW - 1, g.y, 1, 4 * g.cellH - 1, 1);
+  const foot = fit(ctx, s.footer || '', L.SCREEN_W - 2);
+  ctx.text((L.SCREEN_W - ctx.textWidth(foot)) >> 1, L.SCREEN_H - L.TEXT_H, foot, 1);
+}
+
 /* ---- Lesson card -------------------------------------------------------- */
 /*
  * A short explanation before a practice (lessons.mjs): its title over a rule,

@@ -13,33 +13,33 @@
     {
       "beat": 0,
       "voices": [
-        "RD",
+        "P1",
         "KK"
       ]
     },
     {
       "beat": 0.5,
       "voices": [
-        "RD"
+        "P1"
       ]
     },
     {
       "beat": 1,
       "voices": [
-        "RD"
+        "P1"
       ]
     },
     {
       "beat": 1.5,
       "voices": [
-        "RD",
+        "P1",
         "HT"
       ]
     },
     {
       "beat": 1.75,
       "voices": [
-        "RD"
+        "P1"
       ]
     },
     {
@@ -52,13 +52,13 @@
     {
       "beat": 2.25,
       "voices": [
-        "RD"
+        "P1"
       ]
     },
     {
       "beat": 2.75,
       "voices": [
-        "RD"
+        "P1"
       ]
     },
     {
@@ -70,46 +70,46 @@
     {
       "beat": 3.25,
       "voices": [
-        "RD"
+        "P1"
       ]
     },
     {
       "beat": 3.5,
       "voices": [
-        "RD",
+        "P1",
         "LT"
       ]
     },
     {
       "beat": 4,
       "voices": [
-        "RD",
+        "P1",
         "KK"
       ]
     },
     {
       "beat": 4.5,
       "voices": [
-        "RD"
+        "P1"
       ]
     },
     {
       "beat": 5,
       "voices": [
-        "RD"
+        "P1"
       ]
     },
     {
       "beat": 5.5,
       "voices": [
-        "RD",
+        "P1",
         "HT"
       ]
     },
     {
       "beat": 5.75,
       "voices": [
-        "RD"
+        "P1"
       ]
     },
     {
@@ -122,13 +122,13 @@
     {
       "beat": 6.25,
       "voices": [
-        "RD"
+        "P1"
       ]
     },
     {
       "beat": 6.75,
       "voices": [
-        "RD"
+        "P1"
       ]
     },
     {
@@ -140,13 +140,13 @@
     {
       "beat": 7.25,
       "voices": [
-        "RD"
+        "P1"
       ]
     },
     {
       "beat": 7.5,
       "voices": [
-        "RD",
+        "P1",
         "LT"
       ]
     }

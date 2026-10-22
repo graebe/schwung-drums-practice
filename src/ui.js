@@ -93,6 +93,7 @@ const PROGRESS_ITEM = 'progressItem';
 const SETTINGS = 'settings';
 const ERROR = 'error';
 const CARD = 'card';
+const PADMAP = 'padmap';
 
 /* MIDI out routes. */
 const OUT_TRACK = 1;
@@ -526,6 +527,7 @@ function paintLeds(t) {
   st.sounding = t < listenLitUntil && ((tp.mode === C.MODE_LISTEN && screen === RUNNING)
     || (isUntimed() && (screen === READY || screen === RUNNING))) ? listenLit : null;
   st.stuck = stuckTargets();
+  st.selected = padMapSelected();
   st.phase = Math.floor(t / 500) % 2;
   /* The second hint lights the pad. Only for the drills whose answer IS a
    * pad — naming a groove has no pad to light, and a Pick drill's hints strike
@@ -1692,6 +1694,10 @@ function padDown(pad, vel) {
     return;
   }
   held.add(pad);
+  if (screen === PADMAP) {
+    padMapPress(pad, vel);
+    return;
+  }
   const voice = PAD.padVoice(pad, layoutNow());
   if (!voice) return;
   const hand = PAD.padHand(pad);
@@ -2110,6 +2116,10 @@ function layoutNow() {
  * every pad is the snare and eight of nine prompts could not be answered.
  */
 let customPads = null;
+/* The Pad map screen: the Custom pad being edited (grid index, -1 none),
+ * whether an edit lands on both halves, the voice last struck, and whether
+ * Custom changed since it was opened (Back saves it). */
+const pm = { sel: -1, both: true, note: '', noteUntil: 0, edited: false };
 let padLayout = PAD.resolveLayout(PAD.DEFAULT_LAYOUT);
 let quizLayout = padLayout;
 function refreshLayout() {
@@ -2117,6 +2127,99 @@ function refreshLayout() {
   quizLayout = settings.layout === 'sticking'
     ? PAD.resolveLayout(PAD.DEFAULT_LAYOUT, { flip: settings.flip }) : padLayout;
   if (chart) chartWarning = warningFor(chart);
+}
+
+/* ---- the Pad map screen ------------------------------------------------- */
+/*
+ * Settings › Pad map: the layout in force, every pad named. On a preset a pad
+ * sounds its drum and names it, the jog steps through the layouts, and Click
+ * makes an editable copy of it — Custom. On Custom a pad is picked, the jog
+ * gives it a sound, and knob 1 says whether the edit lands on both halves (the
+ * pad its layout pairs it with: the same column of the other half, or its
+ * mirror image). Back saves Custom to pads.json and returns to Settings.
+ */
+function openPadMap() {
+  pm.sel = -1;
+  pm.note = '';
+  pm.edited = false;
+  screen = PADMAP;
+  announce(`Pad map: ${padLayout.name}`);
+}
+
+const isCustom = () => settings.layout === PAD.CUSTOM;
+
+/* A pad of the grid as an index into Custom's own, unflipped rows. */
+function customIndex(i) {
+  if (!settings.flip) return i;
+  const row = Math.floor(i / PAD.COLS);
+  return row * PAD.COLS + (PAD.COLS - 1 - (i % PAD.COLS));
+}
+
+function padMapPress(pad, vel) {
+  const i = pad - PAD.PAD_FIRST;
+  const voice = padLayout.grid[i];
+  if (voice) sound(voice, vel || 100);
+  const v = voice ? KIT.voiceById(voice) : null;
+  pm.note = v ? v.label : 'no sound';
+  pm.noteUntil = now() + 2000;
+  if (isCustom()) pm.sel = i;
+  announce(pm.note);
+}
+
+function padMapJog(delta) {
+  if (isCustom() && pm.sel >= 0) {
+    /* No sound, then every voice in staff order. */
+    const list = [null].concat(KIT.VOICE_IDS);
+    const at = Math.max(0, list.indexOf(padLayout.grid[pm.sel]));
+    const next = list[Math.max(0, Math.min(list.length - 1, at + delta))];
+    customPads = PIO.setPad(customPads || PIO.copyPreset(PAD.DEFAULT_LAYOUT), customIndex(pm.sel), next, pm.both);
+    pm.edited = true;
+    refreshLayout();
+    pm.note = next ? KIT.voiceById(next).label : 'no sound';
+    pm.noteUntil = now() + 2000;
+    return;
+  }
+  editSetting('layout', delta);
+  pm.sel = -1;
+  pm.note = '';
+}
+
+/* Click on a preset: Custom becomes a copy of it, to edit. */
+function padMapClick() {
+  if (isCustom()) {
+    pm.sel = -1;
+    return;
+  }
+  if (settings.layout === 'sticking') return;
+  const from = padLayout.name;
+  customPads = PIO.copyPreset(settings.layout);
+  pm.edited = true;
+  settings.layout = PAD.CUSTOM;
+  settingsRowsCache = SET.settingsRows(settings);
+  saveSettings();
+  refreshLayout();
+  announce(`Custom: a copy of ${from}. Pick a pad, turn the jog to give it a sound.`);
+}
+
+function savePads() {
+  if (!pm.edited || !customPads) return;
+  if (writeFile(PADS_PATH, PIO.serialisePads(customPads))) pm.edited = false;
+}
+
+/* The pads an edit is landing on, lit on the grid. Flip leaves the pairing
+ * where it was: a twin is four columns away, a mirror image 7 - c, either way. */
+function padMapSelected() {
+  if (screen !== PADMAP || !isCustom() || pm.sel < 0) return null;
+  const row = Math.floor(pm.sel / PAD.COLS);
+  const out = [PAD.PAD_FIRST + pm.sel];
+  if (pm.both) out.push(PAD.padAt(row, PAD.pairCol(pm.sel % PAD.COLS, padLayout.pair)));
+  return out;
+}
+
+function padMapFooter() {
+  if (isCustom()) return pm.sel >= 0 ? 'JOG sound KNOB1 both' : 'PAD pick  JOG layout';
+  if (settings.layout === 'sticking') return 'JOG layout';
+  return 'PAD hear CLICK edit';
 }
 
 function loadPads() {
@@ -2227,6 +2330,7 @@ function leaveToMenu() {
   }
   untimed = null;
   card = null;
+  if (screen === PADMAP) savePads();
   screen = MENU;
   settingsEditing = false;
   quiz = null;
@@ -2249,6 +2353,7 @@ function back() {
   /* Up one folder; only the top of the tree is left by Back. */
   if (screen === MENU) return CAT.navPop(nav);
   if (screen === CARD) { card = null; screen = MENU; return true; }
+  if (screen === PADMAP) { savePads(); screen = SETTINGS; return true; }
   if (screen === PROGRESS_ITEM) { screen = PROGRESS; return true; }
   /* Back from a run RESTARTS it. Back again lands on READY, whose own Back
    * goes to the list — so leaving needs no gesture of its own. */
@@ -2450,6 +2555,17 @@ function draw() {
       message: lastError ? lastError.message : 'unknown',
       count: errCount,
       safeMode,
+    });
+    return;
+  }
+  if (screen === PADMAP) {
+    const sel = padMapSelected();
+    V.drawPadMap(ctx, {
+      title: pm.note && now() < pm.noteUntil ? pm.note : padLayout.name,
+      right: isCustom() ? (pm.both ? 'both' : 'one') : settings.flip ? 'flip' : '',
+      grid: padLayout.grid,
+      selected: sel ? sel.map((p) => p - PAD.PAD_FIRST) : [],
+      footer: padMapFooter(),
     });
     return;
   }
@@ -2876,6 +2992,10 @@ function midiInner(data) {
       else if (k === C.KNOB_COUNT - 1) changeSpeed(delta);
       return;
     }
+    if (screen === PADMAP) {
+      if (k === 0 && isCustom()) pm.both = !pm.both;
+      return;
+    }
     if (screen === SETTINGS) {
       const i = settingsRowForKnob(k);
       if (i < 0) return;
@@ -2916,6 +3036,8 @@ function jog(delta) {
     settingsSel = Math.max(0, Math.min(SET.ROWS.length - 1, settingsSel + delta));
   } else if (target === 'value') {
     editSetting(SET.ROWS[settingsSel].key, delta);
+  } else if (target === 'padmap') {
+    padMapJog(delta);
   } else if (target === 'page' && card) {
     card.page = Math.max(0, Math.min(card.pages.length - 1, card.page + delta));
   } else if (target === 'choice' && quiz) {
@@ -2938,7 +3060,16 @@ function jog(delta) {
 function click() {
   if (screen === MENU) { openRow(); return; }
   if (screen === CARD && card) { nextCard(); return; }
-  if (screen === SETTINGS) { settingsEditing = !settingsEditing; return; }
+  if (screen === SETTINGS) {
+    const row = SET.ROWS[settingsSel];
+    if (row && row.type === 'action') {
+      if (row.action === 'padmap') openPadMap();
+      return;
+    }
+    settingsEditing = !settingsEditing;
+    return;
+  }
+  if (screen === PADMAP) { padMapClick(); return; }
   if (screen === QUIZ && quiz && quiz.mode === 'pick') {
     const r = Q.pickChoice(quiz, now());
     if (r === 'right') quizSolvedAt = now();

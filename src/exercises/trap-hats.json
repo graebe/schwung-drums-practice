@@ -40,10 +40,10 @@
       "beat": 2,
       "voices": [
         "HH",
-        "SN"
+        "CL"
       ],
       "dyn": {
-        "SN": "accent"
+        "CL": "accent"
       }
     },
     {
