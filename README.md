@@ -790,20 +790,37 @@ teaching is.
 | --- | --- |
 | **Guess: drum** | a notehead sits on the staff; play it. Reading the legend — which line is the tom? |
 | **Hear: drum** | a drum sounds; play it back. The notation stays hidden until you get it, then it is revealed — which is where the teaching is |
-| **Pick: drum** | a drum sounds; name it from three near misses. The only drill that runs name-first, and the only one you can do in a room where you cannot make noise |
+| **Pick: drum** | a drum sounds; name it. The only drill that runs name-first, and the only one you can do in a room where you cannot make noise |
 | **Hear: subdivision** | a figure plays; is it eighths, triplets or sixteenths? Ear training for *time* |
-| **Pick: groove** | a groove plays; name it from three |
+| **Pick: groove** | a groove plays; name it |
 
 **The naming drills answer on the pads**, as Piano Practice does. In *Pick: drum*, *Hear:
-subdivision* and *Pick: groove* the bottom row of pads becomes the answers — one pad each, every
-other pad so a near miss lands on nothing, each in its own colour — and the screen names the colour
-beside each answer:
+subdivision* and *Pick: groove* the bottom row of pads becomes the answers, one pad each.
+
+**The answers never move.** A drill puts the same answers on the same pads for every question, in
+the same order, so once you know where *triplets* sits you can answer without looking. When the
+drill's whole set fits the bottom row (eight pads), every question offers all of it: the five
+subdivisions, the drums of the drill. Only a set bigger than the row (a long list of grooves)
+offers three near misses instead, and even those keep the set's order.
+
+Three answers or fewer sit on every other pad, so a near miss lands on nothing, each in its own
+colour, and the screen names the colour beside each answer:
+
+```
+ PICK: DRUM               3/20
+  Kick                  blue      ← the pad second from the left
+  Snare                 cyan      ← the middle one
+  Hi-hat                white     ← the one after
+      PAD answer  REC help
+```
+
+More answers fill the row from the left, and the screen draws them as the pads they sit on, with
+a short name each and the jog's choice spelled out underneath:
 
 ```
  HEAR: SUBDIVISION        3/20
-  Triplets              blue      ← the pad second from the left
-  Quarters              cyan      ← the middle one
-  Sextuplets            white     ← the one after
+  [4][8][3][16][6]                ← the five pads from the left
+        Triplets
       PAD answer  REC help
 ```
 
@@ -813,9 +830,9 @@ a drum — and the rows above them are still the kit. *Guess: drum* and *Hear: d
 kit, because their answer **is** a drum and the bottom row holds drums. The colours are piano's,
 less its orange, which on these pads already means *right drum, wrong hand*.
 
-The wrong options are always near misses — the drum either side of it on the staff, the
-subdivision either side of it, a groove with the same density — because three options where two
-are absurd is a quiz you pass by elimination without ever hearing the answer.
+When a set is too big for the row, the wrong options are near misses — the drum either side of it
+on the staff, the subdivision either side of it, a groove with the same density — because three
+options where two are absurd is a quiz you pass by elimination without ever hearing the answer.
 
 There is no *guess the subdivision* and no *guess the groove*: for both, the notation **is** the
 answer, so there would be nothing left to ask.

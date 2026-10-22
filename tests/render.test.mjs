@@ -777,6 +777,26 @@ test('the first Hear hint names the drum and still hides the staff', () => {
   assert.ok(after.includes('?'), 'and the staff is still withheld');
 });
 
+test('a pick drill with more answers than rows draws them as the pads they sit on', async () => {
+  const AP = await import('../src/answer_pads.mjs');
+  const Q = await import('../src/guess.mjs');
+  for (const [kind, n] of [['subdiv', 5], ['voice', 8]]) {
+    const quiz = createQuiz({ kind, mode: 'pick', seed: 3 });
+    assert.equal(quiz.options.length, n);
+    const { c, seen } = capture();
+    const rects = [];
+    const drawRect = c.drawRect.bind(c);
+    c.drawRect = (x, y, w, h, v) => { rects.push(x); return drawRect(x, y, w, h, v); };
+    drawQuiz(c, { quiz, labelFor: (id) => Q.labelFor(quiz, id), shortFor: (id) => Q.shortFor(quiz, id),
+      columnOf: (i) => AP.answerPads(n)[i] - 68, isEliminated: () => false, hintsLeft: 2, progress: '0/20' });
+    /* One cell per answer, in its pad's column: the chosen one filled, the rest outlined. */
+    const want = AP.answerPads(n).map((p) => (p - 68) * 16 + 1).filter((_, i) => i !== quiz.choice);
+    assert.deepEqual(rects.filter((x) => x < 128), want, kind);
+    for (const id of quiz.options) assert.ok(seen.includes(Q.shortFor(quiz, id)), `${kind}: ${id}`);
+    assert.ok(seen.includes(Q.labelFor(quiz, quiz.options[quiz.choice])), 'the jog\'s choice in full');
+  }
+});
+
 /* ---- The result screen, worst case ------------------------------------------- */
 
 test('the result screen draws nothing over anything else, at its worst', () => {

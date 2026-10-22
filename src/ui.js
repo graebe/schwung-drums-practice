@@ -3148,6 +3148,8 @@ function draw() {
       quiz, title: quizTitle, progress: Q.roundProgress(quiz),
       colours: answerBarActive() ? AP.COLOUR_NAMES : null,
       labelFor: (id) => Q.labelFor(quiz, id),
+      shortFor: (id) => Q.shortFor(quiz, id),
+      columnOf: (i) => AP.answerPads(quiz.options.length)[i] - PAD.PAD_FIRST,
       isEliminated: (i) => Q.isEliminated(quiz, i),
       hintsLeft: Q.hintsLeft(quiz),
       footer: hint,

@@ -327,6 +327,62 @@ export function drawLadder(ctx, s) {
 /* ---- Quiz --------------------------------------------------------------- */
 const PICK_ROW_Y = 15;
 const PICK_ROW_H = 12;
+/* Rows of 12 px fit three answers above the hint line. */
+const PICK_LIST_MAX = 3;
+
+/*
+ * Three answers or fewer: one row per answer, as Piano Practice lists them:
+ * the answer on the left, the colour of its pad on the right — the panel is
+ * one colour, so the pad's colour is named rather than shown — and the jog's
+ * choice inverted, as everywhere.
+ */
+function drawPickList(ctx, s) {
+  const q = s.quiz;
+  for (let i = 0; i < q.options.length; i++) {
+    const y = PICK_ROW_Y + i * PICK_ROW_H;
+    const selected = i === q.choice;
+    const v = selected ? 0 : 1;
+    if (selected) ctx.fillRect(0, y - 1, L.SCREEN_W, PICK_ROW_H, 1);
+    const colour = s.colours ? s.colours[i % s.colours.length] : '';
+    const cw = colour ? ctx.textWidth(colour) : 0;
+    const label = fit(ctx, s.labelFor(q.options[i]), L.SCREEN_W - 8 - cw - (cw ? 6 : 0));
+    ctx.text(4, y, label, v);
+    if (colour) ctx.text(L.SCREEN_W - 4 - cw, y, colour, v);
+    /* A struck-out option stays on screen, and its pad goes dark: seeing
+     * what you ruled out is part of what the hint teaches. */
+    if (s.isEliminated(i)) ctx.fillRect(2, y + 3, L.SCREEN_W - 4, 1, v);
+  }
+}
+
+/*
+ * More: the answer pads as they sit on the bottom row, each cell in its pad's
+ * column with a short name, and the jog's choice spelled out underneath. Past
+ * three a list of colour names stops being readable; the place carries the
+ * meaning — and since the answers never move, it is a place you learn.
+ */
+const PICK_CELL_W = 16;
+const PICK_CELL_H = 11;
+const PICK_CELL_Y = 20;
+const PICK_NAME_Y = 40;
+
+function drawPickMap(ctx, s) {
+  const q = s.quiz;
+  for (let i = 0; i < q.options.length; i++) {
+    const x = s.columnOf(i) * PICK_CELL_W;
+    const selected = i === q.choice;
+    if (selected) ctx.fillRect(x + 1, PICK_CELL_Y, PICK_CELL_W - 1, PICK_CELL_H, 1);
+    else ctx.drawRect(x + 1, PICK_CELL_Y, PICK_CELL_W - 1, PICK_CELL_H, 1);
+    const short = s.shortFor(q.options[i]);
+    const tw = ctx.textWidth(short);
+    ctx.text(x + 1 + ((PICK_CELL_W - 1 - tw) >> 1), PICK_CELL_Y + 2, short, selected ? 0 : 1);
+    if (s.isEliminated(i)) {
+      ctx.line(x + 2, PICK_CELL_Y + PICK_CELL_H - 2, x + PICK_CELL_W - 2, PICK_CELL_Y + 1, selected ? 0 : 1);
+    }
+  }
+  const name = fit(ctx, s.labelFor(q.options[q.choice]) || '', L.SCREEN_W - 4);
+  ctx.text((L.SCREEN_W - ctx.textWidth(name)) >> 1, PICK_NAME_Y, name, 1);
+}
+
 export function drawQuiz(ctx, s) {
   ctx.clear();
   const q = s.quiz;
@@ -336,26 +392,8 @@ export function drawQuiz(ctx, s) {
   ctx.fillRect(0, L.HEADER_RULE_Y, L.SCREEN_W, 1, 1);
 
   if (q.mode === 'pick') {
-    /*
-     * One row per answer, as Piano Practice lists them: the answer on the
-     * left, the colour of its pad on the right — the panel is one colour, so
-     * the pad's colour is named rather than shown — and the jog's choice
-     * inverted, as everywhere.
-     */
-    for (let i = 0; i < q.options.length; i++) {
-      const y = PICK_ROW_Y + i * PICK_ROW_H;
-      const selected = i === q.choice;
-      const v = selected ? 0 : 1;
-      if (selected) ctx.fillRect(0, y - 1, L.SCREEN_W, PICK_ROW_H, 1);
-      const colour = s.colours ? s.colours[i % s.colours.length] : '';
-      const cw = colour ? ctx.textWidth(colour) : 0;
-      const label = fit(ctx, s.labelFor(q.options[i]), L.SCREEN_W - 8 - cw - (cw ? 6 : 0));
-      ctx.text(4, y, label, v);
-      if (colour) ctx.text(L.SCREEN_W - 4 - cw, y, colour, v);
-      /* A struck-out option stays on screen, and its pad goes dark: seeing
-       * what you ruled out is part of what the hint teaches. */
-      if (s.isEliminated(i)) ctx.fillRect(2, y + 3, L.SCREEN_W - 4, 1, v);
-    }
+    if (q.options.length <= PICK_LIST_MAX) drawPickList(ctx, s);
+    else drawPickMap(ctx, s);
     drawHint(ctx, s.footer || (s.hintsLeft > 0 ? 'PAD answer  REC help' : 'PAD answer  CLICK ok'));
     return;
   } else {

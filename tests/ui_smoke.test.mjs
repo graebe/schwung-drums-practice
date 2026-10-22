@@ -2380,36 +2380,47 @@ function padNow(log) {
   return now;
 }
 
-test('a Pick drill puts its answers on the bottom row, named by colour on screen', async () => {
+test('a Pick drill puts its answers on the bottom row, every question in the same place', async () => {
   const AP = await import('../src/answer_pads.mjs');
-  for (const index of [2, 3, 4]) {
+  /* Pick: drum and Hear: subdivision fit the bar whole (8 drums, 5
+   * subdivisions); the groove pool does not, so it offers three near misses. */
+  for (const [index, count] of [[2, 8], [3, 5], [4, 3]]) {
     const { log } = await loadUi();
     globalThis.init();
     ticks(2);
     openQuiz(index);
     ticks(2);
-    const leds = padNow(log);
-    const row = [];
-    for (let p = 68; p < 76; p++) row.push(leds[p]);
+    const lit = () => {
+      const leds = padNow(log);
+      const row = [];
+      for (let p = 68; p < 76; p++) row.push(leds[p] === 0 ? 0 : 1);
+      return row;
+    };
+    const want = [0, 0, 0, 0, 0, 0, 0, 0];
+    for (const p of AP.answerPads(count)) want[p - 68] = 1;
+    assert.deepEqual(lit(), want, `${DRILLS[index].name}`);
     const bright = AP.ANSWER_COLOURS.map((c) => c.bright);
     const dim = AP.ANSWER_COLOURS.map((c) => c.dim);
-    assert.deepEqual(row.map((c) => c === 0 ? 0 : 1), [0, 1, 0, 1, 0, 1, 0, 0], `${DRILLS[index].name}: ${row}`);
-    for (const c of [row[1], row[3], row[5]]) assert.ok(bright.includes(c) || dim.includes(c), String(c));
-    const shown = drawnText(1);
-    for (const name of ['blue', 'cyan', 'white']) assert.ok(shown.includes(name), `${name}: ${shown.join('|')}`);
-    assert.ok(shown.includes('PAD answer  REC help'));
+    const leds = padNow(log);
+    for (const p of AP.answerPads(count)) assert.ok(bright.includes(leds[p]) || dim.includes(leds[p]), String(leds[p]));
+    if (count <= AP.LIST_MAX) {
+      const shown = drawnText(1);
+      for (const name of ['blue', 'cyan', 'white']) assert.ok(shown.includes(name), `${name}: ${shown.join('|')}`);
+    }
+    assert.ok(drawnText(1).includes('PAD answer  REC help'));
   }
 });
 
-test('an answer pad answers and sounds nothing; one of the three is right', async () => {
+test('an answer pad answers and sounds nothing; one of them is right', async () => {
+  const AP = await import('../src/answer_pads.mjs');
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  openQuiz(3);                               /* Hear: subdivision */
+  openQuiz(3);                               /* Hear: subdivision: all five on the bar */
   ticks(120);                                /* the prompt itself sounds: let it finish */
   const before = log.params.length;
   const flashes = [];
-  for (const p of [69, 71, 73]) {
+  for (const p of AP.answerPads(5)) {
     pad(p, 100); pad(p, 0);
     ticks(1);
     flashes.push(padNow(log)[p]);
