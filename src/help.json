@@ -100,12 +100,25 @@
       "lines": [
         "Left half is your left",
         "hand, right half your",
-        "right. Each voice owns a",
-        "block; any pad in it",
-        "counts.",
+        "right, in every layout.",
         "",
-        "kit       the whole kit",
-        "sticking  one surface"
+        "Settings > Pads:",
+        "MPC      the default",
+        "Family   a row a family",
+        "Centre   kick, snare in",
+        "         the middle",
+        "GM       Move's drum mode",
+        "Mirror   two-handed",
+        "Custom   your own",
+        "Sticking snare only",
+        "Flip mirrors it.",
+        "",
+        "Pad map: every pad",
+        "named. CLICK on a preset",
+        "copies it to Custom;",
+        "PAD picks, JOG sounds,",
+        "KNOB 1 both halves,",
+        "BACK saves pads.json."
       ]
     },
     {

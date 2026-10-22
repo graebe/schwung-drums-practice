@@ -20,6 +20,7 @@ for entry in \
   drums-practice/LICENSE \
   drums-practice/THIRD-PARTY-NOTICES.md \
   drums-practice/samples/drums.nisp \
+  drums-practice/samples/perc.nisp \
   drums-practice/samples/click.nisp \
   drums-practice/samples/LICENSES/CC-BY-4.0.txt \
   drums-practice/samples/LICENSES/CC0-1.0.txt
@@ -56,7 +57,7 @@ for f in "$MODDIR/ui.js" "$MODDIR"/*.mjs; do
 done
 # The packs are packs, not the LFS pointers a checkout without its objects
 # holds.
-for pack in drums click; do
+for pack in drums perc click; do
   if [ "$(head -c 4 "$MODDIR/samples/$pack.nisp")" != NISP ]; then
     echo "samples/$pack.nisp in the package is not a pack" >&2
     rm -rf "$TMPD"; exit 1

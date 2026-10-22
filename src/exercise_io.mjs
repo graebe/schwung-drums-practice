@@ -10,8 +10,8 @@
  * typo in a file is worse than the file simply not appearing.
  */
 
-import { isVoice, VOICE_IDS } from './kit.mjs';
-import { layoutVoices, LAYOUT_IDS } from './padmap.mjs';
+import { isVoice, VOICE_IDS, voicesInChart } from './kit.mjs';
+import { layoutVoices, PRESET_IDS } from './padmap.mjs';
 import { merge } from './events.mjs';
 import { DEFAULT_REPEATS, practiceSeconds, practiceBars } from './chart.mjs';
 
@@ -182,10 +182,12 @@ export function parseManifest(text, name = 'index.json') {
  * with nothing on screen to say why. That is worth saying BEFORE the count-in
  * rather than discovering at the summary.
  */
+export const MAX_CHART_VOICES = 9;
+
 export function playabilityWarnings(chart) {
   const out = [];
   const reachable = new Set();
-  for (const layout of LAYOUT_IDS) for (const v of layoutVoices(layout)) reachable.add(v);
+  for (const layout of PRESET_IDS) for (const v of layoutVoices(layout)) reachable.add(v);
 
   const unreachable = [];
   for (const e of chart.events) {
@@ -194,6 +196,11 @@ export function playabilityWarnings(chart) {
     }
   }
   if (unreachable.length) out.push(`no pad for ${unreachable.join(' ')}`);
+
+  /* The tab view gives each voice a lane of a 36-pixel band: past nine the
+   * lanes are too thin to read a note in. */
+  const voices = voicesInChart(chart).length;
+  if (voices > MAX_CHART_VOICES) out.push(`${voices} drums, more than ${MAX_CHART_VOICES} to read`);
 
   if (chart.sticking !== 'off') {
     const withHand = chart.events.filter((e) => e.hand).length;

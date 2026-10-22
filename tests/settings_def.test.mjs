@@ -9,7 +9,12 @@ import * as L from '../src/layout.mjs';
 test('every row is complete and every default is in range', () => {
   for (const row of S.ROWS) {
     assert.ok(row.key && row.label, `${row.key} needs a label`);
-    assert.ok(['int', 'bool', 'list', 'wrap'].includes(row.type), `${row.key} type`);
+    assert.ok(['int', 'bool', 'list', 'wrap', 'action'].includes(row.type), `${row.key} type`);
+    if (row.type === 'action') {
+      assert.ok(row.action, `${row.key} opens nothing`);
+      assert.equal(S.DEFAULTS[row.key], undefined, 'an action holds no value');
+      continue;
+    }
     const v = S.DEFAULTS[row.key];
     assert.notEqual(v, undefined, `${row.key} has no default`);
     if (row.type === 'int') {
@@ -59,9 +64,9 @@ test('Reps is an override, and defaults to what the file says', () => {
 });
 
 test('a list stops at its ends rather than wrapping', () => {
-  const s = { ...S.DEFAULTS, layout: 'kit' };
+  const s = { ...S.DEFAULTS, layout: 'mpc' };
   S.applySetting(s, 'layout', -5);
-  assert.equal(s.layout, 'kit');
+  assert.equal(s.layout, 'mpc');
   S.applySetting(s, 'layout', 9);
   assert.equal(s.layout, 'sticking');
 });
@@ -117,6 +122,7 @@ test('every row formats, and label plus value fits the row', () => {
   for (const row of S.ROWS) {
     const vals = row.type === 'bool' ? [true, false]
       : row.type === 'int' ? [row.min, row.max]
+      : row.type === 'action' ? [undefined]
       : row.values;
     for (const v of vals) {
       const out = S.formatValue(row, v);
@@ -136,6 +142,23 @@ test('the defaults are the ones the README promises', () => {
   assert.equal(S.DEFAULTS.strictness, 'normal');
   assert.equal(S.DEFAULTS.midiCh, 0, 'broadcast: a channel mismatch is silent');
   assert.equal(S.DEFAULTS.midiOut, 4, 'the built-in kit, so nothing has to be set up');
+  assert.equal(S.DEFAULTS.layout, 'mpc', 'MPC Classic, what most finger drummers learnt on');
+  assert.equal(S.DEFAULTS.flip, false);
+});
+
+test('the v4 migration moves the old kit layout to MPC Classic, keeps Sticking, saves no action', () => {
+  const old = S.loadSettings(JSON.stringify({ version: 3, layout: 'kit', bpm: 100 }));
+  assert.equal(old.settings.layout, 'mpc');
+  assert.equal(old.settings.bpm, 100);
+  assert.equal(old.changed, true);
+  assert.equal(S.loadSettings(JSON.stringify({ version: 3, layout: 'sticking' })).settings.layout, 'sticking');
+  const saved = JSON.parse(S.serialiseSettings(old.settings));
+  assert.equal(saved.version, 4);
+  assert.ok(!('padMap' in saved), 'the Pad map row is not a setting');
+  assert.equal(S.loadSettings(S.serialiseSettings(old.settings)).changed, false);
+  const s = { ...S.DEFAULTS };
+  S.applySetting(s, 'padMap', 1);
+  assert.deepEqual(s, { ...S.DEFAULTS }, 'turning an action row changes nothing');
 });
 
 test('the v2 migration moves a stale staff default to drum tab, once', () => {

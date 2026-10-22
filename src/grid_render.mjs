@@ -17,7 +17,7 @@
 
 import * as L from './layout.mjs';
 import { voiceById } from './kit.mjs';
-import { drawX, drawRing, rowsToRuns } from './glyphs.mjs';
+import { drawHead, drawRing, rowsToRuns } from './glyphs.mjs';
 
 /* Lane geometry for a set of voices. Pure, so the tests can check it without
  * drawing anything. */
@@ -160,7 +160,7 @@ export function drawCell(ctx, x, lane, state, head = 'note', dyn = 'normal', spa
   if (head === 'note') {
     drawDisc(ctx, cx, cy, w);
   } else {
-    drawX(ctx, cx, cy, w);
+    drawHead(ctx, head === 'circled-x' ? 'x' : head, cx, cy, w);
   }
 
   if (state === 'missed') {

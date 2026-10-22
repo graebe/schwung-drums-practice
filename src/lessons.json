@@ -11,6 +11,11 @@
       "text": "Each row is one drum. Kick at the bottom, snare in the middle, cymbals on top, as on any drum chart. Stuck for a pad? Record twice is a hint that lights it."
     },
     {
+      "id": "your-pads",
+      "title": "Your pads",
+      "text": "MPC Classic: kick, snare and hats along the bottom row, cymbals on top. Settings > Pads picks another layout, Flip mirrors it, Pad map names every pad."
+    },
+    {
       "id": "pulse",
       "title": "The pulse",
       "text": "Music has a steady beat you could clap to: the pulse. Count it out loud, 1 2 3 4. Steady matters more than fast."

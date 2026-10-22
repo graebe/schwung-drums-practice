@@ -404,7 +404,8 @@ re-read at any time.
 | Card | Steps | Text |
 |---|---|---|
 | Stage 0: Hello, kit | stage | Three drums make a beat: kick (low thump), snare (crack), hi-hat (tick). Find them, then play your first beat today. |
-| The kit on paper | 0.1–0.2 | Each row is one drum. Kick at the bottom, snare in the middle, cymbals on top — as on any drum chart. Same order on the pads: kick bottom-left. |
+| The kit on paper | 0.1–0.2 | Each row is one drum. Kick at the bottom, snare in the middle, cymbals on top — as on any drum chart. |
+| Your pads | 0.1 | MPC Classic: kick, snare and hats along the bottom row, cymbals on top. Settings › Pads picks another layout, Flip mirrors it, Pad map names every pad. |
 | The pulse | 0.3 | Music has a steady beat you could clap to. Count it: 1 2 3 4. Steady matters more than fast. |
 | Your result | 0.3 | % right: right pad, right time. s12: your spread in ms — smaller is steadier. +3ms: a little late; minus is early. |
 | Rests | 0.4 | A rest is a beat you count but do not play. Keep counting through it — the next note depends on it. |
@@ -524,10 +525,15 @@ Generators (`src/generator.mjs`, seeded, same chart shape as today):
 | `group:3` / `group:5` | 16ths accented every 3/5 |
 | `displace:<groove>:<n16>` | a groove shifted by n 16ths |
 
-JSON (`src/exercises/`): `first-beat` (HH 1 2 3 4, KK 1 3, SN 2 4, 70); `eighth-beat` (HH 8ths,
-KK 1 3, SN 2 4, 80); `blues-12-8`; `ballad-6-8`; `son-clave-3-2` (SN 0, 1.5, 3 | 5, 6 + KK 1 and 3);
-`son-clave-2-3`; `rumba-clave-3-2` (SN 0, 1.5, 3.5 | 5, 6); `groove-5-4`; `groove-7-8`. Named by
-style, never by record or player.
+JSON (`src/exercises/`): `first-beat` (HH 1 2 3 4, KK 1 3, SN 2 4, 70) ◆; `eighth-beat` (HH 8ths,
+KK 1 3, SN 2 4, 80) ◆; `blues-12-8`; `ballad-6-8`; `son-clave-3-2` (**RM**, the cross-stick:
+0, 1.5, 3 | 5, 6 + KK 1 and 3); `son-clave-2-3`; `rumba-clave-3-2` (RM 0, 1.5, 3.5 | 5, 6);
+`groove-5-4`; `groove-7-8`. Named by style, never by record or player.
+
+The kit has 21 voices since 2026-10-22: the clave is written on the rim (`RM`), the songo and
+mozambique bell on the cowbell (`P1`, done), house and trap backbeats on the clap (`CL`, done), bossa
+nova and reggae one-drop's cross-stick on the rim (done). Planned: a Stage-1 quiz on the rest of the
+kit — tambourine, shaker, cowbell, China, the second kick and snare — once the nine are known.
 
 Clock variants (`src/controls.mjs` `clickMuted` grows a pattern): `gap1`, `gap2`, `gap4`
 (today), `24` (click on 2 & 4), `off` (click on the "&"s), `bar` (one click per 2 bars).

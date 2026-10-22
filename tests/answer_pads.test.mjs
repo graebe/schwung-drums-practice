@@ -66,7 +66,7 @@ test('struck answers go dark, and the jog answer pulses in its own hue', () => {
 test('the bar owns the bottom row and nothing else; a judgement still shows over it', () => {
   const out = new Array(32);
   const pads = answerPads(3);
-  const state = { layout: 'kit', held: new Set([PAD_FIRST + 1, PAD_FIRST + 9]), flash: null,
+  const state = { layout: 'mpc', held: new Set([PAD_FIRST + 1, PAD_FIRST + 9]), flash: null,
     answerPads: pads, answerColours: [16, 14, 120] };
   paint(out, state);
   assert.deepEqual(out.slice(0, 8), [0, 16, 0, 14, 0, 120, 0, 0]);

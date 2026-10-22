@@ -1,0 +1,32 @@
+# The hand percussion the drum kit has none of: one hit each from the
+# Versilian Community Sample Library (VCSL, CC0-1.0, https://github.com/sgossner/VCSL)
+# at the commit the claves come from, fetched by sha256 in
+# scripts/build-samples.sh. Each sample lands on its General MIDI note, the
+# voice's `gm` in src/kit.mjs. Credits: THIRD-PARTY-NOTICES.md. volume_db
+# brings each to within a few dB of the synthesized voice it falls back to
+# (dsp/drums tests::the_recorded_kit_keeps_the_balance).
+budget_mb = 1.0
+one_shot = true
+max_seconds = [[0, 1.2]]
+fade_ms = 80
+
+[[sample]]
+file = "Clap_rr1.wav"                 # CL, hand clap
+key = 39
+volume_db = -6
+
+[[sample]]
+file = "Tamb1_Hit_v2_rr1_Mid.wav"     # P2, tambourine
+key = 54
+volume_db = 3
+
+[[sample]]
+file = "Cowbell1_Hit_v3_rr1_Mid.wav"  # P1, cowbell
+key = 56
+volume_db = 7
+
+[[sample]]
+file = "LShaker_Hit_rr1_Mid.wav"      # SH, shaker (the large one: VCSL's small
+                                      # shaker files carry a WAVE header nisp-build
+                                      # does not read)
+key = 70

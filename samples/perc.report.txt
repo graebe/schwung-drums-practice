@@ -1,0 +1,6 @@
+samples/perc.nisp: 4 zones, 0.24 MB, 2.7 s of audio, scale +7.6 dB
+
+         key  39-39  root  39 vel   1-127 rr 1/1    0.40 s  peak   -1.0 dBFS  mics 1
+         key  54-54  root  54 vel   1-127 rr 1/1    0.99 s  peak  -10.9 dBFS  mics 1
+         key  56-56  root  56 vel   1-127 rr 1/1    0.71 s  peak   -8.5 dBFS  mics 1
+         key  70-70  root  70 vel   1-127 rr 1/1    0.64 s  peak   -8.2 dBFS  mics 1

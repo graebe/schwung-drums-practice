@@ -79,60 +79,101 @@ fingers, in the same way its sister module is a reading trainer rather than a pi
 
 ## The kit
 
-Nine voices, at their standard positions on the staff. This is the whole vertical vocabulary, and
-unlike a pitch it is learned in an evening — which is the point. On drums the difficulty is in the
-horizontal axis.
+Twenty-one voices: the sixteen General MIDI drums from 36 to 51, and Kick 2, China, tambourine,
+cowbell and shaker — a whole kit, every sound recorded. The vertical vocabulary is still learned
+in an evening, which is the point: on drums the difficulty is in the horizontal axis. The drills
+are written in the nine voices drum charts are made of (bold below), and a beginner meets only
+those; the rest are there for the grooves that need them and for your own.
 
-| | Voice | Staff | Head | Stem |
-| --- | --- | --- | --- | --- |
-| `CR` | Crash | above the staff | circled ✗ | up |
-| `HH` | Hi-hat | above the staff | ✗ | up |
-| `HO` | Hi-hat, open | above the staff | circled ✗ | up |
-| `RD` | Ride | top line | ✗ | up |
-| `HT` | High tom | 4th space | ● | up |
-| `SN` | Snare | 3rd space | ● | up |
-| `LT` | Low tom | 2nd space | ● | up |
-| `KK` | Kick | bottom space | ● | **down** |
-| `HF` | Hi-hat pedal | below the staff | ✗ | **down** |
+| | Voice | GM | Staff | Head | Stem |
+| --- | --- | --- | --- | --- | --- |
+| **`CR`** | **Crash** | 49 | A5, ledger | circled ✗ | up |
+| `FX` | China | 52 | A5, ledger | ✗ | up |
+| `P1` | Cowbell | 56 | A5, ledger | triangle | up |
+| **`HH`** | **Hi-hat** | 42 | G5 | ✗ | up |
+| **`HO`** | **Hi-hat, open** | 46 | G5 | circled ✗ | up |
+| `P2` | Tambourine | 54 | G5 | triangle | up |
+| `SH` | Shaker | 70 | G5 | slash | up |
+| **`RD`** | **Ride** | 51 | top line | ✗ | up |
+| **`HT`** | **High tom** | 50 | 4th space | ● | up |
+| `HM` | Hi-mid tom | 48 | 4th line | ● | up |
+| **`SN`** | **Snare** | 38 | 3rd space | ● | up |
+| `RM` | Rim (cross-stick) | 37 | 3rd space | ✗ | up |
+| `CL` | Clap | 39 | 3rd space | circled ✗ | up |
+| `S2` | Snare 2 | 40 | 3rd space | diamond | up |
+| `MT` | Mid tom | 47 | 3rd line | ● | up |
+| **`LT`** | **Low tom** | 45 | 2nd space | ● | up |
+| `F1` | Floor tom | 43 | 2nd line | ● | up |
+| `F2` | Low floor tom | 41 | bottom space | ● | up |
+| **`KK`** | **Kick** | 36 | bottom space | ● | **down** |
+| `K2` | Kick 2 | 35 | bottom line | ● | **down** |
+| **`HF`** | **Hi-hat pedal** | 44 | below the staff | ✗ | **down** |
 
-Stems up are hands, stems down are feet. That is how a drum chart is engraved and it costs one
-line of code to honour.
+Stems up are hands, stems down are feet. That is how a drum chart is engraved. Five lines cannot
+give six toms a space each and keep the nine voices where every chart has always had them, and
+nothing fits above the crash's ledger on a 64-pixel staff — so voices that share a place differ by
+their head or their stem, and no two share all three. In the tab view, each voice has its own lane.
 
-The hi-hat pedal `HF` has a pad in the kit layout (third row, first column), because the jazz and
-Latin grooves need it — a hat foot on 2 and 4 is what a swing ride sits on. A drill that asks for a
-voice the current layout cannot reach says so before it starts.
+A voice is its GM note everywhere: the module plays its recording by it, MIDI out sends it, and the
+Chromatic layout is laid out by it. Bossa nova and reggae one-drop play their cross-stick on the rim,
+songo and mozambique their bell on the cowbell, house and trap their backbeat on the clap; takes
+played before 2026-10-22 had those on the snare and the ride.
 
 ## The pads
 
-**The kit is laid out in Ableton's Drum Rack order.** Move puts a Drum Rack on the left 16 pads as
-a 4×4, and a Drum Rack is General MIDI from C1 upward, left to right and bottom to top — which is
-why the kick is the bottom-left corner on every Move kit there is. This module uses the same
-order, so what your hands learn here works in Move's own kits and back again.
+The pads are the finger drummer's. **Settings › Pads** chooses the layout, **Flip** mirrors it left to
+right for a left-hander, and **Settings › Pad map** shows every pad's drum on screen.
 
 ```
-      GM 48       49        50        51
-        HT        CR        HT        RD        │  and the same four columns
-      GM 44       45        46        47        │  again under the right hand
-        HF        LT        HO        HT        │
-      GM 40       41        42        43        │  the order reads left to
-        SN        LT        HH        LT        │  right, so it is repeated
-      GM 36       37        38        39        │  rather than mirrored
-      ► KK        SN        SN        SN        │
+ MPC Classic (default)  MPC Family Rows     MPC Centre Core     Chromatic GM 36-51
+ CR RD P1 FX            CR RD P1 P2         CR MT FX RD         HM CR HT RD
+ LT MT HT P2            HH HO HF SH         SH HH HO HF         HF LT HO MT
+ K2 CL RM HF            SN S2 CL RM         P1 KK SN P2         S2 F2 HH F1
+ KK SN HH HO            KK K2 LT HT         LT RM CL HT         KK RM SN CL
 ```
 
-Nine voices do not fill sixteen General MIDI slots, so a slot with no exact match takes the
-nearest voice that has one — a rim shot and a hand clap are struck on the snare, three GM toms
-share two. No pad is dead, and the three the Basics need sit together in the bottom-left corner:
-**kick** at 36, **snare** at 38, **closed hi-hat** at 42 directly above it.
+These four are 4×4s that the right half of the grid **duplicates**: the left half is where Move's own
+drum mode puts its Drum Rack, and the copy keeps every sound under either hand, which sticking
+needs. **MPC Classic** is the default: kick, snare and hats along the bottom row under the strongest
+fingers, from the corner, cymbals on top, toms between — the layout most finger drummers learnt
+on. Its shaker pad holds the **hat foot**, because the jazz and Latin grooves need one. **Chromatic**
+is General MIDI 36–51 bottom left to top right, note for note what Move's drum mode and a Live Drum
+Rack play, so it carries straight into Move's own kits; it has no room for the cowbell, and songo
+and mozambique say `NO P1 ON PADS` on it.
 
-The grid is split down the middle — columns 1–4 are your left hand, 5–8 your right — and the right
-half repeats the left rather than reflecting it. Every voice is therefore reachable with either
-hand, which is what makes sticking scoreable, while the Ableton order still reads the right way
-round under both.
+```
+ Mirrored Performance
+ SH FX | CR P1 P2 RD | FX SH
+ HM HT | HH HO HO HH | HT HM
+ MT RM | LT SN CL HT | RM MT
+ HF F1 | KK SN SN KK | F1 HF
+```
 
-**Kit** in settings switches to `sticking`, where every pad is the snare and the only questions are
-which hand and when. That is the layout for rudiments. (The quiz always uses the kit layout: it asks
-about drums, and in `sticking` every pad is the snare.)
+**Mirrored** is a two-handed kit centred on columns 3–6, each hand the mirror of the other, the
+extension — toms, China, shaker, the hat foot — on the outer columns. **Sticking** puts the snare on
+every pad: the only questions are which hand and when, which is the layout for rudiments. A drum
+quiz asks about drums, so under Sticking it plays on MPC Classic.
+
+**The hand split.** Columns 1–4 are your left hand, 5–8 your right, whatever the layout and whether it
+is flipped. So `RLRR LRLL` is not a suggestion printed under the staff — it is checked, and a wrong
+hand is its own kind of error, counted apart from a missed note.
+
+**Custom** is one layout of your own. In the Pad map, a pad sounds and names its drum, the jog steps
+through the layouts, and **Click** on a preset makes Custom a copy of it. On Custom, press a pad to
+pick it and turn the jog to give it a sound (or none); **knob 1** says whether the edit lands on both
+halves — on the same finger of the other hand for a copied 4×4, on the mirror image for a copied
+Mirrored. **Back** saves it to `pads.json` beside the module:
+
+```json
+{ "version": 1, "pair": "twin",
+  "rows": ["CR RD P1 FX CR RD P1 FX", "LT MT HT P2 LT MT HT P2",
+           "K2 CL RM HF K2 CL RM HF", "KK SN HH HO KK SN HH HO"] }
+```
+
+Eight voice ids a row, top row first, `.` for a pad with no sound. It doubles as export and import:
+copy it off the Move, edit it, copy it back. A file that will not read says `BAD PADS.JSON` and plays
+MPC Classic until Custom is saved again. A drill that asks for a drum your layout has no pad for
+names it on the ready screen (`NO HF ON PADS`) before you start.
 
 ### Colours
 
@@ -769,7 +810,9 @@ mapping rather than having to remember it.
 | Tempo | 90 | the tempo of the generated drills in Basics |
 | Speed | **100%** | every drill at this share of its own tempo, 50–120%. Also knob 8 in a drill |
 | Read ahead | 32 | pixels per beat: how far ahead the chart shows |
-| Kit | **kit** | the pad layout; `sticking` puts the snare on every pad |
+| Pads | **MPC** | the pad layout: `MPC` Classic, `Family`, `Centre`, `GM` chromatic, `Mirror`, `Custom`, `Sticking` (the snare on every pad) |
+| Flip | off | mirror the layout left to right; the hands stay the physical halves |
+| Pad map | › | every pad's drum on screen, and the Custom editor |
 | View | **grid** | `grid` is drum tab — what a drummer reads; `staff` is real percussion notation, for reading practice |
 | Strict | **normal** | the timing windows, above |
 | Sticking | **strict** | `strict` counts a wrong hand as its own error; `loose` shows it amber but does not count it; `off` ignores hands, which is right for grooves |
@@ -905,7 +948,7 @@ Everything except `ui.js` is pure and runs under plain `node`.
 | File | |
 | --- | --- |
 | `src/ui.js` | host glue only: lifecycle, MIDI, LEDs, settings, state machine |
-| `src/kit.mjs` | the nine voices — staff position, notehead, stem, DSP channel |
+| `src/kit.mjs` | the 21 voices — GM note, staff position, notehead, stem |
 | `src/layout.mjs` | every screen coordinate, in one leaf module |
 | `src/notation.mjs` | staff placement and ledger lines |
 | `src/catalog.mjs` | the drill tree and how the list walks it |
@@ -924,7 +967,8 @@ Everything except `ui.js` is pure and runs under plain `node`.
 | `src/timing.mjs` | mean, σ and the per-voice breakdown |
 | `src/generator.mjs` | seeded procedural drills |
 | `src/exercise_io.mjs` | JSON loading and validation |
-| `src/padmap.mjs` | the zoned pad grid and the hand split |
+| `src/padmap.mjs` | the pad layouts, Flip and the hand split |
+| `src/pads_io.mjs` | the Custom layout as `pads.json` |
 
 ### The DSP
 
@@ -999,11 +1043,12 @@ ask:
 
 - **Kit:** [Naked Drums](https://github.com/sfzinstruments/WilkinsonAudio.NakedDrums) by
   **Wilkinson Audio**, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/);
-  the SFZ edition by kinwie. **Modified:** nine pieces of its "CR" mix, folded to mono and
+  the SFZ edition by kinwie. **Modified:** seventeen pieces of its "CR" mix, folded to mono and
   rebalanced so every voice is clear on the Move, four of ten round robins, tails shortened with
-  a fade.
-- **Metronome:** claves from the [Versilian Community Sample Library](https://github.com/sgossner/VCSL)
-  by Versilian Studios, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+  a fade, the smallest tom pitched up for the high tom and the kick down for Kick 2.
+- **Hand percussion and metronome:** clap, tambourine, cowbell, shaker and claves from the
+  [Versilian Community Sample Library](https://github.com/sgossner/VCSL) by Versilian Studios,
+  [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
 
 Neither author endorses this module. The licence texts ship in the tarball under
 `samples/LICENSES/`, and [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) has the details. The

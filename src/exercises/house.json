@@ -36,11 +36,11 @@
       "beat": 1,
       "voices": [
         "HH",
-        "SN",
+        "CL",
         "KK"
       ],
       "dyn": {
-        "SN": "accent"
+        "CL": "accent"
       }
     },
     {
@@ -84,11 +84,11 @@
       "beat": 3,
       "voices": [
         "HH",
-        "SN",
+        "CL",
         "KK"
       ],
       "dyn": {
-        "SN": "accent"
+        "CL": "accent"
       }
     },
     {

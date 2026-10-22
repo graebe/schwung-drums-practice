@@ -64,23 +64,28 @@ cymbals, licensed under
 kinwie, <https://github.com/sfzinstruments/WilkinsonAudio.NakedDrums>
 (commit 407732a).
 
-**Modified:** nine pieces (crash, closed / open / pedal hi-hat, ride, 12" and
-16" toms, snare, kick) taken from the "CR" mix — direct mics, overheads and
-close room — summed to mono at that preset's own levels, then rebalanced
-between pieces (+6 to +14 dB against the snare), all velocity layers and four
-of the ten round robins, the silence before each hit trimmed and the tails
-ended at 0.8–3.5 s with a fade; by Piano Practice's `tools/nisp-build` from
-`samples/drums.manifest.toml`. Licensor endorsement is neither claimed nor
-implied.
+**Modified:** seventeen pieces (crash, China, closed / open / pedal hi-hat,
+ride, the five toms, snare, second snare, side stick, kick) taken from the
+"CR" mix — direct mics, overheads and close room — summed to mono at that
+preset's own levels, then rebalanced between pieces (+6 to +16 dB against the
+snare), all velocity layers and four of the ten round robins, the silence
+before each hit trimmed and the tails ended at 0.8–3.5 s with a fade; the
+smallest tom also pitched up three semitones for the high tom, and the kick
+down a whole tone for a second kick; by Piano Practice's `tools/nisp-build`
+from `samples/drums.manifest.toml`. Licensor endorsement is neither claimed
+nor implied.
 
-## VCSL claves — CC0-1.0
+## VCSL claves and hand percussion — CC0-1.0
 
-The metronome (`samples/click.nisp`, shared with Piano Practice) is two claves
-from the **Versilian Community Sample Library** by Versilian Studios
-(<https://github.com/sgossner/VCSL>, commit c1ea7bc), dedicated to the public
-domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
-(text: `samples/LICENSES/CC0-1.0.txt`). No credit is required; it is given
-anyway.
+The metronome (`samples/click.nisp`, shared with Piano Practice) is two claves,
+and the hand percussion (`samples/perc.nisp`: hand clap, tambourine, cowbell,
+large shaker) one hit each, from the **Versilian Community Sample Library** by
+Versilian Studios (<https://github.com/sgossner/VCSL>, commit c1ea7bc),
+dedicated to the public domain under
+[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) (text:
+`samples/LICENSES/CC0-1.0.txt`). No credit is required; it is given anyway.
+The percussion is cut by `tools/nisp-build` from `samples/perc.manifest.toml`,
+levelled against the kit.
 
 ## The drills
 

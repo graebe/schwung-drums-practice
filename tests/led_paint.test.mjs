@@ -10,9 +10,9 @@ const buf = () => new Array(P.PAD_COUNT).fill(-1);
 const at = (out, pad) => out[pad - P.PAD_FIRST];
 
 test('a pad with no voice stays dark, one with a voice is dimly lit', () => {
-  const out = paint(buf(), { layout: 'kit' });
+  const out = paint(buf(), { layout: 'mpc' });
   for (let pad = P.PAD_FIRST; pad <= P.PAD_LAST; pad++) {
-    assert.equal(at(out, pad), P.padVoice(pad, 'kit') ? P.LED_VOICE : P.LED_OFF);
+    assert.equal(at(out, pad), P.padVoice(pad, 'mpc') ? P.LED_VOICE : P.LED_OFF);
   }
 });
 
@@ -20,7 +20,7 @@ test('a judgement outranks the finger that caused it', () => {
   /* The press is still down when the verdict arrives; showing the finger
    * would hide the answer exactly when it is useful. */
   const out = paint(buf(), {
-    layout: 'kit',
+    layout: 'mpc',
     held: { has: (p) => p === 80 },
     flash: { pads: [80], color: P.LED_MISS },
   });
@@ -29,7 +29,7 @@ test('a judgement outranks the finger that caused it', () => {
 
 test('the finger outranks the guidance', () => {
   const out = paint(buf(), {
-    layout: 'kit',
+    layout: 'mpc',
     held: { has: (p) => p === 80 },
     targets: [{ voice: 'SN', hand: null, beatsAway: 0.1 }],
   });
@@ -56,10 +56,10 @@ test('wrong hand and wrong dynamic each have their own colour, told apart from a
 });
 
 test('guidance brightens as the hit approaches, and stops when it is far off', () => {
-  const near = paint(buf(), { layout: 'kit', targets: [{ voice: 'SN', beatsAway: 0.1 }] });
-  const far = paint(buf(), { layout: 'kit', targets: [{ voice: 'SN', beatsAway: 1.0 }] });
-  const away = paint(buf(), { layout: 'kit', targets: [{ voice: 'SN', beatsAway: 8 }] });
-  const snare = P.padsForVoice('SN', 'kit')[0];
+  const near = paint(buf(), { layout: 'mpc', targets: [{ voice: 'SN', beatsAway: 0.1 }] });
+  const far = paint(buf(), { layout: 'mpc', targets: [{ voice: 'SN', beatsAway: 1.0 }] });
+  const away = paint(buf(), { layout: 'mpc', targets: [{ voice: 'SN', beatsAway: 8 }] });
+  const snare = P.padsForVoice('SN', 'mpc')[0];
   assert.equal(at(near, snare), P.LED_TARGET_NEAR);
   assert.equal(at(far, snare), P.LED_TARGET_FAR);
   assert.equal(at(away, snare), P.LED_VOICE, 'a hit eight beats out is not guidance');
@@ -67,22 +67,22 @@ test('guidance brightens as the hit approaches, and stops when it is far off', (
 
 test('guidance lights only the hand being asked for', () => {
   /* Lighting both halves would answer the question the drill is asking. */
-  const out = paint(buf(), { layout: 'kit', targets: [{ voice: 'SN', hand: 'R', beatsAway: 0.1 }] });
-  for (const pad of P.padsForVoice('SN', 'kit', 'R')) assert.equal(at(out, pad), P.LED_TARGET_NEAR);
-  for (const pad of P.padsForVoice('SN', 'kit', 'L')) assert.equal(at(out, pad), P.LED_VOICE);
+  const out = paint(buf(), { layout: 'mpc', targets: [{ voice: 'SN', hand: 'R', beatsAway: 0.1 }] });
+  for (const pad of P.padsForVoice('SN', 'mpc', 'R')) assert.equal(at(out, pad), P.LED_TARGET_NEAR);
+  for (const pad of P.padsForVoice('SN', 'mpc', 'L')) assert.equal(at(out, pad), P.LED_VOICE);
 });
 
 test('painting allocates nothing — it fills the array it was given', () => {
   /* It runs on every LED frame; the pitched module records killing a
    * 34k-allocations-per-second path of exactly this shape. */
   const out = buf();
-  const same = paint(out, { layout: 'kit', targets: [{ voice: 'KK', beatsAway: 0.2 }] });
+  const same = paint(out, { layout: 'mpc', targets: [{ voice: 'KK', beatsAway: 0.2 }] });
   assert.equal(same, out);
 });
 
 test('dark blanks everything, whatever else is set', () => {
   const out = paint(buf(), {
-    layout: 'kit', dark: true, held: { has: () => true },
+    layout: 'mpc', dark: true, held: { has: () => true },
     flash: { pads: [70], color: P.LED_HIT },
   });
   assert.ok(out.every((c) => c === P.LED_OFF));
@@ -135,21 +135,21 @@ test('a stack points at every voice in it', () => {
 });
 
 test('a stuck drum pulses on its own pads, and only on the hand asked for', () => {
-  const sn = P.padsForVoice('SN', 'kit');
-  const on = paint(buf(), { layout: 'kit', stuck: [{ voice: 'SN', hand: null }], phase: 1 });
-  const off = paint(buf(), { layout: 'kit', stuck: [{ voice: 'SN', hand: null }], phase: 0 });
+  const sn = P.padsForVoice('SN', 'mpc');
+  const on = paint(buf(), { layout: 'mpc', stuck: [{ voice: 'SN', hand: null }], phase: 1 });
+  const off = paint(buf(), { layout: 'mpc', stuck: [{ voice: 'SN', hand: null }], phase: 0 });
   for (const p of sn) {
     assert.equal(at(on, p), P.LED_PROMPT);
     assert.equal(at(off, p), P.LED_OFF, 'it pulses rather than sitting steady');
   }
-  const right = paint(buf(), { layout: 'kit', stuck: [{ voice: 'SN', hand: 'R' }], phase: 1 });
-  for (const p of P.padsForVoice('SN', 'kit', 'L')) assert.notEqual(at(right, p), P.LED_PROMPT);
+  const right = paint(buf(), { layout: 'mpc', stuck: [{ voice: 'SN', hand: 'R' }], phase: 1 });
+  for (const p of P.padsForVoice('SN', 'mpc', 'L')) assert.notEqual(at(right, p), P.LED_PROMPT);
 });
 
 test('Listen lights what it is playing, and a press still outranks it', () => {
-  const kk = P.padsForVoice('KK', 'kit')[0];
-  const out = paint(buf(), { layout: 'kit', sounding: ['KK'] });
+  const kk = P.padsForVoice('KK', 'mpc')[0];
+  const out = paint(buf(), { layout: 'mpc', sounding: ['KK'] });
   assert.equal(at(out, kk), P.LED_TARGET_NEAR);
-  const pressed = paint(buf(), { layout: 'kit', sounding: ['KK'], held: new Set([kk]) });
+  const pressed = paint(buf(), { layout: 'mpc', sounding: ['KK'], held: new Set([kk]) });
   assert.equal(at(pressed, kk), P.LED_PRESSED);
 });

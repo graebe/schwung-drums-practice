@@ -72,12 +72,13 @@ pub fn float(s: &[u8]) -> Option<f32> {
     Some(if neg { -v } else { v })
 }
 
-/// One `drum:velocity` pair. `None` if either half is missing or not a number
+/// One `note:velocity` pair — a drum's General MIDI note. `None` if either
+/// half is missing or not a number
 /// — which is what makes a malformed entry mid-list lose only itself rather
 /// than the whole bar.
 ///
-/// The drum index is bounds-checked by the caller against the kit it actually
-/// has, not here: this file knows about bytes, not about drums.
+/// Whether the note is a drum of the kit is the caller's question, not this
+/// file's: it knows about bytes, not about drums.
 pub fn hit(entry: &[u8]) -> Option<(u8, u8)> {
     let colon = entry.iter().position(|&c| c == b':')?;
     let drum = int(entry.get(..colon)?)?;

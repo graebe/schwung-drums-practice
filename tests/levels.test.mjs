@@ -201,3 +201,14 @@ test('a rung is recorded against its own id, so the plot never mixes them', () =
   const ids = LV.availableLevels(c).map((lv) => LV.projectLevel(c, lv.id).id);
   assert.equal(new Set(ids).size, ids.length);
 });
+
+test('the new voices climb with their families: bell with time, rim and clap with the snare', () => {
+  const chart = { id: 'x', name: 'X', bpm: 90, timeSig: [4, 4], loopBars: 1, repeats: 1, events: [
+    { beat: 0, voices: ['P1', 'K2'] }, { beat: 1, voices: ['CL', 'SH'] }, { beat: 2, voices: ['RM', 'MT'] },
+  ] };
+  const at = (lv) => LV.projectLevel(chart, lv).events.flatMap((e) => e.voices).sort();
+  assert.deepEqual(at('l1'), ['P1', 'SH']);
+  assert.deepEqual(at('l2'), ['K2', 'P1', 'SH']);
+  assert.deepEqual(at('l3'), ['CL', 'K2', 'P1', 'RM', 'SH']);
+  assert.deepEqual(at('l4'), ['CL', 'K2', 'MT', 'P1', 'RM', 'SH']);
+});

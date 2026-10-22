@@ -63,14 +63,16 @@ const MAX_VOICES: usize = 16;
  */
 const CLICK_SLOTS: usize = 2;
 
-/// Where the kit's nine voices sit in the pack: their General MIDI notes, the
-/// same table ui.js sends down a MIDI route, so a voice is one drum
-/// everywhere — screen, pads, speaker, a drum rack at the other end.
-pub const GM_KEYS: [u8; voice::NUM_DRUMS] = [49, 42, 46, 51, 48, 38, 45, 36, 44];
-
-/// The packs, relative to the module directory.
+/// The packs, relative to the module directory. Every voice of the kit is a
+/// General MIDI note (src/kit.mjs) and the packs are cut by it: the recorded
+/// kit, then the hand percussion, then the synth (`voice::synth_for`).
 const KIT_PACK: &[u8] = b"samples/drums.nisp";
+const PERC_PACK: &[u8] = b"samples/perc.nisp";
 const CLICK_PACK: &[u8] = b"samples/click.nisp";
+
+/// Voices for the hand percussion: a shaker under a tambourine and a cowbell
+/// is the most it is ever asked for at once, and then some.
+const PERC_SLOTS: usize = 8;
 
 /// The recorded kit against the synthesized one, before the kit's gain:
 /// chosen so a bar of kick, snare and hat at velocity 100 is about as loud
@@ -96,10 +98,15 @@ impl<const V: usize> Recorded<V> {
         Some(Recorded { bytes, voices: Sampler::new(voice::SAMPLE_RATE, Retrigger::Stack) })
     }
 
-    fn strike(&mut self, key: u8, vel: u8) {
-        if let Ok(p) = Pack::new(&self.bytes) {
+    /// Strike `key` if the pack holds it; false when it does not, so the
+    /// caller can try the next pack.
+    fn strike(&mut self, key: u8, vel: u8) -> bool {
+        let Ok(p) = Pack::new(&self.bytes) else { return false };
+        let held = (0..p.zone_count()).any(|i| p.zone(i).is_some_and(|z| (z.lokey..=z.hikey).contains(&key)));
+        if held {
             self.voices.note_on(&p, key, vel);
         }
+        held
     }
 
     fn next(&mut self) -> f32 {
@@ -120,6 +127,7 @@ pub struct Drums {
     click_gain: f32,
     ring: Ring,
     kit: Option<Recorded<MAX_VOICES>>,
+    perc: Option<Recorded<PERC_SLOTS>>,
     claves: Option<Recorded<CLICK_SLOTS>>,
 }
 
@@ -162,19 +170,21 @@ impl Drums {
 
     fn apply(&mut self, e: Event) {
         match e {
-            Event::Strike { drum, vel } => {
-                if vel == 0 || drum as usize >= NUM_DRUMS {
+            Event::Strike { key, vel } => {
+                if vel == 0 {
                     return;
                 }
-                if let (Some(kit), Some(&key)) = (self.kit.as_mut(), GM_KEYS.get(drum as usize)) {
-                    kit.strike(key, vel);
+                if self.kit.as_mut().is_some_and(|k| k.strike(key, vel))
+                    || self.perc.as_mut().is_some_and(|p| p.strike(key, vel))
+                {
                     return;
                 }
+                let Some(drum) = voice::synth_for(key) else { return };
                 self.counter = self.counter.wrapping_add(1);
                 let age = self.counter;
                 let seed = self.next_seed();
                 if let Some(v) = self.pick() {
-                    v.strike(drum as usize, vel, age, seed);
+                    v.strike(drum, vel, age, seed);
                 }
             }
             Event::Click { downbeat } => {
@@ -197,6 +207,9 @@ impl Drums {
                 if let Some(k) = self.kit.as_mut() {
                     k.voices.panic();
                 }
+                if let Some(p) = self.perc.as_mut() {
+                    p.voices.panic();
+                }
                 if let Some(c) = self.claves.as_mut() {
                     c.voices.panic();
                 }
@@ -210,7 +223,7 @@ impl Drums {
         }
     }
 
-    /// `"drum:vel,drum:vel,..."`, in one write.
+    /// `"note:vel,note:vel,..."`, in one write — the GM note of each drum.
     ///
     /// The overtake parameter channel is a SINGLE-SLOT MAILBOX: one call per
     /// drum would have a kick-and-snare overwrite itself and only the second
@@ -229,8 +242,8 @@ impl Drums {
                 }
                 None => {}
             }
-            if let Some((drum, vel)) = parse::hit(entry) {
-                self.ring.push(Event::Strike { drum, vel });
+            if let Some((key, vel)) = parse::hit(entry) {
+                self.ring.push(Event::Strike { key, vel });
             }
         }
     }
@@ -270,6 +283,7 @@ impl SchwungPlugin for Drums {
                 ring: Ring::new(),
                 /* Each pack on its own: one failing leaves the other. */
                 kit: Recorded::load(module_dir, KIT_PACK),
+                perc: Recorded::load(module_dir, PERC_PACK),
                 claves: Recorded::load(module_dir, CLICK_PACK),
             });
             Box::from_raw(raw)
@@ -367,7 +381,7 @@ impl SchwungPlugin for Drums {
 
         /* Split the borrow: the voices need the sine table while being ticked. */
         let (sine, voices, clicks) = (&self.sine, &mut self.voices, &mut self.clicks);
-        let (kit, claves) = (&mut self.kit, &mut self.claves);
+        let (kit, perc, claves) = (&mut self.kit, &mut self.perc, &mut self.claves);
         let gain = self.gain;
         let click_gain = self.click_gain;
 
@@ -381,6 +395,9 @@ impl SchwungPlugin for Drums {
             }
             if let Some(k) = kit.as_mut() {
                 mix += k.next() * KIT_TRIM;
+            }
+            if let Some(p) = perc.as_mut() {
+                mix += p.next() * KIT_TRIM;
             }
             mix *= gain;
 

@@ -81,7 +81,7 @@ fn velocity_is_audible_across_its_whole_range() {
 #[test]
 fn zero_velocity_never_starts_a_voice() {
     let mut d = Drums::create(None, None).unwrap();
-    d.set_param(b"n", Some(b"7:0"));
+    d.set_param(b"n", Some(b"36:0"));
     let mut buf = [0i16; 256];
     d.render(&mut buf);
     assert_eq!(active_voices(&d), 0);
@@ -129,11 +129,11 @@ fn a_flam_sounds_twice_on_one_drum() {
      * list — and the player would be told they missed a stroke they played.
      */
     let mut d = Drums::create(None, None).unwrap();
-    d.set_param(b"n", Some(b"5:100"));
+    d.set_param(b"n", Some(b"38:100"));
     let mut buf = [0i16; 64];
     d.render(&mut buf);
     assert_eq!(active_voices(&d), 1);
-    d.set_param(b"n", Some(b"5:100"));
+    d.set_param(b"n", Some(b"38:100"));
     d.render(&mut buf);
     assert_eq!(active_voices(&d), 2, "the grace note was swallowed");
 }
@@ -143,7 +143,7 @@ fn one_write_carries_a_whole_stack() {
     /* The parameter channel is a single-slot mailbox: a kick and a snare sent
      * as two calls would have the second overwrite the first. */
     let mut d = Drums::create(None, None).unwrap();
-    d.set_param(b"n", Some(b"7:110,5:90,1:60"));
+    d.set_param(b"n", Some(b"36:110,38:90,42:60"));
     let mut buf = [0i16; 64];
     d.render(&mut buf);
     assert_eq!(active_voices(&d), 3);
@@ -152,19 +152,38 @@ fn one_write_carries_a_whole_stack() {
 #[test]
 fn a_malformed_entry_loses_only_itself() {
     let mut d = Drums::create(None, None).unwrap();
-    d.set_param(b"n", Some(b"7:110,rubbish,5:90"));
+    d.set_param(b"n", Some(b"36:110,rubbish,38:90"));
     let mut buf = [0i16; 64];
     d.render(&mut buf);
     assert_eq!(active_voices(&d), 2);
 }
 
 #[test]
-fn an_out_of_range_drum_is_dropped_at_the_door() {
+fn a_note_that_is_no_drum_is_dropped_at_the_door() {
     let mut d = Drums::create(None, None).unwrap();
-    d.set_param(b"n", Some(b"99:110"));
+    d.set_param(b"n", Some(b"99:110,60:100,128:100"));
     let mut buf = [0i16; 64];
     d.render(&mut buf);
     assert_eq!(active_voices(&d), 0);
+}
+
+/* The kit's twenty-one GM notes (src/kit.mjs), each of which must sound. */
+const KIT_NOTES: [u8; 21] = [35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 54, 56, 70];
+
+#[test]
+fn every_voice_of_the_kit_has_a_synthesized_fallback() {
+    /* Without packs every note is the synth: a broken install is a plainer
+     * kit, never silence. */
+    for key in KIT_NOTES {
+        let mut d = Drums::create(None, None).unwrap();
+        let list = alloc::format!("{key}:110");
+        d.set_param(b"n", Some(list.as_bytes()));
+        let mut buf = [0i16; 64];
+        d.render(&mut buf);
+        assert_eq!(active_voices(&d), 1, "GM {key} made no sound");
+        assert!(voice::synth_for(key).is_some());
+    }
+    assert_eq!(voice::synth_for(60), None);
 }
 
 #[test]
@@ -178,7 +197,7 @@ fn the_click_cannot_be_stolen_by_a_busy_bar() {
     let mut d = Drums::create(None, None).unwrap();
     let mut buf = [0i16; 64];
     for _ in 0..(MAX_VOICES + 8) {
-        d.set_param(b"n", Some(b"0:120"));
+        d.set_param(b"n", Some(b"49:120"));
         d.render(&mut buf);
     }
     assert_eq!(active_voices(&d), MAX_VOICES, "the pool is full");
@@ -227,7 +246,7 @@ fn a_click_with_no_value_still_clicks() {
 fn panic_cuts_the_kit_and_the_click_together() {
     let mut d = Drums::create(None, None).unwrap();
     let mut buf = [0i16; 64];
-    d.set_param(b"n", Some(b"0:120,5:120"));
+    d.set_param(b"n", Some(b"49:120,38:120"));
     d.set_param(b"c", Some(b"1"));
     d.render(&mut buf);
     assert!(active_voices(&d) > 0);
@@ -242,7 +261,7 @@ fn the_panic_messages_are_honoured_on_every_channel() {
     for ch in 0..16u8 {
         let mut d = Drums::create(None, None).unwrap();
         let mut buf = [0i16; 64];
-        d.set_param(b"n", Some(b"0:120"));
+        d.set_param(b"n", Some(b"49:120"));
         d.render(&mut buf);
         d.on_midi(&[0xB0 | ch, 120, 0], 0);
         d.render(&mut buf);
@@ -251,7 +270,7 @@ fn the_panic_messages_are_honoured_on_every_channel() {
     /* System Reset, which carries no channel at all. */
     let mut d = Drums::create(None, None).unwrap();
     let mut buf = [0i16; 64];
-    d.set_param(b"n", Some(b"0:120"));
+    d.set_param(b"n", Some(b"49:120"));
     d.render(&mut buf);
     d.on_midi(&[0xFF], 0);
     d.render(&mut buf);
@@ -262,7 +281,7 @@ fn the_panic_messages_are_honoured_on_every_channel() {
 fn all_notes_off_lets_a_crash_ring_rather_than_clicking() {
     let mut d = Drums::create(None, None).unwrap();
     let mut buf = [0i16; 64];
-    d.set_param(b"n", Some(b"0:120"));
+    d.set_param(b"n", Some(b"49:120"));
     d.render(&mut buf);
     d.on_midi(&[0xB0, 123, 0], 0);
     d.render(&mut buf);
@@ -289,7 +308,7 @@ fn render_adds_into_the_buffer_and_never_assigns() {
     d.render(&mut buf);
     assert!(buf.iter().all(|&s| s == 1234), "silence must leave the buffer alone");
 
-    d.set_param(b"n", Some(b"7:120"));
+    d.set_param(b"n", Some(b"36:120"));
     let mut buf2 = [1000i16; 512];
     d.render(&mut buf2);
     assert!(buf2.iter().any(|&s| s != 1000), "the kick never reached the buffer");
@@ -318,7 +337,7 @@ fn get_param_answers_what_the_ui_asks() {
     let n = d.get_param(b"drums", &mut out);
     assert_eq!(&out[..n], b"9");
     let mut buf = [0i16; 64];
-    d.set_param(b"n", Some(b"0:120,5:120"));
+    d.set_param(b"n", Some(b"49:120,38:120"));
     d.render(&mut buf);
     let n = d.get_param(b"voices", &mut out);
     assert_eq!(&out[..n], b"2");
@@ -330,7 +349,7 @@ fn a_full_ring_drops_events_rather_than_blocking() {
     /* Blocking here would block the SPI callback. */
     let mut d = Drums::create(None, None).unwrap();
     for _ in 0..(ring::RING * 2) {
-        d.set_param(b"n", Some(b"5:100"));
+        d.set_param(b"n", Some(b"38:100"));
     }
     let mut buf = [0i16; 64];
     d.render(&mut buf);
@@ -418,7 +437,7 @@ fn an_installed_module_plays_the_recordings() {
     let mut d = installed();
     assert_eq!(answer(&mut d, b"source"), b"sampled");
     assert_eq!(answer(&mut d, b"click"), b"sampled");
-    d.set_param(b"n", Some(b"7:100,5:100"));
+    d.set_param(b"n", Some(b"36:100,38:100"));
     assert!(listen(&mut d, 4).0 > 0.0);
     assert_eq!(answer(&mut d, b"voices"), b"2", "two recorded voices");
     assert!(d.voices.iter().all(|v| !v.active), "and no synthesized one");
@@ -429,7 +448,7 @@ fn without_packs_it_is_the_synth_and_says_so() {
     let mut d = Drums::create(Some(b"/nonexistent"), None).unwrap();
     assert_eq!(answer(&mut d, b"source"), b"synth");
     assert_eq!(answer(&mut d, b"click"), b"synth");
-    d.set_param(b"n", Some(b"7:100,c:1"));
+    d.set_param(b"n", Some(b"36:100,c:1"));
     listen(&mut d, 1);
     assert!(d.voices.iter().any(|v| v.active));
     assert!(d.clicks.iter().any(|c| c.active), "c:1 in the list is the synthesized click");
@@ -437,7 +456,7 @@ fn without_packs_it_is_the_synth_and_says_so() {
 
 #[test]
 fn the_recorded_kit_is_as_loud_as_the_synth() {
-    let groove = b"7:100,5:100,1:100";
+    let groove = b"36:100,38:100,42:100";
     let a = bar(&mut Drums::create(None, None).unwrap(), groove);
     let b = bar(&mut installed(), groove);
     let db = 20.0 * (b / a).log10();
@@ -447,23 +466,27 @@ fn the_recorded_kit_is_as_loud_as_the_synth() {
 #[test]
 fn the_recorded_kit_keeps_the_balance() {
     /* Every voice against the snare, recorded and synthesized: the record's
-     * mix sits hats and cymbals far back; the manifest's trims bring each
+     * mix sits hats and cymbals far back; the manifests' trims bring each —
+     * the hand percussion against the synthesized voice it falls back to —
      * within reach of the balance tuned by ear on the device. */
-    let level = |d: &mut Drums, drum: usize| bar(d, alloc::format!("{drum}:100").as_bytes());
+    let level = |d: &mut Drums, key: u8| bar(d, alloc::format!("{key}:100").as_bytes());
     let (mut syn, mut rec) = (Drums::create(None, None).unwrap(), installed());
-    let (s_sn, r_sn) = (level(&mut syn, 5), level(&mut rec, 5));
-    for drum in [0usize, 1, 2, 3, 4, 6, 7, 8] {
-        let s = level(&mut syn, drum) / s_sn;
-        let r = level(&mut rec, drum) / r_sn;
+    let (s_sn, r_sn) = (level(&mut syn, 38), level(&mut rec, 38));
+    for key in KIT_NOTES {
+        let s = level(&mut syn, key) / s_sn;
+        let r = level(&mut rec, key) / r_sn;
         let db = 20.0 * (r / s).log10();
-        assert!(db.abs() < 9.0, "drum {drum} sits {db:+.1} dB off the synthesized kit's balance");
+        if std::env::var("NI_BALANCE").is_ok() {
+            std::println!("GM {key}: {db:+.1} dB");
+        }
+        assert!(db.abs() < 9.0, "GM {key} sits {db:+.1} dB off the synthesized kit's balance");
     }
 }
 
 #[test]
 fn a_stack_at_full_velocity_stays_under_the_knee() {
     let mut d = installed();
-    d.set_param(b"n", Some(b"7:127,5:127,0:127"));
+    d.set_param(b"n", Some(b"36:127,38:127,49:127"));
     let (_, peak) = listen(&mut d, 100);
     assert!(peak < (26000.0 * 2.0 / 3.0) as i32, "peak {peak}: the soft clip would flatten it");
 }
@@ -471,9 +494,9 @@ fn a_stack_at_full_velocity_stays_under_the_knee() {
 #[test]
 fn a_recorded_flam_sounds_twice() {
     let mut d = installed();
-    d.set_param(b"n", Some(b"5:60"));
+    d.set_param(b"n", Some(b"38:60"));
     listen(&mut d, 2);
-    d.set_param(b"n", Some(b"5:110"));
+    d.set_param(b"n", Some(b"38:110"));
     listen(&mut d, 1);
     assert_eq!(answer(&mut d, b"voices"), b"2", "the grace note rings on under the stroke");
 }
@@ -481,18 +504,45 @@ fn a_recorded_flam_sounds_twice() {
 #[test]
 fn a_closed_hat_chokes_the_open_one() {
     let mut d = installed();
-    d.set_param(b"n", Some(b"2:110"));
+    d.set_param(b"n", Some(b"46:110"));
     listen(&mut d, 20);
-    d.set_param(b"n", Some(b"1:90"));
+    d.set_param(b"n", Some(b"42:90"));
     /* Naked Drums' own choke fade: -60 dB over 200 ms, gone at -80. */
     listen(&mut d, 100);
     assert_eq!(answer(&mut d, b"voices"), b"1", "the open hat is gone, the closed one rings");
 }
 
 #[test]
+fn the_hat_pedal_chokes_the_open_hat_too() {
+    let mut d = installed();
+    d.set_param(b"n", Some(b"46:110"));
+    listen(&mut d, 20);
+    d.set_param(b"n", Some(b"44:90"));
+    listen(&mut d, 100);
+    assert_eq!(answer(&mut d, b"voices"), b"1", "the open hat is gone, the pedal rings");
+}
+
+#[test]
+fn every_voice_of_the_kit_plays_a_recording_when_installed() {
+    /* The packs hold every one of the kit's notes: none falls back to the
+     * synth on a whole install. */
+    let d = installed();
+    for key in KIT_NOTES {
+        let in_kit = d.kit.as_ref().is_some_and(|k| holds(&k.bytes, key));
+        let in_perc = d.perc.as_ref().is_some_and(|p| holds(&p.bytes, key));
+        assert!(in_kit || in_perc, "GM {key} is in neither pack");
+    }
+}
+
+fn holds(bytes: &[u8], key: u8) -> bool {
+    let p = ni_sampler::Pack::new(bytes).unwrap();
+    (0..p.zone_count()).any(|i| p.zone(i).is_some_and(|z| (z.lokey..=z.hikey).contains(&key)))
+}
+
+#[test]
 fn the_click_is_the_claves_in_the_same_write_as_the_hits() {
     let mut d = installed();
-    d.set_param(b"n", Some(b"7:100,c:1"));
+    d.set_param(b"n", Some(b"36:100,c:1"));
     listen(&mut d, 2);
     assert_eq!(answer(&mut d, b"voices"), b"1", "the click is not a kit voice");
     let claves = d.claves.as_ref().unwrap();
@@ -512,9 +562,9 @@ fn the_click_is_the_claves_in_the_same_write_as_the_hits() {
 #[test]
 fn a_panic_entry_cuts_in_order() {
     let mut d = installed();
-    d.set_param(b"n", Some(b"0:127,7:127,c:1"));
+    d.set_param(b"n", Some(b"49:127,36:127,c:1"));
     listen(&mut d, 4);
-    d.set_param(b"n", Some(b"x,5:100"));
+    d.set_param(b"n", Some(b"x,38:100"));
     listen(&mut d, 1);
     assert_eq!(answer(&mut d, b"voices"), b"1", "everything cut, then the snare");
     assert_eq!(d.claves.as_ref().unwrap().voices.active_voices(), 0, "the click too");
@@ -522,9 +572,9 @@ fn a_panic_entry_cuts_in_order() {
     assert_eq!(listen(&mut d, 1), (0.0, 0), "a lone x is silence from the next block");
 
     let mut s = Drums::create(None, None).unwrap();
-    s.set_param(b"n", Some(b"0:127,c:1"));
+    s.set_param(b"n", Some(b"49:127,c:1"));
     listen(&mut s, 2);
-    s.set_param(b"n", Some(b" x ,5:100"));
+    s.set_param(b"n", Some(b" x ,38:100"));
     listen(&mut s, 1);
     assert_eq!(s.voices.iter().filter(|v| v.active).count(), 1, "the synth kit takes x the same way");
     assert!(s.clicks.iter().all(|c| !c.active));
@@ -538,5 +588,5 @@ fn cues_are_exact() {
     assert_eq!(cue(b" x"), Some(Cue::Panic));
     assert_eq!(cue(b"c:2"), None);
     assert_eq!(cue(b"xx"), None);
-    assert_eq!(cue(b"5:100"), None);
+    assert_eq!(cue(b"38:100"), None);
 }

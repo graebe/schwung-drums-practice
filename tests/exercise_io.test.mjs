@@ -169,7 +169,7 @@ const SHAPE = {
                          KK: 'o---o---o---o---' },
   /* The kick lands WITH the snare on 3 and nowhere else — that is the drop. */
   'reggae-one-drop':   { HH: 'o---o---o---o---',
-                         SN: '--------X-------',
+                         RM: '--------X-------',
                          KK: '--------o-------' },
   /* Four on the floor, with the hat opening on the off-beats. */
   /* The open hat on the OFFBEATS. 1.0 had it on 2 and 4, over the closed one —
@@ -226,7 +226,7 @@ test('the first beat leads the list, and is playable on the default layout', () 
   assert.deepEqual(manifest.entries.slice(0, 3).map((e) => e.id),
     ['first-beat', 'eighth-beat', 'rock-backbeat']);
   const c = IO.parseExercise(read('first-beat.json'), 'first-beat').chart;
-  assert.equal(layoutForChart(c), 'kit');
+  assert.equal(layoutForChart(c), 'mpc');
   assert.ok(c.bpm <= 70, `${c.bpm} is too fast to lead with`);
   for (const e of c.events) assert.ok(e.voices.includes('HH'), 'a drum without its hat is not unison');
 });
@@ -311,4 +311,27 @@ test('every drag is two grace notes from the other hand, and Drag is not Flam', 
       }
     }
   }
+});
+
+test('every bundled drill plays on every preset, flipped or not — Chromatic all but the cowbell grooves', async () => {
+  const P = await import('../src/padmap.mjs');
+  const cowbell = [];
+  for (const e of manifest.entries) {
+    const chart = IO.parseExercise(read(e.file), e.id).chart;
+    const rudiment = chart.sticking !== 'off';
+    for (const id of P.PRESET_IDS) {
+      if (id === 'sticking' && !rudiment) continue;
+      for (const flip of [false, true]) {
+        const missing = P.missingVoices(chart, P.resolveLayout(id, { flip }));
+        if (id === 'gm' && missing.length) {
+          assert.deepEqual(missing, ['P1'], `${e.id} on Chromatic`);
+          if (!flip) cowbell.push(e.id);
+          continue;
+        }
+        assert.deepEqual(missing, [], `${e.id} on ${id}${flip ? ', flipped' : ''}`);
+      }
+    }
+    assert.ok(IO.playabilityWarnings(chart).length === 0, `${e.id} warns: ${IO.playabilityWarnings(chart)}`);
+  }
+  assert.deepEqual(cowbell.sort(), ['mozambique', 'songo']);
 });

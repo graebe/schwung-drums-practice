@@ -2,30 +2,51 @@
 // Copyright (C) 2026 Torben Gräber
 
 /*
- * padmap.mjs — the zoned pad grid and the hand split. Pure.
+ * padmap.mjs — the pad layouts and the hand split. Pure.
  *
  * The grid is 4 rows of 8, notes 68..99, bottom-left to top-right.
- *
  * Two things are laid over it:
  *
- *   THE HAND SPLIT.  Columns 0..3 are the left hand, 4..7 the right. This is
- *   the whole reason sticking can be scored at all: a pad press carries which
- *   half of the grid it came from, so "RLRR LRLL" is checkable rather than
- *   decorative.
+ *   THE HAND SPLIT.  Columns 0..3 are the left hand, 4..7 the right — the
+ *   physical halves, whatever layout is in force and whether it is flipped.
+ *   This is the whole reason sticking can be scored at all: a pad press
+ *   carries which half of the grid it came from, so "RLRR LRLL" is checkable
+ *   rather than decorative.
  *
- *   THE VOICE ZONES. Each layout assigns a voice to every pad. A voice owns a
- *   BLOCK rather than a pad, which is the one idea carried over unaltered
- *   from the pitched module: any pad in the block counts, so a double or a
- *   roll has two fingers to land on and nothing is lost to fumbling for a
- *   single 12mm square.
+ *   THE LAYOUT. Each assigns a voice to every pad. A voice may own several
+ *   pads, and any of them counts, so a double or a roll has two fingers to
+ *   land on and nothing is lost to fumbling for a single 12mm square.
  *
- * The two halves MIRROR about the centre line, so a voice sits at the same
- * height under either hand. Learning the layout once rather than twice is
- * worth more than any ergonomic gain from arranging the hands differently,
- * and `tests/padmap.test.mjs` asserts the mirror rather than trusting it.
+ * The layouts are the finger drummer's, each a 4x4 that the right half
+ * DUPLICATES — the left half is where Move's own drum mode puts its Drum Rack,
+ * and the copy keeps every sound under either hand, which sticking needs:
+ *
+ *   mpc      MPC Classic, the default: the kick, snare and hats along the
+ *            bottom row under the strongest fingers, cymbals on top, toms
+ *            between — the layout most finger drummers learnt on
+ *   family   MPC Family Rows: one row a family — kicks, snares, hats, cymbals
+ *   centre   MPC Centre Core: kick and snare in the middle, all else round them
+ *   gm       Chromatic: General MIDI 36..51 left to right, bottom to top —
+ *            Ableton's Drum Rack and Move's drum mode, note for note
+ *
+ * and two that are not 4x4s:
+ *
+ *   mirror   Mirrored Performance: a two-handed kit centred on columns 2..5,
+ *            each half the mirror of the other, the extension (toms, cymbals,
+ *            the hat foot) on the outer columns
+ *   sticking one surface: the snare on every pad, for rudiments, where the
+ *            only questions are which hand and when
+ *
+ * plus `custom`, one layout of the player's own (pads_io.mjs, pads.json).
+ * FLIP mirrors any of them, column c to 7-c, for a left-hander; the hand is
+ * still the physical half.
+ *
+ * Every preset reaches the voices the bundled drills are written in, so no
+ * step of the Learning Path is unplayable on any of them (padmap.test.mjs) —
+ * but Chromatic, which is GM 36..51 by definition and has no cowbell.
  */
 
-import { VOICE_IDS, voiceIndex } from './kit.mjs';
+import { VOICE_IDS } from './kit.mjs';
 
 export const PAD_FIRST = 68;
 export const PAD_LAST = 99;
@@ -36,69 +57,121 @@ export const ROWS = 4;
 export const LEFT = 'L';
 export const RIGHT = 'R';
 
-/*
- * Layouts, written top row first because that is how they sit under your
- * hands and how the chart reads.
- *
- *   kit       ABLETON'S DRUM RACK ORDER. Move puts a Drum Rack on the left
- *             16 pads as a 4x4, and a Drum Rack is General MIDI from C1 (36)
- *             ascending left to right, bottom to top — which is why the kick
- *             is the bottom-left corner on every Move kit ever made. Using
- *             the same order means muscle memory carries straight from here
- *             into Move's own kits and back, which is worth more than any
- *             layout this module could invent.
- *
- *               48 HiMidTom  49 Crash   50 HighTom  51 Ride
- *               44 PedalHH   45 LowTom  46 OpenHH   47 LowMidTom
- *               40 ElecSnr   41 FloorTm 42 ClosedHH 43 FloorTm2
- *               36 KICK      37 Rim     38 SNARE    39 Clap
- *
- *             The nine voices here do not fill sixteen GM slots, so a slot
- *             with no exact match takes the nearest voice that does — a rim
- *             and a clap are struck on the snare, three GM toms share two.
- *             No pad is dead.
- *
- *   sticking  one surface, two hands. For rudiments, where the only
- *             questions are which hand and when.
- *
- * The right four columns DUPLICATE the left rather than mirroring them: the
- * Ableton order reads left to right, and reversing it for the right hand
- * would put the kick under the wrong finger and undo the point of matching.
- * Every voice is still reachable with either hand, which is all the sticking
- * model needs.
- */
-const GRIDS = {
-  sticking: [
-    'SN SN SN SN SN SN SN SN',
-    'SN SN SN SN SN SN SN SN',
-    'SN SN SN SN SN SN SN SN',
-    'SN SN SN SN SN SN SN SN',
-  ],
-  kit: [
-    'HT CR HT RD HT CR HT RD',
-    'HF LT HO HT HF LT HO HT',
-    'SN LT HH LT SN LT HH LT',
-    'KK SN SN SN KK SN SN SN',
-  ],
+/* How a layout's halves relate, which is also where an edit made to "both
+ * halves" lands: the same column of the other half, or its mirror image. */
+export const TWIN = 'twin';
+export const MIRROR = 'mirror';
+
+/* Written top row first, as they sit under your hands. A 4x4 is duplicated
+ * into both halves; an 8-wide grid is taken as it is. */
+export const PRESETS = {
+  mpc: { name: 'MPC Classic', pair: TWIN, rows: [
+    'CR RD P1 FX',
+    'LT MT HT P2',
+    'K2 CL RM HF',
+    'KK SN HH HO',
+  ] },
+  family: { name: 'MPC Family Rows', pair: TWIN, rows: [
+    'CR RD P1 P2',
+    'HH HO HF SH',
+    'SN S2 CL RM',
+    'KK K2 LT HT',
+  ] },
+  centre: { name: 'MPC Centre Core', pair: TWIN, rows: [
+    'CR MT FX RD',
+    'SH HH HO HF',
+    'P1 KK SN P2',
+    'LT RM CL HT',
+  ] },
+  gm: { name: 'Chromatic GM', pair: TWIN, rows: [
+    'HM CR HT RD',
+    'HF LT HO MT',
+    'S2 F2 HH F1',
+    'KK RM SN CL',
+  ] },
+  mirror: { name: 'Mirrored', pair: MIRROR, rows: [
+    'SH FX CR P1 P2 RD FX SH',
+    'HM HT HH HO HO HH HT HM',
+    'MT RM LT SN CL HT RM MT',
+    'HF F1 KK SN SN KK F1 HF',
+  ] },
+  sticking: { name: 'Sticking', pair: TWIN, rows: [
+    'SN SN SN SN',
+    'SN SN SN SN',
+    'SN SN SN SN',
+    'SN SN SN SN',
+  ] },
 };
 
-export const LAYOUT_IDS = ['sticking', 'kit'];
-export const DEFAULT_LAYOUT = 'kit';
+export const CUSTOM = 'custom';
+/* The order the Pads setting steps through. */
+export const LAYOUT_IDS = ['mpc', 'family', 'centre', 'gm', 'mirror', CUSTOM, 'sticking'];
+/* The layouts that are the same on every Move: what a bundled drill must be
+ * playable on. */
+export const PRESET_IDS = ['mpc', 'family', 'centre', 'gm', 'mirror', 'sticking'];
+export const DEFAULT_LAYOUT = 'mpc';
 
-/* Expand each grid once, into pad -> voice. Rows are written top-first but
- * pad row 0 is the BOTTOM row, so the written order is reversed here. */
-const LAYOUTS = {};
-for (const id of LAYOUT_IDS) {
-  const rows = GRIDS[id].slice().reverse();
+/* Rows (top first) into pad index -> voice, bottom row first. A 4-wide row is
+ * duplicated into both halves. */
+export function gridOf(rows) {
   const byPad = new Array(PAD_COUNT).fill(null);
+  const bottomFirst = rows.slice().reverse();
   for (let row = 0; row < ROWS; row++) {
-    const cells = rows[row].trim().split(/\s+/);
+    const cells = String(bottomFirst[row] || '').trim().split(/\s+/);
     for (let col = 0; col < COLS; col++) {
-      const cell = cells[col];
-      byPad[row * COLS + col] = cell === '.' ? null : cell;
+      const cell = cells.length === COLS / 2 ? cells[col % (COLS / 2)] : cells[col];
+      byPad[row * COLS + col] = cell && cell !== '.' ? cell : null;
     }
   }
-  LAYOUTS[id] = byPad;
+  return byPad;
+}
+
+/* A grid back into 8-wide rows, top first: how pads.json writes Custom. */
+export function rowsOf(grid) {
+  const out = [];
+  for (let row = ROWS - 1; row >= 0; row--) {
+    const cells = [];
+    for (let col = 0; col < COLS; col++) cells.push(grid[row * COLS + col] || '.');
+    out.push(cells.join(' '));
+  }
+  return out;
+}
+
+function flipped(grid) {
+  const out = new Array(PAD_COUNT);
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) out[row * COLS + col] = grid[row * COLS + (COLS - 1 - col)];
+  }
+  return out;
+}
+
+/*
+ * A layout as the pads see it: { id, name, pair, grid } with Flip applied —
+ * what every caller holds, so a flipped or custom layout is never one case
+ * short somewhere. `custom` is { rows, pair } from pads.json; without one,
+ * Custom starts as a copy of MPC Classic.
+ */
+export function resolveLayout(id, { flip = false, custom = null } = {}) {
+  let base;
+  if (id === CUSTOM) {
+    const c = custom || { rows: PRESETS.mpc.rows, pair: TWIN };
+    base = { id: CUSTOM, name: 'Custom', pair: c.pair === MIRROR ? MIRROR : TWIN, grid: gridOf(c.rows) };
+  } else {
+    const key = PRESETS[id] ? id : DEFAULT_LAYOUT;
+    base = { id: key, name: PRESETS[key].name, pair: PRESETS[key].pair, grid: gridOf(PRESETS[key].rows) };
+  }
+  if (flip) base.grid = flipped(base.grid);
+  base.flip = Boolean(flip);
+  return base;
+}
+
+/* A layout id, unflipped, resolved once: what callers that only know an id get. */
+const byId = new Map();
+function asLayout(layout) {
+  if (layout && typeof layout === 'object') return layout;
+  const id = layout || DEFAULT_LAYOUT;
+  if (!byId.has(id)) byId.set(id, resolveLayout(id));
+  return byId.get(id);
 }
 
 export function isPad(note) {
@@ -125,16 +198,19 @@ export function twinCol(col) {
   return (col + COLS / 2) % COLS;
 }
 
-export function layoutExists(layout) {
-  return Object.prototype.hasOwnProperty.call(LAYOUTS, layout);
+/* Where "both halves" lands for a layout's pairing: its twin or its mirror. */
+export function pairCol(col, pair = TWIN) {
+  return pair === MIRROR ? COLS - 1 - col : twinCol(col);
+}
+
+export function layoutExists(id) {
+  return id === CUSTOM || Object.prototype.hasOwnProperty.call(PRESETS, id);
 }
 
 /* The voice a pad plays in this layout, or null. */
 export function padVoice(pad, layout = DEFAULT_LAYOUT) {
   if (!isPad(pad)) return null;
-  const grid = LAYOUTS[layout];
-  if (!grid) return null;
-  return grid[pad - PAD_FIRST];
+  return asLayout(layout).grid[pad - PAD_FIRST] || null;
 }
 
 /*
@@ -145,8 +221,7 @@ export function padVoice(pad, layout = DEFAULT_LAYOUT) {
  */
 export function padsForVoice(voice, layout = DEFAULT_LAYOUT, hand = null) {
   const out = [];
-  const grid = LAYOUTS[layout];
-  if (!grid) return out;
+  const grid = asLayout(layout).grid;
   for (let i = 0; i < PAD_COUNT; i++) {
     if (grid[i] !== voice) continue;
     const pad = PAD_FIRST + i;
@@ -158,22 +233,23 @@ export function padsForVoice(voice, layout = DEFAULT_LAYOUT, hand = null) {
 
 /* The voices a layout can reach, in staff order. */
 export function layoutVoices(layout = DEFAULT_LAYOUT) {
-  const grid = LAYOUTS[layout];
-  if (!grid) return [];
   const seen = {};
-  for (const id of grid) if (id) seen[id] = true;
+  for (const id of asLayout(layout).grid) if (id) seen[id] = true;
   return VOICE_IDS.filter((id) => seen[id]);
 }
 
-/* The narrowest layout that can play every voice in the chart, or null. */
+/* The voices a chart asks for that this layout has no pad for, in staff order. */
+export function missingVoices(chart, layout = DEFAULT_LAYOUT) {
+  const reach = new Set(layoutVoices(layout));
+  const seen = new Set();
+  for (const ev of chart.events || []) for (const id of ev.voices || []) if (!reach.has(id)) seen.add(id);
+  /* Staff order, and a voice no kit has heard of last: it is missing too. */
+  return VOICE_IDS.filter((id) => seen.has(id)).concat([...seen].filter((id) => VOICE_IDS.indexOf(id) < 0));
+}
+
+/* The first preset that can play every voice in the chart, or null. */
 export function layoutForChart(chart) {
-  const wanted = {};
-  for (const ev of chart.events || []) for (const id of ev.voices || []) wanted[id] = true;
-  const ids = Object.keys(wanted);
-  for (const layout of LAYOUT_IDS) {
-    const reach = layoutVoices(layout);
-    if (ids.every((id) => reach.indexOf(id) >= 0)) return layout;
-  }
+  for (const id of PRESET_IDS) if (!missingVoices(chart, id).length) return id;
   return null;
 }
 

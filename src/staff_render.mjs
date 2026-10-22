@@ -14,7 +14,7 @@
  */
 
 import * as L from './layout.mjs';
-import { blit, rowsToRuns, drawRing, drawX, CIRCLE_RUNS } from './glyphs.mjs';
+import { blit, rowsToRuns, drawRing, drawHead, CIRCLE_RUNS } from './glyphs.mjs';
 import { ledgerYs, diatonicToY } from './notation.mjs';
 import { voiceById, sortVoices } from './kit.mjs';
 import * as B from './beam.mjs';
@@ -70,7 +70,8 @@ export function drawPlayedMarker(ctx, x, y) {
 /*
  * One notehead.
  *
- *   head    'note' | 'x' | 'circled-x'   which drum it is
+ *   head    'note' | 'x' | 'circled-x' | 'triangle' | 'diamond' | 'slash'
+ *           which voice it is (kit.mjs)
  *   state   'pending' | 'hit' | 'missed' how it went
  *
  * The two are orthogonal and both have to survive: a missed crash must still
@@ -82,19 +83,19 @@ export function drawNote(ctx, x, y, head, state, dyn = 'normal', spacingPx = und
   const cx = Math.round(x);
   if (state === 'hit') {
     drawRing(ctx, cx, y);
-    if (head === 'x' || head === 'circled-x') {
-      /* A hit cymbal keeps a dot of its x inside the ring, so the ring does
-       * not turn every voice into the same anonymous circle. */
+    if (head !== 'note') {
+      /* A hit cymbal or percussion head keeps a dot inside the ring, so the
+       * ring does not turn every voice into the same anonymous circle. */
       ctx.fillRect(cx, y, 1, 1, 1);
     }
     return;
   }
 
   const w = headWidth(dyn, spacingPx);
-  if (head === 'x' || head === 'circled-x') {
-    drawX(ctx, cx, y, w);
-  } else {
+  if (head === 'note') {
     ctx.fillRect(cx - (w >> 1), y - (L.HEAD_H >> 1), w, L.HEAD_H, 1);
+  } else {
+    drawHead(ctx, head === 'circled-x' ? 'x' : head, cx, y, w);
   }
   if (head === 'circled-x' && w >= L.HEAD_W) {
     blit(ctx, CIRCLE_RUNS, cx - L.CIRCLED_R, y - L.CIRCLED_R);
