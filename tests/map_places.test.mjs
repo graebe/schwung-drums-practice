@@ -77,13 +77,19 @@ test('on the current island Continue\'s track is current, a skipped track skippe
   const stage = folder.children[0];
   let r = MP.islandPlaces(p, program, stage, { atMs: T0, hutPercent: () => 50 });
   const by = (label) => r.places.find((x) => x.label === label);
-  assert.equal(by('Time').state, 'current', 'Continue opens Quarters first');
+  assert.equal(by('Ear').state, 'current', 'Continue opens Meet the pads first, under Ear');
+  P.recordTour(p, 'tour:pads', T0);
+  r = MP.islandPlaces(p, program, stage, { atMs: T0, hutPercent: () => 50 });
+  assert.equal(by('Time').state, 'current', 'then Quarters');
   assert.equal(by('Lessons').state, 'started', 'half the cards read');
   assert.equal(by('Lessons').percent, 50);
-  for (const st of stage.children.find((c) => c.label === 'Ear').steps) P.skipItem(p, st.id, T0);
+  for (const label of ['Ear', 'Time']) {
+    for (const st of stage.children.find((c) => c.label === label).steps) P.skipItem(p, st.id, T0);
+  }
   take(p, 'first-beat:l3');
   r = MP.islandPlaces(p, program, stage, { atMs: T0, hutPercent: () => 100 });
-  assert.equal(by('Ear').state, 'skipped');
+  assert.equal(by('Time').state, 'skipped', 'all skipped');
+  assert.equal(by('Ear').state, 'done', 'the tour walked, the rest skipped: through');
   assert.equal(by('Checkpoint').state, 'done');
   assert.equal(by('Checkpoint').percent, 100);
   assert.equal(by('Lessons').state, 'done');

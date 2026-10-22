@@ -60,6 +60,7 @@ import { layoutPlaces, placeOfPad } from './pathmap/layout.mjs';
 import { createWalk, walkTo, walkStep, posAt, arrived } from './pathmap/walk.mjs';
 import { mapPadColors } from './pathmap/leds.mjs';
 import * as UT from './untimed.mjs';
+import * as PT from './pad_tour.mjs';
 import { availableLevels } from './levels.mjs';
 import * as IDS from './ids.mjs';
 import { isUntimedId } from './ids.mjs';
@@ -98,7 +99,7 @@ const OUTBOX_MAX = 512;
 /* Screens: named in hints.mjs, so none can go without a hint line. */
 const {
   MENU, READY, RUNNING, SUMMARY, LADDER, QUIZ, RESULT, PROGRESS, PROGRESS_ITEM, SETTINGS, ERROR, CARD,
-  PADMAP, SHEET, HELP, WELCOME, TIP, MAP,
+  PADMAP, SHEET, HELP, WELCOME, TIP, MAP, TOUR,
 } = H.SCREENS;
 
 /* MIDI out routes. */
@@ -228,13 +229,13 @@ let progress = PROG.emptyProgress();
 let progressDirty = false;
 /* Folder sums over the tree, cached by folder against progress.rev. */
 const agg = PROG.createAggregator();
-/* The Learning Path's stages, every leaf by item id, and what each item is
+/* The Path's stages, every leaf by item id, and what each item is
  * called on its own — all made with the tree, once. */
 let program = { stages: [], tracks: [] };
 let pathNode = null;
 let leafIdx = new Map();
 let itemNames = new Map();
-/* The step of the Learning Path the armed drill was opened as, so Click on
+/* The step of the Path the armed drill was opened as, so Click on
  * its result goes on along the path; null when it came from anywhere else. */
 let pathStep = null;
 /* The lesson cards (lessons.json), and the deck on screen (lessons.mjs):
@@ -242,6 +243,10 @@ let pathStep = null;
  * null when they were opened from Lessons to read again. */
 let lessons = new Map();
 let card = null;
+/* A line about each drum (lessons.json), and Meet the pads while it is on
+ * screen (pad_tour.mjs): { tour, id, recorded }. */
+let lessonPads = new Map();
+let tour = null;
 /* How stuck the learner is on that step, for the result's footer (program.mjs
  * stuckLevel): 0, 1 suggest an easier way in, 2 parked for a day. */
 let stuckNow = 0;
@@ -520,6 +525,14 @@ function scrubTargets() {
   }));
 }
 
+/* The drum Meet the pads is showing pulses, on both halves, until it is struck. */
+const tourBuf = [{ voice: null, hand: null }];
+function tourTargets() {
+  if (screen !== TOUR || !tour || tour.tour.solvedAt) return null;
+  tourBuf[0].voice = PT.current(tour.tour);
+  return tourBuf[0].voice ? tourBuf : null;
+}
+
 /* The drum Study has stopped for. A rescue, so it lives behind Guide pads like
  * every other hint: this is a reading trainer first. */
 function stuckTargets() {
@@ -565,7 +578,7 @@ function paintLeds(t) {
     ? (untimed ? UT.targets(untimed) : guideTargets(run, tp.songBeats)) : null);
   st.sounding = t < listenLitUntil && ((tp.mode === C.MODE_LISTEN && screen === RUNNING)
     || (isUntimed() && (screen === READY || screen === RUNNING))) ? listenLit : null;
-  st.stuck = stuckTargets();
+  st.stuck = tourTargets() || stuckTargets();
   st.selected = padMapSelected();
   st.phase = Math.floor(t / 500) % 2;
   /* The second hint lights the pad. Only for the drills whose answer IS a
@@ -867,6 +880,7 @@ function namesOfItems() {
   for (const d of GEN.RANDOM_DRILLS) names.set(d.family, d.name);
   for (const d of Q.DRILLS) names.set(PLAN.quizItemId(d), d.name);
   names.set(CAT.CLOCK_ID, 'Clock');
+  for (const [name, label] of Object.entries(PLAN.TOURS)) names.set(IDS.tourItemId(name), label);
   return names;
 }
 
@@ -1771,6 +1785,13 @@ function padDown(pad, vel) {
   const hand = PAD.padHand(pad);
   sound(voice, vel || 100);
 
+  if (screen === TOUR && tour) {
+    const r = PT.press(tour.tour, voice, now());
+    if (r === 'right') setFlash(PAD.padsForVoice(voice, layoutNow()), PAD.LED_HIT);
+    else if (r === 'other') announce(KIT.voiceById(voice).label);
+    return;
+  }
+
   if (screen === QUIZ && quiz) {
     if (quiz.mode !== 'pick') {
       const r = Q.pressVoice(quiz, voice, now());
@@ -2203,6 +2224,11 @@ function openStep(step) {
     pathStep = step;
     return;
   }
+  if (step.tour) {
+    openTour(step.id);
+    pathStep = step;
+    return;
+  }
   const id = step.wrap || step.id;
   const node = leafIdx.get(id);
   if (!node) {
@@ -2317,11 +2343,12 @@ function goNext() {
 
 /*
  * What the module is doing beyond showing a screen is ONE of: a quiz round, a
- * Ladder, the Clock, an L0 take, or a deck of lesson cards — each held in its
- * own variable (quiz, ladder, clockMode, untimed, card). They are exclusive,
- * and every place that starts one comes through here, which ends the others:
- * a Clock left armed under a quiz, or a quiz under a deck of cards, is the
- * kind of state the scattered flags used to allow.
+ * Ladder, the Clock, an L0 take, a deck of lesson cards or Meet the pads —
+ * each held in its own variable (quiz, ladder, clockMode, untimed, card,
+ * tour). They are exclusive, and every place that starts one comes through
+ * here, which ends the others: a Clock left armed under a quiz, or a quiz
+ * under a deck of cards, is the kind of state the scattered flags used to
+ * allow.
  */
 function beginActivity(kind) {
   if (kind !== 'quiz') quiz = null;
@@ -2329,6 +2356,42 @@ function beginActivity(kind) {
   if (kind !== 'clock') clockMode = false;
   if (kind !== 'untimed') untimed = null;
   if (kind !== 'cards') card = null;
+  if (kind !== 'tour') tour = null;
+}
+
+/* ---- Meet the pads ------------------------------------------------------- */
+/* Its rules are pad_tour.mjs's; here the drum is sounded and the end recorded. */
+function openTour(id) {
+  beginActivity('tour');
+  tour = { id, recorded: false, tour: PT.createTour(quizLayout, { texts: lessonPads,
+    width: L.PAGE_FULL_PX, measure }) };
+  screen = TOUR;
+  arriveTour();
+}
+
+/* A new stop: its drum heard once. The end: the tour walked, recorded once. */
+function arriveTour() {
+  const voice = PT.current(tour.tour);
+  if (voice) {
+    sound(voice, 105);
+    announce(KIT.voiceById(voice).label);
+    return;
+  }
+  announce(PT.END_TITLE);
+  if (tour.recorded) return;
+  tour.recorded = true;
+  PROG.recordTour(progress, tour.id, Date.now());
+  saveProgress();
+}
+
+function serviceTour() {
+  if (PT.service(tour.tour, now())) arriveTour();
+}
+
+/* Click on the last page: on along the path — a tour is only ever a step of it. */
+function leaveTour() {
+  tour = null;
+  goNext();
 }
 
 function openQuiz(drill, step = null) {
@@ -2388,7 +2451,7 @@ function grooveCharts() {
 }
 
 /*
- * Pick: groove on the Learning Path asks only about grooves you have played,
+ * Pick: groove on the Path asks only about grooves you have played,
  * in the styles you have on: naming a groove you have never heard is a guess,
  * not ear training. With fewer than three of those there is no fair question,
  * so it falls back to the styles you have on.
@@ -2409,11 +2472,11 @@ function quizItemOf(q) {
   return IDS.quizItemId(q.mode, q.kind, q.variant);
 }
 
-/* The pad layout a press is read in. A drum quiz always uses the kit: in the
- * sticking layout every pad is the snare, and eight of nine prompts could not
- * be answered at all. */
+/* The pad layout a press is read in. A drum quiz and Meet the pads always use
+ * the kit: in the sticking layout every pad is the snare, and eight of nine
+ * prompts could not be answered at all. */
 function layoutNow() {
-  return screen === QUIZ ? quizLayout : padLayout;
+  return screen === QUIZ || screen === TOUR ? quizLayout : padLayout;
 }
 
 /*
@@ -2760,6 +2823,9 @@ function hintState(shift = shiftHeld) {
     st.scrolls = tipCard.lines.length > L.PAGE_ROWS;
   } else if (screen === SETTINGS) {
     st.editing = settingsEditing;
+  } else if (screen === TOUR && tour) {
+    st.done = tour.tour.done;
+    st.sounding = Boolean(tour.tour.solvedAt);
   }
   return st;
 }
@@ -2772,7 +2838,7 @@ function hintLine() {
   const st = hintState();
   const key = `${screen}|${st.shift}|${st.depth > 1}|${st.mode}|${st.paused}|${st.untimed}|${st.clock}|`
     + `${st.pick}|${st.audible}|${st.hintsLeft > 0}|${st.path}|${st.guided}|${st.more}|${st.pages > 1}|`
-    + `${st.asks}|${st.scrolls}|${st.editing}`;
+    + `${st.asks}|${st.scrolls}|${st.editing}|${st.done}|${st.sounding}`;
   const view = viewNow();
   if (view + key !== hintKey) {
     hintKey = view + key;
@@ -2794,6 +2860,7 @@ function leaveToMenu() {
   }
   untimed = null;
   card = null;
+  tour = null;
   if (screen === PADMAP) savePads();
   screen = MENU;
   settingsEditing = false;
@@ -2829,6 +2896,7 @@ function back() {
     return CAT.navPop(nav);
   }
   if (screen === CARD) { card = null; screen = MENU; return true; }
+  if (screen === TOUR) { tour = null; screen = MENU; return true; }
   if (screen === PADMAP) { savePads(); screen = SETTINGS; return true; }
   if (screen === PROGRESS_ITEM) { screen = PROGRESS; return true; }
   /* Back from a run RESTARTS it. Back again lands on READY, whose own Back
@@ -3034,6 +3102,12 @@ function draw() {
     drawMapView(hint);
     return;
   }
+  if (screen === TOUR && tour) {
+    const stop = PT.screenOf(tour.tour);
+    stop.footer = hint;
+    V.drawTour(ctx, stop);
+    return;
+  }
   if (screen === MENU) {
     const top = CAT.navTop(nav);
     const rows = menuRows(top.node);
@@ -3220,7 +3294,9 @@ function initInner() {
   stats = loadStats();
   manifestError = '';
   loadExercises();
-  lessons = LES.parseLessons(readFile(`${MODULE_DIR}/lessons.json`)).cards;
+  const les = LES.parseLessons(readFile(`${MODULE_DIR}/lessons.json`));
+  lessons = les.cards;
+  lessonPads = les.pads;
   helpTopics = HP.parseHelp(readFile(`${MODULE_DIR}/help.json`));
   rebuildMenu();
   /* After the tree: reading takes in from stats.json needs its item ids. */
@@ -3331,6 +3407,7 @@ function tickInner() {
   /* The quiz's prompt, or L0's bar: either way a figure on the wall clock. */
   servicePrompt();
   if (screen === QUIZ && quiz) serviceQuiz();
+  if (screen === TOUR && tour) serviceTour();
 
   flushDsp();
   serviceOutbox(false);
@@ -3449,6 +3526,11 @@ function midiInner(data) {
        * you did not catch is a prompt you cannot answer. */
       if (screen === QUIZ && promptIsAudible()) { schedulePrompt(); return; }
       if (screen === CARD && card) { hearFromCard(); return; }
+      /* Meet the pads: the drum again. */
+      if (screen === TOUR && tour) {
+        if (PT.current(tour.tour)) sound(PT.current(tour.tour), 105);
+        return;
+      }
       if (screen === READY || ((screen === SUMMARY || screen === LADDER) && chart)) {
         if (screen !== READY) enterReady();
         start(false);
@@ -3546,6 +3628,8 @@ function jog(delta) {
     editSetting(settingsDefs[settingsSel].key, delta);
   } else if (target === 'padmap') {
     padMapJog(delta);
+  } else if (target === 'tour' && tour) {
+    if (PT.skip(tour.tour, delta)) arriveTour();
   } else if (target === 'page' && card) {
     LES.turnPage(card.deck, delta);
   } else if (target === 'sheet' && sheet) {
@@ -3584,6 +3668,10 @@ function click() {
   if (screen === TIP) { closeTip(); return; }
   if (screen === WELCOME && welcome) { welcomeClick(); return; }
   if (screen === CARD && card) { nextCard(); return; }
+  if (screen === TOUR && tour) {
+    if (tour.tour.done) leaveTour();
+    return;
+  }
   if (screen === SETTINGS) {
     const row = settingsDefs[settingsSel];
     if (row && row.type === 'action') {

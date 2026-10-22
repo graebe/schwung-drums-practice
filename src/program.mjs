@@ -40,9 +40,10 @@
  */
 
 import { availableLevels } from './levels.mjs';
-import { isUntimedId, higherLevelIds, parseLevelId, quizItemId as makeQuizId } from './ids.mjs';
+import { isUntimedId, higherLevelIds, parseLevelId, quizItemId as makeQuizId, tourItemId } from './ids.mjs';
 import { item, isDone, isParked, LEARNED } from './progress.mjs';
 import { DRILLS } from './guess.mjs';
+import { TOUR_NAME } from './pad_tour.mjs';
 
 /*
  * The written tempo of a generated drill. A file says how fast it goes; a
@@ -89,6 +90,9 @@ const time = (id, t = 100, o = {}) => ({ track: 'time', id, t, ...o });
 const hands = (id, t = 100, o = {}) => ({ track: 'hands', id, t, ...o });
 const groove = (id, t = 100, o = {}) => ({ track: 'grooves', groove: id, t, ...o });
 const quiz = (mode, kind, variant = '', o = {}) => ({ track: 'ear', quiz: { mode, kind, variant }, ...o });
+/* A guided tour (pad_tour.mjs). It LEADS its stage: Continue offers it before
+ * anything else, because the rest of the stage assumes what it shows. */
+const tour = (name, o = {}) => ({ track: 'ear', tour: name, lead: true, ...o });
 
 /*
  * A quiz with a smaller pool is a different exercise — three drums are not
@@ -105,7 +109,8 @@ export const STAGES = [
   {
     key: 's0', name: 'Hello, kit', card: 'stage-0',
     core: [
-      quiz('guess', 'voice', 'kit3', { card: ['kit-on-paper', 'your-pads'] }),
+      tour('pads', { card: 'your-pads' }),
+      quiz('guess', 'voice', 'kit3', { card: 'kit-on-paper' }),
       quiz('hear', 'voice', 'kit3'),
       time('subdiv:quarters', 60, { card: ['pulse', 'result'] }),
       time('read:1', 100, { card: 'rests' }),
@@ -327,6 +332,9 @@ export const PLANNED = new Set([
 
 /* ---- Building it ---------------------------------------------------------- */
 
+/* The tours there are, by the name a spec gives them. */
+export const TOURS = { pads: TOUR_NAME };
+
 /* A quiz step's id is the id its rounds are recorded under. */
 export function quizItemId(drill, variant = '') {
   return makeQuizId(drill.mode, drill.kind, variant);
@@ -362,6 +370,10 @@ function grooveRungs(chart, spec) {
  * whether a plain drill id is in the tree.
  */
 function resolve(spec, ctx) {
+  if (spec.tour) {
+    const label = TOURS[spec.tour];
+    return label ? [{ id: spec.tour, style: '', steps: [{ id: tourItemId(spec.tour), label, tour: spec.tour }] }] : null;
+  }
   const ids = [spec.groove || spec.id].concat(spec.alt || []);
   const options = [];
   for (const id of ids) {
@@ -392,6 +404,7 @@ function makeSteps(spec, option, stage, part) {
     track: spec.track,
     target,
     dyn: spec.dyn || 0,
+    lead: Boolean(spec.lead),
     style: option.style,
     cards: [].concat(spec.card || []),
     stage: stage.key,
@@ -425,7 +438,7 @@ export function buildProgram({ entries = [], categories = [], has = () => false,
       for (const s of list) {
         const options = resolve(s, ctx);
         if (!options) continue;
-        named.add(s.groove || s.id);
+        if (!s.tour) named.add(s.groove || s.id);
         /* The first option is the step; the rest stand in for it (pick). */
         out.push({ spec: s, options: options.map((o) => ({ ...o, steps: makeSteps(s, o, stage, part) })) });
       }
@@ -473,10 +486,10 @@ function stepsOf(slots, prefs) {
  * Whether a step is done: its drill clean at the step's target, or better.
  * A groove's higher rung carries the lower ones — if you can play everything
  * at that speed you can play the cymbals alone at it — and a ✓ (clean at
- * 100%) covers every target up to it. L0 and a quiz have their own ✓.
+ * 100%) covers every target up to it. L0, a quiz and a tour have their own ✓.
  */
 export function stepDone(progress, step) {
-  if (step.quiz) return isDone(progress, step.id);
+  if (step.quiz || step.tour) return isDone(progress, step.id);
   const ids = [step.id].concat(higherLevelIds(step.id));
   /* L0 asks whether you know the notes: its own ✓, or any rung above it
    * played clean, at any speed. */
@@ -567,10 +580,12 @@ function trackActivity(progress, program, track) {
 }
 
 /*
- * Continue: in the current stage, the next open core step of the track left
- * longest (ties to the earlier track, so a first session walks Time, Hands,
- * Grooves and Ear in turn); the checkpoint once the core is through. `except`
- * leaves one step out — the one just played, when Click moves on.
+ * Continue: in the current stage, its lead step while that is open (Meet the
+ * pads, before anything asks for a pad); then the next open core step of the
+ * track left longest (ties to the earlier track, so a first session walks
+ * Time, Hands, Grooves and Ear in turn); the checkpoint once the core is
+ * through. `except` leaves one step out — the one just played, when Click
+ * moves on.
  * Returns { stage, step } or null when the whole path is through.
  */
 export function continueStep(progress, program, atMs = Date.now(), except = '') {
@@ -578,6 +593,8 @@ export function continueStep(progress, program, atMs = Date.now(), except = '') 
   const stage = currentStage(progress, program);
   if (!stage) return null;
   const core = coreSteps(stage, prefs).filter((st) => st.key !== except && open(progress, st, atMs));
+  const lead = core.find((st) => st.lead);
+  if (lead) return { stage, step: lead };
   let best = null;
   let bestAt = Infinity;
   for (const t of TRACKS) {

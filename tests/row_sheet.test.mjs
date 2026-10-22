@@ -74,12 +74,13 @@ test('a folder skips what is open in it, and takes back what was skipped', () =>
   const ear = byLabel(byLabel(path, '0 Hello'), 'Ear');
   const first = SH.sheetFor(ear, env(p));
   assert.deepEqual(first.map((a) => a.act), ['skipAll', 'settings']);
-  assert.deepEqual(first[0].ids, ['quiz:guess:voice:kit3', 'quiz:hear:voice:kit3']);
+  assert.deepEqual(first[0].ids, ['tour:pads', 'quiz:guess:voice:kit3', 'quiz:hear:voice:kit3']);
+  P.skipItem(p, 'tour:pads', T0);
   P.skipItem(p, 'quiz:guess:voice:kit3', T0);
   const half = SH.sheetFor(ear, env(p));
   assert.deepEqual(half.map((a) => a.act), ['skipAll', 'unskip', 'settings']);
   assert.deepEqual(half[0].ids, ['quiz:hear:voice:kit3']);
-  assert.deepEqual(half[1].ids, ['quiz:guess:voice:kit3']);
+  assert.deepEqual(half[1].ids, ['tour:pads', 'quiz:guess:voice:kit3']);
 });
 
 test('a step: skip it or undo the skip; a drill with a tempo goes on the Ladder or the Clock', () => {
@@ -123,7 +124,7 @@ test('Continue skips the step it would open, never a review', () => {
   const row = tree.children[0];
   const sheet = SH.sheetFor(row, env(p));
   assert.deepEqual(sheet.map((a) => a.act), ['skip', 'settings']);
-  assert.equal(sheet[0].step.id, 'subdiv:quarters');
+  assert.equal(sheet[0].step.id, 'tour:pads', 'Meet the pads leads');
   assert.deepEqual(labels(row, env(p, { pick: { kind: 'review', id: 'flam' } })), ['Settings...']);
   assert.deepEqual(labels(row, env(p, { pick: null })), ['Settings...']);
 });

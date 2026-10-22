@@ -33,6 +33,7 @@ test('a jog turn does nothing while you are playing', () => {
   assert.equal(C.jogTarget('settings', true), 'value');
   assert.equal(C.jogTarget('quiz', false), 'choice');
   assert.equal(C.jogTarget('progress', false), 'drill');
+  assert.equal(C.jogTarget('tour', false), 'tour');
   assert.equal(C.jogTarget('sheet', false), 'sheet');
   assert.equal(C.jogTarget('help', false), 'scroll');
   assert.equal(C.jogTarget('welcome', false), 'welcome');

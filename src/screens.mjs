@@ -282,6 +282,19 @@ export function drawMapScreen(ctx, s) {
   drawHint(ctx, s.footer || '');
 }
 
+/* ---- Meet the pads ------------------------------------------------------ */
+/*
+ * A stop of the pad tour (pad_tour.mjs): the drum's name over a rule, where it
+ * is in the tour, a line about it, and the hint line. The pads say where it
+ * is; the screen says what it is. A page of text like help and the tips
+ * (drawPage); its lines arrive fitted (help.mjs fitPage).
+ *
+ * s = { title, right, lines, footer }
+ */
+export function drawTour(ctx, s) {
+  drawPage(ctx, s);
+}
+
 /* ---- Ladder ------------------------------------------------------------- */
 export function drawLadder(ctx, s) {
   ctx.clear();

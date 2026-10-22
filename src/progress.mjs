@@ -515,6 +515,23 @@ export function recordRound(progress, id, { correct, wrong, hinted = 0, at = 0 }
   });
 }
 
+/*
+ * A guided tour walked to its end (pad_tour.mjs): learned, with nothing to
+ * score — no best, so its row shows only the ✓ — and nothing to repeat: the
+ * drills that use the pads are what keeps them known.
+ */
+export function recordTour(progress, id, at = 0) {
+  return apply(progress, id, {
+    value: null,
+    learned: true,
+    counts: false,
+    schedule: false,
+    bpm: 0,
+    entry: [100, 100, 0, F_CLEAN | F_STANDARD, -1],
+    at,
+  });
+}
+
 function apply(progress, id, r) {
   const it = ensure(progress, id);
   const t = Math.round((r.at || 0) / 1000);

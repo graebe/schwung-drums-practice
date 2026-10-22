@@ -567,3 +567,15 @@ test('a version 1 file is read for what it reached, and merged into the rebuild'
   assert.equal(P.item(p, 'slow').best, 80, 'the better of the two');
   assert.equal(P.item(p, 'slow').h.length, 1, 'the rebuilt history, which carries the dynamics');
 });
+
+test('a tour walked is learned, with no number to show and nothing to repeat', () => {
+  const p = P.emptyProgress();
+  const r = P.recordTour(p, 'tour:pads', T0);
+  assert.equal(r.learned, true);
+  assert.ok(P.isDone(p, 'tour:pads'));
+  assert.equal(P.itemMark(p, 'tour:pads'), P.MARK_DONE);
+  assert.equal(P.itemValue(p, 'tour:pads'), '');
+  assert.equal(P.item(p, 'tour:pads').rep, null, 'never in Repetition');
+  assert.equal(P.recordTour(p, 'tour:pads', T0 + 1000).learned, false, 'learned once');
+  assert.equal(P.repetitionSession(p, T0 + 40 * 86400 * 1000).length, 0);
+});

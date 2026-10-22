@@ -153,7 +153,12 @@
         "Custom; PAD picks,",
         "JOG sounds, KNOB 1",
         "both halves, BACK",
-        "saves."
+        "saves.",
+        "",
+        "New to them? Path >",
+        "0 Hello, kit > Ear >",
+        "Meet the pads shows",
+        "each one."
       ]
     },
     {
@@ -230,10 +235,11 @@
         "tempo:",
         "",
         "90% of notes right -",
-        "right drum and hand,",
-        "no strays - and the",
-        "spread inside the",
-        "Strict window.",
+        "the right drum (and",
+        "hand, on Sticking",
+        "strict), no strays -",
+        "and the spread in",
+        "the Strict window.",
         "",
         "Your % is the",
         "fastest clean take.",

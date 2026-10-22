@@ -55,6 +55,15 @@ export function isQuizItemId(id) {
   return String(id).indexOf('quiz:') === 0;
 }
 
+/* A guided tour (pad_tour.mjs): `tour:pads`. Walked, not scored. */
+export function tourItemId(name) {
+  return `tour:${name}`;
+}
+
+export function isTourItemId(id) {
+  return String(id).indexOf('tour:') === 0;
+}
+
 /* The Clock, and its variants (`gap1`, `24`, `off` — docs/curriculum.md):
  * each its own item, so learning one does not tick the others. */
 export const CLOCK_ID = 'clock';

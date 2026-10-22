@@ -49,6 +49,7 @@ const ABOUT = {
   [S.MENU]: ['LIST', ['The list: CLICK a', 'row to open it.']],
   [S.SHEET]: ['OPTIONS', ['Options for the row.']],
   [S.MAP]: ['MAP', ['The map: a place per', 'pad. Walk, go in.']],
+  [S.TOUR]: ['PADS', ['Meet the pads: every', 'drum, one by one.']],
   [S.HELP]: ['HELP', ['This help.']],
   [S.WELCOME]: ['WELCOME', ['Your first steps.']],
   [S.TIP]: ['TIP', ['A tip, shown once.']],
@@ -89,6 +90,7 @@ export function topicsFor(screen, st = {}) {
     case S.MENU: return SECTION_TOPICS[st.section] || ['The list', 'The sheet'];
     case S.SHEET: return ['The sheet'];
     case S.MAP: return ['The map', 'Path', 'Review', 'The sheet'];
+    case S.TOUR: return ['The pads', 'Colours'];
     case S.WELCOME: case S.TIP: return ['The list'];
     case S.CARD: return ['Path'];
     case S.READY: case S.RUNNING: {

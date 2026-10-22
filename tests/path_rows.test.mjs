@@ -26,6 +26,10 @@ const byLabel = (f, l) => f.children.find((c) => c.label === l || c.label.starts
 
 test('Continue names the step it opens; a step row reads its best against its target', () => {
   const p = P.emptyProgress();
+  /* Meet the pads leads: too long for the row, so the title bar names it. */
+  assert.deepEqual(R.pathRow(CONTINUE, R.pathContext(p, program, T0)),
+    { label: 'Continue', value: '', mark: null, title: 'Meet the pads' });
+  P.recordTour(p, 'tour:pads', T0);
   let pc = R.pathContext(p, program, T0);
   assert.deepEqual(R.pathRow(CONTINUE, pc), { label: 'Continue', value: 'Quarters', mark: null, title: 'Quarters' },
     'the step\'s title, cut to what the row leaves it');
@@ -76,7 +80,7 @@ test('a folder skip names the open steps; Undo skip names the skipped ones', () 
   const p = P.emptyProgress();
   const ear = byLabel(byLabel(folder, '0 Hello'), 'Ear');
   const first = R.skipAllChange(ear.steps, p);
-  assert.deepEqual(first.skip, ['quiz:guess:voice:kit3', 'quiz:hear:voice:kit3']);
+  assert.deepEqual(first.skip, ['tour:pads', 'quiz:guess:voice:kit3', 'quiz:hear:voice:kit3']);
   assert.deepEqual(first.unskip, []);
   for (const id of first.skip) P.skipItem(p, id, T0);
   assert.deepEqual(R.skipAllChange(ear.steps, p), { skip: [], unskip: first.skip });

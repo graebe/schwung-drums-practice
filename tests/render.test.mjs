@@ -1149,3 +1149,60 @@ test('the map screen: the place in the title, the map, the hint line — nothing
   assert.equal(countOn(ctx, 0, PL.MAP_Y + PL.MAP_H, L.SCREEN_W, L.HINT_Y - PL.MAP_Y - PL.MAP_H), 0,
     'something between the map and the hint');
 });
+
+/* ---- Meet the pads ------------------------------------------------------ */
+import { drawTour } from '../src/view.mjs';
+import * as PT from '../src/pad_tour.mjs';
+import * as H from '../src/hints.mjs';
+import { resolveLayout } from '../src/padmap.mjs';
+
+test('a tour stop draws its drum, where it is, a line, and what to do; the end page too', () => {
+  const s = createScreen();
+  let texts = [];
+  const ctx = Object.create(s);
+  ctx.text = (x, y, t, v) => { texts.push(t); s.text(x, y, t, v); };
+  /* The hint line is hints.mjs's, as ui.js draws it. */
+  const draw = (tour) => {
+    texts = [];
+    const stop = PT.screenOf(tour);
+    drawTour(ctx, { ...stop, footer: H.hintFor(H.SCREENS.TOUR, stop)[0] });
+    return texts;
+  };
+  const tour = PT.createTour(resolveLayout('mpc'), { texts: new Map([['KK', 'The low thump.']]),
+    measure: (t) => s.textWidth(t), width: L.SCREEN_W - 2 });
+  const stop = draw(tour);
+  for (const t of ['Kick', '1/16', 'The low thump.', 'PAD hit lit  JOG skip']) {
+    assert.ok(stop.includes(t), `${t} not drawn: ${stop.join('|')}`);
+  }
+  PT.skip(tour, 100);
+  const end = draw(tour);
+  assert.ok(end.includes(PT.END_TITLE) && end.includes('CLICK next  BACK list'), end.join('|'));
+  PT.skip(tour, -1);
+  PT.press(tour, 'P2', 1);
+  assert.ok(draw(tour).includes('JOG skip  BACK list'), 'while it sounds no pad is asked for');
+});
+
+/* ---- Hands shown, not judged ------------------------------------------- */
+test('Sticking off still shows the written hands: on the scroll, on the page, in Study', () => {
+  const drill = subdivisionDrill(2);
+  const scroll = frame(drill, { view: 'grid', songBeats: 5.2, repeats: 4, sticking: 'off' }).ctx;
+  assert.equal(countOn(scroll, 0, L.UNDER_LANE_Y, 12, L.TEXT_H), 0, 'a bar number over the hands');
+  assert.ok(countOn(scroll, 0, L.UNDER_LANE_Y, L.SCREEN_W, L.TEXT_H) > 0, 'the hands are gone');
+
+  const c = projectLevel({ ...ROCKISH, sticking: 'strict',
+    events: ROCKISH.events.map((e, i) => ({ ...e, hand: i % 2 ? 'L' : 'R' })) }, 'l0');
+  const run = createRun(c, { sticking: 'off' });
+  const u = UT.createUntimed(run, { togetherMs: 60 });
+  const ctx = createScreen();
+  const seen = [];
+  const text = ctx.text.bind(ctx);
+  ctx.text = (x, y, s, v) => { seen.push(s); text(x, y, s, v); };
+  drawUntimedView(ctx, { run, chart: c, view: 'grid', dynamics: true, cursor: u.index,
+    title: c.name, rightLabel: '--', progress: 0, footerRight: '' });
+  assert.ok(seen.includes('R') && seen.includes('L'), seen.join('|'));
+
+  const study = createRun({ id: 'x', name: 'X', bpm: 120, timeSig: [4, 4], loopBars: 1, repeats: 1,
+    sticking: 'strict', events: [{ beat: 0, voices: ['SN'], hand: 'R' }] }, { sticking: 'off' });
+  expireMissed(study, 0.5, true);
+  assert.equal(stuckLabel(study), 'Snare R', 'Study names the hand as a guide');
+});

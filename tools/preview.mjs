@@ -26,6 +26,10 @@
  *   npm run preview -- --screen map --level world|island [--to N --t ms]   (stage 0 done, 1 current;
  *                       --to walks the avatar to place N and draws it --t ms into the walk)
  *   npm run preview -- --screen map-sheet   (a stage's options on the map, with Show as list)
+ *   npm run preview -- --screen map --level island --stage 0 --fresh [--walked]
+ *                       (stage 0 from the start: Meet the pads not walked, or walked)
+ *   npm run preview -- --screen tour --stop 0      (Meet the pads; --stop 99 is the end page,
+ *                                                   --struck SN a wrong pad named)
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { createScreen, toAscii } from './screen_buffer.mjs';
@@ -53,13 +57,15 @@ import { RANDOM_DRILLS } from '../src/generator.mjs';
 
 /* The real Path, with stage 0 through on its checkpoint and stage 1 begun, for
  * the map previews: every state shows somewhere. */
-function samplePath() {
+function samplePath({ fresh = false, walked = false } = {}) {
   const man = parseManifest(readFileSync(new URL('index.json', exDir), 'utf8'));
   const entries = man.entries.map((e) => ({ chart: parseExercise(readFileSync(new URL(e.file, exDir), 'utf8'), e.id).chart,
     category: e.category }));
   const ids = new Set([...builtins({}).map((c) => c.family), ...RANDOM_DRILLS.map((d) => d.family), 'clock']);
   const program = PLAN.buildProgram({ entries, categories: man.categories, has: (id) => ids.has(id) });
   const progress = PROG.emptyProgress();
+  if (walked) PROG.recordTour(progress, 'tour:pads', Date.UTC(2026, 9, 1));
+  if (fresh) return { program, progress, folder: PLAN.programFolder(program) };
   const take = (id, speed) => PROG.recordTake(progress, id, { speed, accuracy: 1, sd: 10, clean: true, bpm: 90,
     at: Date.UTC(2026, 9, 1) });
   take('first-beat:l3', 100);
@@ -69,6 +75,8 @@ function samplePath() {
   PROG.skipItem(progress, 'quiz:pick:voice', 1);
   return { program, progress, folder: PLAN.programFolder(program) };
 }
+import * as PT from '../src/pad_tour.mjs';
+import { parseLessons } from '../src/lessons.mjs';
 
 const exDir = new URL('../src/exercises/', import.meta.url);
 
@@ -212,6 +220,14 @@ if (screen) {
     const lay = resolveLayout(String(arg('layout', 'mpc')), { flip: Boolean(arg('flip', false)) });
     V.drawPadMap(ctx, { title: lay.name, right: lay.flip ? 'flip' : '', grid: lay.grid, selected: [],
       footer: 'PAD hear CLICK edit' });
+  } else if (screen === 'tour') {
+    const { pads } = parseLessons(readFileSync(new URL('../src/lessons.json', import.meta.url), 'utf8'));
+    const tour = PT.createTour(resolveLayout(String(arg('layout', 'mpc'))), { texts: pads,
+      measure: (t) => ctx.textWidth(t), width: L.PAGE_FULL_PX });
+    PT.skip(tour, Number(arg('stop', 0)));
+    if (arg('struck', false)) PT.press(tour, String(arg('struck')), 0);
+    const stop = PT.screenOf(tour);
+    V.drawTour(ctx, { ...stop, footer: H.hintFor(H.SCREENS.TOUR, stop)[0] });
   } else if (screen === 'menu') {
     /* Continue on a step too long for the row: its rung, the whole step on top. */
     const items = [{ label: 'Continue', value: 'L0' }, { label: 'Path', value: '>' },
@@ -244,10 +260,11 @@ if (screen) {
     V.drawPage(ctx, { title: TIPS.TIP_TITLE, lines, top: Number(arg('top', 0)),
       footer: H.hintFor(H.SCREENS.TIP, { scrolls: lines.length > L.PAGE_ROWS })[0] });
   } else if (screen === 'map' || screen === 'map-sheet') {
-    const { program, progress, folder } = samplePath();
+    const { program, progress, folder } = samplePath({ fresh: Boolean(arg('fresh', false)),
+      walked: Boolean(arg('walked', false)) });
     const island = arg('level', 'world') === 'island';
     const built = island
-      ? MP.islandPlaces(progress, program, folder.children[1], { atMs: Date.UTC(2026, 9, 2) })
+      ? MP.islandPlaces(progress, program, folder.children[Number(arg('stage', 1))], { atMs: Date.UTC(2026, 9, 2) })
       : MP.worldPlaces(progress, program, {});
     const layout = layoutPlaces(built.places.length);
     const walk = createWalk(layout, MP.startPlace(built.places));

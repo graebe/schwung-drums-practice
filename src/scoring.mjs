@@ -80,6 +80,16 @@ export const STICK_STRICT = 'strict';
 export const STICK_LOOSE = 'loose';
 export const STICK_OFF = 'off';
 
+/*
+ * Whether the drill has its hands written, and so its R and L to read. That
+ * is the chart's, not the Sticking setting's: the setting says whether the
+ * hand is JUDGED, and off — the default, since this is finger drumming, where
+ * either hand may take a pad — still shows the letters as a guide.
+ */
+export function handsWritten(run) {
+  return Boolean(run && run.chart && run.chart.sticking && run.chart.sticking !== STICK_OFF);
+}
+
 /* See ensureEntries. */
 export const MAX_ENTRIES = 4096;
 

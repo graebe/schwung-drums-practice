@@ -72,6 +72,7 @@ export function jogTarget(screen, editing) {
   if (screen === 'progress') return 'drill';
   if (screen === 'card') return 'page';
   if (screen === 'padmap') return 'padmap';
+  if (screen === 'tour') return 'tour';
   if (screen === 'sheet') return 'sheet';
   if (screen === 'help' || screen === 'tip') return 'scroll';
   if (screen === 'welcome') return 'welcome';

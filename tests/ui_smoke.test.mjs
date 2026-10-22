@@ -15,6 +15,8 @@
  * because shadow_ui's stderr goes to /dev/null.
  */
 import * as PADMAP from '../src/padmap.mjs';
+import * as PROG from '../src/progress.mjs';
+import { VOICES } from '../src/kit.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, writeFileSync, mkdtempSync } from 'node:fs';
@@ -37,7 +39,7 @@ let uiLoads = 0;
 const ALL_TIPS = ['welcome', 'sheet', 'practice', 'quiz', 'map', 'island'];
 
 async function loadUi({ extraFiles = {}, settings = null, dataFiles = {}, withLessons = false,
-  tips = ALL_TIPS } = {}) {
+  tips = ALL_TIPS, walked = false } = {}) {
   const src = readFileSync(new URL('../src/ui.js', import.meta.url), 'utf8');
   const log = { leds: [], buttons: [], params: [], midi: [], writes: {}, announces: [], exited: 0 };
   const screen = createScreen();
@@ -86,11 +88,23 @@ async function loadUi({ extraFiles = {}, settings = null, dataFiles = {}, withLe
    * progress to be rebuilt from stats.json gets no progress file. */
   const data = { ...dataFiles };
   if (!('progress.json' in data) && !('stats.json' in data)) {
-    data['progress.json'] = JSON.stringify({ version: 2, items: {}, tips });
+    /* Meet the pads walked, for the tests that begin past it: Continue's
+     * first offer is otherwise the tour. */
+    const p = PROG.emptyProgress();
+    if (walked) PROG.recordTour(p, 'tour:pads', Date.now());
+    data['progress.json'] = JSON.stringify({ ...JSON.parse(PROG.serialiseProgress(p)), tips });
   } else if (data['progress.json']) {
     try {
       const obj = JSON.parse(data['progress.json']);
-      if (obj && obj.version === 2 && !obj.tips) data['progress.json'] = JSON.stringify({ ...obj, tips });
+      if (obj && obj.version === 2) {
+        if (!obj.tips) obj.tips = tips;
+        if (walked) {
+          const p = PROG.emptyProgress();
+          PROG.recordTour(p, 'tour:pads', Date.now());
+          obj.items = { ...p.items, ...obj.items };
+        }
+        data['progress.json'] = JSON.stringify(obj);
+      }
     } catch (e) { /* a damaged file stays damaged */ }
   }
   for (const [name, text] of Object.entries(data)) {
@@ -491,7 +505,7 @@ test('a finished practice records a score without being asked', async () => {
 });
 
 test('the list opens on Continue, naming the step it opens, with the keys under it', async () => {
-  await loadUi();
+  await loadUi({ walked: true });
   globalThis.init();
   ticks(3);
   const drawn = drawnText(2);
@@ -1502,7 +1516,7 @@ test('a Settings knob keeps its row however far it is turned, and the jog touch 
   assert.equal(saved.bpm, 91, 'jog touch must not move the cursor off Tempo');
   assert.equal(saved.strictness, 'tight', 'three turns of one knob, one row');
   assert.equal(saved.view, 'grid', 'and not the rows around it');
-  assert.equal(saved.sticking, 'strict');
+  assert.equal(saved.sticking, 'off');
 });
 
 test('knob 8 slows a hand-written drill', async () => {
@@ -1632,7 +1646,7 @@ function playQuarters(snarePadNo, bpm, beats = 40) {
 }
 
 test('Continue opens the first step, a clean take at tempo learns it, Click goes on', async () => {
-  const { log } = await loadUi({ settings: PLAIN });
+  const { log } = await loadUi({ settings: PLAIN, walked: true });
   const sn = await snare();
   globalThis.init();
   ticks(2);
@@ -1666,7 +1680,7 @@ test('leaving the path for the library gives back your own Speed', async () => {
 });
 
 test('Click on a path result opens the next step of the track', async () => {
-  await loadUi({ settings: PLAIN });
+  await loadUi({ settings: PLAIN, walked: true });
   const sn = await snare();
   globalThis.init();
   ticks(2);
@@ -1680,7 +1694,7 @@ test('Click on a path result opens the next step of the track', async () => {
 });
 
 test('a take short of the step\'s target reads as its speed; the row shows it against the target', async () => {
-  await loadUi({ settings: PLAIN });
+  await loadUi({ settings: PLAIN, walked: true });
   const sn = await snare();
   globalThis.init();
   ticks(2);
@@ -1753,7 +1767,7 @@ test('an even take of an accented drill counts, and its dynamics say the accents
 });
 
 test('a Study take is not counted', async () => {
-  const { log } = await loadUi({ settings: { ...PLAIN, study: true } });
+  const { log } = await loadUi({ settings: { ...PLAIN, study: true }, walked: true });
   const sn = await snare();
   globalThis.init();
   ticks(2);
@@ -1766,7 +1780,7 @@ test('a Study take is not counted', async () => {
 });
 
 test('I know this: skip on Continue moves it on to the next track', async () => {
-  const { log } = await loadUi();
+  const { log } = await loadUi({ walked: true });
   globalThis.init();
   ticks(2);
   assert.ok(drawnText(1).includes('Quarters'));
@@ -1782,7 +1796,7 @@ test('I know this: skip on Continue moves it on to the next track', async () => 
 });
 
 test('a folder skips everything in it from its sheet, and Undo skip takes it back', async () => {
-  const { log } = await loadUi();
+  const { log } = await loadUi({ walked: true });
   globalThis.init();
   ticks(2);
   goTo('Path', '0 Hello, kit', 'Ear', { open: false });
@@ -1798,7 +1812,7 @@ test('a folder skips everything in it from its sheet, and Undo skip takes it bac
 });
 
 test('a stage\'s sheet starts the path there, and its Settings... opens Settings over the list', async () => {
-  const { log } = await loadUi();
+  const { log } = await loadUi({ walked: true });
   globalThis.init();
   ticks(2);
   goTo('Path', '2 Sixteenths', { open: false });
@@ -1819,7 +1833,7 @@ test('a stage\'s sheet starts the path there, and its Settings... opens Settings
 });
 
 test('Test out: checkpoint plays the stage\'s checkpoint', async () => {
-  const { log } = await loadUi();
+  const { log } = await loadUi({ walked: true });
   globalThis.init();
   ticks(2);
   goTo('Path', '0 Hello, kit', { open: false });
@@ -1830,7 +1844,7 @@ test('Test out: checkpoint plays the stage\'s checkpoint', async () => {
 });
 
 test('Settings › Path: a track switched off, and Continue no longer offers it', async () => {
-  await loadUi();
+  await loadUi({ walked: true });
   globalThis.init();
   ticks(2);
   goTo('Settings', 'Path', 'Tracks');
@@ -1875,7 +1889,7 @@ function playHalf(snarePadNo, bpm, beats = 40) {
 }
 
 test('stuck on a step: a hint after three failed takes, parked after six', async () => {
-  const { log } = await loadUi({ settings: PLAIN });
+  const { log } = await loadUi({ settings: PLAIN, walked: true });
   const sn = await snare();
   globalThis.init();
   ticks(2);
@@ -2068,7 +2082,7 @@ test('a drill a layout cannot fully play names the drum on the ready screen', as
 /* ---- lesson cards ---------------------------------------------------------- */
 
 test('a lesson card stands before a new concept, and Click is all it costs', async () => {
-  const { log } = await loadUi({ settings: PLAIN, withLessons: true });
+  const { log } = await loadUi({ settings: PLAIN, withLessons: true, walked: true });
   globalThis.init();
   ticks(2);
   continuePath();
@@ -2093,7 +2107,7 @@ test('a lesson card stands before a new concept, and Click is all it costs', asy
 });
 
 test('Back from a card returns to the list and marks nothing read; Intros off shows none', async () => {
-  await loadUi({ settings: PLAIN, withLessons: true });
+  await loadUi({ settings: PLAIN, withLessons: true, walked: true });
   globalThis.init();
   ticks(2);
   continuePath();
@@ -2113,7 +2127,7 @@ test('Back from a card returns to the list and marks nothing read; Intros off sh
 });
 
 test('Play on a card skips the reading and hears the practice', async () => {
-  const { log } = await loadUi({ settings: PLAIN, withLessons: true });
+  const { log } = await loadUi({ settings: PLAIN, withLessons: true, walked: true });
   globalThis.init();
   ticks(2);
   continuePath();
@@ -2176,7 +2190,7 @@ test('Continue alternates a due review with the next step, one each', async () =
     best: 100, bpm: 70, plays: 1, t: now - 3 * day, done: now - 3 * day, skip: 0,
     rep: { due: now - day, step: 0, at: 0, ok: false }, h: [],
   } } };
-  const { log } = await loadUi({ dataFiles: { 'progress.json': JSON.stringify(progress) } });
+  const { log } = await loadUi({ dataFiles: { 'progress.json': JSON.stringify(progress) }, walked: true });
   globalThis.init();
   ticks(2);
   assert.equal(globalThis.drumsPracticeMenu().labels[0], 'Review', 'a due review comes first');
@@ -2224,7 +2238,7 @@ test('Progress lists the tracks and what was played, and opens a chart', async (
   cc(CC.jogTurn, 127);
   ticks(1);
   const ear = drawnText(1);
-  assert.ok(ear.includes('EAR') && ear.some((t) => /learned of 7/.test(t)), ear.join('|'));
+  assert.ok(ear.includes('EAR') && ear.some((t) => /learned of 8/.test(t)), ear.join('|'));
   cc(CC.back, 127);
   ticks(1);
   assert.ok(drawnText(1).includes('PROGRESS'), 'Back from a chart returns to the list');
@@ -2424,7 +2438,7 @@ test('Guess: drum keeps the whole kit — its answer is a drum, so there is no b
 /* ---- looking back over a finished take ----------------------------------- */
 
 test('from the result the jog scrolls back through the take, and forward to the result again', async () => {
-  await loadUi({ settings: PLAIN });
+  await loadUi({ settings: PLAIN, walked: true });
   const sn = await snare();
   globalThis.init();
   ticks(2);
@@ -2446,7 +2460,7 @@ test('from the result the jog scrolls back through the take, and forward to the 
 });
 
 test('the review shows what was played: hits as rings, misses as crosses', async () => {
-  const { screen } = await loadUi({ settings: { ...PLAIN, view: 'staff' } });
+  const { screen } = await loadUi({ settings: { ...PLAIN, view: 'staff' }, walked: true });
   const sn = await snare();
   globalThis.init();
   ticks(2);
@@ -2474,7 +2488,7 @@ test('the review shows what was played: hits as rings, misses as crosses', async
 });
 
 test('knob 1 scrolls the review too, finer than the jog', async () => {
-  await loadUi({ settings: PLAIN });
+  await loadUi({ settings: PLAIN, walked: true });
   const sn = await snare();
   globalThis.init();
   ticks(2);
@@ -2964,7 +2978,7 @@ test('Click on the result of a review Continue opened goes on as Continue would'
     best: 100, bpm: 70, plays: 1, t: now - 3 * day, done: now - 3 * day, skip: 0,
     rep: { due: now - day, step: 0, at: 0, ok: false }, h: [],
   } } };
-  const { log } = await loadUi({ settings: PLAIN, dataFiles: { 'progress.json': JSON.stringify(progress) } });
+  const { log } = await loadUi({ settings: PLAIN, dataFiles: { 'progress.json': JSON.stringify(progress) }, walked: true });
   globalThis.init();
   ticks(2);
   cc(CC.jogClick, 127);                      /* Review: Flam */
@@ -3062,7 +3076,7 @@ test('pads make no sound on the map, and are the kit again in a list', async () 
 
 test('on the map the pads light its places, and Play is Continue', async () => {
   const PAD = await import('../src/padmap.mjs');
-  const { log } = await loadUi();
+  const { log } = await loadUi({ walked: true });
   globalThis.init();
   ticks(2);
   goTo('Path');
@@ -3137,4 +3151,92 @@ test('Back and Menu light: Menu always, Back while there is somewhere to go back
   ticks(30);
   assert.equal(last(CC.back), 0, 'left lit after closing');
   assert.equal(last(CC.menu), 0);
+});
+
+/* ---- Meet the pads ------------------------------------------------------ */
+
+/* The pulsing pads (LED_PROMPT on the pulse's lit half), over half a second. */
+function pulsing(log) {
+  const lit = new Set();
+  for (let i = 0; i < 25; i++) {
+    ticks(1);
+    for (const [n, c] of Object.entries(padColours(log))) if (c === PADMAP.LED_PROMPT) lit.add(Number(n));
+  }
+  return [...lit].sort((a, b) => a - b);
+}
+
+test('Meet the pads: Continue opens it first, the drum pulses and sounds, its pad moves on', async () => {
+  const { log } = await loadUi({ settings: PLAIN, withLessons: true });
+  globalThis.init();
+  ticks(2);
+  /* Continue's first offer; too long for the row, so the title bar names it. */
+  assert.ok(drawnText(1).includes('MEET THE PADS'), drawnText(1).join('|'));
+  goTo('Continue');
+  ticks(1);
+  /* The stage's card, then the tour's own. */
+  assert.ok(drawnText(1).includes('0 Hello, kit'), drawnText(1).join('|'));
+  cc(CC.jogClick, 127); ticks(1);
+  assert.ok(drawnText(1).includes('Meet the pads'), drawnText(1).join('|'));
+  const before = log.params.filter(isHit).length;
+  cc(CC.jogClick, 127); ticks(2);
+  let shown = drawnText(1);
+  assert.ok(shown.includes('Kick') && shown.includes('1/16'), shown.join('|'));
+  assert.ok(shown.includes('PAD hit lit  JOG skip'), shown.join('|'));
+  assert.equal(log.params.filter(isHit).length, before + 1, 'the kick is heard once');
+  assert.deepEqual(pulsing(log), PADMAP.padsForVoice('KK', 'mpc'), 'the kick pulses on both halves');
+  cc(CC.play, 127); ticks(1);
+  assert.equal(log.params.filter(isHit).length, before + 2, 'Play sounds it again');
+  cc(CC.menu, 127);
+  assert.ok(globalThis.drumsPracticeScreen().help.includes('PAD    hit lit'), 'MENU is the tour\'s help');
+  cc(CC.menu, 127);
+
+  /* Another pad sounds and is named; the kick still waits. */
+  const sn = PADMAP.padsForVoice('SN', 'mpc')[1];
+  pad(sn, 100); pad(sn, 0); ticks(30);
+  assert.ok(drawnText(1).includes('1/16'), 'a wrong pad moved the tour on');
+  pad(sn, 100); pad(sn, 0); ticks(1);
+  assert.ok(drawnText(1).includes('That was the snare.'), drawnText(1).join('|'));
+
+  /* The right pad: a moment, then the next drum. */
+  const kk = PADMAP.padsForVoice('KK', 'mpc')[1];
+  pad(kk, 100); pad(kk, 0); ticks(30);
+  shown = drawnText(1);
+  assert.ok(shown.includes('Snare') && shown.includes('2/16'), shown.join('|'));
+
+  /* The jog skips; the rest walked by their pads, to the end. */
+  cc(CC.jogTurn, 1); ticks(1);
+  assert.ok(drawnText(1).includes('3/16'), drawnText(1).join('|'));
+  for (let i = 3; i <= 16; i++) {
+    const voice = drawnText(1)[0];
+    const v = VOICES.find((x) => x.label === voice);
+    assert.ok(v, `no drum called "${voice}"`);
+    const p = PADMAP.padsForVoice(v.id, 'mpc')[0];
+    pad(p, 100); pad(p, 0); ticks(30);
+  }
+  for (let i = 0; i < 200 && !drawnText(1).includes('CLICK next  BACK list'); i++) ticks(1);
+  shown = drawnText(1);
+  assert.ok(shown.includes('Your kit') && shown.includes('CLICK next  BACK list'), shown.join('|'));
+  /* Click goes on along the Ear track: Guess: drum, after its card. */
+  cc(CC.jogClick, 127); ticks(1);
+  assert.ok(drawnText(1).includes('The kit on paper'), drawnText(1).join('|'));
+  cc(CC.jogClick, 127); ticks(2);
+  assert.ok(drawnText(1).some((t) => /GUESS: DRUM/.test(t)), drawnText(1).join('|'));
+  globalThis.onUnload();
+  const saved = JSON.parse(log.writes[`${DATA}progress.json`]);
+  assert.ok(saved.items['tour:pads'].done > 0, 'the tour was not recorded');
+  assert.equal(saved.items['tour:pads'].plays, 1);
+});
+
+test('Meet the pads: Back leaves it unrecorded; on Sticking it tours the kit', async () => {
+  const { log } = await loadUi({ settings: { ...PLAIN, layout: 'sticking' } });
+  globalThis.init();
+  ticks(2);
+  continuePath();
+  assert.ok(drawnText(1).includes('1/16'), `Sticking tours the kit: ${drawnText(1).join('|')}`);
+  cc(CC.jogTurn, 1); ticks(1);
+  cc(CC.back, 127); ticks(1);
+  assert.ok(drawnText(1).includes('MEET THE PADS'), drawnText(1).join('|'));
+  globalThis.onUnload();
+  const text = log.writes[`${DATA}progress.json`];
+  assert.ok(!text || !JSON.parse(text).items['tour:pads'], 'Back recorded the tour');
 });

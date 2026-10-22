@@ -39,6 +39,8 @@ export const SCREENS = Object.freeze({
   /* A folder of the Path shown as its map (map_places.mjs): ui.js keeps the
    * screen MENU and draws the map when the open folder is one. */
   MAP: 'map',
+  /* Meet the pads (pad_tour.mjs). */
+  TOUR: 'tour',
 });
 
 const S = SCREENS;
@@ -66,6 +68,13 @@ export function keysFor(screen, st = {}) {
     case S.MAP:
       return { keys: [['PAD', 'go'], ['CLICK', 'enter'], ['PLAY', 'continue'], ['MENU', 'help']],
         shift: [['CLICK', 'options'], QUIT] };
+    case S.TOUR: {
+      let keys;
+      if (st.done) keys = [['CLICK', 'next'], ['BACK', 'list']];
+      else if (st.sounding) keys = [['JOG', 'skip'], ['BACK', 'list']];
+      else keys = [['PAD', 'hit lit'], ['JOG', 'skip'], ['PLAY', 'again'], ['BACK', 'list']];
+      return { keys, shift: [SETTINGS, QUIT] };
+    }
     case S.SHEET:
       return { keys: [['CLICK', 'do it'], ['BACK', 'close']], shift: [['CLICK', 'do it'], QUIT] };
     case S.HELP:

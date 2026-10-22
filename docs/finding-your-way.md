@@ -101,9 +101,12 @@ again. Everything due today is also in **Path › Review**.
 Example: a first session.
 
 1. Click **Continue** — `0 Hello, kit` introduces itself on a card. Click.
-2. Read the next card or not — click starts the practice either way.
-3. **REC** plays the drill and scores you; **PLAY** lets you listen first.
-4. On the result, **Click** goes on to the next step. **Back** goes back to the list.
+2. **Meet the pads**: each drum of your layout in turn, its name on screen, its pads pulsing on both
+   halves, its sound once. Strike a pulsing pad to meet the next; another pad is only named, the jog
+   skips, **PLAY** sounds it again, **Back** leaves without counting it. At the end, **Click** goes on.
+3. Read the next card or not — click starts the practice either way.
+4. **REC** plays the drill and scores you; **PLAY** lets you listen first.
+5. On the result, **Click** goes on to the next step. **Back** goes back to the list.
 
 ## The Path
 

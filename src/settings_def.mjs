@@ -129,7 +129,9 @@ export const DEFAULTS = {
    * when reading notation is the point. */
   view: 'grid',
   strictness: 'normal',
-  sticking: 'strict',
+  /* Finger drumming: either hand may take a pad, so the written R and L are a
+   * guide, shown and not judged. Strict and loose are there to opt in. */
+  sticking: 'off',
   dynamics: true,
   accentLift: 15,
   ghostDrop: 20,
@@ -151,7 +153,7 @@ export const DEFAULTS = {
 };
 
 /* Bumped whenever a migration is added below. */
-export const SETTINGS_VERSION = 4;
+export const SETTINGS_VERSION = 5;
 
 const byKey = {};
 for (let i = 0; i < ROWS.length; i++) byKey[ROWS[i].key] = ROWS[i];
@@ -273,6 +275,16 @@ export function migrate(settings, fromVersion) {
    * the new default, MPC Classic; `sticking` is still a layout and is kept.
    */
   if (from < 4) changed = true;
+
+  /*
+   * v5 — hands are not judged by default (DEFAULTS.sticking). `strict` was
+   * the only default there had ever been, so a file carrying it says nothing
+   * about a choice; as with the view at v2, it is reset exactly once.
+   */
+  if (from < 5) {
+    if (settings.sticking === 'strict') settings.sticking = DEFAULTS.sticking;
+    changed = true;
+  }
 
   settings.version = SETTINGS_VERSION;
   return changed;

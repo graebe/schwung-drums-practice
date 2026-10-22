@@ -168,12 +168,23 @@ test('the v4 migration moves the old kit layout to MPC Classic, keeps Sticking, 
   assert.equal(old.changed, true);
   assert.equal(S.loadSettings(JSON.stringify({ version: 3, layout: 'sticking' })).settings.layout, 'sticking');
   const saved = JSON.parse(S.serialiseSettings(old.settings));
-  assert.equal(saved.version, 4);
+  assert.equal(saved.version, S.SETTINGS_VERSION);
   assert.ok(!('padMap' in saved), 'the Pad map row is not a setting');
   assert.equal(S.loadSettings(S.serialiseSettings(old.settings)).changed, false);
   const s = { ...S.DEFAULTS };
   S.applySetting(s, 'padMap', 1);
   assert.deepEqual(s, { ...S.DEFAULTS }, 'turning an action row changes nothing');
+});
+
+test('the v5 migration stops judging hands: a stale strict becomes off, once; loose is a choice and stays', () => {
+  assert.equal(S.DEFAULTS.sticking, 'off');
+  const old = S.loadSettings(JSON.stringify({ version: 4, sticking: 'strict', bpm: 100 }));
+  assert.equal(old.settings.sticking, 'off');
+  assert.equal(old.changed, true);
+  assert.equal(S.loadSettings(JSON.stringify({ version: 4, sticking: 'loose' })).settings.sticking, 'loose');
+  const chosen = S.loadSettings(JSON.stringify({ version: 5, sticking: 'strict' }));
+  assert.equal(chosen.settings.sticking, 'strict', 'strict chosen after the update is kept');
+  assert.equal(chosen.changed, false);
 });
 
 test('the v2 migration moves a stale staff default to drum tab, once', () => {
