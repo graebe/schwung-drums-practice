@@ -1773,7 +1773,7 @@ test('I know this: skip on Continue moves it on to the next track', async () => 
   sheetPick('I know this: skip');
   ticks(1);
   assert.match(log.announces.join('|'), /Skipped Quarters/);
-  assert.ok(drawnText(1).includes('beat L0'), 'skipping did not move on');
+  assert.ok(drawnText(1).includes('FIRST BEAT L0'), 'skipping did not move on');
   goTo('Path', '0 Hello, kit', 'Time', 'Quarters', { open: false });
   sheetPick('Undo skip');
   toTop();
@@ -1841,7 +1841,7 @@ test('Settings › Path: a track switched off, and Continue no longer offers it'
   assert.ok(drawnText(1).includes('off'), drawnText(1).join('|'));
   toTop();
   ticks(1);
-  assert.ok(drawnText(1).includes('beat L0'), drawnText(1).join('|'));
+  assert.ok(drawnText(1).includes('FIRST BEAT L0'), drawnText(1).join('|'));
 });
 
 test('Settings › Path: the short ladder, and starting at a later stage', async () => {
@@ -1890,7 +1890,7 @@ test('stuck on a step: a hint after three failed takes, parked after six', async
   }
   toTop();
   ticks(1);
-  assert.ok(drawnText(1).includes('beat L0'), 'Continue still offers the parked step');
+  assert.ok(drawnText(1).includes('FIRST BEAT L0'), 'Continue still offers the parked step');
   globalThis.onUnload();
   assert.ok(JSON.parse(log.writes[`${DATA}progress.json`]).items['subdiv:quarters'].park > 0);
 });

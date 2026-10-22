@@ -68,24 +68,25 @@ export function prefChange(row, path, stageCount) {
 }
 
 /*
- * `text` fitted to `chars`, so a value leaves its label room on a
- * 21-character row: "Continue" and a space leave twelve. Cut at a word,
- * never inside one. A rung — "L1" — is what tells two steps of a groove
- * apart, so it is kept and the name gives way from its front:
- * "First beat L1" becomes "beat L1". Anything else loses words from its end.
+ * Continue's value in `chars`, so it leaves its label room on a 21-character
+ * row: "Continue" and a space leave twelve. The whole title when it fits;
+ * else only its rung — "L1", what tells two steps of a groove apart — or
+ * nothing at all. The title bar names the whole step while the cursor is on
+ * the row (titleWords), so the row never shows a name cut in half.
  */
 export function fitValue(text, chars) {
   const s = String(text);
   if (s.length <= chars) return s;
-  const words = s.split(' ').filter(Boolean);
-  const rung = words.length > 1 && /^L\d+$/.test(words[words.length - 1]);
-  while (words.length > 1 && words.join(' ').length > chars) {
-    if (rung && words.length > 2) words.shift();
-    else if (rung) break;
-    else words.pop();
-  }
-  const out = words.join(' ');
-  return out.length <= chars ? out : out.slice(0, chars);
+  const last = s.split(' ').filter(Boolean).pop() || '';
+  return /^L\d+$/.test(last) && last.length <= chars ? last : '';
+}
+
+/* `text` cut at a word to `chars`, for a title bar; a word too long on its
+ * own is cut. */
+export function titleWords(text, chars) {
+  const words = String(text).split(' ').filter(Boolean);
+  while (words.length > 1 && words.join(' ').length > chars) words.pop();
+  return words.join(' ').slice(0, chars);
 }
 
 const ROW_CHARS = 21;
@@ -128,11 +129,14 @@ export function pathRow(row, pc) {
   const { progress } = pc;
   if (row.continueRow) {
     const pick = pc.pick;
+    /* `title` is the whole step, for the title bar while the cursor is here. */
     if (pick && pick.kind === 'review') {
-      return { label: 'Review', value: fitValue(pc.titleOf(pick.id), ROW_CHARS - 'Review'.length - 1), mark: null };
+      const title = pc.titleOf(pick.id);
+      return { label: 'Review', value: fitValue(title, ROW_CHARS - 'Review'.length - 1), mark: null, title };
     }
     const value = pick ? PLAN.stepTitle(pick.step) : 'all learned';
-    return { label: row.label, value: fitValue(value, ROW_CHARS - row.label.length - 1), mark: null };
+    return { label: row.label, value: fitValue(value, ROW_CHARS - row.label.length - 1), mark: null,
+      title: pick ? value : '' };
   }
   if (row.prefRow) return { label: row.label, value: prefValue(row, progress.path) };
   if (row.lessonsRow) return { label: row.label, value: '', mark: null };

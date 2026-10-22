@@ -27,7 +27,7 @@ const byLabel = (f, l) => f.children.find((c) => c.label === l || c.label.starts
 test('Continue names the step it opens; a step row reads its best against its target', () => {
   const p = P.emptyProgress();
   let pc = R.pathContext(p, program, T0);
-  assert.deepEqual(R.pathRow(CONTINUE, pc), { label: 'Continue', value: 'Quarters', mark: null },
+  assert.deepEqual(R.pathRow(CONTINUE, pc), { label: 'Continue', value: 'Quarters', mark: null, title: 'Quarters' },
     'the step\'s title, cut to what the row leaves it');
   assert.equal(pc.pick.step.id, 'subdiv:quarters');
   P.recordTake(p, 'subdiv:quarters', { speed: 45, accuracy: 1, sd: 10, clean: true, bpm: 45, at: T0 });
@@ -47,7 +47,8 @@ test('a due review alternates with the next step, one each, and Continue says wh
   const titleOf = (id) => (id === 'flam' ? 'A very long review title' : id);
   const review = R.pathContext(p, program, later, { turn: 'review', titleOf });
   assert.deepEqual(review.pick, { kind: 'review', id: 'flam' });
-  assert.deepEqual(R.pathRow(CONTINUE, review), { label: 'Review', value: 'A very long', mark: null });
+  assert.deepEqual(R.pathRow(CONTINUE, review),
+    { label: 'Review', value: '', mark: null, title: 'A very long review title' });
   const step = R.pathContext(p, program, later, { turn: 'step', titleOf });
   assert.equal(step.pick.kind, 'step');
   assert.equal(R.pathRow(CONTINUE, step).label, 'Continue');
@@ -58,17 +59,17 @@ test('a due review alternates with the next step, one each, and Continue says wh
   assert.equal(R.continuePick(p, done, later, 'step').kind, 'review');
   assert.equal(R.continuePick(p, done, T0, 'step'), null);
   assert.deepEqual(R.pathRow(CONTINUE, R.pathContext(p, done, T0)),
-    { label: 'Continue', value: 'all learned', mark: null });
+    { label: 'Continue', value: 'all learned', mark: null, title: '' });
 });
 
-test('a value is cut at a word to its room, and a rung is kept', () => {
-  assert.equal(R.fitValue('First beat L1', 12), 'beat L1', 'the rung tells two steps apart');
-  assert.equal(R.fitValue('Rock backbeat L2', 12), 'backbeat L2');
-  assert.equal(R.fitValue('Short', 12), 'Short');
-  assert.equal(R.fitValue('Guess: drum (kick, snare)', 12), 'Guess: drum');
-  assert.equal(R.fitValue('A very long review title', 14), 'A very long');
-  assert.equal(R.fitValue('Supercalifragilistic', 12), 'Supercalifra', 'one word too long is cut');
-  assert.equal(R.fitValue('Supercalifragilistic L3', 12), 'Supercalifra');
+test('a value is the whole step when it fits, else its rung, else nothing', () => {
+  assert.equal(R.fitValue('Quarters', 12), 'Quarters');
+  assert.equal(R.fitValue('First beat L1', 12), 'L1', 'the rung tells two steps apart');
+  assert.equal(R.fitValue('Rock backbeat L2', 12), 'L2');
+  assert.equal(R.fitValue('Guess: drum (kick, snare)', 12), '', 'no rung, no half a name');
+  assert.equal(R.titleWords('FIRST BEAT L1', 21), 'FIRST BEAT L1');
+  assert.equal(R.titleWords('GUESS: DRUM (KICK, SNARE, HAT)', 21), 'GUESS: DRUM (KICK,');
+  assert.equal(R.titleWords('SUPERCALIFRAGILISTICEXPIALIDOCIOUS', 21), 'SUPERCALIFRAGILISTICE');
 });
 
 test('a folder skip names the open steps; Undo skip names the skipped ones', () => {

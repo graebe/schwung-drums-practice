@@ -3040,8 +3040,12 @@ function draw() {
     /* A folder whose rows depend on the day — the Path's Review — can lose
      * the row the highlight was on. */
     if (top.cursor >= rows.length) top.cursor = Math.max(0, rows.length - 1);
-    const title = menuNote && now() < menuNoteUntil ? menuNote : top.node.label.toUpperCase();
-    V.drawList(ctx, { title: title.slice(0, 16), items: rows, selected: top.cursor, footer: hint });
+    /* On Continue the title bar names the whole step it opens. */
+    const on = rows[top.cursor];
+    const title = menuNote && now() < menuNoteUntil ? menuNote
+      : on && on.title ? ROWS.titleWords(on.title.toUpperCase(), H.HINT_CHARS)
+        : top.node.label.toUpperCase().slice(0, 16);
+    V.drawList(ctx, { title, items: rows, selected: top.cursor, footer: hint });
     return;
   }
   if (screen === SETTINGS) {

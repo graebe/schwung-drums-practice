@@ -88,7 +88,8 @@ back.
 ## Continue: your one button
 
 **Continue** is the top row, and the row says what it will open: `Continue   Quarters`. A long
-name gives way to fit, keeping what tells steps apart — `Continue   beat L0` for *First beat L0*.
+name that does not fit shows only its rung — `Continue   L0` for *First beat L0* — and the title bar
+names the whole step while the cursor is on the row: `FIRST BEAT L0`.
 Click it and
 you are in that step — its lesson card first if it is new, then the drill, set to the speed the step
 asks for. When you are done, **Click** on the result goes on to the next step.

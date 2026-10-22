@@ -550,7 +550,8 @@ stage is through, whatever else is open — take it at any time to test out. Clo
 does it too. The current stage is marked `▸`, a finished one ✓.
 
 **Continue**, the top row of the list, opens the next step of the current stage, from the track you
-have left longest, and names it: `Continue   Quarters`. When something you learned is due again it
+have left longest, and names it: `Continue   Quarters`. A name too long for the row shows only its
+rung (`Continue   L0`), and the title bar names the whole step while the cursor is on it. When something you learned is due again it
 offers that instead — `Review   Flam tap` — one review, then one new step, in turn.
 
 **The action sheet.** Hold **Shift** and click a row for its options. Only what applies is offered:

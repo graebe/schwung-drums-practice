@@ -213,11 +213,12 @@ if (screen) {
     V.drawPadMap(ctx, { title: lay.name, right: lay.flip ? 'flip' : '', grid: lay.grid, selected: [],
       footer: 'PAD hear CLICK edit' });
   } else if (screen === 'menu') {
-    const items = [{ label: 'Continue', value: 'Quarters' }, { label: 'Path', value: '>' },
+    /* Continue on a step too long for the row: its rung, the whole step on top. */
+    const items = [{ label: 'Continue', value: 'L0' }, { label: 'Path', value: '>' },
       { label: 'Practice', value: '>' }, { label: 'Quiz', value: '>' }, { label: 'Progress', value: '' },
       { label: 'Settings', value: '>' }];
     const shift = Boolean(arg('shift', false));
-    V.drawList(ctx, { title: 'DRUMS', items, selected: 0,
+    V.drawList(ctx, { title: 'FIRST BEAT L0', items, selected: 0,
       footer: H.hintFor(H.SCREENS.MENU, { depth: 1, shift })[0] });
   } else if (screen === 'sheet') {
     const items = [LABELS.skipAll, LABELS.start, LABELS.testOut, LABELS.lessons, LABELS.settings];
