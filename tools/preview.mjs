@@ -18,6 +18,11 @@
  *   npm run preview -- --exercise rock-backbeat --screen untimed-summary
  *   npm run preview -- --exercise kit --px 14 --film 2,8,14,20   (all 21 voices engraved)
  *   npm run preview -- --screen padmap --layout mirror --flip
+ *   npm run preview -- --screen menu      (the top list, its hint line; --shift for Shift's)
+ *   npm run preview -- --screen sheet     (the action sheet of a stage)
+ *   npm run preview -- --screen help      (MENU's help on the list; --top N scrolls it)
+ *   npm run preview -- --screen welcome --page 0|1|2
+ *   npm run preview -- --screen tip --tip sheet|practice|quiz|placement
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { createScreen, toAscii } from './screen_buffer.mjs';
@@ -33,6 +38,10 @@ import * as UT from '../src/untimed.mjs';
 import { projectLevel } from '../src/levels.mjs';
 import { VOICES } from '../src/kit.mjs';
 import { resolveLayout } from '../src/padmap.mjs';
+import * as H from '../src/hints.mjs';
+import * as HP from '../src/help.mjs';
+import * as TIPS from '../src/tips.mjs';
+import { LABELS } from '../src/row_sheet.mjs';
 
 const exDir = new URL('../src/exercises/', import.meta.url);
 
@@ -149,7 +158,7 @@ if (screen) {
       share: 90, sdMs: clean ? 14 : 12, meanMs: 3, failAcc: !clean, failSd: false,
       cause: clean ? '' : '16 soft accents 74<83', limb: 'SN +3 s12',
       series: PROG.percentSeries(h, V.SUMMARY_PLOT.w - 2, V.SUMMARY_PLOT.h - 2),
-      footer: 'REC again  CLICK next',
+      footer: H.hintFor(H.SCREENS.SUMMARY)[0],
     });
   }
   else if (screen === 'untimed-summary') {
@@ -170,14 +179,41 @@ if (screen) {
     V.drawReady(ctx, {
       run: runAt(0), chart, bpm: chart.bpm, title: chart.name,
       songBeats: Number(arg('beats', 0)), pxPerBeat: px, view,
-      dynamics: true, rightLabel: '8 bars',
+      dynamics: true, rightLabel: '8 bars', hint: H.hintFor(H.SCREENS.READY)[0],
     });
   } else if (screen === 'padmap') {
     const lay = resolveLayout(String(arg('layout', 'mpc')), { flip: Boolean(arg('flip', false)) });
     V.drawPadMap(ctx, { title: lay.name, right: lay.flip ? 'flip' : '', grid: lay.grid, selected: [],
       footer: 'PAD hear CLICK edit' });
   } else if (screen === 'menu') {
-    V.drawList(ctx, { title: 'DRUMS', items: drills.map((d) => d.name), selected: 3 });
+    const items = [{ label: 'Continue', value: 'Quarters' }, { label: 'Path', value: '>' },
+      { label: 'Practice', value: '>' }, { label: 'Quiz', value: '>' }, { label: 'Progress', value: '' },
+      { label: 'Settings', value: '>' }];
+    const shift = Boolean(arg('shift', false));
+    V.drawList(ctx, { title: 'DRUMS', items, selected: 0,
+      footer: H.hintFor(H.SCREENS.MENU, { depth: 1, shift })[0] });
+  } else if (screen === 'sheet') {
+    const items = [LABELS.skipAll, LABELS.start, LABELS.testOut, LABELS.lessons, LABELS.settings];
+    V.drawList(ctx, { title: '1 EIGHTH NOTES', items, selected: 0, footer: H.hintFor(H.SCREENS.SHEET)[0] });
+  } else if (screen === 'help') {
+    const help = JSON.parse(readFileSync(new URL('../src/help.json', import.meta.url), 'utf8'));
+    const topics = HP.parseHelp(JSON.stringify(help));
+    const page = HP.helpPage(H.SCREENS.MENU, { st: { depth: 2, section: 'Path' }, topics });
+    V.drawHelp(ctx, { title: page.title, lines: page.lines, top: Number(arg('top', 0)), rows: HP.HELP_LINES,
+      footer: H.hintFor(H.SCREENS.HELP)[0] });
+  } else if (screen === 'welcome') {
+    const n = Number(arg('page', 0));
+    const page = TIPS.welcomePages()[n];
+    const footer = H.hintFor(H.SCREENS.WELCOME, { page: n })[0];
+    if (page.choices) V.drawList(ctx, { title: page.title, items: page.choices, selected: 0, footer });
+    else {
+      V.drawCard(ctx, { title: page.title, page: n, pages: 3, footer,
+        lines: page.lines || TIPS.wrapParas(page.paras, L.SCREEN_W - 2, (t) => ctx.textWidth(t)) });
+    }
+  } else if (screen === 'tip') {
+    const key = String(arg('tip', 'sheet'));
+    V.drawCard(ctx, { title: TIPS.TIP_TITLE, footer: H.hintFor(H.SCREENS.TIP)[0],
+      lines: TIPS.wrapParas(TIPS.TIPS[key] || [], L.SCREEN_W - 2, (t) => ctx.textWidth(t)) });
   } else if (screen === 'progress') {
     const h = [70, 75, 80, 78, 85, 90, 95, 100].map((pct, i) => [i, pct, 93, 24 - i * 2, i === 3 ? 4 : 5]);
     V.drawProgress(ctx, {

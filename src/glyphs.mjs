@@ -179,7 +179,7 @@ export function drawScrubGlyph(ctx, x, y) {
  *   done   ✓  learned: clean at tempo
  *   tried  ○  played, never clean yet
  *   skip   »  skipped on purpose
- *   next   ▸  the Learning Path's next step
+ *   next   ▸  the Path's next step
  * Drawn in the row's own colour, so they read on the highlight too.
  */
 const MARK_ROWS = {

@@ -35,7 +35,7 @@ import * as B from './beam.mjs';
 import { entriesIn } from './scoring.mjs';
 import { beatsPerBar } from './chart.mjs';
 import { voicesInChart } from './kit.mjs';
-import { drawHeader, drawFooter, drawBarRuler, drawLaneCallout } from './chrome.mjs';
+import { drawHeader, drawFooter, drawHint, drawBarRuler, drawLaneCallout } from './chrome.mjs';
 import { drawPlayGlyph, drawRecordGlyph, drawScrubGlyph } from './glyphs.mjs';
 
 /* Where a page starts and how wide a beat is on it, for this view. */
@@ -57,7 +57,7 @@ export function pageBar(run, cursor, perBar) {
 
 /*
  * s = { run, chart, view, lanes, voices, dynamics, cursor, title, rightLabel,
- *       footerRight, progress, paused, done }
+ *       footerRight, progress, paused, done, hint }
  *   cursor   the entry the take waits on; past the end once it is through
  *   done     the take is through: no cursor, and a double bar for the peek
  */
@@ -82,7 +82,9 @@ export function drawUntimedView(ctx, s) {
   if (curItem) drawArrow(ctx, Math.round(curItem.x));
 
   drawUnder(ctx, s, page, bar, curItem, left, px, perBar);
-  drawFooter(ctx, s.progress || 0, s.footerRight || '');
+  /* The hint line takes the footer's band when there is one to show. */
+  if (s.hint) drawHint(ctx, s.hint);
+  else drawFooter(ctx, s.progress || 0, s.footerRight || '');
   if (s.paused) drawLaneCallout(ctx, 'PAUSED');
 }
 

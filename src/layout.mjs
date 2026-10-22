@@ -218,6 +218,12 @@ export const UNDER_LANE_Y = 49;
  * breakdown is on the result screen.
  */
 export const FOOTER_Y = 58;
+/*
+ * The hint line: what the keys do on this screen (hints.mjs), centred along
+ * the bottom edge where the footer bar sits — as Piano Practice draws it. A
+ * list keeps four rows above it, 11 to 46.
+ */
+export const HINT_Y = FOOTER_Y - 2;
 export const PROGRESS_H = 3;
 export const FOOTER_BAR_W = SCREEN_W - 44;
 

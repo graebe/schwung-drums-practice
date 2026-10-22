@@ -125,13 +125,31 @@ export function drawLaneCallout(ctx, text) {
   ctx.text((L.SCREEN_W >> 1) - (w >> 1), L.UNDER_LANE_Y, label, 0);
 }
 
+/* ---- The hint line -------------------------------------------------------- */
+/*
+ * One line along the bottom edge naming the keys (hints.mjs): centred, fitted,
+ * and drawn over whatever the band held — the ready screen's empty progress
+ * bar, a paused take's — so any screen can carry it.
+ */
+export function drawHint(ctx, text) {
+  if (!text) return;
+  ctx.fillRect(0, L.HINT_Y, L.SCREEN_W, L.SCREEN_H - L.HINT_Y, 0);
+  const s = fitText(ctx, text, L.TEXT_MAX_PX);
+  ctx.text((L.SCREEN_W - ctx.textWidth(s)) >> 1, L.HINT_Y, s, 1);
+}
+
 /* ---- Lists (the menu and the settings page) ----------------------------- */
 /*
  * One list renderer for both, because they are the same thing: rows, one
  * highlighted, scrolled to keep the highlight on screen. The window is kept
  * so the selection never sits against an edge while there is more to see.
+ *
+ * Four rows and the hint line under them, as in Piano Practice: a fifth row
+ * left no room to say which keys work.
  */
-export const LIST_ROWS = 5;
+export const LIST_ROWS = 4;
+const LIST_TOP = 10;
+const LIST_BAND = LIST_ROWS * (L.TEXT_H + 2);
 
 export function listWindow(count, selected, rows = LIST_ROWS) {
   if (count <= rows) return 0;
@@ -152,7 +170,7 @@ export function pageTop(count, selected, rows = LIST_ROWS) {
   return Math.floor(Math.max(0, selected) / rows) * rows;
 }
 
-export function drawList(ctx, { title, items, selected, right, top: fixedTop }) {
+export function drawList(ctx, { title, items, selected, right, top: fixedTop, footer }) {
   ctx.clear();
   ctx.text(1, 0, title || '', 1);
   if (right) ctx.text(L.SCREEN_W - ctx.textWidth(right) - 1, 0, right, 1);
@@ -161,7 +179,7 @@ export function drawList(ctx, { title, items, selected, right, top: fixedTop }) 
   const top = fixedTop === undefined ? listWindow(items.length, selected) : fixedTop;
   for (let i = 0; i < LIST_ROWS && top + i < items.length; i++) {
     const idx = top + i;
-    const y = 11 + i * (L.TEXT_H + 2);
+    const y = LIST_TOP + 1 + i * (L.TEXT_H + 2);
     const item = items[idx];
     const label = typeof item === 'string' ? item : item.label;
     const value = typeof item === 'string' ? '' : item.value || '';
@@ -178,10 +196,11 @@ export function drawList(ctx, { title, items, selected, right, top: fixedTop }) 
   }
   /* A scrollbar, so a long list does not look like a short one. */
   if (items.length > LIST_ROWS) {
-    const h = Math.max(3, Math.round((LIST_ROWS / items.length) * 44));
-    const y = 10 + Math.round((top / (items.length - LIST_ROWS)) * (44 - h));
+    const h = Math.max(3, Math.round((LIST_ROWS / items.length) * LIST_BAND));
+    const y = LIST_TOP + Math.round((top / (items.length - LIST_ROWS)) * (LIST_BAND - h));
     ctx.fillRect(L.SCREEN_W - 1, y, 1, h, 1);
   }
+  drawHint(ctx, footer);
 }
 
 /* `text` cut to fit `maxPx`, so it never runs under what sits beside it. */

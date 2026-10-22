@@ -7,12 +7,12 @@
  *
  * A card names ONE concept — what a ghost note is, where you hear it, what to
  * listen for — in a screen or two, and stands before the first step of the
- * Learning Path that needs it. One card per concept, not per drill, so a
+ * Path that needs it. One card per concept, not per drill, so a
  * concept is explained once and the cards read as a thread through the
  * course; each stage has a card of its own, what that world is.
  *
  * A card is never in the way. Click starts the practice — one press, read or
- * not — and Intros in Your path says whether cards show once (new), every
+ * not — and Settings › Path › Intros says whether cards show once (new), every
  * time (always) or never (off). Each stage folder lists its cards under
  * Lessons, to read again at any time.
  *

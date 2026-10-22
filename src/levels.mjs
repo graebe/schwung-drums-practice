@@ -143,7 +143,7 @@ export function projectLevel(chart, levelId) {
  * has two, not four with duplicates.
  */
 /*
- * Remembered per chart object: the drill tree, the Learning Path and the
+ * Remembered per chart object: the drill tree, the Path and the
  * folder sums all ask for every groove's rungs, and projecting four levels of
  * forty grooves is most of what opening the module costs. A loaded chart is
  * never changed afterwards — arming one makes a copy — so the answer holds.

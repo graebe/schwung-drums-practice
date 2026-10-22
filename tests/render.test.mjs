@@ -1058,3 +1058,66 @@ test('the page marks its beats on the rule under the chart', () => {
     assert.ok(isOn(ctx, Math.round(left + b * px), L.UNDER_TICK_Y), `no tick on beat ${b + 1}`);
   }
 });
+
+/* ---- the list, its hint line, and help ---------------------------------- */
+
+test('a list shows four rows and the hint line under them, clear of each other', async () => {
+  const V = await import('../src/view.mjs');
+  assert.equal(V.LIST_ROWS, 4);
+  const ctx = createScreen();
+  const items = ['Continue', 'Path', 'Practice', 'Quiz', 'Progress', 'Settings'].map((label) => ({ label, value: '>' }));
+  const texts = [];
+  const text = ctx.text.bind(ctx);
+  ctx.text = (x, y, s, v) => { texts.push({ x, y, s }); text(x, y, s, v); };
+  V.drawList(ctx, { title: 'DRUMS', items, selected: 0, footer: 'CLICK open  MENU help' });
+  const rows = texts.filter((t) => t.s !== '>' && t.s !== 'DRUMS' && t.s !== 'CLICK open  MENU help');
+  assert.deepEqual(rows.map((t) => t.s), ['Continue', 'Path', 'Practice', 'Quiz'], 'four rows, no fifth');
+  const hint = texts.find((t) => t.s === 'CLICK open  MENU help');
+  assert.equal(hint.y, L.HINT_Y);
+  assert.equal(hint.x, (L.SCREEN_W - ctx.textWidth(hint.s)) >> 1, 'centred');
+  const last = Math.max(...rows.map((t) => t.y));
+  assert.ok(last + L.TEXT_H < L.HINT_Y, 'the last row runs into the hint line');
+  /* The scrollbar stays above the hint line too. */
+  for (let y = L.HINT_Y; y < L.SCREEN_H; y++) assert.equal(isOn(ctx, L.SCREEN_W - 1, y), false);
+});
+
+test('the hint line clears its band, so it can stand over a footer', async () => {
+  const V = await import('../src/view.mjs');
+  const ctx = createScreen();
+  ctx.fillRect(0, 0, L.SCREEN_W, L.SCREEN_H, 1);
+  V.drawHint(ctx, 'REC start');
+  assert.ok(countOn(ctx, 0, L.HINT_Y, L.SCREEN_W, L.SCREEN_H - L.HINT_Y) < 300, 'the band was not cleared');
+  assert.equal(isOn(ctx, 0, L.HINT_Y - 1), true, 'it cleared above its band');
+  const before = countOn(ctx, 0, 0, L.SCREEN_W, L.SCREEN_H);
+  V.drawHint(ctx, '');
+  assert.equal(countOn(ctx, 0, 0, L.SCREEN_W, L.SCREEN_H), before, 'an empty hint draws nothing');
+});
+
+test('the reading view gives its footer band to a hint when there is one', () => {
+  const chart = subdivisionDrill({ subdiv: 'eighths', bpm: 90 });
+  const run = createRun(chart, { repeats: 0, sticking: 'off' });
+  ensureEntries(run, 8);
+  const ctx = createScreen();
+  const texts = [];
+  const text = ctx.text.bind(ctx);
+  ctx.text = (x, y, s, v) => { texts.push(s); text(x, y, s, v); };
+  drawReadingView(ctx, { run, chart, songBeats: 0, view: 'grid', title: 'X', bpm: 90, hint: 'REC start' });
+  assert.ok(texts.includes('REC start'));
+  assert.equal(isOn(ctx, 1, L.FOOTER_Y), false, 'the progress bar is under the hint');
+});
+
+test('the help page scrolls its lines under a counter, with a scrollbar', async () => {
+  const V = await import('../src/view.mjs');
+  const ctx = createScreen();
+  const texts = [];
+  const text = ctx.text.bind(ctx);
+  ctx.text = (x, y, s, v) => { texts.push(s); text(x, y, s, v); };
+  const lines = Array.from({ length: 12 }, (_, i) => `line ${i}`);
+  V.drawHelp(ctx, { title: 'HELP: LIST', lines, top: 3, rows: 6, footer: 'JOG scroll' });
+  assert.ok(texts.includes('HELP: LIST') && texts.includes('9/12') && texts.includes('JOG scroll'));
+  assert.deepEqual(texts.filter((t) => /^line/.test(t)), ['line 3', 'line 4', 'line 5', 'line 6', 'line 7', 'line 8']);
+  assert.ok(countOn(ctx, L.SCREEN_W - 1, 10, 1, 42) >= 3, 'no scrollbar');
+  texts.length = 0;
+  V.drawHelp(ctx, { lines: ['short'] });
+  assert.ok(texts.includes('HELP') && texts.includes('short'));
+});

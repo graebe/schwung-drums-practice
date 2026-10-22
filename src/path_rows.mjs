@@ -2,49 +2,60 @@
 // Copyright (C) 2026 Torben Gräber
 
 /*
- * path_rows.mjs — what the Learning Path's rows say, and what clicking its
- * own rows changes. Pure.
+ * path_rows.mjs — what the Path's rows say, what Continue offers, and what
+ * a click on a Settings › Path row changes. Pure.
  *
  * The path folder (program.mjs programFolder) holds what the path IS:
- * stages, tracks, steps, and rows with a job — Continue, Skip, Skip all here,
- * Your path. What each row SAYS depends on how far you have got, and what a
- * click on it changes depends on your progress and your choices; both are
- * decided here from the progress, so ui.js only applies and saves them.
+ * stages, tracks, steps. What each row SAYS depends on how far you have got,
+ * and what Continue opens depends on your progress, your choices and what is
+ * due again today; all of it is decided here from the progress, so ui.js only
+ * applies and saves it.
  */
 
 import * as PLAN from './program.mjs';
-import { item, itemMark, itemValue, isParked, MARK_DONE, MARK_NEXT, MARK_SKIP, MARK_TRIED,
-         INTROS } from './progress.mjs';
+import { item, itemMark, itemValue, isParked, repetitionSession, MARK_DONE, MARK_NEXT, MARK_SKIP,
+         MARK_TRIED, INTROS } from './progress.mjs';
 import { isUntimedId } from './ids.mjs';
 import { isFolder } from './catalog.mjs';
 
+/* The items due again today, most pressing first (progress.mjs). */
+export function dueReviews(progress, atMs) {
+  return repetitionSession(progress, atMs).filter((r) => !r.done).map((r) => r.id);
+}
+
+/*
+ * What Continue opens: a review or the next step. When reviews are due it
+ * alternates — one review, then one new step — on `turn`, which the caller
+ * keeps for the session and turns over each time Continue is used. With no
+ * new step left it offers reviews only; with none due, new steps only.
+ * Returns { kind: 'review', id } | { kind: 'step', step, stage } | null.
+ */
+export function continuePick(progress, program, atMs, turn = 'review') {
+  const due = dueReviews(progress, atMs);
+  const next = PLAN.continueStep(progress, program, atMs);
+  if (due.length && (!next || turn === 'review')) return { kind: 'review', id: due[0] };
+  return next ? { kind: 'step', step: next.step, stage: next.stage } : null;
+}
+
 /* What the list needs to know once for all of a folder's rows: the step
- * Continue would open (marked ▸) and the stage you are in. */
-export function pathContext(progress, program, atMs) {
+ * Continue would open (marked ▸), what Continue offers, and the stage you
+ * are in. `titleOf` names an item for a review. */
+export function pathContext(progress, program, atMs, { turn = 'review', titleOf = (id) => id } = {}) {
   const next = PLAN.continueStep(progress, program, atMs);
-  return { progress, program, atMs, nextKey: next ? next.step.key : '', next,
-    current: PLAN.currentStage(progress, program) };
+  return { progress, program, atMs, nextKey: next ? next.step.key : '', next, titleOf,
+    pick: continuePick(progress, program, atMs, turn), current: PLAN.currentStage(progress, program) };
 }
 
-/* What a "Skip" row skips: the next open step of its folder, or, at the top
- * of the path, the step Continue would open. */
-export function skipTarget(row, progress, program, atMs) {
-  if (row.scope) return PLAN.nextOpen(progress, row.scope, atMs);
-  const next = PLAN.continueStep(progress, program, atMs);
-  return next ? next.step : null;
-}
-
-/* "Skip all here": the open steps of the folder to skip — or, when nothing in
- * it is left to skip, the skips to take back. One row, so it is never more
- * than a click to undo. */
+/* "I know all this: skip" on a folder: the open steps it would skip, and the
+ * skipped ones "Undo skip" would take back. */
 export function skipAllChange(scope, progress) {
   const open = scope.filter((st) => !PLAN.stepDone(progress, st) && !PLAN.stepSkipped(progress, st));
-  if (open.length) return { skip: open.map((st) => st.id) };
-  return { unskip: scope.filter((st) => PLAN.stepSkipped(progress, st)).map((st) => st.id) };
+  return { skip: open.map((st) => st.id),
+    unskip: scope.filter((st) => PLAN.stepSkipped(progress, st)).map((st) => st.id) };
 }
 
-/* A row of Your path, clicked: a track or style toggled, or a choice moved
- * on to its next value. */
+/* A row of Settings › Path, clicked: a track or style toggled, or a choice
+ * moved on to its next value. */
 export function prefChange(row, path, stageCount) {
   if (row.group === 'tracks' || row.group === 'styles') return { toggle: [row.group, row.key] };
   if (row.group === 'rungs') return { set: ['rungs', path.rungs === 'full' ? 'short' : 'full'] };
@@ -56,7 +67,16 @@ export function prefChange(row, path, stageCount) {
   return {};
 }
 
-/* What a Your path row shows as its value. */
+/* `text` cut to `chars`, so a value leaves its label room on a 21-character
+ * row: "Continue" and a space leave twelve. */
+export function fitValue(text, chars) {
+  const s = String(text);
+  return s.length <= chars ? s : s.slice(0, chars).trimEnd();
+}
+
+const ROW_CHARS = 21;
+
+/* What a Settings › Path row shows as its value. */
 export function prefValue(row, path) {
   if (row.group === 'tracks' || row.group === 'styles') return path[row.group][row.key] ? 'on' : 'off';
   if (row.group === 'start') return `Stage ${path.start || 0}`;
@@ -85,24 +105,20 @@ export function stepRowOf(row, pc) {
 }
 
 /*
- * A row of the Learning Path as the list shows it, or null for a row this
- * module does not speak for (a library drill, Repetition, a plain folder),
- * which the caller decorates as it does everywhere else.
+ * A row of the Path as the list shows it — and the Continue row, and the
+ * rows of Settings › Path — or null for a row this module does not speak for
+ * (a library drill, Review, a plain folder), which the caller decorates as it
+ * does everywhere else.
  */
 export function pathRow(row, pc) {
-  const { progress, program } = pc;
+  const { progress } = pc;
   if (row.continueRow) {
-    return pc.next
-      ? { label: `Next: ${PLAN.stepTitle(pc.next.step)}`, value: '', mark: MARK_NEXT }
-      : { label: 'All learned', value: '', mark: MARK_DONE };
-  }
-  if (row.skipRow) {
-    const next = skipTarget(row, progress, program, pc.atMs);
-    return { label: next ? `Skip: ${PLAN.stepTitle(next)}` : 'Skip: nothing left', value: '' };
-  }
-  if (row.skipAllRow) {
-    const change = skipAllChange(row.scope, progress);
-    return { label: change.unskip && change.unskip.length ? 'Unskip all here' : 'Skip all here', value: '' };
+    const pick = pc.pick;
+    if (pick && pick.kind === 'review') {
+      return { label: 'Review', value: fitValue(pc.titleOf(pick.id), ROW_CHARS - 'Review'.length - 1), mark: null };
+    }
+    const value = pick ? PLAN.stepTitle(pick.step) : 'all learned';
+    return { label: row.label, value: fitValue(value, ROW_CHARS - row.label.length - 1), mark: null };
   }
   if (row.prefRow) return { label: row.label, value: prefValue(row, progress.path) };
   if (row.lessonsRow) return { label: row.label, value: '', mark: null };

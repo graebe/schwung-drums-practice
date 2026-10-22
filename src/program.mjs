@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Torben Gräber
 
 /*
- * program.mjs — the Learning Path: what to practise next. Pure.
+ * program.mjs — the Path: what to practise next. Pure.
  *
  * SEVEN STAGES, each one musical world — the kit, eighth notes, sixteenths and
  * dynamics, ghosts and independence, triplets and swing, clave, and the pro
@@ -546,7 +546,7 @@ export function stageComplete(progress, stage) {
 /* The stage the learner is in: the first not through, from where they chose
  * to start. Null when every stage from there is through. */
 export function currentStage(progress, program) {
-  const start = Math.min(prefsOf(progress).start || 0, program.stages.length - 1);
+  const start = Math.max(0, Math.min(prefsOf(progress).start || 0, program.stages.length - 1));
   for (let i = start; i < program.stages.length; i++) {
     if (!stageComplete(progress, program.stages[i])) return program.stages[i];
   }
@@ -617,11 +617,6 @@ export function stepAfter(progress, program, step, atMs = Date.now()) {
   }
   const next = continueStep(progress, program, atMs, step.key);
   return next ? next.step : null;
-}
-
-/* The first open step of a list, for a scoped "Skip:" row. */
-export function nextOpen(progress, steps, atMs = Date.now()) {
-  return steps.find((st) => open(progress, st, atMs)) || null;
 }
 
 export function findStep(program, key) {
@@ -719,47 +714,55 @@ function stepRows(steps) {
       continue;
     }
     const name = st.title.slice(0, st.title.lastIndexOf(' '));
-    rows.push({ label: name, value: '>', steps: g,
-      children: [{ label: 'Skip all here', value: '', skipAllRow: true, scope: g }, ...g.map(stepRow)] });
+    rows.push({ label: name, value: '>', steps: g, children: g.map(stepRow) });
   }
   return rows;
 }
 
-function scopedRows(steps) {
-  return [
-    { label: 'Skip next', value: '', skipRow: true, scope: steps },
-    { label: 'Skip all here', value: '', skipAllRow: true, scope: steps },
-  ];
-}
+/*
+ * A stage's places in the order a lesson takes them — orient, hear, pattern,
+ * apply, show: the lesson cards, the ear, time and hands, the grooves that put
+ * them to use, the electives, and last the checkpoint, the piece that proves
+ * the stage. Continue still walks the tracks in TRACKS order; this is only the
+ * order the folder lists them in. The rows with a job — skip a step, skip a
+ * folder, start here, test out — are in the action sheet (row_sheet.mjs), not
+ * among the content.
+ */
+export const FOLDER_TRACKS = ['ear', 'time', 'hands', 'grooves'];
 
 function stageFolder(stage) {
   const core = stepsOf(stage.core, {});
-  const children = [...scopedRows(core)];
-  const cp = checkpointSteps(stage, {});
-  if (cp.length) children.push({ ...stepRow(cp[0]), label: `Checkpoint: ${stepTitle(cp[0])}`, checkpoint: true });
-  children.push({ label: 'Lessons', value: '', lessonsRow: true, stage });
-  for (const t of TRACKS) {
-    const steps = core.filter((st) => st.track === t.key);
+  const children = [{ label: 'Lessons', value: '', lessonsRow: true, stage }];
+  for (const key of FOLDER_TRACKS) {
+    const steps = core.filter((st) => st.track === key);
     if (!steps.length) continue;
-    children.push({ label: t.name, value: '>', trackKey: t.key, steps,
-      children: [...scopedRows(steps), ...stepRows(steps)] });
+    const t = TRACKS.find((x) => x.key === key);
+    children.push({ label: t.name, value: '>', trackKey: key, steps, children: stepRows(steps) });
   }
   const el = electiveSteps(stage, {});
   if (el.length) children.push({ label: 'Electives', value: '>', steps: el, electives: true, children: stepRows(el) });
+  const cp = checkpointSteps(stage, {});
+  if (cp.length) children.push({ ...stepRow(cp[0]), label: 'Checkpoint', checkpoint: true });
   return { label: `${stage.index} ${stage.name}`, value: '>', stage, steps: core, children };
 }
 
 const pref = (label, group, key) => ({ label, value: '', prefRow: true, group, key });
 
-function pathFolder() {
+/*
+ * Settings › Path: what Continue offers — the tracks and styles on or off,
+ * the full ladder of a groove or its first and last rung, the stage to start
+ * at, and how the lesson cards show. `styles` are the groove families.
+ */
+export function pathSettingsFolder(styles = []) {
   return {
-    label: 'Your path',
+    label: 'Path',
     value: '>',
     untracked: true,
     children: [
       { label: 'Tracks', value: '>', untracked: true,
         children: TRACKS.map((t) => pref(t.name, 'tracks', t.key)) },
-      { label: 'Styles', value: '>', untracked: true, styleRows: true, children: [] },
+      { label: 'Styles', value: '>', untracked: true, styleRows: true,
+        children: styles.map((c) => pref(c.name, 'styles', c.id)) },
       pref('Rungs', 'rungs', ''),
       pref('Start at', 'start', ''),
       pref('Intros', 'intros', ''),
@@ -768,32 +771,29 @@ function pathFolder() {
 }
 
 /*
- * The Learning Path folder. Continue, Skip, the path's settings and
- * Repetition are rows ui.js gives meaning to; Repetition's rows depend on the
- * day, so the caller supplies them as a function and the folder sums leave
- * them out. `styles` are the groove families, for the Styles rows.
+ * The Path folder: the stages, then Review — what is due again today — only
+ * while it holds something. Review's rows depend on the day, so the caller
+ * supplies them as a function, and the folder sums leave them out.
  */
-export function programFolder(program, repetitionRows = () => [], styles = []) {
-  const yours = pathFolder();
-  yours.children[1].children = styles.map((c) => pref(c.name, 'styles', c.id));
+export function programFolder(program, reviewRows = () => []) {
+  const stages = program.stages.map(stageFolder);
+  const review = {
+    label: 'Review',
+    value: '>',
+    review: true,
+    untracked: true,
+    /* Asked for each time: what is due changes with the day — and should
+     * the last of it go while the folder is open, it says so. */
+    get children() {
+      const rows = reviewRows();
+      return rows.length ? rows : [{ label: 'Nothing due today', value: '' }];
+    },
+  };
   return {
-    label: 'Learning Path',
+    label: 'Path',
     value: '>',
     /* Its rows point back into the tree rather than holding drills. */
     pointers: true,
-    children: [
-      { label: 'Continue', value: '', continueRow: true },
-      { label: 'Skip next', value: '', skipRow: true },
-      yours,
-      ...program.stages.map(stageFolder),
-      {
-        label: 'Repetition',
-        value: '>',
-        repetition: true,
-        untracked: true,
-        /* Asked for each time: what is due changes with the day. */
-        get children() { return repetitionRows(); },
-      },
-    ],
+    get children() { return reviewRows().length ? stages.concat(review) : stages; },
   };
 }

@@ -50,7 +50,7 @@ export function createQuiz(opts = {}) {
      * beginner meets first, and the ones every drill is written in. */
     pool: opts.pool || CORE_VOICES.filter((v) => v !== 'HF'),
     /* The subdivisions asked about: all of them, or the ones a stage of the
-     * Learning Path has taught so far. */
+     * Path has taught so far. */
     subdivs: opts.subdivs || SUBDIV_ORDER,
     /* A pooled quiz is its own exercise, filed under its own id. */
     variant: opts.variant || '',

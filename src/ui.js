@@ -51,6 +51,10 @@ import * as PROG from './progress.mjs';
 import * as PLAN from './program.mjs';
 import * as LES from './lessons.mjs';
 import * as ROWS from './path_rows.mjs';
+import * as H from './hints.mjs';
+import * as SH from './row_sheet.mjs';
+import * as HP from './help.mjs';
+import * as TIPS from './tips.mjs';
 import * as UT from './untimed.mjs';
 import { availableLevels } from './levels.mjs';
 import * as IDS from './ids.mjs';
@@ -87,20 +91,11 @@ const LED_INTERVAL_MS = 20;
 const OUTBOX_PER_TICK = 8;
 const OUTBOX_MAX = 512;
 
-/* Screens. */
-const MENU = 'menu';
-const READY = 'ready';
-const RUNNING = 'running';
-const SUMMARY = 'summary';
-const LADDER = 'ladder';
-const QUIZ = 'quiz';
-const RESULT = 'result';
-const PROGRESS = 'progress';
-const PROGRESS_ITEM = 'progressItem';
-const SETTINGS = 'settings';
-const ERROR = 'error';
-const CARD = 'card';
-const PADMAP = 'padmap';
+/* Screens: named in hints.mjs, so none can go without a hint line. */
+const {
+  MENU, READY, RUNNING, SUMMARY, LADDER, QUIZ, RESULT, PROGRESS, PROGRESS_ITEM, SETTINGS, ERROR, CARD,
+  PADMAP, SHEET, HELP, WELCOME, TIP,
+} = H.SCREENS;
 
 /* MIDI out routes. */
 const OUT_TRACK = 1;
@@ -259,11 +254,34 @@ let nav = [];
  * were applied — re-armed from when one of those changes, so a random drill
  * keeps its notes and a level keeps its rung. */
 let armedSource = null;
-/* A word for the list's title bar, briefly: "ARM A DRILL". */
+/* A word for the list's title bar, briefly: "BAD USER.JSON". */
 let menuNote = '';
 let menuNoteUntil = 0;
 let settingsSel = 0;
 let settingsEditing = false;
+/* The rows the settings editor shows: one group's, opened from the
+ * Settings folder, or every row, over a drill (settings_def.mjs). */
+let settingsGroup = null;
+let settingsDefs = SET.ROWS;
+/* The Settings folder of the tree, for the sheet's Settings... */
+let settingsNode = null;
+/* The action sheet on screen (row_sheet.mjs): { title, items, sel, row }. */
+let sheet = null;
+/* MENU's help page on screen (help.mjs): { title, lines, top, back }. */
+let help = null;
+let helpTopics = new Map();
+/* The welcome on screen (tips.mjs), and a tip card: { key, lines, back }. */
+let welcome = null;
+let welcomeLines = null;
+let tipCard = null;
+/*
+ * Continue alternates when reviews are due: one review, then one new step.
+ * Which comes next is kept for the session only. `fromContinue` is set while
+ * a review Continue opened is on screen, so Click on its result goes on as
+ * Continue would.
+ */
+let continueTurn = 'review';
+let fromContinue = false;
 let progressSel = 0;
 let progressRows = [];
 /* The item the Progress chart is showing. */
@@ -746,11 +764,10 @@ function loadManifest(path) {
 }
 
 /*
- * THE FIRST THING IN THE LIST IS THE FIRST THING TO PLAY: Basics, the
- * Learning Path, then the grooves and rudiments, and the things that are
- * ABOUT practising rather than practice itself — Training, Quiz, Progress —
- * at the bottom. Each is a folder, so the top of the list is eight rows
- * rather than forty-eight.
+ * THE FIRST THING IN THE LIST IS THE NEXT THING TO PLAY: Continue, then the
+ * Path, the Practice library, Quiz, Progress and Settings — the top level
+ * Piano Practice shares (catalog.mjs). Each is a folder, so the top of the
+ * list is six rows rather than forty-eight.
  *
  * Built once, when the material is loaded. Every leaf is indexed by its item
  * id here too, which makes the lazy folders: the folder sums need every leaf
@@ -770,8 +787,7 @@ function rebuildMenu() {
       if (st.quiz) itemNames.set(st.id, st.label);
     }
   }
-  pathNode = PLAN.programFolder(program, repetitionRows,
-    fileCategories.filter((c) => c.folder === 'Grooves'));
+  pathNode = PLAN.programFolder(program, reviewRows);
   catalog = CAT.drumsTree({
     entries: fileEntries,
     categories: fileCategories,
@@ -779,7 +795,9 @@ function rebuildMenu() {
     drills: Q.DRILLS,
     newSeed: () => (Date.now() & 0x7fffffff) || 1,
     path: pathNode,
+    pathPrefs: PLAN.pathSettingsFolder(fileCategories.filter((c) => c.folder === 'Grooves')),
   });
+  settingsNode = catalog.children.find((c) => c.label === 'Settings') || null;
   nav = CAT.navStart(catalog);
   leafIdx = CAT.leafIndex(catalog);
   PROG.resetShape(agg);
@@ -809,11 +827,10 @@ function itemTitle(id) {
   return itemNames.get(id) || id;
 }
 
-/* The routine due today, as rows; a placeholder when there is none, so the
- * folder is never an empty screen. */
-function repetitionRows() {
+/* What is due again today, as the rows of Path › Review — and the ones
+ * already played today, ticked. None at all, and the Path shows no Review. */
+function reviewRows() {
   const session = PROG.repetitionSession(progress, Date.now());
-  if (!session.length) return [{ label: 'Nothing due today', value: '' }];
   return session.map((r) => ({
     label: itemTitle(r.id),
     value: r.done ? 'today' : 'due',
@@ -886,7 +903,7 @@ function changeSpeed(delta) {
   const before = settings.speed;
   SET.applySetting(settings, 'speed', delta > 0 ? 1 : -1);
   if (settings.speed === before) return;
-  settingsRowsCache = SET.settingsRows(settings);
+  refreshSettingsRows();
   saveSettings();
   const base = armedSource && armedSource.generated ? settings.bpm : (armedSource ? armedSource.bpm : chart.bpm);
   armedBpm = Math.max(20, Math.round((base * settings.speed) / 100));
@@ -1259,7 +1276,6 @@ function untimedResultOf(whole, { c, verdict, eased, pace, dyn }) {
     dyn: dyn.score,
     dynAdvice: dyn.score >= 0 && dyn.score < PROG.DYN_GOOD ? PROG.dynamicsAdvice(c) : '',
     series: PROG.percentSeries(it ? it.h : [], box.w - 2, box.h - 2, PROG.UNTIMED_SCALE),
-    footer: 'REC again  CLICK next',
   };
 }
 
@@ -1334,7 +1350,6 @@ function resultOf(whole, { t, st, verdict, eased, dyn }) {
     dyn: dyn.score,
     dynAdvice: dyn.score >= 0 && dyn.score < PROG.DYN_GOOD ? PROG.dynamicsAdvice(st) : '',
     series: PROG.percentSeries(it ? it.h : [], box.w - 2, box.h - 2),
-    footer: stuckFooter() || (clockMode && !pathStep ? 'REC again  BACK start' : 'REC again  CLICK next'),
   };
 }
 
@@ -1785,36 +1800,29 @@ function finishQuiz() {
 function openRow() {
   const item = CAT.navCurrent(nav);
   if (!item) return;
+  fromContinue = false;
   if (CAT.navPush(nav)) {
     announce(`${item.label}.`);
     return;
   }
   if (item.continueRow) {
-    const next = PLAN.continueStep(progress, program);
-    if (next) openPathStep(next.step);
-    else announce('Everything on the path is learned.');
+    continueOpen();
     return;
   }
   if (item.lessonsRow) {
-    const st = item.stage;
-    const ids = LES.stageCards(lessons, st, PLAN.coreSteps(st).concat(PLAN.checkpointSteps(st)));
-    if (ids.length) showCards(ids, null);
-    return;
-  }
-  if (item.skipRow) {
-    const next = skipTarget(item);
-    if (!next) return;
-    PROG.skipItem(progress, next.id, Date.now());
-    saveProgress();
-    announce(`Skipped ${PLAN.stepTitle(next)}`);
-    return;
-  }
-  if (item.skipAllRow) {
-    skipAll(item.scope);
+    showLessons(item.stage);
     return;
   }
   if (item.prefRow) {
     turnPref(item);
+    return;
+  }
+  if (item.settingsGroup) {
+    openSettingsGroup(item);
+    return;
+  }
+  if (item.helpAction) {
+    helpAction(item.helpAction);
     return;
   }
   if (item.step) {
@@ -1830,24 +1838,42 @@ function openRow() {
   openLeaf(item);
 }
 
-function skipTarget(row) {
-  return ROWS.skipTarget(row, progress, program, Date.now());
-}
-
-/* Skip every open step of a folder, or take its skips back (path_rows.mjs). */
-function skipAll(scope) {
-  const change = ROWS.skipAllChange(scope, progress);
-  if (change.skip) {
-    for (const id of change.skip) PROG.skipItem(progress, id, Date.now());
-    announce(`Skipped ${change.skip.length}`);
-  } else {
-    for (const id of change.unskip) PROG.unskipItem(progress, id);
-    announce('Skips taken back');
+/*
+ * Continue: a review that is due, or the next step of the path — one of each
+ * in turn while reviews are due (path_rows.mjs continuePick).
+ */
+function continueOpen() {
+  const pick = ROWS.continuePick(progress, program, Date.now(), continueTurn);
+  if (!pick) {
+    announce('Everything on the path is learned.');
+    return;
   }
-  saveProgress();
+  if (pick.kind === 'step') {
+    continueTurn = 'review';
+    openPathStep(pick.step);
+    return;
+  }
+  continueTurn = 'step';
+  const node = leafIdx.get(pick.id);
+  if (!node) return;
+  pathStep = null;
+  leavePath();
+  announce(`Review: ${itemTitle(pick.id)}`);
+  openLeaf(node);
+  fromContinue = true;
 }
 
-/* A row of Your path, turned on by a click. */
+/* A stage's lesson cards, to read again. */
+function showLessons(st) {
+  const ids = LES.stageCards(lessons, st, PLAN.coreSteps(st).concat(PLAN.checkpointSteps(st)));
+  if (ids.length) showCards(ids, null);
+}
+
+function stageHasCards(st) {
+  return LES.stageCards(lessons, st, PLAN.coreSteps(st).concat(PLAN.checkpointSteps(st))).length > 0;
+}
+
+/* A row of Settings › Path, turned on by a click. */
 function turnPref(row) {
   const change = ROWS.prefChange(row, progress.path, program.stages.length);
   if (change.toggle && !PROG.togglePath(progress, ...change.toggle)) announce('One track stays on');
@@ -1855,8 +1881,125 @@ function turnPref(row) {
   saveProgress();
 }
 
+/* Settings › Help: the tips shown again, or the welcome. */
+function helpAction(what) {
+  if (what === 'tips') {
+    PROG.clearTips(progress);
+    saveProgress();
+    announce('The tips will show again.');
+    return;
+  }
+  startWelcome();
+}
+
+/* ---- the action sheet ---------------------------------------------------- */
 /*
- * A step of the Learning Path: the row of the tree it points at, opened as if
+ * Shift + jog-click on a row: what can be done to it besides opening it
+ * (row_sheet.mjs). Drawn as a list of its own over the row's label; Click
+ * does the action and closes it, Back closes it.
+ */
+function openSheet() {
+  const top = CAT.navTop(nav);
+  const row = CAT.navCurrent(nav);
+  const shown = row ? menuRows(top.node)[top.cursor] : null;
+  sheet = {
+    title: shown ? shown.label : 'OPTIONS',
+    items: SH.sheetFor(row, {
+      progress,
+      pick: ROWS.continuePick(progress, program, Date.now(), continueTurn),
+      hasCards: stageHasCards,
+      leafOf: (id) => leafIdx.get(id),
+    }),
+    sel: 0,
+  };
+  screen = SHEET;
+  announce(`Options: ${sheet.items.map((a) => a.label).join(', ')}`);
+}
+
+function sheetDo() {
+  const a = sheet && sheet.items[sheet.sel];
+  sheet = null;
+  screen = MENU;
+  if (!a) return;
+  const at = Date.now();
+  switch (a.act) {
+    case 'skip':
+      PROG.skipItem(progress, a.step.id, at);
+      saveProgress();
+      announce(`Skipped ${PLAN.stepTitle(a.step)}`);
+      return;
+    case 'skipAll':
+      for (const id of a.ids) PROG.skipItem(progress, id, at);
+      saveProgress();
+      announce(`Skipped ${a.ids.length}`);
+      return;
+    case 'unskip':
+      for (const id of a.ids) PROG.unskipItem(progress, id);
+      saveProgress();
+      announce('Skips taken back');
+      return;
+    case 'start':
+      PROG.setPath(progress, 'start', a.index);
+      saveProgress();
+      announce(`The path starts at stage ${a.index}`);
+      return;
+    case 'testOut':
+      pathStep = null;
+      openPathStep(a.step);
+      return;
+    case 'lessons':
+      showLessons(a.stage);
+      return;
+    case 'ladder':
+    case 'clock':
+      practiseWrapped(a.leaf, a.act);
+      return;
+    default:
+      openSettingsFolder();
+  }
+}
+
+/* The sheet's Settings...: the Settings folder, on top of where you are, so
+ * Back comes back here. */
+function openSettingsFolder() {
+  if (!settingsNode) return;
+  const at = nav.findIndex((n) => n.node === settingsNode);
+  if (at >= 0) nav.length = at + 1;
+  else nav.push({ node: settingsNode, cursor: 0 });
+  announce('Settings.');
+}
+
+/*
+ * Practise: Ladder or Practise: Clock on a drill's row. Both WRAP a drill —
+ * climb its tempo, take its click away — so the drill is armed as if opened,
+ * then wrapped. They need a tempo, which L0 has not; the sheet only offers
+ * them on a timed drill.
+ */
+function practiseWrapped(leaf, kind) {
+  pathStep = null;
+  leavePath();
+  openLeaf(leaf);
+  if (screen !== READY || !chart || chart.untimed) return;
+  if (kind === 'ladder') {
+    /* From 70% of the tempo the drill is played at — its own times Speed —
+     * climbing through it. */
+    beginActivity('ladder');
+    ladder = newLadder();
+    ladderReason = '';
+    enterReady();
+    announce(`Ladder: ${chart.name}, from ${ladder.bpm}`);
+    return;
+  }
+  /* The Clock files its takes under one item of its own (CLOCK_ID): keeping
+   * time without the click is the skill, whichever drill it wraps. */
+  beginActivity('clock');
+  clockMode = true;
+  enterReady();
+  announce(`Clock: ${chart.name}`);
+}
+
+/*
+ * A step of the Path: the row of the tree it points at, opened as if
  * picked there — with a generated drill's Tempo set to its target, so 100%
  * Speed is what the step asks for, and the Clock wrapped round its drill.
  */
@@ -1881,7 +2024,7 @@ function openStep(step) {
   if ((target && settings.bpm !== target) || settings.speed !== speed) {
     if (target) settings.bpm = target;
     settings.speed = speed;
-    settingsRowsCache = SET.settingsRows(settings);
+    refreshSettingsRows();
     saveSettings();
   }
   openLeaf(node);
@@ -1952,7 +2095,7 @@ function leavePath() {
   if (speedBeforePath === null) return;
   if (settings.speed !== speedBeforePath) {
     settings.speed = speedBeforePath;
-    settingsRowsCache = SET.settingsRows(settings);
+    refreshSettingsRows();
     saveSettings();
   }
   speedBeforePath = null;
@@ -2024,41 +2167,6 @@ function openLeaf(item) {
   }
   if (item.kind === 'quiz') {
     openQuiz(item.quiz);
-    return;
-  }
-  /*
-   * The Ladder and the Clock WRAP the armed drill — climb its tempo, take its
-   * click away. With nothing armed they used to grab the first drill in the
-   * list, which was a single stroke roll nobody had picked; now they say so.
-   */
-  if ((item.kind === 'clock' || item.kind === 'ladder') && !chart) {
-    menuNote = 'ARM A DRILL';
-    menuNoteUntil = now() + 2000;
-    announce('Arm a drill first, then open the ' + item.label + '.');
-    return;
-  }
-  /* Both are about time, and L0 has none: they wrap a timed rung. */
-  if ((item.kind === 'clock' || item.kind === 'ladder') && chart.untimed) {
-    menuNote = 'ARM A TIMED RUNG';
-    menuNoteUntil = now() + 2000;
-    announce(`The ${item.label} needs a timed rung, L1 to L4.`);
-    return;
-  }
-  if (item.kind === 'clock') {
-    beginActivity('clock');
-    clockMode = true;
-    enterReady();
-    announce(`Clock: ${chart.name}`);
-    return;
-  }
-  if (item.kind === 'ladder') {
-    /* From 70% of the tempo the drill is played at — its own times Speed —
-     * climbing through it. */
-    beginActivity('ladder');
-    ladder = newLadder();
-    ladderReason = '';
-    enterReady();
-    announce(`Ladder: ${chart.name}, from ${ladder.bpm}`);
     return;
   }
   /* A drill. Whatever the Ladder or the Clock was wrapping before, this is not
@@ -2171,7 +2279,7 @@ function padMapClick() {
   const from = padLayout.name;
   customPads = PIO.copyPreset(settings.layout);
   settings.layout = PAD.CUSTOM;
-  settingsRowsCache = SET.settingsRows(settings);
+  refreshSettingsRows();
   saveSettings();
   refreshLayout();
   announce(`Custom: a copy of ${from}. Pick a pad, turn the jog to give it a sound.`);
@@ -2272,12 +2380,36 @@ function progressDetail(index) {
   };
 }
 
-/* Settings opens over whatever is on screen, pausing a run, and goes back to it. */
+/* Settings opens over whatever is on screen, pausing a run, and goes back to
+ * it — every row of it, as it always has. */
 function openSettings() {
   settingsFrom = screen;
   if (screen === RUNNING && !tp.paused) pause();
+  useSettingsRows(null);
   screen = SETTINGS;
   settingsEditing = false;
+}
+
+/* A group of the Settings folder: the editor with that group's rows. */
+function openSettingsGroup(row) {
+  settingsFrom = MENU;
+  useSettingsRows(row.settingsGroup);
+  settingsSel = 0;
+  screen = SETTINGS;
+  settingsEditing = false;
+  announce(`${row.label} settings.`);
+}
+
+function useSettingsRows(group) {
+  settingsGroup = group;
+  settingsDefs = SET.rowsIn(group);
+  refreshSettingsRows();
+  settingsSel = Math.max(0, Math.min(settingsSel, settingsDefs.length - 1));
+}
+
+/* The editor's rows as the list shows them, made when a value changes. */
+function refreshSettingsRows() {
+  settingsRowsCache = SET.settingsRows(settings, settingsDefs);
 }
 
 function leaveSettings() {
@@ -2288,10 +2420,173 @@ function leaveSettings() {
   screen = to;
 }
 
+/* ---- MENU: help for this screen ----------------------------------------- */
 /*
- * Menu: back to the list from anywhere. A run is stopped properly on the way —
- * the kit silenced, the transport home, nothing half-recorded and no Record
- * light left burning over the list.
+ * MENU opens the help page of the screen on it (help.mjs): what it is, its
+ * keys, the topics that explain it, and on a row of the Path the lesson card
+ * behind it. A take is paused first, as Settings pauses it. MENU or BACK
+ * closes it, back to where it was opened.
+ */
+function openHelp() {
+  /* The keys as they were: a take is paused only once they are read. */
+  const st = hintState(false);
+  if (screen === RUNNING && !tp.paused) pause();
+  if (screen === MENU) st.section = nav.length > 1 ? nav[1].node.label : (CAT.navCurrent(nav) || {}).label;
+  if (screen === SETTINGS) st.group = settingsGroup;
+  const page = HP.helpPage(screen, { st, topics: helpTopics, extra: screen === MENU ? rowCardLines() : [] });
+  help = { title: page.title, lines: page.lines, top: 0, back: screen };
+  screen = HELP;
+  announce(page.lines.join(' '));
+}
+
+function closeHelp() {
+  screen = help ? help.back : MENU;
+  help = null;
+}
+
+/* The lesson card behind the highlighted row of the Path: a step's own
+ * cards, else its stage's. */
+function rowCardLines() {
+  const row = CAT.navCurrent(nav);
+  if (!row) return [];
+  let step = row.step || (row.steps && row.steps[0]) || null;
+  if (row.continueRow) {
+    const pick = ROWS.continuePick(progress, program, Date.now(), continueTurn);
+    step = pick && pick.kind === 'step' ? pick.step : null;
+  }
+  const stage = row.stage || (step && program.stages.find((x) => x.key === step.stage)) || null;
+  const own = row.step ? (step.cards || []) : [];
+  const ids = own.filter((id) => lessons.has(id));
+  if (!ids.length && stage && lessons.has(stage.card)) ids.push(stage.card);
+  return HP.cardLines(ids.map((id) => lessons.get(id)), L.SCREEN_W - 4, (t) => ctx.textWidth(t));
+}
+
+/* ---- the welcome and the tips -------------------------------------------- */
+/*
+ * The first launch (tips.mjs): what the module is, its keys, and new or
+ * already playing. "From the start" puts the path at its first stage and the
+ * cursor on Continue; "I already play" opens the Path with a tip on testing
+ * out. Back at any page ends it; either way it is marked seen.
+ */
+function startWelcome() {
+  welcome = TIPS.createWelcome();
+  const pages = TIPS.welcomePages();
+  welcomeLines = TIPS.wrapParas(pages[0].paras, L.SCREEN_W - 2, (t) => ctx.textWidth(t));
+  sheet = null;
+  help = null;
+  screen = WELCOME;
+  announce(`Welcome. ${pages[0].paras.join(' ')}`);
+}
+
+function finishWelcome() {
+  welcome = null;
+  PROG.addTip(progress, 'welcome');
+  saveProgress();
+  screen = MENU;
+}
+
+function welcomeClick() {
+  const answer = TIPS.welcomeClick(welcome);
+  if (!answer) {
+    announce(TIPS.welcomePages()[welcome.page].title);
+    return;
+  }
+  finishWelcome();
+  nav = CAT.navStart(catalog);
+  if (answer === 'start') {
+    PROG.setPath(progress, 'start', 0);
+    saveProgress();
+    announce('Continue.');
+    return;
+  }
+  const at = catalog.children.indexOf(pathNode);
+  if (at >= 0) {
+    nav[0].cursor = at;
+    CAT.navPush(nav);
+  }
+  showTip('placement', MENU);
+}
+
+/* A tip, the first time its screen comes up (tips.mjs tipDue). */
+function serviceTips() {
+  const key = screen === SHEET ? 'sheet' : screen === READY ? 'practice' : screen === QUIZ ? 'quiz' : null;
+  const due = key && TIPS.tipDue(progress, key);
+  if (due) showTip(due, screen);
+}
+
+function showTip(key, back) {
+  if (key !== 'placement') {
+    PROG.addTip(progress, key);
+    saveProgress();
+  }
+  /* A quiz asks again once the tip is read: its question would be lost. */
+  if (back === QUIZ) clearPrompt();
+  tipCard = { key, back,
+    lines: TIPS.wrapParas(TIPS.TIPS[key], L.SCREEN_W - 2, (t) => ctx.textWidth(t)) };
+  screen = TIP;
+  announce(`Tip: ${TIPS.TIPS[key].join(' ')}`);
+}
+
+function closeTip() {
+  const back = tipCard ? tipCard.back : MENU;
+  tipCard = null;
+  screen = back;
+  if (screen === QUIZ && quiz && promptIsAudible()) schedulePrompt();
+}
+
+/*
+ * What the hint line is told about the screen on it (hints.mjs). `shift` is
+ * whether Shift's layer shows.
+ */
+function hintState(shift = shiftHeld) {
+  const st = { shift, depth: nav.length };
+  if (screen === RUNNING || screen === READY) {
+    st.mode = tp.mode;
+    st.paused = tp.paused;
+    st.untimed = isUntimed();
+    st.ladder = Boolean(ladder);
+    st.clock = clockMode;
+  } else if (screen === SUMMARY) {
+    st.clock = clockMode && !pathStep && !fromContinue;
+  } else if (screen === QUIZ && quiz) {
+    st.pick = quiz.mode === 'pick';
+    st.audible = promptIsAudible();
+    st.hintsLeft = Q.hintsLeft(quiz);
+  } else if (screen === RESULT) {
+    st.path = Boolean(pathStep) || fromContinue;
+  } else if (screen === CARD && card) {
+    st.guided = card.deck.guided;
+    st.more = card.deck.at + 1 < card.deck.ids.length;
+    st.pages = card.deck.pages.length;
+  } else if (screen === WELCOME && welcome) {
+    st.page = welcome.page;
+  } else if (screen === SETTINGS) {
+    st.editing = settingsEditing;
+  }
+  return st;
+}
+
+/* The hint line's part on screen now: the parts are made when what they
+ * depend on changes, and only picked from on a frame. */
+let hintKey = '';
+let hintParts = [];
+function hintLine() {
+  const st = hintState();
+  const key = `${screen}|${st.shift}|${st.depth > 1}|${st.mode}|${st.paused}|${st.untimed}|${st.clock}|`
+    + `${st.pick}|${st.audible}|${st.hintsLeft > 0}|${st.path}|${st.guided}|${st.more}|${st.pages > 1}|`
+    + `${st.page >= 2}|${st.editing}`;
+  if (key !== hintKey) {
+    hintKey = key;
+    hintParts = H.hintFor(screen, st);
+  }
+  return H.hintAt(hintParts, now());
+}
+
+/*
+ * Back to the list, from the error screen: MENU's old job everywhere, which
+ * BACK has taken over now that MENU is help. Whatever was running is stopped
+ * properly on the way — the kit silenced, the transport home, nothing
+ * half-recorded and no Record light left burning over the list.
  */
 function leaveToMenu() {
   if (tp.mode !== C.MODE_IDLE) {
@@ -2316,6 +2611,10 @@ function back() {
   if (screen === ERROR || safeMode) return false;
   if (screen === SETTINGS && settingsEditing) { settingsEditing = false; return true; }
   if (screen === SETTINGS) { leaveSettings(); return true; }
+  if (screen === HELP) { closeHelp(); return true; }
+  if (screen === TIP) { closeTip(); return true; }
+  if (screen === SHEET) { sheet = null; screen = MENU; return true; }
+  if (screen === WELCOME) { finishWelcome(); return true; }
   /* Back from looking over a take is the result again. */
   if (reviewing()) { review.at = null; return true; }
   /* Back from a result is another go from the top; Back again is the list. */
@@ -2420,30 +2719,33 @@ function serviceExit() {
 /*
  * The rows of the open folder, made once per folder rather than per frame:
  * the list is drawn at 50Hz and its rows only change when the folder does,
- * when a take moves your progress on, or when the day turns (Repetition).
+ * when a take moves your progress on, when the day turns (Review), or when
+ * Continue turns from a review to a new step.
  */
 let rowsNode = null;
 let rowsCache = null;
 let rowsRev = -1;
 let rowsDay = -1;
+let rowsTurn = '';
 function menuRows(node) {
   const day = Math.floor(Date.now() / 86400000);
-  if (node !== rowsNode || progress.rev !== rowsRev || day !== rowsDay) {
+  if (node !== rowsNode || progress.rev !== rowsRev || day !== rowsDay || continueTurn !== rowsTurn) {
     rowsNode = node;
     rowsRev = progress.rev;
     rowsDay = day;
+    rowsTurn = continueTurn;
     rowsCache = decoratedRows(node);
   }
   return rowsCache;
 }
 
 function decoratedRows(node) {
-  /* Inside the Learning Path its rows speak for themselves (path_rows.mjs). */
-  const inPath = nav.some((n) => n.node === pathNode);
-  const pc = inPath ? ROWS.pathContext(progress, program, Date.now()) : null;
+  /* The Path's rows, Continue and Settings › Path speak for themselves
+   * (path_rows.mjs); the rest are decorated as the library is. */
+  const pc = ROWS.pathContext(progress, program, Date.now(), { turn: continueTurn, titleOf: itemTitle });
   const kids = node.children;
   const out = new Array(kids.length);
-  for (let i = 0; i < kids.length; i++) out[i] = (pc && ROWS.pathRow(kids[i], pc)) || decorateRow(kids[i]);
+  for (let i = 0; i < kids.length; i++) out[i] = ROWS.pathRow(kids[i], pc) || decorateRow(kids[i]);
   return out;
 }
 
@@ -2454,7 +2756,7 @@ function decoratedRows(node) {
  */
 function decorateRow(row) {
   const plain = { label: row.label, value: row.value || '', mark: row.mark || null };
-  if (row.repetition) {
+  if (row.review) {
     const due = PROG.dueCount(PROG.repetitionSession(progress, Date.now()));
     return { label: row.label, value: due ? `${due} due` : '>' };
   }
@@ -2483,35 +2785,72 @@ function draw() {
     });
     return;
   }
+  /* Every screen's bottom line names its keys (hints.mjs); while Shift is
+   * held it names what Shift does there instead. */
+  const hint = hintLine();
   if (screen === PADMAP) {
     V.drawPadMap(ctx, PMS.screenOf(pm, padMapView(), now()));
+    if (shiftHeld) V.drawHint(ctx, hint);
     return;
   }
   if (screen === CARD && card) {
-    V.drawCard(ctx, LES.deckScreen(card.deck));
+    const deck = LES.deckScreen(card.deck);
+    deck.footer = hint;
+    V.drawCard(ctx, deck);
+    return;
+  }
+  if (screen === TIP && tipCard) {
+    V.drawCard(ctx, { title: TIPS.TIP_TITLE, lines: tipCard.lines, footer: hint });
+    return;
+  }
+  if (screen === WELCOME && welcome) {
+    const page = TIPS.welcomePages()[welcome.page];
+    if (page.choices) {
+      V.drawList(ctx, { title: page.title, items: page.choices, selected: welcome.choice, footer: hint });
+    } else {
+      V.drawCard(ctx, { title: page.title, lines: page.lines || welcomeLines, page: welcome.page, pages: 3,
+        footer: hint });
+    }
+    return;
+  }
+  if (screen === HELP && help) {
+    V.drawHelp(ctx, { title: help.title, lines: help.lines, top: help.top, rows: HP.HELP_LINES, footer: hint });
+    return;
+  }
+  if (screen === SHEET && sheet) {
+    V.drawList(ctx, { title: sheet.title.toUpperCase().slice(0, 21), items: sheet.items, selected: sheet.sel,
+      footer: hint });
     return;
   }
   if (screen === MENU) {
     const top = CAT.navTop(nav);
+    const rows = menuRows(top.node);
+    /* A folder whose rows depend on the day — the Path's Review — can lose
+     * the row the highlight was on. */
+    if (top.cursor >= rows.length) top.cursor = Math.max(0, rows.length - 1);
     const title = menuNote && now() < menuNoteUntil ? menuNote : top.node.label.toUpperCase();
-    V.drawList(ctx, { title: title.slice(0, 16), items: menuRows(top.node), selected: top.cursor });
+    V.drawList(ctx, { title: title.slice(0, 16), items: rows, selected: top.cursor, footer: hint });
     return;
   }
   if (screen === SETTINGS) {
+    const group = settingsGroup ? SET.GROUPS.find((g) => g.key === settingsGroup) : null;
     V.drawList(ctx, {
-      title: settingsEditing ? 'SET *' : 'SETTINGS',
+      title: settingsEditing ? 'SET *' : group ? group.label.toUpperCase() : 'SETTINGS',
       items: settingsRowsCache, selected: settingsSel,
       top: V.pageTop(settingsRowsCache.length, settingsSel),
+      footer: hint,
     });
     return;
   }
   if (screen === PROGRESS) {
-    V.drawList(ctx, { title: 'PROGRESS', right: progressRight, items: progressRows, selected: progressSel });
+    V.drawList(ctx, { title: 'PROGRESS', right: progressRight, items: progressRows, selected: progressSel,
+      footer: hint });
     return;
   }
   if (screen === PROGRESS_ITEM && progressItem) {
     if (progressItem.overview) V.drawOverview(ctx, progressItem);
     else V.drawProgress(ctx, progressItem);
+    if (shiftHeld) V.drawHint(ctx, hint);
     return;
   }
   if (screen === QUIZ && quiz) {
@@ -2521,10 +2860,12 @@ function draw() {
       labelFor: (id) => Q.labelFor(quiz, id),
       isEliminated: (i) => Q.isEliminated(quiz, i),
       hintsLeft: Q.hintsLeft(quiz),
+      footer: hint,
     });
     return;
   }
   if (screen === RESULT && resultCache) {
+    resultCache.footer = hint;
     V.drawResult(ctx, resultCache);
     return;
   }
@@ -2550,10 +2891,15 @@ function draw() {
   }
   if (screen === LADDER && ladder) {
     V.drawLadder(ctx, { ladder, reason: ladderReason, barsDone: ladderBarsDone, note: progressNote });
+    if (shiftHeld) V.drawHint(ctx, hint);
     return;
   }
   if (screen === SUMMARY && run) {
-    if (summaryInfo) V.drawSummary(ctx, summaryInfo);
+    if (summaryInfo) {
+      /* Stuck on a step, the line says the way on instead — unless Shift. */
+      summaryInfo.footer = (!shiftHeld && stuckFooter()) || hint;
+      V.drawSummary(ctx, summaryInfo);
+    }
     return;
   }
   if (screen === READY && chart && chart.untimed) {
@@ -2563,6 +2909,7 @@ function draw() {
       cursor: Math.max(0, SC.nextEntryIndex(run, at)), title: chart.name,
       rightLabel: at > 0 ? `${CH.barBeatOf(chart, at).bar}/${CH.barBeatOf(chart, at).bars}` : chartLength,
       footerRight: '', progress: 0, warning: chartWarning, scrubbed: at > 0,
+      hint: at > 0 && !shiftHeld ? '' : hint,
     });
     return;
   }
@@ -2573,6 +2920,7 @@ function draw() {
       rightLabel: untimed.livePace > 0 ? `${Math.round(untimed.livePace)}bpm` : '--',
       footerRight: `${untimed.firstTry}/${untimed.stacks - untimed.firstTry}`,
       progress: UT.progress(untimed), paused: tp.paused,
+      hint: tp.paused || shiftHeld ? hint : '',
     });
     return;
   }
@@ -2589,6 +2937,8 @@ function draw() {
       rightLabel: tp.songBeats > 0
         ? `${CH.barBeatOf(chart, tp.songBeats).bar}/${CH.barBeatOf(chart, tp.songBeats).bars || '?'}`
         : chartLength,
+      /* At home the keys; scrubbed into the drill, how far through it is. */
+      hint: tp.songBeats > 0 && !shiftHeld ? '' : hint,
     });
     return;
   }
@@ -2598,6 +2948,9 @@ function draw() {
       title: chart.name, bpm: chart.bpm, lanes: chartLanes,
       dynamics: settings.dynamics, beatFlash, timing: run.timing, paused: tp.paused, blocked: tp.blocked,
       progress: endlessProgress(),
+      /* While the music runs the bottom line is how far through; paused, or
+       * with Shift held, it is the keys. */
+      hint: tp.paused || shiftHeld ? hint : '',
     });
     if (clockMode) {
       const perBar = CH.beatsPerBar(chart);
@@ -2652,6 +3005,7 @@ function initInner() {
   manifestError = '';
   loadExercises();
   lessons = LES.parseLessons(readFile(`${MODULE_DIR}/lessons.json`)).cards;
+  helpTopics = HP.parseHelp(readFile(`${MODULE_DIR}/help.json`));
   rebuildMenu();
   /* After the tree: reading takes in from stats.json needs its item ids. */
   progress = loadProgress();
@@ -2663,12 +3017,26 @@ function initInner() {
     menuNoteUntil = now() + 8000;
     announce(manifestError);
   }
-  settingsRowsCache = SET.settingsRows(settings);
+  refreshSettingsRows();
   invalidateLedCache();
   darkenPads();
   dspSet('gain', '0.45');
   screen = MENU;
+  sheet = null;
+  help = null;
+  tipCard = null;
+  continueTurn = 'review';
+  fromContinue = false;
   announce('Drums Practice');
+  /* A newcomer is welcomed; someone who practised before the welcome
+   * existed only has it noted as seen. */
+  const w = TIPS.welcomeOnLoad(progress, Object.keys(progress.items).length + stats.records.length);
+  if (w === 'silent') {
+    PROG.addTip(progress, 'welcome');
+    saveProgress();
+  } else if (w === 'show') {
+    startWelcome();
+  }
 }
 
 globalThis.tick = function tick() {
@@ -2756,6 +3124,7 @@ function tickInner() {
     paintLeds(t);
     transport();
   }
+  serviceTips();
   if (t - lastDraw >= DRAW_INTERVAL_MS) {
     lastDraw = t;
     draw();
@@ -2835,19 +3204,20 @@ function midiInner(data) {
       return;
     }
     case C.CC_JOG_CLICK:
-      /* Shift + jog click opens settings from anywhere — the one gesture that
-       * has to work whatever screen you are on. */
+      /* Shift + jog click: on a row of the list, its options; elsewhere,
+       * Settings over whatever is on screen, as it always was. */
       if (d2 > 0) {
-        if (shiftHeld) {
-          if (screen === SETTINGS) leaveSettings();
-          else openSettings();
-        } else {
-          click();
-        }
+        if (shiftHeld) shiftClick();
+        else click();
       }
       return;
     case C.CC_MENU:
-      if (d2 > 0) leaveToMenu();
+      /* Help for this screen, wherever you are; MENU again closes it. The
+       * error screen keeps MENU as the way back to the list. */
+      if (d2 <= 0) return;
+      if (screen === ERROR) leaveToMenu();
+      else if (screen === HELP) closeHelp();
+      else openHelp();
       return;
     case C.CC_BACK:
       /* Shift + Back closes from anywhere, as the manual promises. */
@@ -2917,7 +3287,7 @@ function midiInner(data) {
       const i = settingsRowForKnob(k);
       if (i < 0) return;
       settingsSel = i;
-      editSetting(SET.ROWS[i].key, delta);
+      editSetting(settingsDefs[i].key, delta);
     }
   }
 }
@@ -2931,8 +3301,8 @@ function midiInner(data) {
  */
 function settingsRowForKnob(k) {
   if (k < 0 || k >= V.LIST_ROWS) return -1;
-  const i = V.pageTop(SET.ROWS.length, settingsSel) + k;
-  return i < SET.ROWS.length ? i : -1;
+  const i = V.pageTop(settingsDefs.length, settingsSel) + k;
+  return i < settingsDefs.length ? i : -1;
 }
 
 function knobTouched(knob) {
@@ -2950,13 +3320,19 @@ function jog(delta) {
     const top = CAT.navTop(nav);
     top.cursor = Math.max(0, Math.min(top.node.children.length - 1, top.cursor + delta));
   } else if (target === 'row') {
-    settingsSel = Math.max(0, Math.min(SET.ROWS.length - 1, settingsSel + delta));
+    settingsSel = Math.max(0, Math.min(settingsDefs.length - 1, settingsSel + delta));
   } else if (target === 'value') {
-    editSetting(SET.ROWS[settingsSel].key, delta);
+    editSetting(settingsDefs[settingsSel].key, delta);
   } else if (target === 'padmap') {
     padMapJog(delta);
   } else if (target === 'page' && card) {
     LES.turnPage(card.deck, delta);
+  } else if (target === 'sheet' && sheet) {
+    sheet.sel = Math.max(0, Math.min(sheet.items.length - 1, sheet.sel + delta));
+  } else if (target === 'scroll' && help) {
+    HP.scrollHelp(help, delta);
+  } else if (target === 'welcome' && welcome) {
+    TIPS.welcomeJog(welcome, delta);
   } else if (target === 'choice' && quiz) {
     Q.moveChoice(quiz, delta);
   } else if ((screen === SUMMARY || screen === LADDER) && review) {
@@ -2974,11 +3350,21 @@ function jog(delta) {
   }
 }
 
+function shiftClick() {
+  if (screen === MENU) openSheet();
+  else if (screen === SHEET) sheetDo();
+  else if (screen === SETTINGS) leaveSettings();
+  else if (screen !== HELP && screen !== TIP && screen !== WELCOME && screen !== ERROR) openSettings();
+}
+
 function click() {
   if (screen === MENU) { openRow(); return; }
+  if (screen === SHEET) { sheetDo(); return; }
+  if (screen === TIP) { closeTip(); return; }
+  if (screen === WELCOME && welcome) { welcomeClick(); return; }
   if (screen === CARD && card) { nextCard(); return; }
   if (screen === SETTINGS) {
-    const row = SET.ROWS[settingsSel];
+    const row = settingsDefs[settingsSel];
     if (row && row.type === 'action') {
       if (row.action === 'padmap') openPadMap();
       return;
@@ -2993,9 +3379,17 @@ function click() {
     return;
   }
   if (screen === PROGRESS) { openProgressRow(); return; }
-  /* On along the Learning Path, when that is where the drill came from. */
+  /* On along the Path, when that is where the drill came from; on as
+   * Continue would, after a review Continue opened. */
   if ((screen === RESULT || screen === SUMMARY || screen === LADDER) && pathStep) {
     goNext();
+    return;
+  }
+  if ((screen === RESULT || screen === SUMMARY) && fromContinue) {
+    quiz = null;
+    resultCache = null;
+    screen = MENU;
+    continueOpen();
     return;
   }
   if (screen === RESULT) { screen = MENU; quiz = null; resultCache = null; return; }
@@ -3024,7 +3418,7 @@ function click() {
 function editSetting(key, delta) {
   const wasStudying = settings.study;
   SET.applySetting(settings, key, delta);
-  settingsRowsCache = SET.settingsRows(settings);
+  refreshSettingsRows();
   saveSettings();
   /* Study switched on mid-run would otherwise find the wait pointer parked on a
    * note from minutes ago and pin the clock there — a jump backwards. */
@@ -3079,6 +3473,11 @@ globalThis.drumsPracticeMenu = function drumsPracticeMenu() {
   if (screen !== MENU) return null;
   const top = CAT.navTop(nav);
   return { title: top.node.label, cursor: top.cursor, labels: menuRows(top.node).map((r) => r.label) };
+};
+
+/* The screen on show and, on the action sheet, its rows: read-only too. */
+globalThis.drumsPracticeScreen = function drumsPracticeScreen() {
+  return { screen, sheet: sheet ? sheet.items.map((a) => a.label) : null, help: help ? help.lines.slice() : null };
 };
 
 globalThis.onUnload = function onUnload() {

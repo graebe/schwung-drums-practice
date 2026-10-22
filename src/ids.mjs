@@ -6,7 +6,7 @@
  * place. Pure, and a leaf.
  *
  * One string id joins the drill tree, progress.json, stats.json and the
- * Learning Path, so its shape is a file format: a drill's own id, a rung of a
+ * Path, so its shape is a file format: a drill's own id, a rung of a
  * groove (`rock-backbeat:l3`), a quiz round (`quiz:pick:subdiv:qe`), the Clock
  * (`clock`, or `clock:gap1` for a variant), and a stats record's drill id
  * (`drill:rock-backbeat:l3:normal:strict`). Drill ids contain colons

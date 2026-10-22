@@ -191,7 +191,7 @@ export function grooveVariation(opts = {}) {
   });
 }
 
-/* Basics › Subdivisions: the same every time, because they are exercises. */
+/* Practice › Subdivisions: the same every time, because they are exercises. */
 export function subdivisionDrills(opts = {}) {
   const o = { bpm: opts.bpm || 90, seed: opts.seed || 1 };
   return [
@@ -205,7 +205,7 @@ export function subdivisionDrills(opts = {}) {
 }
 
 /*
- * Basics › Random, as recipes rather than charts: each takes a seed, and the
+ * Practice › Random, as recipes rather than charts: each takes a seed, and the
  * list asks for a new one every time a row is opened — material you have
  * already learned by heart is not reading practice. A restart replays the set
  * you just played, because the armed chart is kept.

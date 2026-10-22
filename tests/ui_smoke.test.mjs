@@ -29,7 +29,15 @@ const SHARED = '/data/UserData/schwung/shared/';
 const STAGED_UI = join(mkdtempSync(join(tmpdir(), 'drums-ui-')), 'ui.js');
 let uiLoads = 0;
 
-async function loadUi({ extraFiles = {}, settings = null, dataFiles = {}, withLessons = false } = {}) {
+/*
+ * Every tip already read, as a learner who has met them: the welcome and the
+ * first-visit cards stand in front of the screens most tests walk to. The
+ * tests about them load with `tips: []`.
+ */
+const ALL_TIPS = ['welcome', 'sheet', 'practice', 'quiz'];
+
+async function loadUi({ extraFiles = {}, settings = null, dataFiles = {}, withLessons = false,
+  tips = ALL_TIPS } = {}) {
   const src = readFileSync(new URL('../src/ui.js', import.meta.url), 'utf8');
   const log = { leds: [], buttons: [], params: [], midi: [], writes: {}, announces: [], exited: 0 };
   const screen = createScreen();
@@ -70,8 +78,22 @@ async function loadUi({ extraFiles = {}, settings = null, dataFiles = {}, withLe
     files['/data/UserData/schwung/modules/tools/drums-practice/settings.json'] =
       JSON.stringify({ version: 2, ...settings });
   }
-  /* The module's own data — progress.json, stats.json — as left by a session. */
-  for (const [name, text] of Object.entries(dataFiles)) {
+  /* MENU's help, which every screen opens. */
+  files['/data/UserData/schwung/modules/tools/drums-practice/help.json'] =
+    readFileSync(new URL('../src/help.json', import.meta.url), 'utf8');
+  /* The module's own data — progress.json, stats.json — as left by a session,
+   * with the tips read unless the test says otherwise. A test that leaves
+   * progress to be rebuilt from stats.json gets no progress file. */
+  const data = { ...dataFiles };
+  if (!('progress.json' in data) && !('stats.json' in data)) {
+    data['progress.json'] = JSON.stringify({ version: 2, items: {}, tips });
+  } else if (data['progress.json']) {
+    try {
+      const obj = JSON.parse(data['progress.json']);
+      if (obj && obj.version === 2 && !obj.tips) data['progress.json'] = JSON.stringify({ ...obj, tips });
+    } catch (e) { /* a damaged file stays damaged */ }
+  }
+  for (const [name, text] of Object.entries(data)) {
     files[`/data/UserData/schwung/modules/tools/drums-practice/${name}`] = text;
   }
 
@@ -112,12 +134,6 @@ async function loadUi({ extraFiles = {}, settings = null, dataFiles = {}, withLe
 const CC = { jogTurn: 14, jogClick: 3, menu: 50, back: 51, play: 85, record: 86,
              knob1: 71, shift: 49 };
 /*
- * Getting about the tree. Rows are found by facts that hold whatever is
- * bundled: Grooves is the third row (after Basics and the Learning Path) and
- * Rock & Pop its first family, and the jog clamps, so the end of the top list
- * is Progress with Quiz just above it.
- */
-/*
  * Walk the list by name: from the list as it stands, highlight each label in
  * turn and open it, the last one opened too unless `{ open: false }` is last.
  * A label matches a row that is it or starts with it. Rows that move as the
@@ -135,15 +151,45 @@ function goTo(...path) {
   }
 }
 
-/* Grooves › Rock & Pop, highlight on Rock backbeat — the third groove, after
- * First beat and the Eighth-note beat. */
-const toFirstDrill = () => goTo('Grooves', 'Rock & Pop', 'Rock backbeat', { open: false });
+/* Practice › Grooves › Rock & Pop, highlight on Rock backbeat — the third
+ * groove, after First beat and the Eighth-note beat. */
+const toFirstDrill = () => goTo('Practice', 'Grooves', 'Rock & Pop', 'Rock backbeat', { open: false });
 /* Into its ladder, highlight on L1 — the first TIMED rung. L0 above it is the
  * untimed one, and has flows of its own. */
 const toFirstRung = () => { toFirstDrill(); cc(CC.jogClick, 127); cc(CC.jogTurn, 1); };
 /* Into the Quiz folder, highlight on its first drill. */
 const toQuizzes = () => goTo('Quiz');
 const cc = (n, v) => globalThis.onMidiMessageInternal([0xb0, n, v]);
+const shiftClick = () => { cc(CC.shift, 127); cc(CC.jogClick, 127); cc(CC.shift, 0); };
+const screenNow = () => globalThis.drumsPracticeScreen().screen;
+/* Back to the list from a drill, a result, a quiz or a card: Back until it shows. */
+function toList() {
+  for (let i = 0; i < 6 && !globalThis.drumsPracticeMenu(); i++) cc(CC.back, 127);
+  assert.ok(globalThis.drumsPracticeMenu(), `Back did not reach the list from ${screenNow()}`);
+}
+/* Up to the top of the list, the cursor on Continue. */
+function toTop() {
+  toList();
+  for (let i = 0; i < 8 && globalThis.drumsPracticeMenu().title !== 'Drums'; i++) cc(CC.back, 127);
+  const at = globalThis.drumsPracticeMenu().cursor;
+  if (at) cc(CC.jogTurn, 128 - at);
+}
+/* Shift+click the highlighted row, and do one action of its sheet. */
+function sheetPick(label) {
+  shiftClick();
+  const s = globalThis.drumsPracticeScreen();
+  assert.equal(s.screen, 'sheet', 'Shift+click did not open the sheet');
+  const at = s.sheet.indexOf(label);
+  assert.ok(at >= 0, `no "${label}" in the sheet: ${s.sheet.join(' | ')}`);
+  if (at) cc(CC.jogTurn, at);
+  cc(CC.jogClick, 127);
+}
+/* Settings › a group: the editor with that group's rows. */
+function toSettings(group = 'Practice') {
+  toTop();
+  goTo('Settings', group);
+  assert.equal(screenNow(), 'settings');
+}
 const pad = (n, v) => globalThis.onMidiMessageInternal([v > 0 ? 0x90 : 0x80, n, v]);
 /* A write that strikes a drum. The `n` list also carries the tick's click
  * (`c:1`/`c:0`) and panic (`x`), which are not hits. */
@@ -315,13 +361,19 @@ test('every screen draws without throwing', async () => {
   globalThis.init();
   /* Walk the whole menu, opening and backing out of each entry in turn. */
   for (let i = 0; i < 24; i++) {
-    cc(CC.menu, 127);
+    toList();
     ticks(2);
     for (let j = 0; j < i; j++) cc(CC.jogTurn, 1);
     cc(CC.jogClick, 127);
     ticks(6);
     cc(CC.record, 127);
     ticks(10);
+    cc(CC.menu, 127);              /* its help, and closed again */
+    ticks(2);
+    cc(CC.menu, 127);
+    shiftClick();                  /* a sheet on a list, Settings elsewhere */
+    ticks(2);
+    cc(CC.back, 127);
     cc(CC.jogClick, 127);
     ticks(4);
     cc(CC.back, 127);
@@ -334,11 +386,9 @@ test('settings persist, and are written lazily rather than every frame', async (
   const { log } = await loadUi();
   globalThis.init();
   ticks(3);
-  /* Knobs change settings only on the Settings screen: open it, then knob 1
-   * is its first row, Tempo. */
-  cc(CC.shift, 127);
-  cc(CC.jogClick, 127);
-  cc(CC.shift, 0);
+  /* Knobs change settings only on the Settings screen: open Settings ›
+   * Practice, then knob 1 is its first row, Tempo. */
+  toSettings('Practice');
   cc(CC.knob1, 1);
   cc(CC.knob1, 1);
   ticks(3);
@@ -440,25 +490,28 @@ test('a finished practice records a score without being asked', async () => {
   assert.ok(parsed.records.length >= 1, 'a finished practice recorded no score');
 });
 
-test('the list opens on Basics, with the material ahead of the practice tools', async () => {
+test('the list opens on Continue, naming the step it opens, with the keys under it', async () => {
   await loadUi();
   globalThis.init();
   ticks(3);
-  const drawn = [];
-  const orig = globalThis.print;
-  globalThis.print = (x, y, s2, v) => { drawn.push(s2); orig(x, y, s2, v); };
-  ticks(2);
-  globalThis.print = orig;
-  for (const row of ['Basics', 'Grooves', 'Rudiments']) {
+  const drawn = drawnText(2);
+  for (const row of ['Continue', 'Quarters', 'Path', 'Practice', 'Quiz', 'CLICK open  MENU help']) {
     assert.ok(drawn.includes(row), `the top list does not show ${row}: ${drawn.join('|')}`);
   }
+  assert.deepEqual(globalThis.drumsPracticeMenu().labels,
+    ['Continue', 'Path', 'Practice', 'Quiz', 'Progress', 'Settings']);
+  assert.equal(globalThis.drumsPracticeMenu().cursor, 0, 'the cursor starts on Continue');
+  goTo('Practice');
+  assert.ok(drawnText(1).includes('CLICK open  BACK up'), 'a folder says Back goes up');
+  assert.deepEqual(globalThis.drumsPracticeMenu().labels, ['Subdivisions', 'Grooves', 'Rudiments', 'Random']);
 });
 
 test('Back walks up one folder at a time, and leaves only from the top', async () => {
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  toFirstDrill();                            /* two folders deep */
+  toFirstDrill();                            /* three folders deep */
+  cc(CC.back, 127); ticks(1);
   cc(CC.back, 127); ticks(1);
   cc(CC.back, 127); ticks(1);
   assert.equal(log.exited, 0, 'Back left from inside a folder');
@@ -470,20 +523,24 @@ test('Back walks up one folder at a time, and leaves only from the top', async (
   assert.ok(drawn.includes('DRUMS'), `not back at the top: ${drawn.join('|')}`);
 });
 
-test('the Ladder with nothing armed asks for a drill instead of picking one', async () => {
+test('the Ladder and the Clock are offered on a drill with a tempo — not on L0, not on a quiz', async () => {
   await loadUi();
   globalThis.init();
   ticks(2);
-  for (let i = 0; i < 60; i++) cc(CC.jogTurn, 1);
-  cc(CC.jogTurn, 127); cc(CC.jogTurn, 127);  /* Training */
-  cc(CC.jogClick, 127);
-  cc(CC.jogClick, 127);                      /* Ladder */
-  const drawn = [];
-  const orig = globalThis.print;
-  globalThis.print = (x, y, s2, v) => { drawn.push(s2); orig(x, y, s2, v); };
-  ticks(2);
-  globalThis.print = orig;
-  assert.ok(drawn.includes('ARM A DRILL'), drawn.join('|'));
+  toFirstDrill();
+  cc(CC.jogClick, 127);                      /* its rungs, highlight on L0 */
+  shiftClick();
+  assert.deepEqual(globalThis.drumsPracticeScreen().sheet, ['Settings...'], 'L0 has no tempo to climb');
+  assert.ok(drawnText(1).includes('L0 OWN PACE'), 'the sheet is titled with its row');
+  cc(CC.back, 127);
+  cc(CC.jogTurn, 1);                         /* L1 */
+  shiftClick();
+  assert.deepEqual(globalThis.drumsPracticeScreen().sheet, ['Practise: Ladder', 'Practise: Clock', 'Settings...']);
+  cc(CC.back, 127);
+  toTop();
+  goTo('Quiz', { open: true });
+  shiftClick();
+  assert.deepEqual(globalThis.drumsPracticeScreen().sheet, ['Settings...']);
 });
 
 /* ---- the transport ------------------------------------------------------ */
@@ -687,10 +744,8 @@ test('in Settings the knobs follow the rows ON SCREEN, not fixed numbers', async
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  cc(CC.shift, 127);
-  cc(CC.jogClick, 127);             /* shift + click opens settings */
+  toSettings('Practice');
   ticks(2);
-  cc(CC.shift, 0);
 
   /* At the top of the list, knob 1 is the first row — the tempo. */
   cc(CC.knob1, 1);
@@ -704,10 +759,8 @@ test('scrolling Settings moves what the knobs address', async () => {
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  cc(CC.shift, 127);
-  cc(CC.jogClick, 127);
+  toSettings('Practice');
   ticks(2);
-  cc(CC.shift, 0);
 
   /* Scroll well down the list, then turn knob 1: it must edit a row that is
    * now on screen, and NOT the tempo at the top. */
@@ -728,10 +781,8 @@ test('touching a knob moves the cursor to the row it edits', async () => {
   const { screen } = await loadUi();
   globalThis.init();
   ticks(2);
-  cc(CC.shift, 127);
-  cc(CC.jogClick, 127);
+  toSettings('Practice');
   ticks(2);
-  cc(CC.shift, 0);
   const before = screen.pixels.slice();
 
   globalThis.onMidiMessageInternal([0x90, 3, 127]);   /* touch knob 4 */
@@ -775,9 +826,8 @@ test('a drill listed in user.json loads alongside the shipped ones', async () =>
   const drawn = [];
   const orig = globalThis.print;
   globalThis.print = (x, y, s, v) => { drawn.push(s); orig(x, y, s, v); };
-  /* A user drill with no shipped category lands in Other, after Rudiments. */
-  for (let i = 0; i < 4; i++) cc(CC.jogTurn, 1);
-  cc(CC.jogClick, 127);
+  /* A user drill with no shipped category lands in Practice › Other, last. */
+  goTo('Practice', 'Other');
   ticks(3);
   globalThis.print = orig;
   assert.ok(drawn.some((t) => /My groove/.test(t)), `user drill missing: ${drawn.join('|')}`);
@@ -907,9 +957,12 @@ test('the module closes from EVERY screen, and silences everything on the way', 
     ready: () => { toFirstRung(); ticks(2); cc(CC.jogClick, 127); ticks(2); },
     running: () => { startFirstDrill(); ticks(10); },
     paused: () => { startFirstDrill(); ticks(10); cc(CC.play, 127); ticks(2); },
-    settings: () => { cc(CC.shift, 127); cc(CC.jogClick, 127); ticks(2); cc(CC.shift, 0); },
-    progress: () => { for (let i = 0; i < 60; i++) cc(CC.jogTurn, 1); cc(CC.jogClick, 127); ticks(2); },
+    settings: () => { toSettings('Sound'); ticks(2); },
+    progress: () => { goTo('Progress'); ticks(2); },
     quiz: () => { toQuizzes(); cc(CC.jogClick, 127); ticks(2); },
+    sheet: () => { shiftClick(); ticks(2); },
+    help: () => { startFirstDrill(); ticks(10); cc(CC.menu, 127); ticks(2); },
+    welcome: () => { goTo('Settings', 'Help', 'Welcome again'); ticks(2); },
   };
   for (const [name, go] of Object.entries(routes)) {
     const { log } = await loadUi();
@@ -1343,19 +1396,14 @@ test('Listen lights each drum as it plays it', async () => {
  * level never reset it.
  */
 test('the Clock stays with the drill it wrapped', async () => {
-  await loadUi();
+  const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  toFirstRung(); cc(CC.jogClick, 127); ticks(2);   /* Rock backbeat L1 armed */
-  for (let i = 0; i < 4; i++) { cc(CC.back, 127); ticks(1); } /* up to the top */
-  for (let i = 0; i < 60; i++) cc(CC.jogTurn, 1);
-  cc(CC.jogTurn, 127); cc(CC.jogTurn, 127);                  /* Training */
-  cc(CC.jogClick, 127);
-  cc(CC.jogTurn, 1);
-  cc(CC.jogClick, 127); ticks(2);                            /* Clock, on the armed drill */
-  for (let i = 0; i < 4; i++) { cc(CC.back, 127); ticks(1); }
-  for (let i = 0; i < 60; i++) cc(CC.jogTurn, 127);          /* back to the first row */
-  toFirstRung(); cc(CC.jogClick, 127); ticks(2);   /* a plain level again */
+  toFirstRung();
+  sheetPick('Practise: Clock'); ticks(2);          /* Rock backbeat L1, on the Clock */
+  assert.match(log.announces.join('|'), /Clock: Rock backbeat/);
+  cc(CC.back, 127); ticks(1);                      /* the list, on L1 */
+  cc(CC.jogClick, 127); ticks(2);                  /* a plain level again */
   cc(CC.record, 127);
   const drawn = drawnText(200);
   assert.ok(!drawn.some((t) => /LISTEN|ON YOUR OWN/.test(t)), 'the Clock banner followed into a plain drill');
@@ -1364,7 +1412,6 @@ test('the Clock stays with the drill it wrapped', async () => {
 /* ---- Regressions from the 1.2.0 review, driven end to end ------------------- */
 
 const SETTINGS_FILE = '/data/UserData/schwung/modules/tools/drums-practice/settings.json';
-const shiftClick = () => { cc(CC.shift, 127); cc(CC.jogClick, 127); cc(CC.shift, 0); };
 const knob = (k, d) => cc(CC.knob1 + k, d);
 /* Arm the first rung of the first groove: Grooves › Rock & Pop › Rock backbeat › L1. */
 function armFirstRung() {
@@ -1372,11 +1419,6 @@ function armFirstRung() {
   ticks(2);
   cc(CC.jogClick, 127);
   ticks(2);
-}
-/* Up to the top of the tree and into Training (the fifth row). */
-function toTraining() {
-  for (let i = 0; i < 4; i++) cc(CC.back, 127);
-  goTo('Training');
 }
 function runUntil(re, maxTicks) {
   for (let i = 0; i < maxTicks; i++) {
@@ -1449,11 +1491,11 @@ test('a Settings knob keeps its row however far it is turned, and the jog touch 
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  shiftClick();
+  toSettings('Practice');
   globalThis.onMidiMessageInternal([0x90, 9, 127]);   /* jog touch */
   knob(0, 1);                                         /* row 0 is Tempo, if the cursor stayed */
-  for (let i = 0; i < 8; i++) cc(CC.jogTurn, 1);      /* row 8, Strict: the second page */
-  for (let i = 0; i < 3; i++) knob(3, 1);             /* knob 4 is row 8 on that page */
+  for (let i = 0; i < 5; i++) cc(CC.jogTurn, 1);      /* row 5, Strict: the second page */
+  for (let i = 0; i < 3; i++) knob(1, 1);             /* knob 2 is row 5 on that page */
   ticks(2);
   globalThis.onUnload();
   const saved = JSON.parse(log.writes[SETTINGS_FILE]);
@@ -1479,9 +1521,8 @@ test('the Ladder climbs from 70% of the drill\'s tempo', async () => {
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  armFirstRung();
-  toTraining();
-  cc(CC.jogClick, 127);                               /* Ladder */
+  toFirstRung();
+  sheetPick('Practise: Ladder');
   ticks(2);
   assert.match(log.announces.join(' | '), /Ladder: .*, from 65/);
 });
@@ -1490,17 +1531,15 @@ test('the Clock ends by itself on a result', async () => {
   await loadUi();
   globalThis.init();
   ticks(2);
-  armFirstRung();
-  toTraining();
-  cc(CC.jogTurn, 1);
-  cc(CC.jogClick, 127);                               /* Clock */
+  toFirstRung();
+  sheetPick('Practise: Clock');
   ticks(2);
   cc(CC.record, 127);
   /* Four rounds of 4 bars on, 4 off, at 92bpm: about 85 seconds. */
   assert.ok(runUntil(/BACK start/, 5000), 'the Clock never ended');
 });
 
-test('Menu stops a run cleanly: back to the list, the Record light out', async () => {
+test('Menu is help over a run: the take pauses, the Record light goes out, Menu again goes back', async () => {
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
@@ -1510,7 +1549,42 @@ test('Menu stops a run cleanly: back to the list, the Record light out', async (
   ticks(4);
   const record = log.buttons.filter(([c]) => c === CC.record);
   assert.equal(record[record.length - 1][1], 0, 'the Record light was left burning');
-  assert.ok(drawnText(2).some((t) => /ROCK|GROOVES|DRUMS/.test(t)));
+  const shown = drawnText(2);
+  assert.ok(shown.includes('HELP: PLAYING'), shown.join('|'));
+  assert.ok(shown.includes('JOG scroll'), 'the help has its own hint line');
+  const help = globalThis.drumsPracticeScreen().help;
+  assert.ok(help.includes('REC    pause') && help.includes('SHIFT+CLICK  settings'), help.join('|'));
+  assert.ok(help.includes('PLAYING'), 'the Playing topic of help.json is on it');
+  cc(CC.jogTurn, 3);
+  assert.ok(drawnText(1).some((t) => /^9\/\d+$/.test(t)), 'the jog scrolls the help');
+  cc(CC.menu, 127);
+  ticks(2);
+  assert.equal(screenNow(), 'running');
+  assert.ok(drawnText(2).includes('PAUSED'), 'the take was not paused under the help');
+});
+
+test('Menu is help everywhere, and Back closes it where it was opened', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  goTo('Path', '0 Hello, kit', { open: false });
+  cc(CC.menu, 127);
+  let help = globalThis.drumsPracticeScreen().help;
+  assert.ok(help.includes('PATH'), 'a row of the Path explains the path');
+  cc(CC.back, 127);
+  assert.equal(globalThis.drumsPracticeMenu().title, 'Path', 'Back from help is where it was');
+  toTop();
+  goTo('Quiz');
+  cc(CC.menu, 127);
+  help = globalThis.drumsPracticeScreen().help;
+  assert.ok(help.includes('QUIZ') && help.includes('CLICK  open'), help.join('|'));
+  cc(CC.back, 127);
+  cc(CC.jogClick, 127);             /* a quiz */
+  ticks(2);
+  cc(CC.menu, 127);
+  assert.ok(drawnText(1).includes('HELP: QUIZ'));
+  cc(CC.back, 127);
+  assert.equal(screenNow(), 'quiz');
 });
 
 test('a broken user.json is reported, and the shipped drills still load', async () => {
@@ -1518,7 +1592,7 @@ test('a broken user.json is reported, and the shipped drills still load', async 
   globalThis.init();
   const shown = drawnText(2);
   assert.ok(shown.some((t) => /BAD USER\.JSON/.test(t)), shown.join('|'));
-  assert.ok(shown.some((t) => /Grooves/.test(t)), 'the list is there underneath');
+  assert.ok(shown.some((t) => /Practice/.test(t)), 'the list is there underneath');
 });
 
 /* ---- the Learning Path and progress ---------------------------------------- */
@@ -1533,9 +1607,10 @@ async function snare() {
   return snarePad;
 }
 
-/* Learning Path › Continue: the root's second row, its first. */
+/* Continue: the top row of the list. */
 function continuePath() {
-  goTo('Learning Path', 'Next:');
+  toTop();
+  goTo('Continue');
   ticks(2);
 }
 
@@ -1579,10 +1654,8 @@ test('leaving the path for the library gives back your own Speed', async () => {
   globalThis.init();
   ticks(2);
   continuePath();                  /* Quarters, at the step's 60% */
-  cc(CC.menu, 127);
-  for (let i = 0; i < 4; i++) cc(CC.back, 127);
-  for (let i = 0; i < 20; i++) cc(CC.jogTurn, 127);
-  toFirstRung();                   /* Grooves › Rock & Pop › Rock backbeat › L1 */
+  toTop();
+  toFirstRung();                   /* Practice › Grooves › Rock & Pop › Rock backbeat › L1 */
   cc(CC.jogClick, 127);
   ticks(2);
   globalThis.onUnload();
@@ -1616,10 +1689,10 @@ test('a take short of the step\'s target reads as its speed; the row shows it ag
   playQuarters(sn, 50);
   const shown = drawnText(2);
   assert.ok(shown.includes('CLEAN') && shown.includes('50 bpm'), shown.join('|'));
-  cc(CC.menu, 127);
+  toTop();
   ticks(2);
-  /* Learning Path › 0 Hello, kit › Time: Quarters reads 50 of its 60. */
-  goTo('0 Hello, kit', 'Time');
+  /* Path › 0 Hello, kit › Time: Quarters reads 50 of its 60. */
+  goTo('Path', '0 Hello, kit', 'Time');
   ticks(2);
   assert.ok(drawnText(2).includes('50/60'), `the row does not show the speed: ${drawnText(2).join('|')}`);
 });
@@ -1650,11 +1723,8 @@ test('an even take of an accented drill counts, and its dynamics say the accents
   const sn = await snare();
   globalThis.init();
   ticks(2);
-  /* Basics › Subdivisions › Eighths, at 100: its written tempo. */
-  cc(CC.jogClick, 127);
-  cc(CC.jogClick, 127);
-  cc(CC.jogTurn, 1);
-  cc(CC.jogClick, 127);
+  /* Practice › Subdivisions › Eighths, at 100: its written tempo. */
+  goTo('Practice', 'Subdivisions', 'Eighths');
   ticks(2);
   playEighths(sn, 100, () => 70);
   let shown = drawnText(2);
@@ -1693,66 +1763,97 @@ test('a Study take is not counted', async () => {
   assert.ok(!saved || !JSON.parse(saved).items['subdiv:quarters']);
 });
 
-test('Skip next moves Continue on to the next track', async () => {
-  await loadUi();
-  globalThis.init();
-  ticks(2);
-  cc(CC.jogTurn, 1);
-  cc(CC.jogClick, 127);           /* into the Learning Path */
-  ticks(1);
-  assert.ok(drawnText(1).some((t) => /Next: Quarters/.test(t)));
-  cc(CC.jogTurn, 1);
-  cc(CC.jogClick, 127);           /* Skip: Quarters */
-  ticks(1);
-  assert.ok(drawnText(1).some((t) => /Next: First beat L0/.test(t)), 'skipping did not move on');
-});
-
-test('a folder skips everything in it with one row, and takes it back with the same row', async () => {
+test('I know this: skip on Continue moves it on to the next track', async () => {
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  goTo('Learning Path', '0 Hello, kit', 'Ear', 'Skip all here', { open: false });
+  assert.ok(drawnText(1).includes('Quarters'));
+  sheetPick('I know this: skip');
   ticks(1);
-  assert.ok(drawnText(1).includes('Skip all here'));
-  cc(CC.jogClick, 127);
+  assert.match(log.announces.join('|'), /Skipped Quarters/);
+  assert.ok(drawnText(1).includes('First beat L'), 'skipping did not move on');
+  goTo('Path', '0 Hello, kit', 'Time', 'Quarters', { open: false });
+  sheetPick('Undo skip');
+  toTop();
   ticks(1);
-  assert.ok(drawnText(1).includes('Unskip all here'), 'the row did not turn round');
-  assert.match(log.announces.join('|'), /Skipped 2/);
-  cc(CC.jogClick, 127);
-  ticks(1);
-  assert.ok(drawnText(1).includes('Skip all here'), 'the skips were not taken back');
+  assert.ok(drawnText(1).includes('Quarters'), 'the skip was not taken back');
 });
 
-test('Your path: a track switched off, and Continue no longer offers it', async () => {
+test('a folder skips everything in it from its sheet, and Undo skip takes it back', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  goTo('Path', '0 Hello, kit', 'Ear', { open: false });
+  ticks(1);
+  assert.ok(!globalThis.drumsPracticeMenu().labels.some((l) => /^Skip/.test(l)), 'a skip row among the content');
+  sheetPick('I know all this: skip');
+  ticks(1);
+  assert.match(log.announces.join('|'), /Skipped 2/);
+  shiftClick();
+  assert.deepEqual(globalThis.drumsPracticeScreen().sheet, ['Undo skip', 'Settings...']);
+  cc(CC.jogClick, 127);
+  assert.match(log.announces.join('|'), /Skips taken back/);
+});
+
+test('a stage\'s sheet starts the path there, and its Settings... opens Settings over the list', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  goTo('Path', '2 Sixteenths', { open: false });
+  shiftClick();
+  assert.deepEqual(globalThis.drumsPracticeScreen().sheet,
+    ['I know all this: skip', 'Start the path here', 'Test out: checkpoint', 'Settings...']);
+  cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);
+  assert.match(log.announces.join('|'), /The path starts at stage 2/);
+  toTop();
+  ticks(1);
+  assert.ok(drawnText(1).includes('Sixteenths'), 'Continue is not in stage 2');
+  goTo('Path', '2 Sixteenths', { open: false });
+  sheetPick('Settings...');
+  assert.equal(globalThis.drumsPracticeMenu().title, 'Settings');
+  cc(CC.back, 127);
+  assert.equal(globalThis.drumsPracticeMenu().title, 'Path', 'Back from Settings is where it came from');
+});
+
+test('Test out: checkpoint plays the stage\'s checkpoint', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  goTo('Path', '0 Hello, kit', { open: false });
+  sheetPick('Test out: checkpoint');
+  ticks(2);
+  assert.equal(screenNow(), 'ready');
+  assert.match(log.announces.join('|'), /First beat.* ready/);
+});
+
+test('Settings › Path: a track switched off, and Continue no longer offers it', async () => {
   await loadUi();
   globalThis.init();
   ticks(2);
-  goTo('Learning Path', 'Your path', 'Tracks');
+  goTo('Settings', 'Path', 'Tracks');
   ticks(1);
   assert.ok(drawnText(1).includes('on'));
   goTo('Time');                   /* Time: off */
   ticks(1);
   assert.ok(drawnText(1).includes('off'), drawnText(1).join('|'));
-  cc(CC.back, 127);
-  cc(CC.back, 127);
-  goTo('Next:', { open: false });
+  toTop();
   ticks(1);
-  assert.ok(drawnText(1).some((t) => /Next: First beat L0/.test(t)), drawnText(1).join('|'));
+  assert.ok(drawnText(1).includes('First beat L'), drawnText(1).join('|'));
 });
 
-test('Your path: the short ladder, and starting at a later stage', async () => {
+test('Settings › Path: the short ladder, and starting at a later stage', async () => {
   await loadUi();
   globalThis.init();
   ticks(2);
-  goTo('Learning Path', 'Your path', 'Rungs');   /* full -> short */
-  goTo('Start at');                              /* Stage 0 -> Stage 1 */
+  goTo('Settings', 'Path', 'Rungs');   /* full -> short */
+  goTo('Start at');                    /* Stage 0 -> Stage 1 */
   ticks(1);
   const shown = drawnText(1);
   assert.ok(shown.includes('short') && shown.includes('Stage 1'), shown.join('|'));
-  cc(CC.back, 127);
-  goTo('Next:', { open: false });
+  toTop();
   ticks(1);
-  assert.ok(drawnText(1).some((t) => /Next: Eighths/.test(t)), drawnText(1).join('|'));
+  assert.ok(drawnText(1).includes('Eighths'), drawnText(1).join('|'));
 });
 
 /* Practise quarters at `bpm`, hitting only every other beat: a take that
@@ -1781,25 +1882,24 @@ test('stuck on a step: a hint after three failed takes, parked after six', async
     playHalf(sn, 60);
     const shown = drawnText(2);
     assert.ok(shown.includes('NOT CLEAN'), shown.join('|'));
-    if (n < 3) assert.ok(shown.includes('REC again  CLICK next'), `take ${n}: ${shown.join('|')}`);
+    if (n < 3) assert.ok(shown.includes('CLICK next  REC again'), `take ${n}: ${shown.join('|')}`);
     else if (n < 6) assert.ok(shown.includes('stuck? knob 8 slower'), `take ${n}: ${shown.join('|')}`);
     else assert.ok(shown.includes('parked: CLICK other'), `take ${n}: ${shown.join('|')}`);
   }
-  cc(CC.menu, 127);
+  toTop();
   ticks(1);
-  assert.ok(drawnText(1).some((t) => /Next: First beat L0/.test(t)), 'Continue still offers the parked step');
+  assert.ok(drawnText(1).includes('First beat L'), 'Continue still offers the parked step');
   globalThis.onUnload();
   assert.ok(JSON.parse(log.writes[`${DATA}progress.json`]).items['subdiv:quarters'].park > 0);
 });
 
 /* ---- pad layouts and the Pad map ------------------------------------------- */
 
-/* Settings, cursor on the Pad map row. */
+/* Settings › Pads, then its Pad map row. */
 async function toPadMap() {
   const SET = await import('../src/settings_def.mjs');
-  shiftClick();
-  for (let i = 0; i < 40; i++) cc(CC.jogTurn, 127);
-  const row = SET.ROWS.findIndex((r) => r.key === 'padMap');
+  toSettings('Pads');
+  const row = SET.rowsIn('pads').findIndex((r) => r.key === 'padMap');
   for (let i = 0; i < row; i++) cc(CC.jogTurn, 1);
   cc(CC.jogClick, 127);
   ticks(1);
@@ -1823,7 +1923,7 @@ test('the Pad map names every pad, sounds it, and steps through the layouts', as
   assert.ok(drawnText(1).includes('MPC Family Rows'), drawnText(1).join('|'));
   cc(CC.back, 127);
   ticks(1);
-  assert.ok(drawnText(1).includes('SETTINGS'), 'Back returns to Settings');
+  assert.ok(drawnText(1).includes('PADS'), 'Back returns to Settings › Pads');
   globalThis.onUnload();
   assert.equal(JSON.parse(log.writes[SETTINGS_FILE]).layout, 'family');
 });
@@ -1956,8 +2056,7 @@ test('a drill a layout cannot fully play names the drum on the ready screen', as
   } });
   globalThis.init();
   ticks(2);
-  cc(CC.jogTurn, 2); cc(CC.jogClick, 127);          /* Grooves */
-  cc(CC.jogTurn, 2); cc(CC.jogClick, 127);          /* Latin & World */
+  goTo('Practice', 'Grooves', 'Latin & World');
   for (let i = 0; i < 40; i++) cc(CC.jogTurn, 1);   /* its last groove: Bell */
   cc(CC.jogClick, 127); ticks(2);                    /* its ladder */
   cc(CC.jogTurn, 1); cc(CC.jogClick, 127); ticks(2); /* L1, the timed rung with the bell */
@@ -1974,16 +2073,16 @@ test('a lesson card stands before a new concept, and Click is all it costs', asy
   /* Entering the first stage: its card, then the step's two. */
   let shown = drawnText(1);
   assert.ok(shown.includes('0 Hello, kit'), `no stage card: ${shown.join('|')}`);
-  assert.ok(shown.includes('CLICK next  PLAY hear'), shown.join('|'));
+  assert.ok(shown.includes('JOG page  CLICK next'), shown.join('|'));
   cc(CC.jogClick, 127); ticks(1);
   assert.ok(drawnText(1).includes('The pulse'), drawnText(1).join('|'));
   cc(CC.jogClick, 127); ticks(1);
   shown = drawnText(1);
-  assert.ok(shown.includes('Your result') && shown.includes('CLICK start PLAY hear'), shown.join('|'));
+  assert.ok(shown.includes('Your result') && shown.some((t) => /CLICK start/.test(t)), shown.join('|'));
   cc(CC.jogClick, 127); ticks(2);
   assert.ok(drawnText(2).some((t) => /Quart/.test(t)), 'Click on the last card did not open the step');
   /* Read once, never again: Continue goes straight to the step. */
-  cc(CC.menu, 127); ticks(1);
+  toList(); ticks(1);
   cc(CC.jogClick, 127); ticks(2);
   assert.ok(drawnText(2).some((t) => /Quart/.test(t)), 'a card read came back');
   globalThis.onUnload();
@@ -1997,17 +2096,16 @@ test('Back from a card returns to the list and marks nothing read; Intros off sh
   ticks(2);
   continuePath();
   cc(CC.back, 127); ticks(1);
-  assert.ok(drawnText(1).some((t) => /Next: Quarters/.test(t)), 'Back did not return to the list');
+  assert.ok(drawnText(1).includes('Quarters'), 'Back did not return to the list');
   cc(CC.jogClick, 127); ticks(1);
   assert.ok(drawnText(1).includes('0 Hello, kit'), 'the card was marked read by Back');
   cc(CC.back, 127);
-  /* Your path › Intros: new -> always -> off. */
-  goTo('Your path', 'Intros');
+  /* Settings › Path › Intros: new -> always -> off. */
+  goTo('Settings', 'Path', 'Intros');
   goTo('Intros');
   ticks(1);
   assert.ok(drawnText(1).includes('off'), drawnText(1).join('|'));
-  cc(CC.back, 127);
-  goTo('Next:');
+  continuePath();
   ticks(2);
   assert.ok(drawnText(2).some((t) => /Quart/.test(t)), 'Intros off still showed a card');
 });
@@ -2028,18 +2126,19 @@ test('a stage\'s Lessons row reads its cards again, the jog turning their pages'
   await loadUi({ settings: PLAIN, withLessons: true });
   globalThis.init();
   ticks(2);
-  goTo('Learning Path', '0 Hello, kit', 'Lessons');
+  goTo('Path', '0 Hello, kit', 'Lessons');
   ticks(1);
-  assert.ok(drawnText(1).includes('CLICK next  BACK list'), drawnText(1).join('|'));
+  assert.ok(drawnText(1).includes('JOG page  CLICK next'), drawnText(1).join('|'));
   cc(CC.jogTurn, 1);              /* a one-page card stays on its page */
   ticks(1);
-  for (let i = 0; i < 10 && !drawnText(1).includes('CLICK done'); i++) { cc(CC.jogClick, 127); ticks(1); }
-  assert.ok(drawnText(1).includes('CLICK done'));
+  const done = () => drawnText(1).some((t) => /CLICK done/.test(t));
+  for (let i = 0; i < 10 && !done(); i++) { cc(CC.jogClick, 127); ticks(1); }
+  assert.ok(done());
   cc(CC.jogClick, 127); ticks(1);
   assert.ok(drawnText(1).includes('Lessons'), `not back in the stage folder: ${drawnText(1).join('|')}`);
 });
 
-test('Repetition lists what is due, and opens it', async () => {
+test('Path › Review lists what is due, and opens it; with nothing due there is no Review', async () => {
   const day = 86400;
   const now = Math.round(Date.now() / 1000);
   const progress = { version: 2, items: { flam: {
@@ -2049,9 +2148,7 @@ test('Repetition lists what is due, and opens it', async () => {
   await loadUi({ dataFiles: { 'progress.json': JSON.stringify(progress) } });
   globalThis.init();
   ticks(2);
-  cc(CC.jogTurn, 1);
-  cc(CC.jogClick, 127);
-  for (let i = 0; i < 10; i++) cc(CC.jogTurn, 1);   /* Repetition, the last row */
+  goTo('Path', 'Review', { open: false });          /* the last row, after the stages */
   ticks(1);
   assert.ok(drawnText(1).includes('1 due'), 'the due count is not on the row');
   cc(CC.jogClick, 127);
@@ -2060,7 +2157,40 @@ test('Repetition lists what is due, and opens it', async () => {
   cc(CC.jogClick, 127);
   ticks(2);
   assert.ok(drawnText(2).some((t) => /Flam/.test(t)) && drawnText(1).some((t) => /bars|\d+\/\d+/.test(t)),
-    'the repetition did not arm its drill');
+    'the review did not arm its drill');
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  goTo('Path');
+  assert.ok(!globalThis.drumsPracticeMenu().labels.includes('Review'), 'an empty Review is shown');
+});
+
+test('Continue alternates a due review with the next step, one each', async () => {
+  const day = 86400;
+  const now = Math.round(Date.now() / 1000);
+  const progress = { version: 2, items: { flam: {
+    best: 100, bpm: 70, plays: 1, t: now - 3 * day, done: now - 3 * day, skip: 0,
+    rep: { due: now - day, step: 0, at: 0, ok: false }, h: [],
+  } } };
+  const { log } = await loadUi({ dataFiles: { 'progress.json': JSON.stringify(progress) } });
+  globalThis.init();
+  ticks(2);
+  assert.equal(globalThis.drumsPracticeMenu().labels[0], 'Review', 'a due review comes first');
+  assert.ok(drawnText(1).includes('Flam'));
+  shiftClick();
+  assert.deepEqual(globalThis.drumsPracticeScreen().sheet, ['Settings...'], 'a review is not skipped');
+  cc(CC.back, 127);
+  cc(CC.jogClick, 127);
+  ticks(2);
+  assert.match(log.announces.join('|'), /Review: Flam/);
+  assert.equal(screenNow(), 'ready');
+  toList();
+  assert.equal(globalThis.drumsPracticeMenu().labels[0], 'Continue', 'then a new step');
+  assert.ok(drawnText(1).includes('Quarters'));
+  cc(CC.jogClick, 127);
+  ticks(2);
+  toList();
+  assert.equal(globalThis.drumsPracticeMenu().labels[0], 'Review', 'and the review again');
 });
 
 test('Progress lists the tracks and what was played, and opens a chart', async () => {
@@ -2072,11 +2202,10 @@ test('Progress lists the tracks and what was played, and opens a chart', async (
   await loadUi({ dataFiles: { 'progress.json': JSON.stringify(progress) } });
   globalThis.init();
   ticks(2);
-  for (let i = 0; i < 20; i++) cc(CC.jogTurn, 1);    /* Progress, the last row */
-  cc(CC.jogClick, 127);
+  goTo('Progress');
   ticks(1);
   const list = drawnText(1);
-  for (const t of ['PROGRESS', 'Overall', 'Time', 'Hands', 'Grooves', 'Ear']) {
+  for (const t of ['PROGRESS', 'Overall', 'Time', 'Hands', 'Grooves', 'CLICK chart  BACK up']) {
     assert.ok(list.includes(t), `${t} missing: ${list.join('|')}`);
   }
   for (let i = 0; i < 5; i++) cc(CC.jogTurn, 1);     /* Flam tap, after the five overviews */
@@ -2106,8 +2235,7 @@ test('the overview draws drills learned over time', async () => {
   const { screen } = await loadUi({ dataFiles: { 'progress.json': JSON.stringify(progress) } });
   globalThis.init();
   ticks(2);
-  for (let i = 0; i < 20; i++) cc(CC.jogTurn, 1);
-  cc(CC.jogClick, 127);                              /* Progress */
+  goTo('Progress');
   for (let i = 0; i < 20; i++) cc(CC.jogTurn, 127);
   cc(CC.jogClick, 127);                              /* Overall */
   ticks(1);
@@ -2164,8 +2292,7 @@ test('a damaged progress.json is kept aside and the backup read', async () => {
   globalThis.init();
   ticks(2);
   assert.equal(log.writes[`${DATA}progress.bad.json`], '{"items": {trunc');
-  for (let i = 0; i < 20; i++) cc(CC.jogTurn, 1);
-  cc(CC.jogClick, 127);
+  goTo('Progress');
   for (let i = 0; i < 5; i++) cc(CC.jogTurn, 1);   /* past the overviews */
   ticks(1);
   assert.ok(drawnText(1).includes('90%'), 'the backup was not read');
@@ -2176,7 +2303,7 @@ test('an Ear step records its round, and Click goes on to the next quiz', async 
   const { log } = await loadUi({ settings: { roundSize: 10 } });
   globalThis.init();
   ticks(2);
-  goTo('Learning Path', '0 Hello, kit', 'Ear', 'Guess: drum');
+  goTo('Path', '0 Hello, kit', 'Ear', 'Guess: drum');
   ticks(2);
   assert.ok(drawnText(1).some((t) => /GUESS: DRUM/.test(t)), 'the step did not open its quiz');
   /* Try every drum in turn until the round is over: right answers and wrong
@@ -2202,7 +2329,7 @@ test('the Clock step arms the Clock round its drill, at the drill\'s target', as
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  goTo('Learning Path', '1 Eighth notes', 'Time', 'Clock');
+  goTo('Path', '1 Eighth notes', 'Time', 'Clock');
   ticks(2);
   assert.ok(log.announces.includes('Clock: Quarters'), log.announces.slice(-3).join('|'));
   /* Eight bars of quarters at 100bpm is 19 seconds; at the default 90 it is 21. */
@@ -2213,16 +2340,9 @@ test('a Ladder that never holds a rung ends, says why, and counts as tried', asy
   const { log } = await loadUi({ settings: { ...PLAIN, ladderBars: 1 } });
   globalThis.init();
   ticks(2);
-  /* Basics › Subdivisions › Quarters, then Training › Ladder. */
-  cc(CC.jogClick, 127);
-  cc(CC.jogClick, 127);
-  cc(CC.jogClick, 127);
-  ticks(2);
-  /* Three folders up is the top (four would close the module), then Training. */
-  for (let i = 0; i < 3; i++) cc(CC.back, 127);
-  cc(CC.jogTurn, 4);
-  cc(CC.jogClick, 127);
-  cc(CC.jogClick, 127);
+  /* Practice › Subdivisions › Quarters, on the Ladder. */
+  goTo('Practice', 'Subdivisions', 'Quarters', { open: false });
+  sheetPick('Practise: Ladder');
   ticks(2);
   cc(CC.record, 127);
   assert.ok(runUntil(/best clean 0/, 2000), 'the Ladder never ended');
@@ -2515,14 +2635,14 @@ test('Record pauses an L0 take, and a press while paused is not a stroke', async
   assert.ok(drawnText(3).some((t) => /100% 1st try/.test(t)));
 });
 
-test('the Ladder over L0 asks for a timed rung', async () => {
+test('L0 offers no Ladder: it has no tempo to climb', async () => {
   await loadUi();
   globalThis.init();
   ticks(2);
   armL0();
-  toTraining();
-  cc(CC.jogClick, 127);                         /* Ladder */
-  assert.ok(drawnText(2).includes('ARM A TIMED RUNG'));
+  toList();
+  shiftClick();
+  assert.ok(!globalThis.drumsPracticeScreen().sheet.includes('Practise: Ladder'));
 });
 
 test('Click on an L0 result goes on to L1', async () => {
@@ -2609,7 +2729,7 @@ test('an L0 scrub stops at the last bar with notes in it', async () => {
   } });
   globalThis.init();
   ticks(2);
-  cc(CC.jogTurn, 2); cc(CC.jogClick, 127); cc(CC.jogClick, 127);  /* Rock & Pop */
+  goTo('Practice', 'Grooves', 'Rock & Pop');
   for (let i = 0; i < 40; i++) cc(CC.jogTurn, 1);                 /* its last groove: Half */
   cc(CC.jogClick, 127); ticks(2);                                  /* its ladder, on L0 */
   cc(CC.jogClick, 127); ticks(2);
@@ -2669,4 +2789,191 @@ test('mashing kick, snare and hat at once never steps L0 on', async () => {
   strike(ROCK_STACKS[0]);
   ticks(8);
   assert.ok(drawnText(1).includes('0/1'), 'the first stack is through, not first time');
+});
+
+/* ---- finding your way: the welcome, tips, hints, the sheet, help ---------- */
+
+test('a newcomer is welcomed: what it is, the keys, then new or already playing', async () => {
+  const { log } = await loadUi({ tips: [] });
+  globalThis.init();
+  ticks(2);
+  assert.equal(screenNow(), 'welcome');
+  let shown = drawnText(1);
+  assert.ok(shown.includes('Welcome') && shown.includes('Drums Practice takes'), shown.join('|'));
+  assert.ok(shown.includes('JOG page  CLICK go on'), shown.join('|'));
+  cc(CC.jogTurn, 1);                         /* the jog turns the page too */
+  shown = drawnText(1);
+  assert.ok(shown.includes('Keys') && shown.includes('MENU   help, anywhere'), shown.join('|'));
+  cc(CC.jogClick, 127);
+  shown = drawnText(1);
+  assert.ok(shown.includes('New to drums?') && shown.includes('From the start') && shown.includes('I already play'));
+  assert.ok(shown.includes('JOG pick  CLICK go on'), shown.join('|'));
+  cc(CC.jogClick, 127);                      /* From the start */
+  ticks(1);
+  assert.deepEqual(globalThis.drumsPracticeMenu().labels.slice(0, 2), ['Continue', 'Path']);
+  assert.equal(globalThis.drumsPracticeMenu().cursor, 0, 'the cursor is on Continue');
+  globalThis.onUnload();
+  const saved = JSON.parse(log.writes[`${DATA}progress.json`]);
+  assert.deepEqual(saved.tips, ['welcome']);
+  assert.equal(saved.path.start, 0);
+});
+
+test('"I already play" opens the Path with a tip on testing out; Back ends the welcome anywhere', async () => {
+  await loadUi({ tips: [] });
+  globalThis.init();
+  ticks(2);
+  cc(CC.jogClick, 127);
+  cc(CC.jogClick, 127);
+  cc(CC.jogTurn, 1);                         /* I already play */
+  cc(CC.jogClick, 127);
+  ticks(1);
+  assert.equal(screenNow(), 'tip');
+  const shown = drawnText(1);
+  assert.ok(shown.includes('Know a stage already?') && shown.includes('SHIFT+CLICK a stage,'), shown.join('|'));
+  cc(CC.back, 127);
+  assert.equal(globalThis.drumsPracticeMenu().title, 'Path', 'the Path is open under the tip');
+
+  const second = await loadUi({ tips: [] });
+  globalThis.init();
+  ticks(2);
+  cc(CC.back, 127);                          /* dismissed on its first page */
+  assert.equal(globalThis.drumsPracticeMenu().title, 'Drums');
+  globalThis.onUnload();
+  assert.deepEqual(JSON.parse(second.log.writes[`${DATA}progress.json`]).tips, ['welcome']);
+});
+
+test('someone who practised before the welcome existed is not welcomed, only marked', async () => {
+  const progress = { version: 2, items: { flam: { best: 80, bpm: 60, plays: 3, t: 1, h: [] } } };
+  const { log } = await loadUi({ tips: [], dataFiles: { 'progress.json': JSON.stringify({ ...progress, tips: [] }) } });
+  globalThis.init();
+  ticks(2);
+  assert.equal(screenNow(), 'menu');
+  globalThis.onUnload();
+  assert.deepEqual(JSON.parse(log.writes[`${DATA}progress.json`]).tips, ['welcome']);
+});
+
+test('each first visit shows its tip once, and Show tips again brings them back', async () => {
+  await loadUi({ tips: ['welcome'] });
+  globalThis.init();
+  ticks(2);
+  shiftClick();                              /* the first sheet */
+  ticks(1);
+  assert.equal(screenNow(), 'tip');
+  assert.ok(drawnText(1).includes('Options for this row.'));
+  cc(CC.jogClick, 127);
+  assert.equal(screenNow(), 'sheet', 'the tip stood in front of the sheet');
+  cc(CC.back, 127);
+  shiftClick();
+  ticks(1);
+  assert.equal(screenNow(), 'sheet', 'the tip came back');
+  cc(CC.back, 127);
+  armFirstRung();
+  ticks(1);
+  assert.equal(screenNow(), 'tip');
+  assert.ok(drawnText(1).some((t) => /^REC plays and scores/.test(t)), drawnText(1).join('|'));
+  cc(CC.back, 127);
+  assert.equal(screenNow(), 'ready');
+  toTop();
+  goTo('Quiz', 'Hear: drum');
+  ticks(1);
+  assert.equal(screenNow(), 'tip');
+  assert.ok(drawnText(1).some((t) => /^Answer with the lit/.test(t)));
+  const before = globalThis.__log.params.length;
+  cc(CC.jogClick, 127);
+  ticks(2);
+  assert.equal(screenNow(), 'quiz');
+  assert.ok(globalThis.__log.params.slice(before).some(isHit), 'the question is asked once the tip is read');
+  toTop();
+  goTo('Settings', 'Help', 'Show tips again');
+  cc(CC.back, 127);
+  cc(CC.back, 127);
+  shiftClick();
+  ticks(1);
+  assert.equal(screenNow(), 'tip', 'the tips were not cleared');
+});
+
+test('Shift held shows Shift\'s layer on the hint line; a long hint rotates', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  cc(CC.shift, 127);
+  let shown = drawnText(1);
+  assert.ok(shown.includes('SHIFT: CLICK options') || shown.includes('SHIFT: BACK quit'), shown.join('|'));
+  cc(CC.shift, 0);
+  assert.ok(drawnText(1).includes('CLICK open  MENU help'));
+  shiftClick();
+  const parts = new Set();
+  for (let i = 0; i < 300; i++) for (const t of drawnText(1)) parts.add(t);
+  assert.ok(parts.has('CLICK do it') && parts.has('BACK close'), [...parts].join('|'));
+  cc(CC.back, 127);
+  armFirstRung();
+  cc(CC.shift, 127);
+  shown = drawnText(1);
+  assert.ok(shown.some((t) => /^SHIFT: /.test(t)), `no Shift layer on the ready screen: ${shown.join('|')}`);
+  cc(CC.shift, 0);
+});
+
+test('Settings is a folder of groups; Shift+click over a drill still shows every setting', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  goTo('Settings');
+  assert.deepEqual(globalThis.drumsPracticeMenu().labels, ['Path', 'Practice', 'Sound', 'Pads', 'MIDI', 'Help']);
+  goTo('Sound');
+  let shown = drawnText(1);
+  assert.ok(shown.includes('SOUND') && shown.includes('Click') && shown.includes('Latency'), shown.join('|'));
+  assert.ok(!shown.includes('Tempo'), 'another group\'s row in Sound');
+  cc(CC.back, 127);
+  assert.equal(globalThis.drumsPracticeMenu().title, 'Settings', 'Back from a group is the folder');
+  toTop();
+  armFirstRung();
+  shiftClick();
+  shown = drawnText(1);
+  assert.ok(shown.includes('SETTINGS') && shown.includes('Tempo'), shown.join('|'));
+  shiftClick();
+  assert.equal(screenNow(), 'ready', 'Shift+click again leaves Settings');
+});
+
+test('a stage with lesson cards offers them in its sheet, and its help reads the stage\'s card', async () => {
+  await loadUi({ withLessons: true });
+  globalThis.init();
+  ticks(2);
+  goTo('Path', '1 Eighth notes', { open: false });
+  cc(CC.menu, 127);
+  const help = globalThis.drumsPracticeScreen().help;
+  assert.ok(help.includes('1 EIGHTH NOTES'), `no stage card in the help: ${help.join('|')}`);
+  cc(CC.menu, 127);
+  sheetPick('Lessons');
+  ticks(1);
+  assert.equal(screenNow(), 'card');
+  assert.ok(drawnText(1).some((t) => /Eighth/.test(t)));
+});
+
+test('Click on the result of a review Continue opened goes on as Continue would', async () => {
+  const day = 86400;
+  const now = Math.round(Date.now() / 1000);
+  const progress = { version: 2, items: { flam: {
+    best: 100, bpm: 70, plays: 1, t: now - 3 * day, done: now - 3 * day, skip: 0,
+    rep: { due: now - day, step: 0, at: 0, ok: false }, h: [],
+  } } };
+  const { log } = await loadUi({ settings: PLAIN, dataFiles: { 'progress.json': JSON.stringify(progress) } });
+  globalThis.init();
+  ticks(2);
+  cc(CC.jogClick, 127);                      /* Review: Flam */
+  ticks(2);
+  cc(CC.record, 127);
+  assert.ok(runUntil(/REC again/, 4000), 'the review take never ended');
+  cc(CC.jogClick, 127);
+  ticks(2);
+  assert.match(log.announces.slice(-2).join('|'), /Quarters ready/, 'not on to the next step');
+});
+
+test('Menu on Continue reads the card of the step it would open', async () => {
+  await loadUi({ withLessons: true });
+  globalThis.init();
+  ticks(2);
+  cc(CC.menu, 127);
+  const help = globalThis.drumsPracticeScreen().help;
+  assert.ok(help.includes('HELP: LIST') || drawnText(1).includes('HELP: LIST'));
+  assert.ok(help.some((l) => /^THE PULSE|^YOUR RESULT|^0 HELLO, KIT/.test(l)), help.join('|'));
 });

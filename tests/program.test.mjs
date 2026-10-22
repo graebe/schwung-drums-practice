@@ -237,26 +237,46 @@ test('on from a step: the next open one of its track in its stage, never itself'
   assert.equal(PLAN.stepAfter(p, prog, fb0, T0).id, 'first-beat:l1', 'the next rung');
 });
 
-test('the folder: Continue, Skip, Your path, the stages, Repetition — and every row fits', () => {
-  const f = PLAN.programFolder(build(), () => [{ label: 'due', repId: 'x' }],
-    manifest.categories.filter((c) => c.folder === 'Grooves'));
-  assert.deepEqual(f.children.map((c) => c.label), ['Continue', 'Skip next', 'Your path',
-    '0 Hello, kit', '1 Eighth notes', '2 Sixteenths', '3 Ghosts & flams',
-    '4 Triplets/swing', '5 Clave & world', '6 Pro', 'Repetition']);
-  assert.equal(f.children[10].children[0].repId, 'x', 'asked for each time');
-  const s0 = f.children[3];
-  assert.deepEqual(s0.children.slice(0, 3).map((c) => c.label),
-    ['Skip next', 'Skip all here', 'Checkpoint: First beat L3']);
-  assert.equal(f.children[2].children[1].children.length, 6, 'one row a style');
-  /* A row is fitted to the screen; a folder's label is its title when open. */
+test('the Path: the stages, then Review only while something is due', () => {
+  let due = [];
+  const f = PLAN.programFolder(build(), () => due);
+  const stages = ['0 Hello, kit', '1 Eighth notes', '2 Sixteenths', '3 Ghosts & flams',
+    '4 Triplets/swing', '5 Clave & world', '6 Pro'];
+  assert.deepEqual(f.children.map((c) => c.label), stages, 'nothing due, no Review');
+  due = [{ label: 'due', repId: 'x' }];
+  assert.deepEqual(f.children.map((c) => c.label), stages.concat('Review'));
+  assert.equal(f.children[7].children[0].repId, 'x', 'asked for each time');
+});
+
+test('a stage lists its places in teaching order, the checkpoint last, and no rows with a job', () => {
+  const f = PLAN.programFolder(build());
+  const s0 = f.children[0];
+  assert.deepEqual(s0.children.map((c) => c.label),
+    ['Lessons', 'Ear', 'Time', 'Grooves', 'Electives', 'Checkpoint'], 'Hello, kit has no Hands');
+  assert.deepEqual(f.children[2].children.map((c) => c.label),
+    ['Lessons', 'Ear', 'Time', 'Hands', 'Grooves', 'Electives', 'Checkpoint']);
+  const cp = s0.children[s0.children.length - 1];
+  assert.equal(cp.checkpoint, true);
+  assert.equal(cp.step.id, 'first-beat:l3', 'the checkpoint is the stage\'s exam');
+  /* Skip, Skip all here, Start here: all in the action sheet now. */
   const walk = (n) => {
     for (const c of n.children) {
-      if (!isFolder(c) || c.repetition) continue;
-      assert.ok(c.label.length <= 16, `folder "${c.label}" overflows its title`);
-      walk(c);
+      assert.ok(!/^Skip|^Start here|^Check:/.test(c.label), `"${c.label}" is a control row`);
+      if (isFolder(c) && !c.review) {
+        assert.ok(c.label.length <= 16, `folder "${c.label}" overflows its title`);
+        walk(c);
+      }
     }
   };
   walk(f);
+});
+
+test('Settings › Path: tracks, styles, rungs, the start and the intros', () => {
+  const styles = manifest.categories.filter((c) => c.folder === 'Grooves');
+  const f = PLAN.pathSettingsFolder(styles);
+  assert.deepEqual(f.children.map((c) => c.label), ['Tracks', 'Styles', 'Rungs', 'Start at', 'Intros']);
+  assert.equal(f.children[1].children.length, 6, 'one row a style');
+  assert.equal(f.untracked, true, 'nothing to count in it');
 });
 
 test('every id the table names is installed or planned — a typo cannot vanish', () => {

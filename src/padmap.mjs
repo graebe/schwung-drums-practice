@@ -42,7 +42,7 @@
  * still the physical half.
  *
  * Every preset reaches the voices the bundled drills are written in, so no
- * step of the Learning Path is unplayable on any of them (padmap.test.mjs) —
+ * step of the Path is unplayable on any of them (padmap.test.mjs) —
  * but Chromatic, which is GM 36..51 by definition and has no cowbell.
  */
 

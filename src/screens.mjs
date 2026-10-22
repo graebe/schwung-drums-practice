@@ -12,12 +12,12 @@
 
 import * as L from './layout.mjs';
 import * as SR from './staff_render.mjs';
-import { drawHeader, drawList, drawPlot, fitText } from './chrome.mjs';
+import { drawHeader, drawList, drawPlot, drawHint, fitText } from './chrome.mjs';
 import { drawMark, MARK_W } from './glyphs.mjs';
 import { voiceById } from './kit.mjs';
 import { diatonicToY } from './notation.mjs';
 
-export { drawList };
+export { drawList, drawHint };
 
 /* ---- Summary ------------------------------------------------------------ */
 /*
@@ -96,8 +96,7 @@ export function drawSummary(ctx, s) {
   }
 
   drawPercentPlot(ctx, SUMMARY_PLOT, s.series);
-  const hint = s.footer || 'REC again  CLICK next';
-  ctx.text((L.SCREEN_W - ctx.textWidth(hint)) >> 1, L.SCREEN_H - L.TEXT_H, hint, 1);
+  drawHint(ctx, s.footer || 'CLICK next  REC again');
 }
 
 /* The header: a title fitted against a status on the right, with its mark. */
@@ -215,8 +214,7 @@ export function drawPadMap(ctx, s) {
   }
   /* The hands divide here: left half the left hand. */
   ctx.fillRect(g.x + 4 * g.cellW - 1, g.y, 1, 4 * g.cellH - 1, 1);
-  const foot = fit(ctx, s.footer || '', L.SCREEN_W - 2);
-  ctx.text((L.SCREEN_W - ctx.textWidth(foot)) >> 1, L.SCREEN_H - L.TEXT_H, foot, 1);
+  drawHint(ctx, s.footer || '');
 }
 
 /* ---- Lesson card -------------------------------------------------------- */
@@ -235,8 +233,33 @@ export function drawCard(ctx, s) {
   drawTitle(ctx, s.title || '', pages > 1 ? `${(s.page || 0) + 1}/${pages}` : '', null);
   const lines = s.lines || [];
   for (let i = 0; i < lines.length; i++) ctx.text(1, CARD_TEXT_Y + i * L.TEXT_H, lines[i], 1);
-  const foot = fit(ctx, s.footer || 'CLICK start', L.SCREEN_W - 2);
-  ctx.text((L.SCREEN_W - ctx.textWidth(foot)) >> 1, L.SCREEN_H - L.TEXT_H, foot, 1);
+  drawHint(ctx, s.footer || 'CLICK start');
+}
+
+/* ---- Help ------------------------------------------------------------------ */
+/*
+ * MENU's help page (help.mjs): a page of lines under its title, scrolled by
+ * the jog, a scrollbar when there is more, and the hint line.
+ *
+ * s = { title, lines, top, rows, footer }
+ */
+export function drawHelp(ctx, s) {
+  ctx.clear();
+  const lines = s.lines || [];
+  const rows = s.rows || 6;
+  const top = Math.max(0, Math.min(s.top || 0, Math.max(0, lines.length - rows)));
+  const more = lines.length > rows ? `${Math.min(lines.length, top + rows)}/${lines.length}` : '';
+  drawTitle(ctx, s.title || 'HELP', more, null);
+  for (let i = 0; i < rows && top + i < lines.length; i++) {
+    ctx.text(1, CARD_TEXT_Y + i * L.TEXT_H, fit(ctx, lines[top + i], L.SCREEN_W - 4), 1);
+  }
+  if (lines.length > rows) {
+    const band = rows * L.TEXT_H;
+    const h = Math.max(3, Math.round((rows / lines.length) * band));
+    const y = CARD_TEXT_Y + Math.round((top / (lines.length - rows)) * (band - h));
+    ctx.fillRect(L.SCREEN_W - 1, y, 1, h, 1);
+  }
+  drawHint(ctx, s.footer || '');
 }
 
 /* ---- Ladder ------------------------------------------------------------- */
@@ -300,8 +323,7 @@ export function drawQuiz(ctx, s) {
        * what you ruled out is part of what the hint teaches. */
       if (s.isEliminated(i)) ctx.fillRect(2, y + 3, L.SCREEN_W - 4, 1, v);
     }
-    const foot = s.hintsLeft > 0 ? 'PAD answer  REC help' : 'PAD or JOG  CLICK ok';
-    ctx.text((L.SCREEN_W - ctx.textWidth(foot)) >> 1, L.SCREEN_H - L.TEXT_H, foot, 1);
+    drawHint(ctx, s.footer || (s.hintsLeft > 0 ? 'PAD answer  REC help' : 'PAD answer  CLICK ok'));
     return;
   } else {
     /* guess: the notation, on its own staff. hear: a question mark until you
@@ -327,10 +349,9 @@ export function drawQuiz(ctx, s) {
     }
   }
 
-  const streak = `streak ${q.streak}`;
-  ctx.text(1, L.SCREEN_H - L.TEXT_H, streak, 1);
-  const help = s.hintsLeft > 0 ? 'REC help' : '';
-  if (help) ctx.text(L.SCREEN_W - ctx.textWidth(help) - 1, L.SCREEN_H - L.TEXT_H, help, 1);
+  /* The streak over the hint line, at the left, clear of the name above. */
+  ctx.text(1, L.UNDER_LANE_Y, `streak ${q.streak}`, 1);
+  drawHint(ctx, s.footer || (s.hintsLeft > 0 ? 'PAD answer  REC help' : 'PAD answer'));
 }
 
 /* ---- Quiz result -------------------------------------------------------- */
@@ -355,6 +376,7 @@ export function drawResult(ctx, s) {
     drawNote(ctx, L.SCREEN_W - w - 1, L.RESULT_ROW_B_Y, s.note);
   }
   drawPlot(ctx, L.RESULT_PLOT, s.series || []);
+  drawHint(ctx, s.footer || '');
 }
 
 /* ---- Progress ----------------------------------------------------------- */
@@ -378,8 +400,7 @@ export function drawProgress(ctx, s) {
   const bestLine = s.isQuiz ? `best ${s.best}%` : s.best ? `best ${s.best}% ${s.bpm}bpm` : 'never clean';
   ctx.text(1, L.PROGRESS_ROW_Y, bestLine, 1);
   ctx.text(L.SCREEN_W - ctx.textWidth(takes) - 1, L.PROGRESS_ROW_Y, takes, 1);
-  const foot = s.footer || '';
-  if (foot) ctx.text((L.SCREEN_W - ctx.textWidth(foot)) >> 1, L.SCREEN_H - L.TEXT_H, foot, 1);
+  drawHint(ctx, s.footer || '');
 }
 
 /*
@@ -414,8 +435,7 @@ export function drawOverview(ctx, s) {
   }
   const learned = `${s.done} learned of ${s.count}`;
   ctx.text(1, L.PROGRESS_ROW_Y, fit(ctx, learned, L.SCREEN_W - 2), 1);
-  const foot = s.footer || '';
-  if (foot) ctx.text((L.SCREEN_W - ctx.textWidth(foot)) >> 1, L.SCREEN_H - L.TEXT_H, foot, 1);
+  drawHint(ctx, s.footer || '');
 }
 
 /* ---- Failure ------------------------------------------------------------ */

@@ -26,11 +26,11 @@ import { visibleEntries, runProgress, blockingNotes } from './scoring.mjs';
 import { visibleBars, rulerBars, beatToX, practiceBeats } from './chart.mjs';
 import { voiceById, voicesInChart } from './kit.mjs';
 import { diatonicToY } from './notation.mjs';
-import { drawHeader, drawFooter, drawCountIn, drawBarRuler, drawLaneCallout } from './chrome.mjs';
+import { drawHeader, drawFooter, drawHint, drawCountIn, drawBarRuler, drawLaneCallout } from './chrome.mjs';
 import { drawPlayGlyph, drawRecordGlyph, drawScrubGlyph } from './glyphs.mjs';
 
 /* Re-exported so ui.js and the tests have one place to draw from. */
-export { drawHeader, drawFooter, drawCountIn, drawBarRuler };
+export { drawHeader, drawFooter, drawHint, drawCountIn, drawBarRuler };
 export { pruneMarkers } from './scoring.mjs';
 export { drawList, listWindow, pageTop, LIST_ROWS, drawPlot } from './chrome.mjs';
 export * from './screens.mjs';
@@ -62,7 +62,10 @@ export function drawReadingView(ctx, s) {
    * Clock's rounds. Otherwise it is the run's own. */
   const progress = s.progress !== undefined ? s.progress
     : s.run ? runProgress(s.run, s.songBeats) : 0;
-  drawFooter(ctx, progress, s.run ? `${s.run.hits}/${s.run.misses}` : '');
+  /* The hint line takes the footer's band when there is one to show: on the
+   * ready screen, while paused, and while Shift is held. */
+  if (s.hint) drawHint(ctx, s.hint);
+  else drawFooter(ctx, progress, s.run ? `${s.run.hits}/${s.run.misses}` : '');
   /* Paused and stuck both show a motionless scroll, and only one of them is
    * waiting for you to play something — so each SAYS which it is. */
   if (s.paused) drawLaneCallout(ctx, 'PAUSED');
