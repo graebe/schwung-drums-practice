@@ -52,7 +52,7 @@ const SETTINGS = ['CLICK', 'settings'];
  * The pairs a screen's hint line names, and what Shift does there.
  *   st   what the screen is showing: { depth } for the list, { mode, paused,
  *        untimed } for a run, { pick, audible, hintsLeft } for a quiz,
- *        { guided, more, pages } for a card, { page } for the welcome, …
+ *        { guided, more, pages } for a card, { asks } for the welcome, …
  * Returns { keys, shift }, or null for a screen it does not know.
  */
 export function keysFor(screen, st = {}) {
@@ -65,10 +65,10 @@ export function keysFor(screen, st = {}) {
     case S.HELP:
       return { keys: [['JOG', 'scroll'], ['BACK', 'close']], shift: [QUIT] };
     case S.WELCOME:
-      return { keys: st.page >= 2 ? [['JOG', 'pick'], ['CLICK', 'go on']] : [['JOG', 'page'], ['CLICK', 'go on']],
+      return { keys: st.asks ? [['JOG', 'pick'], ['CLICK', 'go on']] : [['JOG', 'page'], ['CLICK', 'go on']],
         shift: [QUIT] };
     case S.TIP:
-      return { keys: [['CLICK', 'go on']], shift: [QUIT] };
+      return { keys: st.scrolls ? [['JOG', 'scroll'], ['CLICK', 'go on']] : [['CLICK', 'go on']], shift: [QUIT] };
     case S.CARD: {
       const keys = st.pages > 1 ? [['JOG', 'page']] : [];
       if (st.guided) keys.push(['CLICK', st.more ? 'next' : 'start'], ['PLAY', 'hear']);
@@ -155,11 +155,18 @@ export function hintAt(parts, nowMs) {
 /*
  * The same pairs as help lines, the key padded to a column as the welcome
  * card writes them — "CLICK  open" — then Shift's: "SHIFT+CLICK  options".
+ * A help page with a scrollbar has 20 characters, so a Shift line that
+ * would take 21 closes up to one space rather than wrap.
  */
+export const KEY_LINE_CHARS = 20;
+
 export function keyLines(screen, st = {}) {
   const k = keysFor(screen, st);
   if (!k) return [];
   const out = k.keys.map(([key, verb]) => `${key.padEnd(7)}${verb}`);
-  for (const [key, verb] of k.shift) out.push(`SHIFT+${key}  ${verb}`);
+  for (const [key, verb] of k.shift) {
+    const line = `SHIFT+${key}  ${verb}`;
+    out.push(line.length <= KEY_LINE_CHARS ? line : `SHIFT+${key} ${verb}`);
+  }
   return out;
 }

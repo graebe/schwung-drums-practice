@@ -10,8 +10,6 @@ import assert from 'node:assert/strict';
 import * as T from '../src/tips.mjs';
 import * as P from '../src/progress.mjs';
 
-const measure = (s) => s.length * 6 - 1;
-const WIDTH = 126;
 
 test('a newcomer is welcomed; a learner from before is only marked; once is enough', () => {
   const p = P.emptyProgress();
@@ -34,29 +32,22 @@ test('a tip is due once per screen kind, and never for the welcome', () => {
   assert.equal(T.tipDue(p, 'map'), null, 'a tip without words is none');
 });
 
-test('the words are the shared ones, wrapped to the panel', () => {
+test('the words are the shared ones', () => {
   assert.deepEqual(T.TIPS.sheet, ['Options for this row. JOG choose, CLICK do it, BACK close.']);
   assert.deepEqual(T.TIPS.practice, ['REC plays and scores it, PLAY lets you listen first. MENU: help.']);
   assert.deepEqual(T.TIPS.quiz, ['Answer with the lit pads or the jog. MENU: help.']);
-  for (const key of Object.keys(T.TIPS)) {
-    const lines = T.wrapParas(T.TIPS[key], WIDTH, measure);
-    assert.ok(lines.length <= 6, `${key} runs past the card`);
-    for (const l of lines) assert.ok(measure(l) <= WIDTH, `${key}: "${l}"`);
-    assert.equal(lines.join(' '), T.TIPS[key].join(' '), `${key}: wrapping changed a word`);
-  }
+  assert.deepEqual(T.tipItems('quiz'), [{ para: T.TIPS.quiz[0] }]);
+  assert.deepEqual(T.tipItems('nope'), []);
 });
 
-test('the welcome: two pages to read, then the question', () => {
+test('the welcome: the shared words on two pages, the keys, then the question', () => {
   const pages = T.welcomePages();
-  assert.deepEqual(pages.map((p) => p.title), ['Welcome', 'Keys', 'New to drums?']);
-  assert.equal(pages[0].paras.join(' '),
+  assert.deepEqual(pages.map((p) => p.title), ['Welcome', 'Welcome', 'Keys', 'New to drums?']);
+  assert.equal(pages.slice(0, 2).map((p) => p.items[0].para).join(' '),
     'Drums Practice takes you from your first beat to pro, one step a day. Lit pads can be pressed.');
-  assert.deepEqual(pages[1].lines, ['JOG    move', 'CLICK  open', 'BACK   up one level', 'MENU   help, anywhere',
+  assert.deepEqual(pages[2].items, ['JOG    move', 'CLICK  open', 'BACK   up one level', 'MENU   help, anywhere',
     'SHIFT+CLICK  options']);
-  assert.deepEqual(pages[2].choices, ['From the start', 'I already play']);
-  const first = T.wrapParas(pages[0].paras, WIDTH, measure);
-  assert.ok(first.length <= 6);
-  for (const l of pages[1].lines) assert.ok(l.length <= 21, l);
+  assert.deepEqual(pages[3].choices, ['From the start', 'I already play']);
 });
 
 test('the jog pages and chooses, Click goes on and answers', () => {
@@ -66,7 +57,9 @@ test('the jog pages and chooses, Click goes on and answers', () => {
   T.welcomeJog(w, 1);
   assert.equal(w.page, 1);
   assert.equal(T.welcomeClick(w), null);
-  assert.equal(w.page, 2);
+  assert.equal(T.welcomeClick(w), null);
+  assert.equal(w.page, 3);
+  assert.equal(T.welcomeAsks(w), true);
   assert.equal(T.welcomeClick(w), 'start');
   T.welcomeJog(w, 5);
   assert.equal(w.choice, 1);

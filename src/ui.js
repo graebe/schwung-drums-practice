@@ -274,6 +274,9 @@ let helpTopics = new Map();
 let welcome = null;
 let welcomeLines = null;
 let tipCard = null;
+const WELCOME_PAGES = TIPS.welcomePages();
+/* The panel's own measure, for fitting a page of text (help.mjs fitPage). */
+const measure = (t) => ctx.textWidth(t);
 /*
  * Continue alternates when reviews are due: one review, then one new step.
  * Which comes next is kept for the session only. `fromContinue` is set while
@@ -2434,9 +2437,10 @@ function openHelp() {
   if (screen === MENU) st.section = nav.length > 1 ? nav[1].node.label : (CAT.navCurrent(nav) || {}).label;
   if (screen === SETTINGS) st.group = settingsGroup;
   const page = HP.helpPage(screen, { st, topics: helpTopics, extra: screen === MENU ? rowCardLines() : [] });
-  help = { title: page.title, lines: page.lines, top: 0, back: screen };
+  /* Opened at its first line: what this screen is comes first. */
+  help = { title: page.title, lines: HP.fitPage(page.lines, measure), top: 0, back: screen };
   screen = HELP;
-  announce(page.lines.join(' '));
+  announce(help.lines.join(' '));
 }
 
 function closeHelp() {
@@ -2458,7 +2462,7 @@ function rowCardLines() {
   const own = row.step ? (step.cards || []) : [];
   const ids = own.filter((id) => lessons.has(id));
   if (!ids.length && stage && lessons.has(stage.card)) ids.push(stage.card);
-  return HP.cardLines(ids.map((id) => lessons.get(id)), L.SCREEN_W - 4, (t) => ctx.textWidth(t));
+  return HP.cardLines(ids.map((id) => lessons.get(id)));
 }
 
 /* ---- the welcome and the tips -------------------------------------------- */
@@ -2470,12 +2474,11 @@ function rowCardLines() {
  */
 function startWelcome() {
   welcome = TIPS.createWelcome();
-  const pages = TIPS.welcomePages();
-  welcomeLines = TIPS.wrapParas(pages[0].paras, L.SCREEN_W - 2, (t) => ctx.textWidth(t));
+  welcomeLines = WELCOME_PAGES.map((p) => (p.items ? HP.fitPage(p.items, measure) : null));
   sheet = null;
   help = null;
   screen = WELCOME;
-  announce(`Welcome. ${pages[0].paras.join(' ')}`);
+  announce(`Welcome. ${welcomeLines[0].join(' ')}`);
 }
 
 function finishWelcome() {
@@ -2488,7 +2491,8 @@ function finishWelcome() {
 function welcomeClick() {
   const answer = TIPS.welcomeClick(welcome);
   if (!answer) {
-    announce(TIPS.welcomePages()[welcome.page].title);
+    const page = WELCOME_PAGES[welcome.page];
+    announce(page.choices ? `${page.title} ${page.choices.join(', ')}` : welcomeLines[welcome.page].join(' '));
     return;
   }
   finishWelcome();
@@ -2521,8 +2525,7 @@ function showTip(key, back) {
   }
   /* A quiz asks again once the tip is read: its question would be lost. */
   if (back === QUIZ) clearPrompt();
-  tipCard = { key, back,
-    lines: TIPS.wrapParas(TIPS.TIPS[key], L.SCREEN_W - 2, (t) => ctx.textWidth(t)) };
+  tipCard = { key, back, top: 0, lines: HP.fitPage(TIPS.tipItems(key), measure) };
   screen = TIP;
   announce(`Tip: ${TIPS.TIPS[key].join(' ')}`);
 }
@@ -2559,7 +2562,9 @@ function hintState(shift = shiftHeld) {
     st.more = card.deck.at + 1 < card.deck.ids.length;
     st.pages = card.deck.pages.length;
   } else if (screen === WELCOME && welcome) {
-    st.page = welcome.page;
+    st.asks = TIPS.welcomeAsks(welcome);
+  } else if (screen === TIP && tipCard) {
+    st.scrolls = tipCard.lines.length > L.PAGE_ROWS;
   } else if (screen === SETTINGS) {
     st.editing = settingsEditing;
   }
@@ -2574,7 +2579,7 @@ function hintLine() {
   const st = hintState();
   const key = `${screen}|${st.shift}|${st.depth > 1}|${st.mode}|${st.paused}|${st.untimed}|${st.clock}|`
     + `${st.pick}|${st.audible}|${st.hintsLeft > 0}|${st.path}|${st.guided}|${st.more}|${st.pages > 1}|`
-    + `${st.page >= 2}|${st.editing}`;
+    + `${st.asks}|${st.scrolls}|${st.editing}`;
   if (key !== hintKey) {
     hintKey = key;
     hintParts = H.hintFor(screen, st);
@@ -2800,21 +2805,21 @@ function draw() {
     return;
   }
   if (screen === TIP && tipCard) {
-    V.drawCard(ctx, { title: TIPS.TIP_TITLE, lines: tipCard.lines, footer: hint });
+    V.drawPage(ctx, { title: TIPS.TIP_TITLE, lines: tipCard.lines, top: tipCard.top, footer: hint });
     return;
   }
   if (screen === WELCOME && welcome) {
-    const page = TIPS.welcomePages()[welcome.page];
+    const page = WELCOME_PAGES[welcome.page];
     if (page.choices) {
       V.drawList(ctx, { title: page.title, items: page.choices, selected: welcome.choice, footer: hint });
     } else {
-      V.drawCard(ctx, { title: page.title, lines: page.lines || welcomeLines, page: welcome.page, pages: 3,
+      V.drawPage(ctx, { title: page.title, lines: welcomeLines[welcome.page], right: `${welcome.page + 1}/${WELCOME_PAGES.length}`,
         footer: hint });
     }
     return;
   }
   if (screen === HELP && help) {
-    V.drawHelp(ctx, { title: help.title, lines: help.lines, top: help.top, rows: HP.HELP_LINES, footer: hint });
+    V.drawPage(ctx, { title: help.title, lines: help.lines, top: help.top, footer: hint });
     return;
   }
   if (screen === SHEET && sheet) {
@@ -3329,8 +3334,8 @@ function jog(delta) {
     LES.turnPage(card.deck, delta);
   } else if (target === 'sheet' && sheet) {
     sheet.sel = Math.max(0, Math.min(sheet.items.length - 1, sheet.sel + delta));
-  } else if (target === 'scroll' && help) {
-    HP.scrollHelp(help, delta);
+  } else if (target === 'scroll' && (help || tipCard)) {
+    HP.scrollPage(help || tipCard, delta);
   } else if (target === 'welcome' && welcome) {
     TIPS.welcomeJog(welcome, delta);
   } else if (target === 'choice' && quiz) {

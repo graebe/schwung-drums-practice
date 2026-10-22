@@ -33,10 +33,28 @@ const env = (progress, extra = {}) => ({ progress, leafOf: (id) => index.get(id)
 const labels = (row, e) => SH.sheetFor(row, e).map((a) => a.label);
 
 test('the labels are the ones both modules use, word for word', () => {
-  assert.deepEqual(Object.values(SH.LABELS), ['I know this: skip', 'I know all this: skip', 'Undo skip',
+  assert.deepEqual(Object.values(SH.LABELS), ['I know this: skip', 'I know it all: skip', 'Undo skip',
     'Start the path here', 'Test out: checkpoint', 'Lessons', 'Practise: Ladder', 'Practise: Clock',
     'Settings...']);
-  for (const l of Object.values(SH.LABELS)) assert.ok(l.length <= 21, `${l} is a row too long`);
+});
+
+test('every label fits its row whole, the scrollbar showing beside it', async () => {
+  /* drawList fits a label to SCREEN_W - 4: the row starts at x 2 and the
+   * scrollbar takes the last column. 21 characters are 125 px and lose a letter. */
+  const { createScreen } = await import('../tools/screen_buffer.mjs');
+  const L = await import('../src/layout.mjs');
+  const V = await import('../src/view.mjs');
+  const ctx = createScreen();
+  for (const l of Object.values(SH.LABELS)) {
+    assert.ok(ctx.textWidth(l) <= L.SCREEN_W - 4, `"${l}" is ${ctx.textWidth(l)} px`);
+  }
+  /* And drawn on a sheet long enough to scroll, every label comes out whole. */
+  const drawn = [];
+  const text = ctx.text.bind(ctx);
+  ctx.text = (x, y, s2, v) => { drawn.push(s2); text(x, y, s2, v); };
+  const items = Object.values(SH.LABELS);
+  for (let sel = 0; sel < items.length; sel++) V.drawList(ctx, { title: 'X', items, selected: sel });
+  for (const l of items) assert.ok(drawn.includes(l), `"${l}" was cut`);
 });
 
 test('a stage: skip it all, start here, test out, its lessons, then Settings', () => {
@@ -47,7 +65,7 @@ test('a stage: skip it all, start here, test out, its lessons, then Settings', (
   assert.equal(sheet[1].index, 1);
   assert.equal(sheet[2].step.part, 'checkpoint', 'Test out plays the checkpoint');
   assert.deepEqual(labels(stage, env(p, { hasCards: () => false })),
-    ['I know all this: skip', 'Start the path here', 'Test out: checkpoint', 'Settings...'],
+    ['I know it all: skip', 'Start the path here', 'Test out: checkpoint', 'Settings...'],
     'no cards, no Lessons');
 });
 

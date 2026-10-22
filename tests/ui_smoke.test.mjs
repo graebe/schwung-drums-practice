@@ -1550,13 +1550,15 @@ test('Menu is help over a run: the take pauses, the Record light goes out, Menu 
   const record = log.buttons.filter(([c]) => c === CC.record);
   assert.equal(record[record.length - 1][1], 0, 'the Record light was left burning');
   const shown = drawnText(2);
+  assert.ok(shown.some((t) => /^1\/\d+$/.test(t)), `help opened scrolled: ${shown.join('|')}`);
+  assert.ok(shown.includes('A take, under way.'), 'what the screen is comes first');
   assert.ok(shown.includes('HELP: PLAYING'), shown.join('|'));
   assert.ok(shown.includes('JOG scroll'), 'the help has its own hint line');
   const help = globalThis.drumsPracticeScreen().help;
-  assert.ok(help.includes('REC    pause') && help.includes('SHIFT+CLICK  settings'), help.join('|'));
+  assert.ok(help.includes('REC    pause') && help.includes('SHIFT+CLICK settings'), help.join('|'));
   assert.ok(help.includes('PLAYING'), 'the Playing topic of help.json is on it');
   cc(CC.jogTurn, 3);
-  assert.ok(drawnText(1).some((t) => /^9\/\d+$/.test(t)), 'the jog scrolls the help');
+  assert.ok(drawnText(1).some((t) => /^4\/\d+$/.test(t)), 'the jog scrolls the help');
   cc(CC.menu, 127);
   ticks(2);
   assert.equal(screenNow(), 'running');
@@ -1771,7 +1773,7 @@ test('I know this: skip on Continue moves it on to the next track', async () => 
   sheetPick('I know this: skip');
   ticks(1);
   assert.match(log.announces.join('|'), /Skipped Quarters/);
-  assert.ok(drawnText(1).includes('First beat L'), 'skipping did not move on');
+  assert.ok(drawnText(1).includes('beat L0'), 'skipping did not move on');
   goTo('Path', '0 Hello, kit', 'Time', 'Quarters', { open: false });
   sheetPick('Undo skip');
   toTop();
@@ -1786,7 +1788,7 @@ test('a folder skips everything in it from its sheet, and Undo skip takes it bac
   goTo('Path', '0 Hello, kit', 'Ear', { open: false });
   ticks(1);
   assert.ok(!globalThis.drumsPracticeMenu().labels.some((l) => /^Skip/.test(l)), 'a skip row among the content');
-  sheetPick('I know all this: skip');
+  sheetPick('I know it all: skip');
   ticks(1);
   assert.match(log.announces.join('|'), /Skipped 2/);
   shiftClick();
@@ -1802,7 +1804,7 @@ test('a stage\'s sheet starts the path there, and its Settings... opens Settings
   goTo('Path', '2 Sixteenths', { open: false });
   shiftClick();
   assert.deepEqual(globalThis.drumsPracticeScreen().sheet,
-    ['I know all this: skip', 'Start the path here', 'Test out: checkpoint', 'Settings...']);
+    ['I know it all: skip', 'Start the path here', 'Test out: checkpoint', 'Settings...']);
   cc(CC.jogTurn, 1);
   cc(CC.jogClick, 127);
   assert.match(log.announces.join('|'), /The path starts at stage 2/);
@@ -1839,7 +1841,7 @@ test('Settings › Path: a track switched off, and Continue no longer offers it'
   assert.ok(drawnText(1).includes('off'), drawnText(1).join('|'));
   toTop();
   ticks(1);
-  assert.ok(drawnText(1).includes('First beat L'), drawnText(1).join('|'));
+  assert.ok(drawnText(1).includes('beat L0'), drawnText(1).join('|'));
 });
 
 test('Settings › Path: the short ladder, and starting at a later stage', async () => {
@@ -1888,7 +1890,7 @@ test('stuck on a step: a hint after three failed takes, parked after six', async
   }
   toTop();
   ticks(1);
-  assert.ok(drawnText(1).includes('First beat L'), 'Continue still offers the parked step');
+  assert.ok(drawnText(1).includes('beat L0'), 'Continue still offers the parked step');
   globalThis.onUnload();
   assert.ok(JSON.parse(log.writes[`${DATA}progress.json`]).items['subdiv:quarters'].park > 0);
 });
@@ -2800,8 +2802,10 @@ test('a newcomer is welcomed: what it is, the keys, then new or already playing'
   assert.equal(screenNow(), 'welcome');
   let shown = drawnText(1);
   assert.ok(shown.includes('Welcome') && shown.includes('Drums Practice takes'), shown.join('|'));
-  assert.ok(shown.includes('JOG page  CLICK go on'), shown.join('|'));
+  assert.ok(shown.includes('JOG page  CLICK go on') && shown.includes('1/4'), shown.join('|'));
   cc(CC.jogTurn, 1);                         /* the jog turns the page too */
+  assert.ok(drawnText(1).includes('Lit pads can be'), drawnText(1).join('|'));
+  cc(CC.jogClick, 127);
   shown = drawnText(1);
   assert.ok(shown.includes('Keys') && shown.includes('MENU   help, anywhere'), shown.join('|'));
   cc(CC.jogClick, 127);
@@ -2822,14 +2826,16 @@ test('"I already play" opens the Path with a tip on testing out; Back ends the w
   await loadUi({ tips: [] });
   globalThis.init();
   ticks(2);
-  cc(CC.jogClick, 127);
-  cc(CC.jogClick, 127);
+  for (let i = 0; i < 3; i++) cc(CC.jogClick, 127);
   cc(CC.jogTurn, 1);                         /* I already play */
   cc(CC.jogClick, 127);
   ticks(1);
   assert.equal(screenNow(), 'tip');
-  const shown = drawnText(1);
-  assert.ok(shown.includes('Know a stage already?') && shown.includes('SHIFT+CLICK a stage,'), shown.join('|'));
+  let shown = drawnText(1);
+  assert.ok(shown.includes('Know a stage') && shown.includes('JOG scroll'), shown.join('|'));
+  cc(CC.jogTurn, 1);                         /* the tip is longer than a page */
+  shown = drawnText(1);
+  assert.ok(shown.some((t) => /^2\//.test(t)), `the tip did not scroll: ${shown.join('|')}`);
   cc(CC.back, 127);
   assert.equal(globalThis.drumsPracticeMenu().title, 'Path', 'the Path is open under the tip');
 

@@ -16,12 +16,11 @@
  * the tips shown are kept in progress.tips (progress.mjs) and saved with it.
  *
  * The words are shared with Piano Practice. They are written as sentences and
- * wrapped to the panel by the caller's measure, because a line of the shared
- * wording can be longer than the 21 characters the panel shows.
+ * wrapped to the panel by the caller's measure (help.mjs fitPage), because a
+ * line of the shared wording can be longer than the panel shows.
  */
 
 import { hasTip } from './progress.mjs';
-import { wrapText } from './lessons.mjs';
 
 export const TIP_KEYS = ['welcome', 'sheet', 'practice', 'quiz'];
 
@@ -37,24 +36,29 @@ export const TIPS = {
 
 export const TIP_TITLE = 'Tip';
 
-/* The welcome's three pages. The first two are read; the third asks. */
+/*
+ * The welcome's pages: the shared first page — on two screens, because its
+ * words wrap to six lines and a page shows five — then the keys, then the
+ * question. Each is page items for help.mjs fitPage: { para } is prose, a
+ * string a line as it stands.
+ */
 export const WELCOME_CHOICES = ['From the start', 'I already play'];
 
 export function welcomePages(moduleName = 'Drums Practice') {
   return [
-    { title: 'Welcome', paras: [`${moduleName} takes you from your first beat to pro, one step a day.`,
-      'Lit pads can be pressed.'] },
-    { title: 'Keys', lines: ['JOG    move', 'CLICK  open', 'BACK   up one level', 'MENU   help, anywhere',
+    { title: 'Welcome', items: [{ para: `${moduleName} takes you from your first beat to pro, one step a day.` }] },
+    { title: 'Welcome', items: [{ para: 'Lit pads can be pressed.' }] },
+    { title: 'Keys', items: ['JOG    move', 'CLICK  open', 'BACK   up one level', 'MENU   help, anywhere',
       'SHIFT+CLICK  options'] },
     { title: 'New to drums?', choices: WELCOME_CHOICES },
   ];
 }
 
-/* Paragraphs as lines no wider than `width`, as `measure` reckons them. */
-export function wrapParas(paras, width, measure) {
-  const out = [];
-  for (const p of paras) out.push(...wrapText(p, width, measure));
-  return out;
+const LAST = welcomePages().length - 1;
+
+/* A tip as page items. */
+export function tipItems(key) {
+  return (TIPS[key] || []).map((para) => ({ para }));
 }
 
 /*
@@ -82,19 +86,24 @@ export function createWelcome() {
   return { page: 0, choice: 0 };
 }
 
-/* The jog: turns the page on the first two, moves the choice on the last. */
+/* Whether the welcome is on its question. */
+export function welcomeAsks(w) {
+  return w.page >= LAST;
+}
+
+/* The jog: turns the pages to read, moves the choice on the last. */
 export function welcomeJog(w, delta) {
-  if (w.page >= 2) {
+  if (welcomeAsks(w)) {
     w.choice = Math.max(0, Math.min(WELCOME_CHOICES.length - 1, w.choice + delta));
     return;
   }
-  w.page = Math.max(0, Math.min(2, w.page + delta));
+  w.page = Math.max(0, Math.min(LAST, w.page + delta));
 }
 
 /* Click: on to the next page, or, on the last, the answer —
  * 'start' (from the start) or 'play' (already plays). */
 export function welcomeClick(w) {
-  if (w.page < 2) {
+  if (!welcomeAsks(w)) {
     w.page++;
     return null;
   }

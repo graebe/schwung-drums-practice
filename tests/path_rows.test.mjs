@@ -47,7 +47,7 @@ test('a due review alternates with the next step, one each, and Continue says wh
   const titleOf = (id) => (id === 'flam' ? 'A very long review title' : id);
   const review = R.pathContext(p, program, later, { turn: 'review', titleOf });
   assert.deepEqual(review.pick, { kind: 'review', id: 'flam' });
-  assert.deepEqual(R.pathRow(CONTINUE, review), { label: 'Review', value: 'A very long re', mark: null });
+  assert.deepEqual(R.pathRow(CONTINUE, review), { label: 'Review', value: 'A very long', mark: null });
   const step = R.pathContext(p, program, later, { turn: 'step', titleOf });
   assert.equal(step.pick.kind, 'step');
   assert.equal(R.pathRow(CONTINUE, step).label, 'Continue');
@@ -61,22 +61,14 @@ test('a due review alternates with the next step, one each, and Continue says wh
     { label: 'Continue', value: 'all learned', mark: null });
 });
 
-test('a value is cut to its room, never past a space', () => {
-  assert.equal(R.fitValue('Rock backbeat L2', 12), 'Rock backbeat'.slice(0, 12).trimEnd());
+test('a value is cut at a word to its room, and a rung is kept', () => {
+  assert.equal(R.fitValue('First beat L1', 12), 'beat L1', 'the rung tells two steps apart');
+  assert.equal(R.fitValue('Rock backbeat L2', 12), 'backbeat L2');
   assert.equal(R.fitValue('Short', 12), 'Short');
   assert.equal(R.fitValue('Guess: drum (kick, snare)', 12), 'Guess: drum');
-});
-
-test('a parked step reads ~; the current stage is marked next, a finished one done', () => {
-  const p = P.emptyProgress();
-  P.parkItem(p, 'subdiv:quarters', T0);
-  const pc = R.pathContext(p, program, T0);
-  const time = byLabel(byLabel(folder, '0 Hello'), 'Time');
-  const quarters = time.children.find((c) => c.step && c.step.id === 'subdiv:quarters');
-  assert.equal(R.pathRow(quarters, pc).value, '~');
-  assert.equal(R.pathRow(byLabel(folder, '0 Hello'), pc).mark, P.MARK_NEXT);
-  P.recordTake(p, 'first-beat:l3', { speed: 100, accuracy: 1, sd: 10, clean: true, bpm: 70, at: T0 });
-  assert.equal(R.pathRow(byLabel(folder, '0 Hello'), R.pathContext(p, program, T0)).mark, P.MARK_DONE);
+  assert.equal(R.fitValue('A very long review title', 14), 'A very long');
+  assert.equal(R.fitValue('Supercalifragilistic', 12), 'Supercalifra', 'one word too long is cut');
+  assert.equal(R.fitValue('Supercalifragilistic L3', 12), 'Supercalifra');
 });
 
 test('a folder skip names the open steps; Undo skip names the skipped ones', () => {

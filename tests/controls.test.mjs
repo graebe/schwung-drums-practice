@@ -36,7 +36,7 @@ test('a jog turn does nothing while you are playing', () => {
   assert.equal(C.jogTarget('sheet', false), 'sheet');
   assert.equal(C.jogTarget('help', false), 'scroll');
   assert.equal(C.jogTarget('welcome', false), 'welcome');
-  assert.equal(C.jogTarget('tip', false), 'none');
+  assert.equal(C.jogTarget('tip', false), 'scroll');
 });
 
 test('the count-in counts down and hands over at beat zero', () => {

@@ -76,7 +76,7 @@ test('help lines are the same pairs, the key in a column, then Shift', () => {
   assert.deepEqual(H.keyLines(H.SCREENS.MENU, { depth: 2 }),
     ['CLICK  open', 'BACK   up', 'SHIFT+CLICK  options', 'SHIFT+BACK  quit']);
   for (const screen of Object.values(H.SCREENS)) {
-    for (const line of H.keyLines(screen, {})) assert.ok(line.length <= 21, `${screen}: "${line}"`);
+    for (const line of H.keyLines(screen, {})) assert.ok(line.length <= H.KEY_LINE_CHARS, `${screen}: "${line}"`);
   }
 });
 

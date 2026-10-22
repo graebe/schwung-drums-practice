@@ -17,7 +17,7 @@ hands, dynamics, time and the ear.
   track you have left longest, so a session walks Time, Hands, Grooves and Ear in turn. When
   something you learned is due again, it offers one review, then one new step, in turn.
 - **Shift + click** a row for its options: *I know this: skip* passes a step by (on Continue, the
-  step it would open), *I know all this: skip* a whole stage, track or groove, *Undo skip* takes
+  step it would open), *I know it all: skip* a whole stage, track or groove, *Undo skip* takes
   it back, *Start the path here* moves the start, *Test out: checkpoint* plays a stage's exam.
 - A stage folder lists its places in the order a lesson takes them — orient, hear, pattern,
   apply, show: **Lessons**, **Ear**, **Time**, **Hands**, **Grooves**, **Electives**, and the
@@ -501,7 +501,7 @@ Skip next exists; a higher rung ticks the lower ones; Click goes on even after a
    does *Test out: checkpoint* on the stage's action sheet; pass it and the stage is through
    (Continue moves on; the drills keep their honest marks).
 3. **Skipping from the action sheet** (Shift + click a row): *I know this: skip* on a step or on
-   Continue, *I know all this: skip* on a stage, track or groove, *Undo skip* on anything skipped.
+   Continue, *I know it all: skip* on a stage, track or groove, *Undo skip* on anything skipped.
    Skipped steps close the step for the stage's progress but are never learned; `»` as today. The
    skip rows that used to stand among the steps are gone.
 4. **Stage completion** = checkpoint passed, or tested out, or every core step of the tracks

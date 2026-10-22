@@ -8,14 +8,16 @@
         "the pads, watch your",
         "timing.",
         "",
-        "Header: +3 s12 is 3ms",
-        "late, a spread of 12.",
-        "Narrow is good.",
+        "Header: +3 s12 is",
+        "3ms late, a spread",
+        "of 12. Narrow is",
+        "good.",
         "",
-        "The bar at the bottom",
-        "fills as the drill",
-        "goes, hits/misses",
-        "beside it."
+        "The bar at the",
+        "bottom fills as the",
+        "drill goes,",
+        "hits/misses beside",
+        "it."
       ]
     },
     {
@@ -23,20 +25,22 @@
       "lines": [
         "Continue  next step",
         "Path      the stages",
-        "Practice  every drill",
+        "Practice  all drills",
         "Quiz      ear drills",
         "Progress  how far",
         "Settings  your setup",
         "",
         "CLICK opens, BACK",
-        "goes up. MENU is help",
-        "for the screen you",
-        "are on, anywhere.",
+        "goes up. MENU is",
+        "help for the screen",
+        "you are on,",
+        "anywhere.",
         "",
-        "A row shows your best",
-        "clean speed: 80%. A",
-        "tick is learned, a",
-        "ring played but not",
+        "A row shows your",
+        "best clean speed:",
+        "80%. A tick is",
+        "learned, a ring",
+        "played but not",
         "clean."
       ]
     },
@@ -47,7 +51,7 @@
         "opens its options:",
         "",
         "I know this: skip",
-        "I know all this: skip",
+        "I know it all: skip",
         "Undo skip",
         "Start the path here",
         "Test out: checkpoint",
@@ -74,11 +78,11 @@
         "",
         "A result: REC again,",
         "BACK to the start,",
-        "CLICK the next drill.",
-        "JOG back: look over",
-        "the take as played.",
-        "Only whole takes",
-        "count."
+        "CLICK the next",
+        "drill. JOG back:",
+        "look over the take",
+        "as played. Only",
+        "whole takes count."
       ]
     },
     {
@@ -86,14 +90,15 @@
       "lines": [
         "L0 is the whole",
         "groove, no clock.",
-        "The bar stands still;",
-        "arrows mark the next",
-        "stack.",
+        "The bar stands",
+        "still; arrows mark",
+        "the next stack.",
         "",
-        "Strike its drums, and",
-        "only those, TOGETHER",
-        "(60ms on normal) and",
-        "the arrows move on.",
+        "Strike its drums,",
+        "and only those,",
+        "TOGETHER (60ms on",
+        "normal) and the",
+        "arrows move on.",
         "",
         "PLAY   hear the bar",
         "REC    begin, pause",
@@ -116,9 +121,9 @@
         "tempo you play is",
         "what is recorded.",
         "",
-        "In settings the knobs",
-        "are the rows on",
-        "screen, four to a",
+        "In settings the",
+        "knobs are the rows",
+        "on screen, four to a",
         "page. Elsewhere they",
         "do nothing."
       ]
@@ -127,9 +132,9 @@
       "title": "The pads",
       "lines": [
         "Left half is your",
-        "left hand, right half",
-        "your right, in every",
-        "layout.",
+        "left hand, right",
+        "half your right, in",
+        "every layout.",
         "",
         "Settings > Pads:",
         "MPC      the default",
@@ -176,7 +181,8 @@
         "names it; Guide pads",
         "pulse it.",
         "",
-        "One press carries on."
+        "One press carries",
+        "on."
       ]
     },
     {
@@ -184,9 +190,10 @@
       "lines": [
         "Four things, counted",
         "apart, because each",
-        "is fixed differently:",
+        "is fixed",
+        "differently:",
         "",
-        "timing   mean, spread",
+        "timing   mean+spread",
         "drum     hit or miss",
         "hand     sticking",
         "dynamic  accent,",
@@ -209,8 +216,9 @@
         "out.",
         "",
         "Scored apart: dyn",
-        "30%. A soft accent is",
-        "never a wrong note."
+        "30%. A soft accent",
+        "is never a wrong",
+        "note."
       ]
     },
     {
@@ -227,22 +235,23 @@
         "spread inside the",
         "Strict window.",
         "",
-        "Your % is the fastest",
-        "clean take. 100%",
-        "earns the tick - not",
-        "on Loose, Guide pads",
-        "or Study."
+        "Your % is the",
+        "fastest clean take.",
+        "100% earns the tick",
+        "- not on Loose,",
+        "Guide pads or Study."
       ]
     },
     {
       "title": "Path",
       "lines": [
         "Seven stages, first",
-        "beat to pro. In each:",
-        "Lessons, Ear, Time,",
-        "Hands, Grooves,",
-        "Electives, and the",
-        "Checkpoint last.",
+        "beat to pro. In",
+        "each: Lessons, Ear,",
+        "Time, Hands,",
+        "Grooves, Electives,",
+        "and the Checkpoint",
+        "last.",
         "",
         "Continue opens the",
         "next step. A step",
@@ -259,7 +268,8 @@
         "out: checkpoint.",
         "Settings > Path:",
         "tracks, styles,",
-        "rungs, start, intros."
+        "rungs, start,",
+        "intros."
       ]
     },
     {
@@ -267,18 +277,20 @@
       "lines": [
         "What you learned",
         "comes back after 1,",
-        "3, 7, 14 and 30 days.",
-        "Continue offers one",
-        "review, then one new",
-        "step.",
+        "3, 7, 14 and 30",
+        "days. Continue",
+        "offers one review,",
+        "then one new step.",
         "",
-        "A clean take at tempo",
-        "moves it further out;",
-        "a slip brings it back",
+        "A clean take at",
+        "tempo moves it",
+        "further out; a slip",
+        "brings it back",
         "tomorrow. Slow",
-        "practice never counts",
-        "as a slip, and your",
-        "best never drops."
+        "practice never",
+        "counts as a slip,",
+        "and your best never",
+        "drops."
       ]
     },
     {
@@ -290,10 +302,11 @@
         "along real time.",
         "",
         "Then every drill you",
-        "played: CLICK for its",
-        "takes' chart, the",
-        "100% line dotted,",
-        "clean takes filled.",
+        "played: CLICK for",
+        "its takes' chart,",
+        "the 100% line",
+        "dotted, clean takes",
+        "filled.",
         "",
         "In a chart the JOG",
         "goes on to the next."
@@ -303,20 +316,22 @@
       "title": "The result",
       "lines": [
         "Big: the speed you",
-        "played, % of written.",
-        "Beside it: % right",
-        "and the spread; the",
-        "one that stopped it",
-        "is inverted. Not",
-        "clean: big is %",
-        "right, and under it",
-        "what cost the most.",
-        "dyn 30%: how accents",
-        "and ghosts sounded.",
+        "played, % of",
+        "written. Beside it:",
+        "% right and the",
+        "spread; the one that",
+        "stopped it is",
+        "inverted. Not clean:",
+        "big is % right, and",
+        "under it what cost",
+        "the most. dyn 30%:",
+        "how accents and",
+        "ghosts sounded.",
         "",
-        "JOG back: the take as",
-        "you played it - rings",
-        "hit, crosses missed."
+        "JOG back: the take",
+        "as you played it -",
+        "rings hit, crosses",
+        "missed."
       ]
     },
     {
@@ -328,14 +343,14 @@
         "Starts at 70% of the",
         "drill's tempo and",
         "climbs through it.",
-        "Play N bars clean and",
-        "it goes up. Slip and",
-        "the rung plays again;",
-        "slip twice and it",
-        "stops.",
+        "Play N bars clean",
+        "and it goes up. Slip",
+        "and the rung plays",
+        "again; slip twice",
+        "and it stops.",
         "",
-        "Your score is the top",
-        "clean tempo."
+        "Your score is the",
+        "top clean tempo."
       ]
     },
     {
@@ -345,27 +360,29 @@
         "Practise: Clock.",
         "",
         "The click plays for",
-        "four bars, then stops",
-        "and you keep time.",
-        "Your drift shows live",
-        "while it is silent."
+        "four bars, then",
+        "stops and you keep",
+        "time. Your drift",
+        "shows live while it",
+        "is silent."
       ]
     },
     {
       "title": "Quiz",
       "lines": [
         "Guess and Hear: drum",
-        "- play the drum asked",
-        "for.",
+        "- play the drum",
+        "asked for.",
         "",
         "Pick: drum, Hear:",
-        "subdivision and Pick:",
-        "groove name what you",
-        "heard. Their answers",
-        "sit on the bottom",
-        "row, one coloured pad",
-        "each. Press it, or",
-        "JOG and CLICK.",
+        "subdivision and",
+        "Pick: groove name",
+        "what you heard.",
+        "Their answers sit on",
+        "the bottom row, one",
+        "coloured pad each.",
+        "Press it, or JOG and",
+        "CLICK.",
         "",
         "REC is help; PLAY",
         "plays the question",
@@ -389,7 +406,8 @@
         "          welcome",
         "",
         "SHIFT+CLICK in a",
-        "drill: every setting."
+        "drill: every",
+        "setting."
       ]
     },
     {
@@ -412,9 +430,10 @@
         "own kit and click.",
         "Nothing to set up.",
         "",
-        "Settings > MIDI: MIDI",
-        "out can send to a",
-        "track or USB instead."
+        "Settings > MIDI:",
+        "MIDI out can send to",
+        "a track or USB",
+        "instead."
       ]
     }
   ]

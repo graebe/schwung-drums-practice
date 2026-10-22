@@ -63,7 +63,7 @@ export function jogTarget(screen, editing) {
   if (screen === 'card') return 'page';
   if (screen === 'padmap') return 'padmap';
   if (screen === 'sheet') return 'sheet';
-  if (screen === 'help') return 'scroll';
+  if (screen === 'help' || screen === 'tip') return 'scroll';
   if (screen === 'welcome') return 'welcome';
   return 'none';
 }

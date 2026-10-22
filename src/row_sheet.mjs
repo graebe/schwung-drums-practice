@@ -24,7 +24,7 @@ import { isUntimedId } from './ids.mjs';
 
 export const LABELS = Object.freeze({
   skip: 'I know this: skip',
-  skipAll: 'I know all this: skip',
+  skipAll: 'I know it all: skip',
   unskip: 'Undo skip',
   start: 'Start the path here',
   testOut: 'Test out: checkpoint',

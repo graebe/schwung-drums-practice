@@ -236,27 +236,30 @@ export function drawCard(ctx, s) {
   drawHint(ctx, s.footer || 'CLICK start');
 }
 
-/* ---- Help ------------------------------------------------------------------ */
+/* ---- A page of text ------------------------------------------------------- */
 /*
- * MENU's help page (help.mjs): a page of lines under its title, scrolled by
- * the jog, a scrollbar when there is more, and the hint line.
+ * Help, the welcome and a tip (layout.mjs PAGE_*): five lines on a 9px pitch
+ * under the title, scrolled by the jog when there are more, with the first
+ * line shown and the count in the title's right — "1/23" — and a scrollbar.
+ * The lines arrive fitted (help.mjs fitPage); this only draws them.
  *
- * s = { title, lines, top, rows, footer }
+ * s = { title, lines, top, footer, right }
  */
-export function drawHelp(ctx, s) {
+export function drawPage(ctx, s) {
   ctx.clear();
   const lines = s.lines || [];
-  const rows = s.rows || 6;
+  const rows = L.PAGE_ROWS;
   const top = Math.max(0, Math.min(s.top || 0, Math.max(0, lines.length - rows)));
-  const more = lines.length > rows ? `${Math.min(lines.length, top + rows)}/${lines.length}` : '';
-  drawTitle(ctx, s.title || 'HELP', more, null);
+  const more = lines.length > rows ? `${top + 1}/${lines.length}` : (s.right || '');
+  drawTitle(ctx, s.title || '', more, null);
   for (let i = 0; i < rows && top + i < lines.length; i++) {
-    ctx.text(1, CARD_TEXT_Y + i * L.TEXT_H, fit(ctx, lines[top + i], L.SCREEN_W - 4), 1);
+    const max = lines.length > rows ? L.PAGE_TEXT_PX : L.PAGE_FULL_PX;
+    ctx.text(L.PAGE_TEXT_X, L.PAGE_TOP_Y + i * L.PAGE_LINE_H, fit(ctx, lines[top + i], max), 1);
   }
   if (lines.length > rows) {
-    const band = rows * L.TEXT_H;
+    const band = rows * L.PAGE_LINE_H - 2;
     const h = Math.max(3, Math.round((rows / lines.length) * band));
-    const y = CARD_TEXT_Y + Math.round((top / (lines.length - rows)) * (band - h));
+    const y = L.PAGE_TOP_Y + Math.round((top / (lines.length - rows)) * (band - h));
     ctx.fillRect(L.SCREEN_W - 1, y, 1, h, 1);
   }
   drawHint(ctx, s.footer || '');

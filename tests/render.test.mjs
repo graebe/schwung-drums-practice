@@ -1106,18 +1106,23 @@ test('the reading view gives its footer band to a hint when there is one', () =>
   assert.equal(isOn(ctx, 1, L.FOOTER_Y), false, 'the progress bar is under the hint');
 });
 
-test('the help page scrolls its lines under a counter, with a scrollbar', async () => {
+test('a page of text: five lines on a 9px pitch, the first line counted, a scrollbar', async () => {
   const V = await import('../src/view.mjs');
   const ctx = createScreen();
   const texts = [];
   const text = ctx.text.bind(ctx);
-  ctx.text = (x, y, s, v) => { texts.push(s); text(x, y, s, v); };
+  ctx.text = (x, y, s, v) => { texts.push({ y, s }); text(x, y, s, v); };
   const lines = Array.from({ length: 12 }, (_, i) => `line ${i}`);
-  V.drawHelp(ctx, { title: 'HELP: LIST', lines, top: 3, rows: 6, footer: 'JOG scroll' });
-  assert.ok(texts.includes('HELP: LIST') && texts.includes('9/12') && texts.includes('JOG scroll'));
-  assert.deepEqual(texts.filter((t) => /^line/.test(t)), ['line 3', 'line 4', 'line 5', 'line 6', 'line 7', 'line 8']);
-  assert.ok(countOn(ctx, L.SCREEN_W - 1, 10, 1, 42) >= 3, 'no scrollbar');
+  V.drawPage(ctx, { title: 'HELP: LIST', lines, top: 3, footer: 'JOG scroll' });
+  const said = texts.map((t) => t.s);
+  assert.ok(said.includes('HELP: LIST') && said.includes('4/12') && said.includes('JOG scroll'), said.join('|'));
+  const body = texts.filter((t) => /^line/.test(t.s));
+  assert.deepEqual(body.map((t) => t.s), ['line 3', 'line 4', 'line 5', 'line 6', 'line 7']);
+  assert.deepEqual(body.map((t) => t.y), [10, 19, 28, 37, 46], 'two rows of air between lines');
+  assert.ok(body[4].y + L.TEXT_H < L.HINT_Y, 'the last line runs into the hint');
+  assert.ok(countOn(ctx, L.SCREEN_W - 1, 10, 1, 45) >= 3, 'no scrollbar');
   texts.length = 0;
-  V.drawHelp(ctx, { lines: ['short'] });
-  assert.ok(texts.includes('HELP') && texts.includes('short'));
+  V.drawPage(ctx, { lines: ['short'], top: 0, title: 'Tip', right: '1/4' });
+  assert.ok(texts.some((t) => t.s === 'short') && texts.some((t) => t.s === '1/4'));
+  assert.equal(countOn(ctx, L.SCREEN_W - 1, 10, 1, 45), 0, 'a scrollbar on a page that fits');
 });

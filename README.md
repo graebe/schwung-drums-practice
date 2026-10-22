@@ -549,7 +549,7 @@ offers that instead — `Review   Flam tap` — one review, then one new step, i
 | Option | On |
 | --- | --- |
 | **I know this: skip** | a step, or Continue (the step it would open). It stays playable and still counts if you play it later |
-| **I know all this: skip** | a stage, a track, a groove: everything open inside it |
+| **I know it all: skip** | a stage, a track, a groove: everything open inside it |
 | **Undo skip** | a skipped step, or a folder with skipped steps inside |
 | **Start the path here** | a stage: Continue starts there. Earlier stages stay open and nothing is ticked |
 | **Test out: checkpoint** | a stage: plays its checkpoint. Pass it and the path moves on |

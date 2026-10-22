@@ -11,10 +11,11 @@ You only need four keys to start: **JOG** (turn the wheel to move, press it to *
 
 ## Your first launch
 
-The first time you open the module it says hello, in three short pages. Turn the jog or click to
+The first time you open the module it says hello, in a few short pages. Turn the jog or click to
 go on.
 
-1. **Welcome** — what the module is, and one rule worth knowing: *lit pads can be pressed.*
+1. **Welcome** (two screens) — what the module is, and one rule worth knowing: *lit pads can be
+   pressed.*
 2. **Keys** — the five you will use most:
 
    ```
@@ -86,7 +87,9 @@ back.
 
 ## Continue: your one button
 
-**Continue** is the top row, and the row says what it will open: `Continue   Quarters`. Click it and
+**Continue** is the top row, and the row says what it will open: `Continue   Quarters`. A long
+name gives way to fit, keeping what tells steps apart — `Continue   beat L0` for *First beat L0*.
+Click it and
 you are in that step — its lesson card first if it is new, then the drill, set to the speed the step
 asks for. When you are done, **Click** on the result goes on to the next step.
 
@@ -130,7 +133,7 @@ shown, and **Settings...** is always last:
 | Option | Shown on | Does |
 | --- | --- | --- |
 | **I know this: skip** | a step, or Continue | passes the step by; it still counts if you play it later |
-| **I know all this: skip** | a stage, a track, a groove | skips everything open inside it |
+| **I know it all: skip** | a stage, a track, a groove | skips everything open inside it |
 | **Undo skip** | anything skipped | takes the skips back |
 | **Start the path here** | a stage | Continue starts there from now on |
 | **Test out: checkpoint** | a stage | plays the stage's checkpoint |
@@ -159,8 +162,9 @@ Rock & Pop › Rock backbeat), turn to **L1**, **SHIFT+CLICK**, and choose **Pra
 
 ## MENU: help, anywhere
 
-Press **MENU** on any screen and it explains that screen: what it is, its keys — the same ones as
-its hint line, and Shift's — and the help that belongs to it. On a row of the Path it adds that
+Press **MENU** on any screen and it explains that screen first: what it is, its keys — the same
+ones as its hint line, and Shift's. Under a *More help* line follows the manual's help that belongs
+to it; the count in the corner (`1/40`) says how far there is to scroll. On a row of the Path it adds that
 stage's or step's lesson card, so the *why* of a step is one press away. Turn the jog to scroll,
 **BACK** or **MENU** to close. In a drill, the take pauses while you read.
 

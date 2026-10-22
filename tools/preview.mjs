@@ -21,8 +21,8 @@
  *   npm run preview -- --screen menu      (the top list, its hint line; --shift for Shift's)
  *   npm run preview -- --screen sheet     (the action sheet of a stage)
  *   npm run preview -- --screen help      (MENU's help on the list; --top N scrolls it)
- *   npm run preview -- --screen welcome --page 0|1|2
- *   npm run preview -- --screen tip --tip sheet|practice|quiz|placement
+ *   npm run preview -- --screen welcome --page 0|1|2|3
+ *   npm run preview -- --screen tip --tip sheet|practice|quiz|placement [--top N]
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { createScreen, toAscii } from './screen_buffer.mjs';
@@ -196,24 +196,25 @@ if (screen) {
     const items = [LABELS.skipAll, LABELS.start, LABELS.testOut, LABELS.lessons, LABELS.settings];
     V.drawList(ctx, { title: '1 EIGHTH NOTES', items, selected: 0, footer: H.hintFor(H.SCREENS.SHEET)[0] });
   } else if (screen === 'help') {
-    const help = JSON.parse(readFileSync(new URL('../src/help.json', import.meta.url), 'utf8'));
-    const topics = HP.parseHelp(JSON.stringify(help));
+    const topics = HP.parseHelp(readFileSync(new URL('../src/help.json', import.meta.url), 'utf8'));
     const page = HP.helpPage(H.SCREENS.MENU, { st: { depth: 2, section: 'Path' }, topics });
-    V.drawHelp(ctx, { title: page.title, lines: page.lines, top: Number(arg('top', 0)), rows: HP.HELP_LINES,
-      footer: H.hintFor(H.SCREENS.HELP)[0] });
+    V.drawPage(ctx, { title: page.title, lines: HP.fitPage(page.lines, (t) => ctx.textWidth(t)),
+      top: Number(arg('top', 0)), footer: H.hintFor(H.SCREENS.HELP)[0] });
   } else if (screen === 'welcome') {
     const n = Number(arg('page', 0));
-    const page = TIPS.welcomePages()[n];
-    const footer = H.hintFor(H.SCREENS.WELCOME, { page: n })[0];
+    const pages = TIPS.welcomePages();
+    const page = pages[n];
+    const footer = H.hintFor(H.SCREENS.WELCOME, { asks: Boolean(page.choices) })[0];
     if (page.choices) V.drawList(ctx, { title: page.title, items: page.choices, selected: 0, footer });
     else {
-      V.drawCard(ctx, { title: page.title, page: n, pages: 3, footer,
-        lines: page.lines || TIPS.wrapParas(page.paras, L.SCREEN_W - 2, (t) => ctx.textWidth(t)) });
+      V.drawPage(ctx, { title: page.title, right: `${n + 1}/${pages.length}`, footer,
+        lines: HP.fitPage(page.items, (t) => ctx.textWidth(t)) });
     }
   } else if (screen === 'tip') {
     const key = String(arg('tip', 'sheet'));
-    V.drawCard(ctx, { title: TIPS.TIP_TITLE, footer: H.hintFor(H.SCREENS.TIP)[0],
-      lines: TIPS.wrapParas(TIPS.TIPS[key] || [], L.SCREEN_W - 2, (t) => ctx.textWidth(t)) });
+    const lines = HP.fitPage(TIPS.tipItems(key), (t) => ctx.textWidth(t));
+    V.drawPage(ctx, { title: TIPS.TIP_TITLE, lines, top: Number(arg('top', 0)),
+      footer: H.hintFor(H.SCREENS.TIP, { scrolls: lines.length > L.PAGE_ROWS })[0] });
   } else if (screen === 'progress') {
     const h = [70, 75, 80, 78, 85, 90, 95, 100].map((pct, i) => [i, pct, 93, 24 - i * 2, i === 3 ? 4 : 5]);
     V.drawProgress(ctx, {

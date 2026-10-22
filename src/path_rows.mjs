@@ -46,7 +46,7 @@ export function pathContext(progress, program, atMs, { turn = 'review', titleOf 
     pick: continuePick(progress, program, atMs, turn), current: PLAN.currentStage(progress, program) };
 }
 
-/* "I know all this: skip" on a folder: the open steps it would skip, and the
+/* "I know it all: skip" on a folder: the open steps it would skip, and the
  * skipped ones "Undo skip" would take back. */
 export function skipAllChange(scope, progress) {
   const open = scope.filter((st) => !PLAN.stepDone(progress, st) && !PLAN.stepSkipped(progress, st));
@@ -67,11 +67,25 @@ export function prefChange(row, path, stageCount) {
   return {};
 }
 
-/* `text` cut to `chars`, so a value leaves its label room on a 21-character
- * row: "Continue" and a space leave twelve. */
+/*
+ * `text` fitted to `chars`, so a value leaves its label room on a
+ * 21-character row: "Continue" and a space leave twelve. Cut at a word,
+ * never inside one. A rung — "L1" — is what tells two steps of a groove
+ * apart, so it is kept and the name gives way from its front:
+ * "First beat L1" becomes "beat L1". Anything else loses words from its end.
+ */
 export function fitValue(text, chars) {
   const s = String(text);
-  return s.length <= chars ? s : s.slice(0, chars).trimEnd();
+  if (s.length <= chars) return s;
+  const words = s.split(' ').filter(Boolean);
+  const rung = words.length > 1 && /^L\d+$/.test(words[words.length - 1]);
+  while (words.length > 1 && words.join(' ').length > chars) {
+    if (rung && words.length > 2) words.shift();
+    else if (rung) break;
+    else words.pop();
+  }
+  const out = words.join(' ');
+  return out.length <= chars ? out : out.slice(0, chars);
 }
 
 const ROW_CHARS = 21;
