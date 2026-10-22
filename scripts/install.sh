@@ -58,8 +58,11 @@ if [ -f "$remote/stats.json" ]; then
   cp "$remote/stats.json" "$stage/stats.json"
 fi
 # Its backup copy, and a damaged file kept aside, travel with it — and so
-# does how far they have got with every drill, which is the same promise.
-for f in stats.bak.json stats.bad.json progress.json progress.bak.json progress.bad.json; do
+# does how far they have got with every drill, which is the same promise:
+# progress, its backup, a damaged copy and the earlier version set aside. The
+# Custom pad layout they built pad by pad, and its backup, too.
+for f in stats.bak.json stats.bad.json progress.json progress.bak.json progress.bad.json \
+         progress.v1.json pads.json pads.bak.json; do
   if [ -f "$remote/$f" ]; then cp "$remote/$f" "$stage/$f"; fi
 done
 # Keep any drills they added by hand, AND the manifest that makes them
