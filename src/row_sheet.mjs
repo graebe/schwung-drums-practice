@@ -31,6 +31,8 @@ export const LABELS = Object.freeze({
   lessons: 'Lessons',
   ladder: 'Practise: Ladder',
   clock: 'Practise: Clock',
+  list: 'Show as list',
+  map: 'Show as map',
   settings: 'Settings...',
 });
 
@@ -62,11 +64,13 @@ export function wrappableLeaf(row, leafOf) {
  *   env.pick       what Continue would open (path_rows.mjs continuePick)
  *   env.hasCards   (stage) => whether it has lesson cards to read
  *   env.leafOf     (id) => the tree's leaf, for the Ladder and the Clock
+ *   env.view       'map' when the folder is shown as its map, 'list' when a
+ *                  map folder is shown as a list; else absent
  */
 export function sheetFor(row, env) {
   const { progress } = env;
   const out = [];
-  if (!row) return [act('settings')];
+  if (!row) return viewActs(env).concat(act('settings'));
   const done = (st) => PLAN.stepDone(progress, st);
   const skipped = (st) => PLAN.stepSkipped(progress, st);
 
@@ -95,6 +99,14 @@ export function sheetFor(row, env) {
 
   const leaf = env.leafOf ? wrappableLeaf(row, env.leafOf) : null;
   if (leaf) out.push(act('ladder', { leaf }), act('clock', { leaf }));
-  out.push(act('settings'));
+  out.push(...viewActs(env), act('settings'));
   return out;
+}
+
+/* A map hides what is no place — the Path's Review — so its list is one
+ * option away, for the session, and the map one option back. */
+function viewActs(env) {
+  if (env.view === 'map') return [act('list')];
+  if (env.view === 'list') return [act('map')];
+  return [];
 }

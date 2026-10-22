@@ -243,6 +243,33 @@
       ]
     },
     {
+      "title": "The map",
+      "lines": [
+        "Path shows a map: an",
+        "island per stage. On",
+        "an island, a place",
+        "per part: the hut is",
+        "its lessons, a cove",
+        "its electives, the",
+        "fort its checkpoint.",
+        "",
+        "PAD    walk there,",
+        "       again: go in",
+        "JOG    walk",
+        "CLICK  go in",
+        "PLAY   Continue",
+        "BACK   up",
+        "",
+        "A flag: done. Ground",
+        "rising: how much is",
+        "learned. A dot:",
+        "reviews due.",
+        "",
+        "SHIFT+CLICK: Show as",
+        "list, for Review."
+      ]
+    },
+    {
       "title": "Path",
       "lines": [
         "Seven stages, first",

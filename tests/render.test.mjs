@@ -1126,3 +1126,26 @@ test('a page of text: five lines on a 9px pitch, the first line counted, a scrol
   assert.ok(texts.some((t) => t.s === 'short') && texts.some((t) => t.s === '1/4'));
   assert.equal(countOn(ctx, L.SCREEN_W - 1, 10, 1, 45), 0, 'a scrollbar on a page that fits');
 });
+
+test('the map screen: the place in the title, the map, the hint line — nothing in the gaps', async () => {
+  const V = await import('../src/view.mjs');
+  const PL = await import('../src/pathmap/layout.mjs');
+  const PW = await import('../src/pathmap/walk.mjs');
+  const { makePlace } = await import('../src/pathmap/model.mjs');
+  const places = ['done', 'current', 'ahead', 'ahead', 'ahead', 'ahead', 'ahead']
+    .map((state, i) => makePlace({ label: `${i} Stage`, state, percent: state === 'done' ? 100 : 20, kind: 'island' }));
+  const layout = PL.layoutPlaces(places.length);
+  const ctx = createScreen();
+  const texts = [];
+  const text = ctx.text.bind(ctx);
+  ctx.text = (x, y, s, v) => { texts.push({ y, s }); text(x, y, s, v); };
+  V.drawMapScreen(ctx, { title: '1 Stage', right: '20%', places, layout, walk: PW.createWalk(layout, 1), now: 0,
+    footer: 'PAD go  CLICK enter' });
+  assert.deepEqual(texts.map((t) => t.s), ['1 Stage', '20%', 'PAD go  CLICK enter']);
+  assert.equal(texts[2].y, L.HINT_Y);
+  assert.ok(countOn(ctx, 0, PL.MAP_Y, L.SCREEN_W, PL.MAP_H) > 100, 'no map drawn');
+  assert.equal(countOn(ctx, 0, L.HEADER_RULE_Y + 1, L.SCREEN_W, PL.MAP_Y - L.HEADER_RULE_Y - 1), 0,
+    'something between the rule and the map');
+  assert.equal(countOn(ctx, 0, PL.MAP_Y + PL.MAP_H, L.SCREEN_W, L.HINT_Y - PL.MAP_Y - PL.MAP_H), 0,
+    'something between the map and the hint');
+});

@@ -212,3 +212,16 @@ test('every bundled groove\'s bar fits a page with its stacks apart', async () =
     }
   }
 });
+
+test('the Path map sits between the title rule and the hint line, and its cells are the pads', async () => {
+  const PL = await import('../src/pathmap/layout.mjs');
+  assert.ok(PL.MAP_Y > L.HEADER_RULE_Y, 'the map runs into the title rule');
+  assert.ok(PL.MAP_Y + PL.MAP_H <= L.HINT_Y, 'the map runs into the hint line');
+  assert.equal(PL.MAP_W, L.SCREEN_W, 'the map is the screen\'s width: a column a pad');
+  /* Seven islands, and any island the folder can have (hut, four tracks, cove, fort). */
+  for (const n of [7, 1, 2, 3, 4, 5, 6]) {
+    const layout = PL.layoutPlaces(n);
+    const pads = new Set(layout.cells.map((c) => PL.padOfCell(c)));
+    assert.equal(pads.size, n, `${n} places share a pad`);
+  }
+});

@@ -15,6 +15,7 @@ import * as SR from './staff_render.mjs';
 import { drawHeader, drawList, drawPlot, drawHint, fitText } from './chrome.mjs';
 import { drawMark, MARK_W } from './glyphs.mjs';
 import { voiceById } from './kit.mjs';
+import { drawMap } from './pathmap/render.mjs';
 import { diatonicToY } from './notation.mjs';
 
 export { drawList, drawHint };
@@ -262,6 +263,22 @@ export function drawPage(ctx, s) {
     const y = L.PAGE_TOP_Y + Math.round((top / (lines.length - rows)) * (band - h));
     ctx.fillRect(L.SCREEN_W - 1, y, 1, h, 1);
   }
+  drawHint(ctx, s.footer || '');
+}
+
+/* ---- The Path map ---------------------------------------------------------- */
+/*
+ * A folder of the Path as its map (pathmap/render.mjs, vendored from Piano
+ * Practice): the title bar — the place under the avatar, its percent, its
+ * reviews due (map_places.mjs mapTitle) — the map in y 10..53, and the hint
+ * line under it.
+ *
+ * s = { title, right, places, layout, walk, now, footer }
+ */
+export function drawMapScreen(ctx, s) {
+  ctx.clear();
+  drawTitle(ctx, s.title || '', s.right || '', null);
+  drawMap(ctx, { places: s.places, layout: s.layout, walk: s.walk, now: s.now || 0 });
   drawHint(ctx, s.footer || '');
 }
 

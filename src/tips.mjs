@@ -22,14 +22,17 @@
 
 import { hasTip } from './progress.mjs';
 
-export const TIP_KEYS = ['welcome', 'sheet', 'practice', 'quiz'];
+export const TIP_KEYS = ['welcome', 'sheet', 'practice', 'quiz', 'map', 'island'];
 
 /* The tips, as paragraphs. `sheet` on the first action sheet, `practice` on
- * the first ready screen, `quiz` on the first quiz. */
+ * the first ready screen, `quiz` on the first quiz, `map` on the world map
+ * and `island` on the first island. */
 export const TIPS = {
   sheet: ['Options for this row. JOG choose, CLICK do it, BACK close.'],
   practice: ['REC plays and scores it, PLAY lets you listen first. MENU: help.'],
   quiz: ['Answer with the lit pads or the jog. MENU: help.'],
+  map: ['Lit pads are places. Press one to walk there, again to go in. PLAY continues.'],
+  island: ['Each place is part of the stage. The fort is its checkpoint, the hut its lessons.'],
   placement: ['Know a stage already? SHIFT+CLICK a stage, then Test out: checkpoint. Pass it and the path '
     + 'moves on.'],
 };

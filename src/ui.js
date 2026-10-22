@@ -55,6 +55,10 @@ import * as H from './hints.mjs';
 import * as SH from './row_sheet.mjs';
 import * as HP from './help.mjs';
 import * as TIPS from './tips.mjs';
+import * as MP from './map_places.mjs';
+import { layoutPlaces, placeOfPad } from './pathmap/layout.mjs';
+import { createWalk, walkTo, walkStep, posAt, arrived } from './pathmap/walk.mjs';
+import { mapPadColors } from './pathmap/leds.mjs';
 import * as UT from './untimed.mjs';
 import { availableLevels } from './levels.mjs';
 import * as IDS from './ids.mjs';
@@ -94,7 +98,7 @@ const OUTBOX_MAX = 512;
 /* Screens: named in hints.mjs, so none can go without a hint line. */
 const {
   MENU, READY, RUNNING, SUMMARY, LADDER, QUIZ, RESULT, PROGRESS, PROGRESS_ITEM, SETTINGS, ERROR, CARD,
-  PADMAP, SHEET, HELP, WELCOME, TIP,
+  PADMAP, SHEET, HELP, WELCOME, TIP, MAP,
 } = H.SCREENS;
 
 /* MIDI out routes. */
@@ -546,6 +550,13 @@ function answerBarActive() {
 }
 
 function paintLeds(t) {
+  /* On the map the pads are its places: lit means you can walk there. */
+  const m = onMap() ? mapNow() : null;
+  if (m) {
+    mapPadColors({ places: m.places, layout: m.layout, walk: m.walk, now: t, palette: PAD.MAP_PALETTE, out: ledBuf });
+    pushLeds();
+    return;
+  }
   const st = paintState;
   st.layout = layoutNow();
   st.held = held;
@@ -576,6 +587,11 @@ function paintLeds(t) {
   }
   st.dark = false;
   paint(ledBuf, st);
+  pushLeds();
+}
+
+/* What changed since the last repaint, to the pads. */
+function pushLeds() {
   for (let i = 0; i < PAD.PAD_COUNT; i++) {
     if (ledBuf[i] === ledPrev[i]) continue;
     ledPrev[i] = ledBuf[i];
@@ -599,6 +615,34 @@ function transport() {
   const colors = C.transportColors(running, screen === READY || screen === RUNNING, phase);
   setButtonLED(C.CC_PLAY, colors.play);
   setButtonLED(C.CC_RECORD, colors.record);
+  navButtons();
+}
+
+/*
+ * Back and Menu light when they do something (controls.mjs navButtonLeds):
+ * Menu always, Back while there is somewhere to go back to. Whether Move
+ * drives these LEDs for a module is still to be seen on the device; the
+ * values are cached here, so asking costs nothing when nothing changed.
+ */
+let backLit = -1;
+let menuLit = -1;
+function navButtons() {
+  const b = C.navButtonLeds(canGoBack());
+  if (b.back !== backLit) { backLit = b.back; setButtonLED(C.CC_BACK, b.back); }
+  if (b.menu !== menuLit) { menuLit = b.menu; setButtonLED(C.CC_MENU, b.menu); }
+}
+
+function canGoBack() {
+  if (screen !== MENU) return screen !== ERROR;
+  const top = CAT.navTop(nav);
+  return nav.length > 1 || listViews.has(top.node);
+}
+
+function darkenButtons() {
+  backLit = 0;
+  menuLit = 0;
+  setButtonLED(C.CC_BACK, 0);
+  setButtonLED(C.CC_MENU, 0);
 }
 
 /* ---- persistence -------------------------------------------------------- */
@@ -1712,6 +1756,11 @@ function padDown(pad, vel) {
     if (r === 'right') quizSolvedAt = now();
     return;
   }
+  /* On the map a pad is a place, and makes no sound. */
+  if (onMap()) {
+    mapPad(pad);
+    return;
+  }
   held.add(pad);
   if (screen === PADMAP) {
     padMapPress(pad, vel);
@@ -1806,6 +1855,7 @@ function openRow() {
   fromContinue = false;
   if (CAT.navPush(nav)) {
     announce(`${item.label}.`);
+    enterMap();
     return;
   }
   if (item.continueRow) {
@@ -1895,6 +1945,141 @@ function helpAction(what) {
   startWelcome();
 }
 
+/* ---- the Path map -------------------------------------------------------- */
+/*
+ * The Path and its stages are drawn as maps (map_places.mjs, pathmap/): the
+ * world, an island per stage, and on an island a place per row of its folder.
+ * The nav cursor stays the child index, so Back, a restore and the tests'
+ * walk by label work as in a list; the avatar stands on the place that child
+ * is. Pads walk on the map and make no sound; in a list they are the kit.
+ * Anything that is no place — the Path's Review — is in the folder's list,
+ * one option of the sheet away (Show as list), for the session.
+ */
+const listViews = new Set();
+let map = null;
+
+function isMapNode(node) {
+  return Boolean(node && node.view === 'map' && !listViews.has(node));
+}
+
+function onMap() {
+  return screen === MENU && isMapNode(CAT.navTop(nav).node) && Boolean(mapNow());
+}
+
+/* The screen the hint line and help speak for: the map is drawn on MENU. */
+function viewNow() {
+  return screen === MENU && isMapNode(CAT.navTop(nav).node) ? MAP : screen;
+}
+
+/* How much of a stage's lesson cards are read, for its hut. */
+function hutPercent(stage) {
+  const ids = LES.stageCards(lessons, stage, PLAN.coreSteps(stage).concat(PLAN.checkpointSteps(stage)));
+  if (!ids.length) return 0;
+  const seen = progress.path.seen || [];
+  return Math.round((ids.filter((id) => seen.indexOf(id) >= 0).length * 100) / ids.length);
+}
+
+/*
+ * The map of the open folder: its places, worked out again when progress or
+ * the day moves on — the avatar keeps walking through that — and an avatar on
+ * the place of the nav cursor. Null when the folder has no places.
+ */
+function mapNow() {
+  const top = CAT.navTop(nav);
+  if (!isMapNode(top.node)) return null;
+  const day = Math.floor(Date.now() / 86400000);
+  if (map && map.node === top.node && map.rev === progress.rev && map.day === day) return map;
+  const env = { dueIds: MP.dueIdsOf(progress, Date.now()), atMs: Date.now(), hutPercent };
+  const built = top.node === pathNode ? MP.worldPlaces(progress, program, env)
+    : MP.islandPlaces(progress, program, top.node, env);
+  if (!built.places.length) return null;
+  const layout = layoutPlaces(built.places.length);
+  const same = map && map.node === top.node && map.layout === layout;
+  let at = MP.placeOfChild(built.targets, top.cursor);
+  if (at < 0) {
+    at = MP.startPlace(built.places);
+    top.cursor = built.targets[at];
+  }
+  map = { node: top.node, rev: progress.rev, day, places: built.places, targets: built.targets, layout,
+    walk: same ? map.walk : createWalk(layout, at), said: same ? map.said : at };
+  return map;
+}
+
+/* Into a map folder: the avatar on the place Continue would choose, else the
+ * first open one. */
+function enterMap() {
+  const top = CAT.navTop(nav);
+  if (!isMapNode(top.node)) return;
+  map = null;
+  top.cursor = -1;
+  const m = mapNow();
+  if (!m) {
+    top.cursor = 0;
+    return;
+  }
+  const at = MP.startPlace(m.places);
+  top.cursor = m.targets[at];
+  m.walk = createWalk(m.layout, at);
+  m.said = at;
+}
+
+/* The avatar sets out for place `i`; the cursor is that place's child. */
+function walkToPlace(m, i) {
+  walkTo(m.walk, i, now());
+  CAT.navTop(nav).cursor = m.targets[m.walk.target];
+}
+
+function mapJog(delta) {
+  const m = mapNow();
+  if (!m) return;
+  walkStep(m.walk, delta, m.places.length, now());
+  CAT.navTop(nav).cursor = m.targets[m.walk.target];
+}
+
+/* A pad: walk to its place, or go in when the avatar is there or on its
+ * way. Water does nothing. */
+function mapPad(note) {
+  const m = mapNow();
+  const i = m ? placeOfPad(m.layout, note) : -1;
+  if (i < 0) return;
+  if (i === m.walk.target) {
+    openRow();
+    return;
+  }
+  walkToPlace(m, i);
+}
+
+/* Arrived: the place's name and how far it is, said once. */
+function serviceMap(t) {
+  const m = mapNow();
+  if (!m || !arrived(m.walk, t) || m.said === m.walk.target) return;
+  m.said = m.walk.target;
+  const p = m.places[m.said];
+  announce(`${p.label}, ${p.percent} percent${p.due ? `, ${p.due} due` : ''}`);
+}
+
+/* The sheet's Show as list / Show as map, for this folder, this session. */
+function showFolderAs(view) {
+  const top = CAT.navTop(nav);
+  if (view === 'list') {
+    listViews.add(top.node);
+    announce('List.');
+  } else {
+    listViews.delete(top.node);
+    map = null;
+    announce('Map.');
+  }
+}
+
+function drawMapView(hint) {
+  const m = mapNow();
+  const t = now();
+  const place = m.places[posAt(m.walk, t).at];
+  const head = MP.mapTitle(place, L.SCREEN_W - 2, measure);
+  V.drawMapScreen(ctx, { title: head.title, right: head.right, places: m.places, layout: m.layout,
+    walk: m.walk, now: t, footer: hint });
+}
+
 /* ---- the action sheet ---------------------------------------------------- */
 /*
  * Shift + jog-click on a row: what can be done to it besides opening it
@@ -1912,6 +2097,7 @@ function openSheet() {
       pick: ROWS.continuePick(progress, program, Date.now(), continueTurn),
       hasCards: stageHasCards,
       leafOf: (id) => leafIdx.get(id),
+      view: top.node.view !== 'map' ? undefined : listViews.has(top.node) ? 'list' : 'map',
     }),
     sel: 0,
   };
@@ -1956,6 +2142,10 @@ function sheetDo() {
     case 'ladder':
     case 'clock':
       practiseWrapped(a.leaf, a.act);
+      return;
+    case 'list':
+    case 'map':
+      showFolderAs(a.act);
       return;
     default:
       openSettingsFolder();
@@ -2433,10 +2623,11 @@ function leaveSettings() {
 function openHelp() {
   /* The keys as they were: a take is paused only once they are read. */
   const st = hintState(false);
+  const view = viewNow();
   if (screen === RUNNING && !tp.paused) pause();
   if (screen === MENU) st.section = nav.length > 1 ? nav[1].node.label : (CAT.navCurrent(nav) || {}).label;
   if (screen === SETTINGS) st.group = settingsGroup;
-  const page = HP.helpPage(screen, { st, topics: helpTopics, extra: screen === MENU ? rowCardLines() : [] });
+  const page = HP.helpPage(view, { st, topics: helpTopics, extra: screen === MENU ? rowCardLines() : [] });
   /* Opened at its first line: what this screen is comes first. */
   help = { title: page.title, lines: HP.fitPage(page.lines, measure), top: 0, back: screen };
   screen = HELP;
@@ -2507,13 +2698,15 @@ function welcomeClick() {
   if (at >= 0) {
     nav[0].cursor = at;
     CAT.navPush(nav);
+    enterMap();
   }
   showTip('placement', MENU);
 }
 
 /* A tip, the first time its screen comes up (tips.mjs tipDue). */
 function serviceTips() {
-  const key = screen === SHEET ? 'sheet' : screen === READY ? 'practice' : screen === QUIZ ? 'quiz' : null;
+  let key = screen === SHEET ? 'sheet' : screen === READY ? 'practice' : screen === QUIZ ? 'quiz' : null;
+  if (onMap()) key = CAT.navTop(nav).node === pathNode ? 'map' : 'island';
   const due = key && TIPS.tipDue(progress, key);
   if (due) showTip(due, screen);
 }
@@ -2580,9 +2773,10 @@ function hintLine() {
   const key = `${screen}|${st.shift}|${st.depth > 1}|${st.mode}|${st.paused}|${st.untimed}|${st.clock}|`
     + `${st.pick}|${st.audible}|${st.hintsLeft > 0}|${st.path}|${st.guided}|${st.more}|${st.pages > 1}|`
     + `${st.asks}|${st.scrolls}|${st.editing}`;
-  if (key !== hintKey) {
-    hintKey = key;
-    hintParts = H.hintFor(screen, st);
+  const view = viewNow();
+  if (view + key !== hintKey) {
+    hintKey = view + key;
+    hintParts = H.hintFor(view, st);
   }
   return H.hintAt(hintParts, now());
 }
@@ -2625,7 +2819,15 @@ function back() {
   /* Back from a result is another go from the top; Back again is the list. */
   if ((screen === SUMMARY || screen === LADDER) && chart) { restart(); return true; }
   /* Up one folder; only the top of the tree is left by Back. */
-  if (screen === MENU) return CAT.navPop(nav);
+  if (screen === MENU) {
+    /* A map folder shown as its list goes back to the map first. */
+    const top = CAT.navTop(nav);
+    if (listViews.has(top.node)) {
+      showFolderAs('map');
+      return true;
+    }
+    return CAT.navPop(nav);
+  }
   if (screen === CARD) { card = null; screen = MENU; return true; }
   if (screen === PADMAP) { savePads(); screen = SETTINGS; return true; }
   if (screen === PROGRESS_ITEM) { screen = PROGRESS; return true; }
@@ -2706,6 +2908,7 @@ function serviceExit() {
     darkenPads();
     setButtonLED(C.CC_PLAY, 0);
     setButtonLED(C.CC_RECORD, 0);
+    darkenButtons();
   });
   guard('exit:files', () => flushFiles(true));
   if (typeof host_exit_module === 'function') host_exit_module();
@@ -2825,6 +3028,10 @@ function draw() {
   if (screen === SHEET && sheet) {
     V.drawList(ctx, { title: sheet.title.toUpperCase().slice(0, 21), items: sheet.items, selected: sheet.sel,
       footer: hint });
+    return;
+  }
+  if (screen === MENU && onMap()) {
+    drawMapView(hint);
     return;
   }
   if (screen === MENU) {
@@ -3130,6 +3337,7 @@ function tickInner() {
     transport();
   }
   serviceTips();
+  if (onMap()) serviceMap(t);
   if (t - lastDraw >= DRAW_INTERVAL_MS) {
     lastDraw = t;
     draw();
@@ -3231,6 +3439,8 @@ function midiInner(data) {
       return;
     case C.CC_PLAY:
       if (d2 <= 0) return;
+      /* On the map Play is Continue: the one button. */
+      if (onMap()) { continueOpen(); return; }
       /* In a hearing drill Play repeats the question — without it a prompt
        * you did not catch is a prompt you cannot answer. */
       if (screen === QUIZ && promptIsAudible()) { schedulePrompt(); return; }
@@ -3321,7 +3531,9 @@ function knobTouched(knob) {
 
 function jog(delta) {
   const target = C.jogTarget(screen, settingsEditing);
-  if (target === 'menu') {
+  if (target === 'menu' && onMap()) {
+    mapJog(delta);
+  } else if (target === 'menu') {
     const top = CAT.navTop(nav);
     top.cursor = Math.max(0, Math.min(top.node.children.length - 1, top.cursor + delta));
   } else if (target === 'row') {
@@ -3482,7 +3694,9 @@ globalThis.drumsPracticeMenu = function drumsPracticeMenu() {
 
 /* The screen on show and, on the action sheet, its rows: read-only too. */
 globalThis.drumsPracticeScreen = function drumsPracticeScreen() {
-  return { screen, sheet: sheet ? sheet.items.map((a) => a.label) : null, help: help ? help.lines.slice() : null };
+  const m = onMap() ? mapNow() : null;
+  return { screen, sheet: sheet ? sheet.items.map((a) => a.label) : null, help: help ? help.lines.slice() : null,
+    map: m ? { at: m.walk.target, places: m.places.map((p) => `${p.label}:${p.state}`) } : null };
 };
 
 globalThis.onUnload = function onUnload() {
@@ -3522,6 +3736,7 @@ globalThis.onUnload = function onUnload() {
     darkenPads();
     setButtonLED(C.CC_PLAY, 0);
     setButtonLED(C.CC_RECORD, 0);
+    darkenButtons();
   });
   guard('unload:files', () => {
     savePads();

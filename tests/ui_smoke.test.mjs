@@ -34,7 +34,7 @@ let uiLoads = 0;
  * first-visit cards stand in front of the screens most tests walk to. The
  * tests about them load with `tips: []`.
  */
-const ALL_TIPS = ['welcome', 'sheet', 'practice', 'quiz'];
+const ALL_TIPS = ['welcome', 'sheet', 'practice', 'quiz', 'map', 'island'];
 
 async function loadUi({ extraFiles = {}, settings = null, dataFiles = {}, withLessons = false,
   tips = ALL_TIPS } = {}) {
@@ -116,7 +116,7 @@ async function loadUi({ extraFiles = {}, settings = null, dataFiles = {}, withLe
   const rewritten = src
     .replace(`'${SHARED}input_filter.mjs'`, `'${inputFilter}'`)
     .replace(`'${SHARED}screen_reader.mjs'`, `'${screenReader}'`)
-    .replace(/from '\.\/([a-z_]+)\.mjs'/g,
+    .replace(/from '\.\/([a-z_/]+)\.mjs'/g,
       (_m, n) => `from '${new URL(`../src/${n}.mjs`, import.meta.url).href}'`);
 
   /*
@@ -1792,7 +1792,7 @@ test('a folder skips everything in it from its sheet, and Undo skip takes it bac
   ticks(1);
   assert.match(log.announces.join('|'), /Skipped 2/);
   shiftClick();
-  assert.deepEqual(globalThis.drumsPracticeScreen().sheet, ['Undo skip', 'Settings...']);
+  assert.deepEqual(globalThis.drumsPracticeScreen().sheet, ['Undo skip', 'Show as list', 'Settings...']);
   cc(CC.jogClick, 127);
   assert.match(log.announces.join('|'), /Skips taken back/);
 });
@@ -1804,7 +1804,7 @@ test('a stage\'s sheet starts the path there, and its Settings... opens Settings
   goTo('Path', '2 Sixteenths', { open: false });
   shiftClick();
   assert.deepEqual(globalThis.drumsPracticeScreen().sheet,
-    ['I know it all: skip', 'Start the path here', 'Test out: checkpoint', 'Settings...']);
+    ['I know it all: skip', 'Start the path here', 'Test out: checkpoint', 'Show as list', 'Settings...']);
   cc(CC.jogTurn, 1);
   cc(CC.jogClick, 127);
   assert.match(log.announces.join('|'), /The path starts at stage 2/);
@@ -2136,7 +2136,7 @@ test('a stage\'s Lessons row reads its cards again, the jog turning their pages'
   const done = () => drawnText(1).some((t) => /CLICK done/.test(t));
   for (let i = 0; i < 10 && !done(); i++) { cc(CC.jogClick, 127); ticks(1); }
   assert.ok(done());
-  cc(CC.jogClick, 127); ticks(1);
+  cc(CC.jogClick, 127); ticks(20);   /* the avatar finishes its walk to the hut */
   assert.ok(drawnText(1).includes('Lessons'), `not back in the stage folder: ${drawnText(1).join('|')}`);
 });
 
@@ -2150,7 +2150,9 @@ test('Path › Review lists what is due, and opens it; with nothing due there is
   await loadUi({ dataFiles: { 'progress.json': JSON.stringify(progress) } });
   globalThis.init();
   ticks(2);
-  goTo('Path', 'Review', { open: false });          /* the last row, after the stages */
+  goTo('Path');
+  sheetPick('Show as list');                         /* Review is no island: it is in the list */
+  goTo('Review', { open: false });                   /* the last row, after the stages */
   ticks(1);
   assert.ok(drawnText(1).includes('1 due'), 'the due count is not on the row');
   cc(CC.jogClick, 127);
@@ -2982,4 +2984,157 @@ test('Menu on Continue reads the card of the step it would open', async () => {
   const help = globalThis.drumsPracticeScreen().help;
   assert.ok(help.includes('HELP: LIST') || drawnText(1).includes('HELP: LIST'));
   assert.ok(help.some((l) => /^THE PULSE|^YOUR RESULT|^0 HELLO, KIT/.test(l)), help.join('|'));
+});
+
+/* ---- the Path map ---------------------------------------------------------- */
+
+const mapNow = () => globalThis.drumsPracticeScreen().map;
+async function padOfPlace(n, i) {
+  const PL = await import('../src/pathmap/layout.mjs');
+  const layout = PL.layoutPlaces(n);
+  return PL.padOfCell(layout.cells[i]);
+}
+
+test('the Path is a world map: a pad walks the avatar there, a second press goes in', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  goTo('Path');
+  ticks(1);
+  const m = mapNow();
+  assert.ok(m, 'the Path is not drawn as a map');
+  assert.equal(m.places.length, 7, 'an island per stage');
+  assert.equal(m.at, 0, 'the avatar starts where Continue goes');
+  assert.ok(drawnText(1).includes('PAD go  CLICK enter'), drawnText(1).join('|'));
+  const p3 = await padOfPlace(7, 3);
+  pad(p3, 100); pad(p3, 0);
+  assert.equal(mapNow().at, 3, 'the pad did not walk there');
+  assert.equal(globalThis.drumsPracticeMenu().cursor, 3, 'the cursor is the place\'s row');
+  ticks(40);
+  assert.match(log.announces.join('|'), /3 Ghosts & flams, 0 percent/, 'arriving says where');
+  pad(p3, 100); pad(p3, 0);
+  ticks(1);
+  assert.equal(globalThis.drumsPracticeMenu().title, '3 Ghosts & flams', 'the second press did not go in');
+  assert.ok(mapNow(), 'a stage is drawn as its island');
+  assert.ok(mapNow().places.some((p) => p.startsWith('Checkpoint:')));
+});
+
+test('the jog walks the map, click goes in, Back comes out to the island it left', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  goTo('Path');
+  cc(CC.jogTurn, 2);
+  assert.equal(mapNow().at, 2);
+  cc(CC.jogTurn, 127);
+  assert.equal(mapNow().at, 1, 'the jog walks back too');
+  cc(CC.jogClick, 127);
+  assert.equal(globalThis.drumsPracticeMenu().title, '1 Eighth notes');
+  assert.deepEqual(mapNow().places.map((p) => p.split(':')[0]),
+    ['Lessons', 'Ear', 'Time', 'Grooves', 'Electives', 'Checkpoint'], 'the island\'s places, in the folder\'s order');
+  cc(CC.back, 127);
+  assert.equal(globalThis.drumsPracticeMenu().title, 'Path');
+  assert.equal(mapNow().at, 1, 'Back puts the avatar on the island it came from');
+  cc(CC.back, 127);
+  assert.equal(globalThis.drumsPracticeMenu().title, 'Drums');
+  assert.equal(mapNow(), null, 'the top is a list');
+});
+
+test('pads make no sound on the map, and are the kit again in a list', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  goTo('Path');
+  const PL = await import('../src/pathmap/layout.mjs');
+  const water = [];
+  for (let n = 68; n < 100; n++) if (PL.placeOfPad(PL.layoutPlaces(7), n) < 0) water.push(n);
+  let before = log.params.length;
+  for (const p of water.concat(await padOfPlace(7, 2))) { pad(p, 100); pad(p, 0); }
+  ticks(2);
+  assert.equal(log.params.slice(before).filter(isHit).length, 0, 'a pad sounded on the map');
+  assert.equal(globalThis.drumsPracticeMenu().title, 'Path', 'water took us somewhere');
+  cc(CC.back, 127);
+  before = log.params.length;
+  pad(69, 100); pad(69, 0);
+  ticks(2);
+  assert.equal(log.params.slice(before).filter(isHit).length, 1, 'the list lost its kit');
+});
+
+test('on the map the pads light its places, and Play is Continue', async () => {
+  const PAD = await import('../src/padmap.mjs');
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  goTo('Path');
+  ticks(3);
+  const lit = new Map();
+  for (const [n, c] of log.leds) lit.set(n, c);
+  const p0 = await padOfPlace(7, 0);
+  const p4 = await padOfPlace(7, 4);
+  assert.equal(lit.get(p0), PAD.MAP_PALETTE.avatar, 'the avatar\'s pad is the brightest');
+  assert.equal(lit.get(p4), PAD.MAP_PALETTE.ahead, 'a later stage is dim');
+  assert.equal(lit.get(68 + 31), PAD.LED_OFF, 'water is dark');
+  cc(CC.play, 127);
+  ticks(2);
+  assert.equal(globalThis.drumsPracticeScreen().screen, 'ready');
+  assert.match(log.announces.slice(-3).join('|'), /Quarters ready/);
+});
+
+test('the map\'s sheet shows the folder as a list, and Back returns to the map', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  goTo('Path');
+  shiftClick();
+  const sheet = globalThis.drumsPracticeScreen().sheet;
+  assert.ok(sheet.includes('Show as list') && sheet.includes('Start the path here'), sheet.join('|'));
+  cc(CC.back, 127);
+  sheetPick('Show as list');
+  assert.equal(mapNow(), null, 'still a map');
+  assert.ok(drawnText(1).includes('CLICK open  BACK up'), 'the list has the list\'s hint');
+  shiftClick();
+  assert.ok(globalThis.drumsPracticeScreen().sheet.includes('Show as map'));
+  cc(CC.back, 127);
+  cc(CC.back, 127);
+  assert.ok(mapNow(), 'Back did not return to the map');
+  assert.equal(globalThis.drumsPracticeMenu().title, 'Path');
+});
+
+test('Menu on the map is its help, with the place\'s lesson card; the map and island tips show once', async () => {
+  await loadUi({ tips: ['welcome'], withLessons: true });
+  globalThis.init();
+  ticks(2);
+  goTo('Path');
+  ticks(1);
+  assert.equal(globalThis.drumsPracticeScreen().screen, 'tip');
+  assert.ok(drawnText(1).some((t) => /^Lit pads are places/.test(t)), drawnText(1).join('|'));
+  cc(CC.jogClick, 127);
+  cc(CC.menu, 127);
+  const help = globalThis.drumsPracticeScreen().help;
+  assert.ok(help.includes('PAD    go') && help.includes('0 HELLO, KIT') && help.includes('THE MAP'), help.join('|'));
+  cc(CC.menu, 127);
+  cc(CC.jogClick, 127);
+  ticks(1);
+  assert.equal(globalThis.drumsPracticeScreen().screen, 'tip', 'no island tip');
+  assert.ok(drawnText(1).some((t) => /^Each place is part/.test(t)));
+  cc(CC.back, 127);
+  cc(CC.back, 127);
+  ticks(1);
+  assert.equal(globalThis.drumsPracticeScreen().screen, 'menu', 'the map tip came again');
+});
+
+test('Back and Menu light: Menu always, Back while there is somewhere to go back to', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(3);
+  const last = (cc) => { const b = log.buttons.filter(([c]) => c === cc); return b[b.length - 1][1]; };
+  assert.equal(last(CC.menu), 124);
+  assert.equal(last(CC.back), 0, 'at the top Back closes');
+  goTo('Practice');
+  ticks(2);
+  assert.equal(last(CC.back), 124);
+  cc(CC.shift, 127); cc(CC.back, 127); cc(CC.shift, 0);
+  ticks(30);
+  assert.equal(last(CC.back), 0, 'left lit after closing');
+  assert.equal(last(CC.menu), 0);
 });

@@ -21,15 +21,15 @@ test('a newcomer is welcomed; a learner from before is only marked; once is enou
 
 test('a tip is due once per screen kind, and never for the welcome', () => {
   const p = P.emptyProgress();
-  assert.deepEqual(T.TIP_KEYS, ['welcome', 'sheet', 'practice', 'quiz']);
-  for (const key of ['sheet', 'practice', 'quiz']) {
+  assert.deepEqual(T.TIP_KEYS, ['welcome', 'sheet', 'practice', 'quiz', 'map', 'island']);
+  for (const key of ['sheet', 'practice', 'quiz', 'map', 'island']) {
     assert.equal(T.tipDue(p, key), key);
     P.addTip(p, key);
     assert.equal(T.tipDue(p, key), null);
   }
   assert.equal(T.tipDue(p, 'welcome'), null);
   assert.equal(T.tipDue(p, null), null);
-  assert.equal(T.tipDue(p, 'map'), null, 'a tip without words is none');
+  assert.equal(T.tipDue(p, 'world'), null, 'a tip without words is none');
 });
 
 test('the words are the shared ones', () => {

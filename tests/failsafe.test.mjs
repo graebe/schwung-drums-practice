@@ -40,7 +40,7 @@ async function loadUi({ breakOn = null } = {}) {
   /* A learner past the welcome and the first-visit tips, so the screens the
    * tests drive to are the ones that come up. */
   files[`${DIR}/progress.json`] = JSON.stringify({ version: 2, items: {},
-    tips: ['welcome', 'sheet', 'practice', 'quiz'] });
+    tips: ['welcome', 'sheet', 'practice', 'quiz', 'map', 'island'] });
 
   /* Any host primitive can be made to throw, which is what a real host fault
    * looks like from inside the module. */
@@ -92,7 +92,7 @@ async function loadUi({ breakOn = null } = {}) {
   const src = readFileSync(new URL('../src/ui.js', import.meta.url), 'utf8')
     .replace(`'${SHARED}input_filter.mjs'`, `'${inputFilter}'`)
     .replace(`'${SHARED}screen_reader.mjs'`, `'${screenReader}'`)
-    .replace(/from '\.\/([a-z_]+)\.mjs'/g, (_m, n) => {
+    .replace(/from '\.\/([a-z_/]+)\.mjs'/g, (_m, n) => {
       if (n === 'view' && breakOn === 'view') return `from '${viewShim}'`;
       return `from '${new URL(`../src/${n}.mjs`, import.meta.url).href}'`;
     });

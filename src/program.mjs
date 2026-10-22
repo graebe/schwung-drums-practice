@@ -743,7 +743,8 @@ function stageFolder(stage) {
   if (el.length) children.push({ label: 'Electives', value: '>', steps: el, electives: true, children: stepRows(el) });
   const cp = checkpointSteps(stage, {});
   if (cp.length) children.push({ ...stepRow(cp[0]), label: 'Checkpoint', checkpoint: true });
-  return { label: `${stage.index} ${stage.name}`, value: '>', stage, steps: core, children };
+  /* Shown as the stage's island (map_places.mjs), its rows as places. */
+  return { label: `${stage.index} ${stage.name}`, value: '>', stage, steps: core, view: 'map', children };
 }
 
 const pref = (label, group, key) => ({ label, value: '', prefRow: true, group, key });
@@ -794,6 +795,8 @@ export function programFolder(program, reviewRows = () => []) {
     value: '>',
     /* Its rows point back into the tree rather than holding drills. */
     pointers: true,
+    /* Shown as the world map: an island per stage. */
+    view: 'map',
     get children() { return reviewRows().length ? stages.concat(review) : stages; },
   };
 }

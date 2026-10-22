@@ -14,7 +14,13 @@ mkdir -p "$STAGE/exercises"
 cp "$ROOT/src/module.json" "$STAGE/module.json"
 cp "$ROOT/src/ui.js" "$STAGE/ui.js"
 
-MODULES="answer_pads beam catalog chart choices chrome controls events exercise_io generator glyphs grid_render guess kit ladder layout led_paint levels notation padmap rng scoring screens settings_def staff_render stats timing view transport progress program untimed page_view lessons pads_io padmap_screen ids path_rows hints row_sheet help tips"
+# The Path map engine, vendored from Piano Practice into src/pathmap/
+# (scripts/check-vendored.sh). It ships as a folder of its own, stamped like
+# the rest: its files import each other, and two of them share a name with a
+# module beside ui.js (layout), so it cannot be flattened into one folder.
+PATHMAP="model layout walk render leds"
+
+MODULES="answer_pads beam catalog chart choices chrome controls events exercise_io generator glyphs grid_render guess kit ladder layout led_paint levels notation padmap rng scoring screens settings_def staff_render stats timing view transport progress program untimed page_view lessons pads_io padmap_screen ids path_rows hints row_sheet help tips map_places"
 
 # Cache-bust the sibling modules.
 #
@@ -31,14 +37,29 @@ MODULES="answer_pads beam catalog chart choices chrome controls events exercise_
 # So each build stamps its own filenames. New build, new paths, cache cannot
 # serve anything stale — and no hand-maintained version suffixes to forget.
 BUILD_ID=$(cat "$ROOT/src/ui.js" $(for m in $MODULES; do echo "$ROOT/src/$m.mjs"; done) \
-  | cksum | cut -d' ' -f1)
+  $(for m in $PATHMAP; do echo "$ROOT/src/pathmap/$m.mjs"; done) | cksum | cut -d' ' -f1)
 
 for mod in $MODULES; do
   cp "$ROOT/src/$mod.mjs" "$STAGE/$mod-$BUILD_ID.mjs"
 done
 
+mkdir -p "$STAGE/pathmap"
+for mod in $PATHMAP; do
+  cp "$ROOT/src/pathmap/$mod.mjs" "$STAGE/pathmap/$mod-$BUILD_ID.mjs"
+done
+
 for f in "$STAGE/ui.js" "$STAGE"/*.mjs; do
   for mod in $MODULES; do
+    sed -i.bak "s#'\./$mod\.mjs'#'./$mod-$BUILD_ID.mjs'#g" "$f"
+  done
+  for mod in $PATHMAP; do
+    sed -i.bak "s#'\./pathmap/$mod\.mjs'#'./pathmap/$mod-$BUILD_ID.mjs'#g" "$f"
+  done
+  rm -f "$f.bak"
+done
+# Inside the folder its files import one another as './<name>.mjs'.
+for f in "$STAGE"/pathmap/*.mjs; do
+  for mod in $PATHMAP; do
     sed -i.bak "s#'\./$mod\.mjs'#'./$mod-$BUILD_ID.mjs'#g" "$f"
   done
   rm -f "$f.bak"

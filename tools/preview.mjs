@@ -23,6 +23,9 @@
  *   npm run preview -- --screen help      (MENU's help on the list; --top N scrolls it)
  *   npm run preview -- --screen welcome --page 0|1|2|3
  *   npm run preview -- --screen tip --tip sheet|practice|quiz|placement [--top N]
+ *   npm run preview -- --screen map --level world|island [--to N --t ms]   (stage 0 done, 1 current;
+ *                       --to walks the avatar to place N and draws it --t ms into the walk)
+ *   npm run preview -- --screen map-sheet   (a stage's options on the map, with Show as list)
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { createScreen, toAscii } from './screen_buffer.mjs';
@@ -42,6 +45,30 @@ import * as H from '../src/hints.mjs';
 import * as HP from '../src/help.mjs';
 import * as TIPS from '../src/tips.mjs';
 import { LABELS } from '../src/row_sheet.mjs';
+import * as PLAN from '../src/program.mjs';
+import * as MP from '../src/map_places.mjs';
+import { layoutPlaces } from '../src/pathmap/layout.mjs';
+import { createWalk, walkTo, posAt } from '../src/pathmap/walk.mjs';
+import { RANDOM_DRILLS } from '../src/generator.mjs';
+
+/* The real Path, with stage 0 through on its checkpoint and stage 1 begun, for
+ * the map previews: every state shows somewhere. */
+function samplePath() {
+  const man = parseManifest(readFileSync(new URL('index.json', exDir), 'utf8'));
+  const entries = man.entries.map((e) => ({ chart: parseExercise(readFileSync(new URL(e.file, exDir), 'utf8'), e.id).chart,
+    category: e.category }));
+  const ids = new Set([...builtins({}).map((c) => c.family), ...RANDOM_DRILLS.map((d) => d.family), 'clock']);
+  const program = PLAN.buildProgram({ entries, categories: man.categories, has: (id) => ids.has(id) });
+  const progress = PROG.emptyProgress();
+  const take = (id, speed) => PROG.recordTake(progress, id, { speed, accuracy: 1, sd: 10, clean: true, bpm: 90,
+    at: Date.UTC(2026, 9, 1) });
+  take('first-beat:l3', 100);
+  take('subdiv:eighths', 100);
+  take('rock-backbeat:l1', 60);
+  PROG.skipItem(progress, 'quiz:pick:subdiv:qe', 1);
+  PROG.skipItem(progress, 'quiz:pick:voice', 1);
+  return { program, progress, folder: PLAN.programFolder(program) };
+}
 
 const exDir = new URL('../src/exercises/', import.meta.url);
 
@@ -215,6 +242,25 @@ if (screen) {
     const lines = HP.fitPage(TIPS.tipItems(key), (t) => ctx.textWidth(t));
     V.drawPage(ctx, { title: TIPS.TIP_TITLE, lines, top: Number(arg('top', 0)),
       footer: H.hintFor(H.SCREENS.TIP, { scrolls: lines.length > L.PAGE_ROWS })[0] });
+  } else if (screen === 'map' || screen === 'map-sheet') {
+    const { program, progress, folder } = samplePath();
+    const island = arg('level', 'world') === 'island';
+    const built = island
+      ? MP.islandPlaces(progress, program, folder.children[1], { atMs: Date.UTC(2026, 9, 2) })
+      : MP.worldPlaces(progress, program, {});
+    const layout = layoutPlaces(built.places.length);
+    const walk = createWalk(layout, MP.startPlace(built.places));
+    const to = arg('to', null);
+    const t = Number(arg('t', 0));
+    if (to !== null) walkTo(walk, Number(to), 0);
+    const place = built.places[posAt(walk, t).at];
+    const head = MP.mapTitle(place, L.SCREEN_W - 2, (x) => ctx.textWidth(x));
+    V.drawMapScreen(ctx, { title: head.title, right: head.right, places: built.places, layout, walk, now: t,
+      footer: H.hintFor(H.SCREENS.MAP)[0] });
+    if (screen === 'map-sheet') {
+      const items = [LABELS.skipAll, LABELS.start, LABELS.testOut, LABELS.list, LABELS.settings];
+      V.drawList(ctx, { title: '1 EIGHTH NOTES', items, selected: 3, footer: H.hintFor(H.SCREENS.SHEET)[0] });
+    }
   } else if (screen === 'progress') {
     const h = [70, 75, 80, 78, 85, 90, 95, 100].map((pct, i) => [i, pct, 93, 24 - i * 2, i === 3 ? 4 : 5]);
     V.drawProgress(ctx, {

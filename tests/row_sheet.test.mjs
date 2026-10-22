@@ -35,7 +35,7 @@ const labels = (row, e) => SH.sheetFor(row, e).map((a) => a.label);
 test('the labels are the ones both modules use, word for word', () => {
   assert.deepEqual(Object.values(SH.LABELS), ['I know this: skip', 'I know it all: skip', 'Undo skip',
     'Start the path here', 'Test out: checkpoint', 'Lessons', 'Practise: Ladder', 'Practise: Clock',
-    'Settings...']);
+    'Show as list', 'Show as map', 'Settings...']);
 });
 
 test('every label fits its row whole, the scrollbar showing beside it', async () => {
@@ -140,4 +140,12 @@ test('the library: the Ladder and the Clock on a drill, only Settings on anythin
   /* A review opens the drill it names. */
   assert.deepEqual(labels({ label: 'Flam', repId: 'flam' }, env(p)),
     ['Practise: Ladder', 'Practise: Clock', 'Settings...']);
+});
+
+test('a map folder offers its list, and its list the map again', () => {
+  const p = P.emptyProgress();
+  assert.deepEqual(labels(byLabel(path, '0 Hello'), env(p, { view: 'map', hasCards: () => false })),
+    ['I know it all: skip', 'Start the path here', 'Test out: checkpoint', 'Show as list', 'Settings...']);
+  assert.deepEqual(labels(null, env(p, { view: 'list' })), ['Show as map', 'Settings...']);
+  assert.deepEqual(labels(null, env(p)), ['Settings...'], 'no view, no switch');
 });

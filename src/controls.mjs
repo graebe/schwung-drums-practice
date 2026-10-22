@@ -23,6 +23,16 @@ export const CC_RECORD = 86;
 export const CC_KNOB1 = 71;
 export const KNOB_COUNT = 8;
 
+/*
+ * Back and Menu have white LEDs, lit 0..127 (124 is the brightest that
+ * shows). Menu is always lit — it is help, everywhere — and Back while there
+ * is somewhere to go back to: at the top of the list Back closes the module.
+ */
+export const BUTTON_LIT = 124;
+export function navButtonLeds(canGoBack) {
+  return { menu: BUTTON_LIT, back: canGoBack ? BUTTON_LIT : 0 };
+}
+
 /* Move's pads are notes 68..99; notes below 10 are capacitive knob TOUCH and
  * are not pads at all. Every module that forgets this gets phantom hits the
  * moment someone rests a finger on a knob. */
