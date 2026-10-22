@@ -27,6 +27,7 @@
  * shipped categories — it must be somewhere in the list.
  */
 
+import { CLOCK_ID, quizItemId } from './ids.mjs';
 import { availableLevels, projectLevel } from './levels.mjs';
 import { subdivisionDrills, RANDOM_DRILLS } from './generator.mjs';
 
@@ -151,14 +152,14 @@ export function drumsTree({ entries = [], categories = [], bpm = 90, drills = []
       { label: 'Clock', value: '', kind: 'clock', id: CLOCK_ID },
     ]),
     folder('Quiz', drills.map((d) => ({
-      label: d.name, value: '?', kind: 'quiz', quiz: d, id: `quiz:${d.mode}:${d.kind}`,
+      label: d.name, value: '?', kind: 'quiz', quiz: d, id: quizItemId(d.mode, d.kind),
     }))),
     { label: 'Progress', value: '', kind: 'progress' },
   ];
   return buildCatalog({ charts: entries, categories, basics, lead: path ? [path] : [], tail });
 }
 
-export const CLOCK_ID = 'clock';
+export { CLOCK_ID };
 
 /*
  * Every leaf that opens something, by item id — so a step of the Learning

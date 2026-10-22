@@ -117,8 +117,12 @@ test('the module graph has no backwards edges', () => {
   assert.ok(!imports('chrome').includes('view'), 'the shared furniture must not depend on a screen');
   assert.ok(!imports('chrome').includes('screens'));
 
-  /* And the leaves stay leaves. */
-  for (const leaf of ['layout', 'events', 'rng', 'settings_def', 'stats', 'timing']) {
-    assert.deepEqual(imports(leaf), [], `${leaf}.mjs must import nothing`);
+  /* And the leaves stay leaves: they import nothing but other leaves. */
+  const leaves = ['layout', 'events', 'rng', 'settings_def', 'stats', 'timing', 'ids'];
+  for (const leaf of leaves) {
+    for (const dep of imports(leaf)) {
+      assert.ok(leaves.includes(dep), `${leaf}.mjs must import only leaves, not ${dep}`);
+    }
   }
+  assert.deepEqual(imports('ids'), [], 'ids.mjs imports nothing');
 });

@@ -70,14 +70,9 @@ export const LEVELS = [
  */
 export const UNTIMED_PASSES = 2;
 
-/* A rung's item id, `rock-backbeat:l3` -> 3. One pattern for every reader of
- * ids — progress, the list, the stats — so a new rung is added here once. */
-export const LEVEL_ID_RE = /:l([0-4])$/;
-
-export function isUntimedId(id) {
-  const m = LEVEL_ID_RE.exec(id || '');
-  return Boolean(m && m[1] === '0');
-}
+/* A rung's item id, `rock-backbeat:l3`: made and read in ids.mjs, and
+ * offered here as well, where the rungs are. */
+export { LEVEL_ID_RE, isUntimedId } from './ids.mjs';
 
 export function levelById(id) {
   for (let i = 0; i < LEVELS.length; i++) {

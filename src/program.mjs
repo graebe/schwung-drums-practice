@@ -39,7 +39,8 @@
  * built, so the table can be the whole curriculum while it ships.
  */
 
-import { availableLevels, isUntimedId, LEVEL_ID_RE } from './levels.mjs';
+import { availableLevels } from './levels.mjs';
+import { isUntimedId, higherLevelIds, parseLevelId, quizItemId as makeQuizId } from './ids.mjs';
 import { item, isDone, isParked, LEARNED } from './progress.mjs';
 import { DRILLS } from './guess.mjs';
 
@@ -328,7 +329,7 @@ export const PLANNED = new Set([
 
 /* A quiz step's id is the id its rounds are recorded under. */
 export function quizItemId(drill, variant = '') {
-  return `quiz:${drill.mode}:${drill.kind}${variant ? `:${variant}` : ''}`;
+  return makeQuizId(drill.mode, drill.kind, variant);
 }
 
 const POOL_NAMES = { kit3: 'kick, snare, hat', qe: '4ths, 8ths', qes: '4ths-16ths' };
@@ -476,12 +477,7 @@ function stepsOf(slots, prefs) {
  */
 export function stepDone(progress, step) {
   if (step.quiz) return isDone(progress, step.id);
-  const ids = [step.id];
-  const m = LEVEL_ID_RE.exec(step.id);
-  if (m) {
-    const base = step.id.slice(0, -m[0].length);
-    for (let n = Number(m[1]) + 1; n <= 4; n++) ids.push(`${base}:l${n}`);
-  }
+  const ids = [step.id].concat(higherLevelIds(step.id));
   /* L0 asks whether you know the notes: its own ✓, or any rung above it
    * played clean, at any speed. */
   if (isUntimedId(step.id)) {
@@ -696,8 +692,8 @@ export function stepRow(step) {
 /* A groove's rungs share a folder, so a stage lists grooves, not rungs; a
  * groove with a single step here (a checkpoint's top rung) is a row of its own. */
 const baseOf = (id) => {
-  const m = LEVEL_ID_RE.exec(id);
-  return m ? id.slice(0, -m[0].length) : id;
+  const r = parseLevelId(id);
+  return r ? r.base : id;
 };
 
 function stepRows(steps) {

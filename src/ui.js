@@ -51,7 +51,9 @@ import * as PROG from './progress.mjs';
 import * as PLAN from './program.mjs';
 import * as LES from './lessons.mjs';
 import * as UT from './untimed.mjs';
-import { availableLevels, LEVEL_ID_RE, isUntimedId } from './levels.mjs';
+import { availableLevels } from './levels.mjs';
+import * as IDS from './ids.mjs';
+import { isUntimedId } from './ids.mjs';
 import { paint, flashColor, guideTargets, FLASH_MS } from './led_paint.mjs';
 import { stats as timingStats, statsSince, perVoice, voicesBySpread } from './timing.mjs';
 
@@ -656,10 +658,8 @@ function rebuildProgress(always = false) {
  * the item "rock-backbeat:l2". A quiz round is filed as "pick:groove".
  */
 function itemOfRecord(rec) {
-  const { kind, id } = ST.parseDrillId(rec.d);
-  if (ST.QUIZ_KINDS.indexOf(kind) >= 0) return `quiz:${kind}:${id}`;
-  if (kind === 'clock') return CAT.CLOCK_ID;
-  if (kind !== 'drill' && kind !== 'ladder' && kind !== 'untimed') return null;
+  const id = IDS.itemOfDrillId(rec.d);
+  if (!id || IDS.isQuizItemId(id) || IDS.isClockItemId(id)) return id;
   return itemNames.has(id) ? id : null;
 }
 
@@ -680,8 +680,8 @@ function writtenOf(id, rec) {
 }
 
 function fileChartOf(id) {
-  const m = LEVEL_ID_RE.exec(id);
-  const base = m ? id.slice(0, -m[0].length) : id;
+  const r = IDS.parseLevelId(id);
+  const base = r ? r.base : id;
   for (let i = 0; i < fileCharts.length; i++) if (fileCharts[i].id === base) return fileCharts[i];
   return null;
 }
@@ -757,7 +757,7 @@ function rebuildMenu() {
   program = PLAN.buildProgram({
     entries: fileEntries,
     categories: fileCategories,
-    has: (id) => itemNames.has(id) && id.indexOf('quiz:') !== 0,
+    has: (id) => itemNames.has(id) && !IDS.isQuizItemId(id),
     label: itemTitle,
   });
   /* A pooled quiz is an item of its own, named by its step. */
@@ -2113,7 +2113,7 @@ function pathGrooves() {
 
 /* The item a quiz round is filed under: its pooled variant's, when it has one. */
 function quizItemOf(q) {
-  return PLAN.quizItemId({ mode: q.mode, kind: q.kind }, q.variant);
+  return IDS.quizItemId(q.mode, q.kind, q.variant);
 }
 
 /* The pad layout a press is read in. A drum quiz always uses the kit: in the
@@ -2258,7 +2258,7 @@ function progressDetail(index) {
   }
   const id = row.id;
   const it = PROG.item(progress, id) || { h: [], best: 0, bpm: 0, plays: 0 };
-  const isQuiz = id.indexOf('quiz:') === 0;
+  const isQuiz = IDS.isQuizItemId(id);
   /* The best dynamics beside where the jog is: the chart's dotted line. */
   const dyn = it.dyn >= 0 ? `dyn ${it.dyn}%` : '';
   return {

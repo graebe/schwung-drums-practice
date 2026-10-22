@@ -31,8 +31,7 @@
  * Learning Path, the Grooves folder or a repetition.
  */
 
-import { LEVEL_ID_RE } from './levels.mjs';
-import { parseDrillId } from './stats.mjs';
+import { parseDrillId, higherLevelIds } from './ids.mjs';
 
 /* 2: dynamics apart from clean, a take's dynamics in its history entry. A
  * version 1 file is set aside and progress rebuilt from the stats log. */
@@ -575,12 +574,7 @@ export function failStreak(progress, id) {
  * reading, never written into the lower items.
  */
 export function higherLevels(id) {
-  const m = LEVEL_ID_RE.exec(id);
-  if (!m) return [];
-  const base = id.slice(0, -m[0].length);
-  const out = [];
-  for (let n = Number(m[1]) + 1; n <= 4; n++) out.push(`${base}:l${n}`);
-  return out;
+  return higherLevelIds(id);
 }
 
 export function isDone(progress, id) {

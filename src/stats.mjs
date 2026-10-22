@@ -24,41 +24,8 @@ export const STATS_VERSION = 1;
 export const PER_DRILL = 40;
 export const MAX_RECORDS = 2000;
 
-export function drillId(kind, id, opts = {}) {
-  const parts = [kind, id];
-  if (opts.strictness) parts.push(opts.strictness);
-  if (opts.sticking && opts.sticking !== 'off') parts.push(opts.sticking);
-  return parts.join(':');
-}
-
-/*
- * A record's drill id read back: { kind, id, strictness, sticking }. The id
- * itself may hold colons (`rock-backbeat:l3`, `subdiv:quarters`), so it is
- * everything between the kind and the first strictness; a quiz round's id
- * (`pick:subdiv:qe`) has no strictness and is the kind and the rest. The
- * one reader of what drillId writes — it used to be parsed in two places,
- * each scanning for a strictness of its own.
- */
-export const STRICTNESS = ['loose', 'normal', 'tight'];
-export const QUIZ_KINDS = ['guess', 'hear', 'pick'];
-
-export function parseDrillId(d) {
-  const parts = String(d).split(':');
-  const kind = parts[0];
-  if (QUIZ_KINDS.indexOf(kind) >= 0) {
-    return { kind, id: parts.slice(1).join(':'), strictness: '', sticking: '' };
-  }
-  let end = parts.length;
-  for (let i = 1; i < parts.length; i++) {
-    if (STRICTNESS.indexOf(parts[i]) >= 0) { end = i; break; }
-  }
-  return {
-    kind,
-    id: parts.slice(1, end).join(':'),
-    strictness: parts[end] || '',
-    sticking: parts[end + 1] || '',
-  };
-}
+/* A take's drill id, made and read in ids.mjs; offered here, where records are. */
+export { drillId, parseDrillId, STRICTNESS, QUIZ_KINDS } from './ids.mjs';
 
 /*
  * One finished attempt.
