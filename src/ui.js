@@ -982,6 +982,7 @@ function startUntimed(practice) {
     SC.seekTo(run, from);
     index = Math.max(0, SC.nextEntryIndex(run, from));
   }
+  beginActivity('untimed');
   untimed = UT.createUntimed(run, { togetherMs: SC.WINDOWS[settings.strictness].goodMs, from: index });
   screen = RUNNING;
   announce('own pace');
@@ -1882,6 +1883,7 @@ function openStep(step) {
   }
   openLeaf(node);
   if (step.wrap && chart) {
+    beginActivity('clock');
     clockMode = true;
     enterReady();
     announce(`Clock: ${chart.name}`);
@@ -1902,6 +1904,7 @@ function openPathStep(step) {
 }
 
 function showCards(ids, then) {
+  beginActivity('cards');
   card = { deck: LES.createDeck(lessons, ids, { guided: Boolean(then), width: L.SCREEN_W - 2,
     measure: (t) => ctx.textWidth(t) }), then };
   screen = CARD;
@@ -1973,11 +1976,26 @@ function goNext() {
   screen = MENU;
 }
 
+/*
+ * What the module is doing beyond showing a screen is ONE of: a quiz round, a
+ * Ladder, the Clock, an L0 take, or a deck of lesson cards — each held in its
+ * own variable (quiz, ladder, clockMode, untimed, card). They are exclusive,
+ * and every place that starts one comes through here, which ends the others:
+ * a Clock left armed under a quiz, or a quiz under a deck of cards, is the
+ * kind of state the scattered flags used to allow.
+ */
+function beginActivity(kind) {
+  if (kind !== 'quiz') quiz = null;
+  if (kind !== 'ladder') ladder = null;
+  if (kind !== 'clock') clockMode = false;
+  if (kind !== 'untimed') untimed = null;
+  if (kind !== 'cards') card = null;
+}
+
 function openQuiz(drill, step = null) {
   /* Nothing a quiz could be wrapped in: a Clock step before it on the path
    * must not still be armed when the round is over. */
-  ladder = null;
-  clockMode = false;
+  beginActivity('quiz');
   /* A step of the path asks about what its stage has taught: three drums,
    * two subdivisions, the grooves you have played. From the Quiz folder, all. */
   const pool = step && step.pool;
@@ -2024,8 +2042,8 @@ function openLeaf(item) {
     return;
   }
   if (item.kind === 'clock') {
+    beginActivity('clock');
     clockMode = true;
-    ladder = null;
     enterReady();
     announce(`Clock: ${chart.name}`);
     return;
@@ -2033,7 +2051,7 @@ function openLeaf(item) {
   if (item.kind === 'ladder') {
     /* From 70% of the tempo the drill is played at — its own times Speed —
      * climbing through it. */
-    clockMode = false;
+    beginActivity('ladder');
     ladder = newLadder();
     ladderReason = '';
     enterReady();
