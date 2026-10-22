@@ -242,15 +242,26 @@ a flam — and it is punishing until the σ on `normal` is already small.
 means capture what I do. Both pulse when a drill is armed, in their own colours; whichever is
 running goes solid and the other dims. Four beats count you in.
 
-The ready screen **is the chart**, with the three controls laid over it:
+The ready screen **is the chart**, with the controls laid over it — and, for a groove, the
+**level** you play it at:
 
 ```
- ┌──────────────────────────────────┐
- │ ▶  PLAY  listen                  │
- │ ●  REC   practise                │
- │ ↺  SCRUB view                    │
- └──────────────────────────────────┘
+ ROCK BACKBEAT        1/8  8 bars
+ ┌──────────────────┬──────────┐
+ │ ▶  listen        │  LEVEL   │
+ │ ●  practise      │  <  2  > │
+ │ ↺  scrub         │          │
+ └──────────────────┴──────────┘
+ L2  + kick            REC start
 ```
+
+**Turn the jog to change the level.** A groove is one row in the list: opening it goes straight
+to its ready screen, on the first rung you have not learned yet, and the jog walks L0 to L4 from
+there — the arrows say where it can still go, a tick beside LEVEL says this rung is learned. Each
+turn arms the new rung from the top, its pads lit; turning to L0 swaps in the own-pace screen
+(`hear bar`, `own pace`) and back. On the Path the jog walks only the rungs that stage asks for, so
+its targets stay the stage's; a review arms the rung that is due. The bottom line names the rung —
+`L2  + kick` — beside the keys, taking turns with them when both will not fit.
 
 The third line is only worth printing because **scrubbing works where it is printed**: knob 1
 moves you through the drill before you start, so you can pick the bar you want to work on, and the
@@ -271,8 +282,7 @@ away; the **other** button switches between listening and practising in place, w
 to the top — watch a bar, then play it. **Knob 1 scrubs while paused too** — a scrub is a proper
 seek, so the bars behind settle rather than counting as misses, the bars ahead re-arm and can be
 taken again, and the marks from the last attempt clear. Back restarts; Back from the ready screen
-goes to the folder the drill came from — for a groove, its ladder, so the next rung is one step
-away. **Shift + Back closes from anywhere**, whatever screen you are on.
+goes to the folder the drill came from, the drill on the highlight. **Shift + Back closes from anywhere**, whatever screen you are on.
 
 Pausing shifts the clock by the time you spent stopped, so resuming carries on in tempo rather
 than lurching forward to wall time. `PAUSED` appears under the chart, and the transport light
@@ -381,7 +391,7 @@ the loosest limb — that is the one to practise.
 | **Record** | another take, straight away |
 | **Play** | listen to it |
 | **Back** | back to the start of the drill |
-| **Click** | on to the next drill in the folder — the next level of a groove, the next rudiment — or, on the Path, the next step of its track; after a review Continue opened, whatever Continue offers next |
+| **Click** | on to the next rung of a groove, else the next drill in the folder — the next rudiment — or, on the Path, the next step of its track; after a review Continue opened, whatever Continue offers next |
 
 Only a whole take is kept: practised from the top and never scrubbed. A take started from a scrubbed
 bar, or scrubbed while paused, is practice on a passage, and its result says **not kept**.
@@ -647,7 +657,8 @@ Every groove is **one file**, and the ladder is derived from it:
 | **L3** | + snare | the backbeat |
 | **L4** | everything | as written |
 
-Open a groove and you get its rungs; play them in order and each one adds a limb to the last.
+Open a groove and its ready screen walks its rungs with the jog; play them in order and each one
+adds a limb to the last.
 Because the rungs are projections of the same file rather than separate ones, they are provably
 the same groove, and — the part that matters — **a voice never moves between them**. The kick is
 the same pad at L2 as at L4, so what you learn at the bottom transfers literally instead of by

@@ -91,8 +91,8 @@ export function keysFor(screen, st = {}) {
       return { keys, shift: [SETTINGS, QUIT] };
     }
     case S.READY:
-      return { keys: [['REC', 'start'], ['PLAY', st.untimed ? 'hear' : 'listen'], ['BACK', 'up']],
-        shift: [SETTINGS, QUIT] };
+      return { keys: (st.levels ? [['JOG', 'level']] : []).concat([['REC', 'start'],
+        ['PLAY', st.untimed ? 'hear' : 'listen'], ['BACK', 'up']]), shift: [SETTINGS, QUIT] };
     case S.RUNNING: {
       let keys;
       if (st.untimed) keys = [['REC', st.paused ? 'go on' : 'pause'], ['PLAY', 'hear'], ['BACK', 'stop']];
@@ -158,7 +158,31 @@ export function pack(pairs, prefix = '', width = HINT_CHARS) {
 export function hintFor(screen, st = {}) {
   const k = keysFor(screen, st);
   if (!k) return [];
-  return st.shift ? pack(k.shift, 'SHIFT: ') : pack(k.keys);
+  /* `width` leaves room on the line for what the screen shows beside the
+   * keys: the ready screen's level. */
+  const width = st.width || HINT_CHARS;
+  return st.shift ? pack(k.shift, 'SHIFT: ') : pack(k.keys, '', width);
+}
+
+/*
+ * A hint beside something the screen shows at the left of the line — the
+ * ready screen's level, "L2  + kick". Each part that fits beside it is a
+ * [left, part] pair; one that does not takes the line alone, and the left
+ * gets a turn of its own, so neither is ever cut.
+ */
+export function besideParts(left, parts, chars = HINT_CHARS) {
+  if (!left) return parts.map((p) => ['', p]);
+  const out = [];
+  let alone = false;
+  for (const p of parts) {
+    if (left.length + 2 + p.length <= chars) out.push([left, p]);
+    else {
+      out.push(['', p]);
+      alone = true;
+    }
+  }
+  if (alone || !out.length) out.unshift([left, '']);
+  return out;
 }
 
 /* The part on screen at `nowMs`: each stays ROTATE_MS. */

@@ -72,7 +72,7 @@ The bottom line of every screen names the keys that work there, in the Move's ow
 | --- | --- |
 | the list | `CLICK open  MENU help` |
 | a folder | `CLICK open  BACK up` |
-| a drill, ready | `REC start`, then `PLAY listen  BACK up` |
+| a drill, ready | the level at the left — `L2  + kick` — and `JOG level`, `REC start`, … at the right |
 | a take, paused | `REC go on  BACK stop` |
 | a result | `CLICK next  REC again` |
 | a lesson card | `JOG page  CLICK next` |
@@ -209,6 +209,15 @@ Just one step in your way? **SHIFT+CLICK Continue** and choose **I know this: sk
 They are not rows of their own: they wrap a drill. Open a groove's rungs (Practice › Grooves ›
 Rock & Pop › Rock backbeat), turn to **L1**, **SHIFT+CLICK**, and choose **Practise: Ladder** or
 **Practise: Clock**. L0 has neither — it has no clock to climb or to take away.
+
+## A groove's level
+
+A groove — Rock backbeat, First beat — is one row. Open it and you are on its ready screen, with
+the controls on the left of the box and its **LEVEL** on the right: **L0** at your own pace, then
+**L1** cymbals only, **L2** + kick, **L3** + snare, **L4** everything. **Turn the jog** to change
+it; the arrows show where you can still go, and a tick that the level is learned. A groove opens on
+the first level you have not learned. On the Path the jog walks only the levels the stage asks for.
+**Click** on a result goes on to the next level.
 
 ## MENU: help, anywhere
 

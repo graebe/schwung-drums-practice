@@ -742,6 +742,16 @@ function collectLeaves(node, out, seen) {
     for (let i = 0; i < kids.length; i++) collectLeaves(kids[i], out, seen);
     return;
   }
+  /* A row of several rungs (catalog.mjs chartNode, program.mjs stepRows)
+   * counts each of them. */
+  if (node.levelIds) {
+    for (const id of node.levelIds) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      out.push(id);
+    }
+    return;
+  }
   if (isTracked(node) && !seen.has(node.id)) {
     seen.add(node.id);
     out.push(node.id);

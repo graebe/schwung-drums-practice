@@ -35,8 +35,7 @@ import * as B from './beam.mjs';
 import { entriesIn, handsWritten } from './scoring.mjs';
 import { beatsPerBar } from './chart.mjs';
 import { voicesInChart } from './kit.mjs';
-import { drawHeader, drawFooter, drawHint, drawBarRuler, drawLaneCallout } from './chrome.mjs';
-import { drawPlayGlyph, drawRecordGlyph, drawScrubGlyph } from './glyphs.mjs';
+import { drawHeader, drawFooter, drawHint, drawBarRuler, drawLaneCallout, drawReadyBox } from './chrome.mjs';
 
 /* Where a page starts and how wide a beat is on it, for this view. */
 export function pageGeometry(view, chart) {
@@ -83,7 +82,7 @@ export function drawUntimedView(ctx, s) {
 
   drawUnder(ctx, s, page, bar, curItem, left, px, perBar);
   /* The hint line takes the footer's band when there is one to show. */
-  if (s.hint) drawHint(ctx, s.hint);
+  if (s.hint || s.hintLeft) drawHint(ctx, s.hint, s.hintLeft);
   else drawFooter(ctx, s.progress || 0, s.footerRight || '');
   if (s.paused) drawLaneCallout(ctx, 'PAUSED');
 }
@@ -178,19 +177,5 @@ function drawArrow(ctx, x) {
 export function drawUntimedReady(ctx, s) {
   drawUntimedView(ctx, s);
   if (s.scrubbed || s.listening) return;
-  const b = L.READY_BOX;
-  ctx.fillRect(b.x, b.y, b.w, b.h, 0);
-  ctx.drawRect(b.x, b.y, b.w, b.h, 1);
-  const gx = b.x + 6;
-  const tx = gx + 13;
-  drawPlayGlyph(ctx, gx + 1, b.y + 4, 7);
-  ctx.text(tx, b.y + 4, 'PLAY  hear bar', 1);
-  drawRecordGlyph(ctx, gx + 1, b.y + 13, 7);
-  ctx.text(tx, b.y + 13, 'REC   own pace', 1);
-  if (s.warning) {
-    ctx.text(gx, b.y + 22, s.warning.slice(0, 17), 1);
-  } else {
-    drawScrubGlyph(ctx, gx, b.y + 22);
-    ctx.text(tx, b.y + 22, 'SCRUB view', 1);
-  }
+  drawReadyBox(ctx, { rows: [['play', 'hear bar'], ['rec', 'own pace'], ['scrub', 'scrub']], level: s.level });
 }

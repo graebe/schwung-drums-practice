@@ -27,7 +27,7 @@ test('the transport says which mode the module is in', () => {
 test('a jog turn does nothing while you are playing', () => {
   /* A knock must not change what you are playing. */
   assert.equal(C.jogTarget('running', false), 'none');
-  assert.equal(C.jogTarget('ready', false), 'none');
+  assert.equal(C.jogTarget('ready', false), 'level');
   assert.equal(C.jogTarget('menu', false), 'menu');
   assert.equal(C.jogTarget('settings', false), 'row');
   assert.equal(C.jogTarget('settings', true), 'value');

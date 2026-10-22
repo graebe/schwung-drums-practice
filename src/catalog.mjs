@@ -63,19 +63,29 @@ export function isFolder(node) {
 }
 
 /*
- * A drill opens its ladder of rungs; one with a single rung — a rudiment,
- * which is all snare — arms straight away.
+ * A drill is one row. A groove with a ladder of rungs — L0 to L4 — is one
+ * row too, its rungs chosen on the ready screen with the jog: the level page
+ * it used to open was a menu level nobody needed. Each rung keeps the item id
+ * its takes are filed under (`rock-backbeat:l2`); `levels` lists them, and
+ * `build(id)` makes the one asked for. A drill with a single rung — a
+ * rudiment, which is all snare — arms straight away as before.
  */
 export function chartNode(chart) {
   const levels = availableLevels(chart);
   if (levels.length > 1) {
-    return folder(chart.name, levels.map((lv) => ({
-      label: `${lv.step} ${lv.label}`,
+    const rungs = levels.map((lv) => ({ id: `${chart.id}:${lv.id}`, step: lv.step, label: lv.label,
+      untimed: Boolean(lv.untimed) }));
+    return {
+      label: chart.name,
       value: '',
       kind: 'chart',
-      id: `${chart.id}:${lv.id}`,
-      build: () => projectLevel(chart, lv.id),
-    })));
+      levels: rungs,
+      levelIds: rungs.map((r) => r.id),
+      build: (id) => {
+        const lv = levels[Math.max(0, rungs.findIndex((r) => r.id === id))];
+        return projectLevel(chart, lv.id);
+      },
+    };
   }
   return { label: chart.name, value: '', kind: 'chart', id: chart.id, build: () => chart };
 }
@@ -205,6 +215,10 @@ export function leafIndex(root) {
       if (node.untracked || node.pointers) return;
       const kids = node.children;
       for (let i = 0; i < kids.length; i++) walk(kids[i]);
+      return;
+    }
+    if (node && node.levelIds && node.kind) {
+      for (const id of node.levelIds) if (!index.has(id)) index.set(id, node);
       return;
     }
     if (node && node.id && node.kind && !index.has(node.id)) index.set(node.id, node);

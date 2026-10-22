@@ -238,6 +238,13 @@ let itemNames = new Map();
 /* The step of the Path the armed drill was opened as, so Click on
  * its result goes on along the path; null when it came from anywhere else. */
 let pathStep = null;
+/*
+ * The rungs the jog walks on the ready screen (one row for a groove, its
+ * level chosen there): { node, at } over the groove's own rungs, from the
+ * library or a review, or { steps, at } over the rungs a stage of the Path
+ * asks for. Null for a drill of one rung.
+ */
+let levelNav = null;
 /* The lesson cards (lessons.json), and the deck on screen (lessons.mjs):
  * { deck, then } — `then` is what Click goes on to once the last is read,
  * null when they were opened from Lessons to read again. */
@@ -1923,6 +1930,11 @@ function openRow() {
     helpAction(item.helpAction);
     return;
   }
+  if (item.levelRow) {
+    const pick = ROWS.continuePick(progress, program, Date.now(), continueTurn);
+    openPathStep(PLAN.levelRowStep(item.steps, progress, pick && pick.kind === 'step' ? pick.step.key : ''));
+    return;
+  }
   if (item.step) {
     openPathStep(item.step);
     return;
@@ -1930,7 +1942,8 @@ function openRow() {
   pathStep = null;
   leavePath();
   if (item.repId) {
-    if (leafIdx.get(item.repId)) openLeaf(leafIdx.get(item.repId));
+    /* A review arms the rung that is due. */
+    if (leafIdx.get(item.repId)) openLeaf(leafIdx.get(item.repId), item.repId);
     return;
   }
   openLeaf(item);
@@ -1957,7 +1970,7 @@ function continueOpen() {
   pathStep = null;
   leavePath();
   announce(`Review: ${itemTitle(pick.id)}`);
-  openLeaf(node);
+  openLeaf(node, pick.id);
   fromContinue = true;
 }
 
@@ -2142,6 +2155,10 @@ function openSheet() {
       pick: ROWS.continuePick(progress, program, Date.now(), continueTurn),
       hasCards: stageHasCards,
       leafOf: (id) => leafIdx.get(id),
+      nextKey: (() => {
+        const p = ROWS.continuePick(progress, program, Date.now(), continueTurn);
+        return p && p.kind === 'step' ? p.step.key : '';
+      })(),
       view: top.node.view !== 'map' ? undefined : listViews.has(top.node) ? 'list' : 'map',
     }),
     sel: 0,
@@ -2217,7 +2234,16 @@ function practiseWrapped(leaf, kind) {
   pathStep = null;
   leavePath();
   openLeaf(leaf);
+  /* A groove opening on L0 is wrapped on its first timed rung. */
+  if (chart && chart.untimed && leaf.levels) {
+    const timed = leaf.levels.find((lv) => !lv.untimed);
+    if (timed) openLeaf(leaf, timed.id);
+  }
   if (screen !== READY || !chart || chart.untimed) return;
+  rewrap(kind);
+}
+
+function rewrap(kind) {
   if (kind === 'ladder') {
     /* From 70% of the tempo the drill is played at — its own times Speed —
      * climbing through it. */
@@ -2270,7 +2296,10 @@ function openStep(step) {
     refreshSettingsRows();
     saveSettings();
   }
-  openLeaf(node);
+  openLeaf(node, id);
+  /* On the Path the jog walks only the rungs this stage asks for. */
+  levelNav = node.levels ? { steps: PLAN.levelSteps(program, step), at: 0 } : null;
+  if (levelNav) levelNav.at = Math.max(0, levelNav.steps.findIndex((st) => st.key === step.key));
   if (step.wrap && chart) {
     beginActivity('clock');
     clockMode = true;
@@ -2440,7 +2469,7 @@ function openQuiz(drill, step = null) {
 }
 
 /* Do what a leaf of the tree holds. */
-function openLeaf(item) {
+function openLeaf(item, levelId) {
   if (item.kind === 'progress') {
     openProgress();
     return;
@@ -2454,10 +2483,95 @@ function openLeaf(item) {
   if (typeof item.build !== 'function') return;
   ladder = null;
   clockMode = false;
-  const built = item.build();
+  let id;
+  levelNav = null;
+  if (item.levels) {
+    /* The rung asked for, else the first not yet learned. */
+    const at = levelId ? item.levels.findIndex((lv) => lv.id === levelId) : -1;
+    levelNav = { node: item, at: at >= 0 ? at : ROWS.defaultLevel(progress, item.levels) };
+    id = item.levels[levelNav.at].id;
+  }
+  const built = item.build(id);
   if (!built) return;
   armedSource = built;
   armChart(built);
+}
+
+/* ---- the level, on the ready screen -------------------------------------- */
+/*
+ * A groove is one row; its rung is chosen here, with the jog, clamped. Each
+ * step arms the new rung from the top, its pads relit and its name said: on
+ * the Path among the rungs the stage asks for, so its targets stay the
+ * stage's; elsewhere among all of them.
+ */
+function levelCount() {
+  if (!levelNav) return 0;
+  return levelNav.steps ? levelNav.steps.length : levelNav.node.levels.length;
+}
+
+/* The armed rung: { id, step ('L2'), label ('+ kick') }, or null. */
+function levelNow() {
+  if (!levelNav) return null;
+  if (levelNav.steps) {
+    const st = levelNav.steps[levelNav.at];
+    const sp = st.label.indexOf(' ');
+    return { id: st.id, step: st.label.slice(0, sp), label: st.label.slice(sp + 1), step0: st };
+  }
+  return levelNav.node.levels[levelNav.at];
+}
+
+/* The ready screen's bottom line as { hint, hintLeft }: the level beside the
+ * keys, taking turns with them when both will not fit (hints.mjs besideParts). */
+let footKey = '';
+let footParts = [];
+function readyFooter() {
+  const left = shiftHeld ? '' : readyLeft();
+  const st = hintState();
+  /* Pairs packed short enough to sit beside the level where they can. */
+  if (left) st.width = Math.max(7, H.HINT_CHARS - left.length - 2);
+  const key = `${left}|${st.shift}|${st.levels}|${st.untimed}`;
+  if (key !== footKey) {
+    footKey = key;
+    footParts = H.besideParts(left, H.hintFor(READY, st));
+  }
+  const part = H.hintAt(footParts, now());
+  return { hint: part[1], hintLeft: part[0] };
+}
+
+/* The ready box's LEVEL: the digit, where the jog can go, and whether the
+ * rung is learned — on the Path at the step's target. */
+function readyLevel() {
+  const lv = levelNow();
+  if (!lv) return null;
+  return { digit: lv.step.slice(1), down: levelNav.at > 0, up: levelNav.at < levelCount() - 1,
+    done: lv.step0 ? PLAN.stepDone(progress, lv.step0) : PROG.isDone(progress, lv.id) };
+}
+
+/* The ready screen's bottom line, at the left: a drum the pads cannot reach,
+ * which matters more, else the rung — "L2  + kick". */
+function readyLeft() {
+  if (chartWarning) return chartWarning;
+  const lv = levelNow();
+  return lv ? `${lv.step}  ${lv.label}` : '';
+}
+
+function levelJog(delta) {
+  const n = levelCount();
+  if (n < 2) return;
+  const to = Math.max(0, Math.min(n - 1, levelNav.at + delta));
+  if (to === levelNav.at) return;
+  const wrap = ladder ? 'ladder' : clockMode ? 'clock' : '';
+  if (levelNav.steps) {
+    const steps = levelNav.steps;
+    openStep(steps[to]);
+    levelNav = { steps, at: to };
+  } else {
+    openLeaf(levelNav.node, levelNav.node.levels[to].id);
+  }
+  /* The Ladder or the Clock stays round the drill, on its new rung. */
+  if (wrap && chart && !chart.untimed) rewrap(wrap);
+  const lv = levelNow();
+  announce(`level ${lv.step.slice(1)}, ${lv.label.replace('+', 'plus')}`);
 }
 
 /*
@@ -2823,6 +2937,7 @@ function closeTip() {
  */
 function hintState(shift = shiftHeld) {
   const st = { shift, depth: nav.length };
+  if (screen === READY) st.levels = levelCount() > 1;
   if (screen === RUNNING || screen === READY) {
     st.mode = tp.mode;
     st.paused = tp.paused;
@@ -2862,7 +2977,7 @@ function hintLine() {
   const st = hintState();
   const key = `${screen}|${st.shift}|${st.depth > 1}|${st.mode}|${st.paused}|${st.untimed}|${st.clock}|`
     + `${st.pick}|${st.audible}|${st.hintsLeft > 0}|${st.path}|${st.guided}|${st.more}|${st.pages > 1}|`
-    + `${st.asks}|${st.scrolls}|${st.editing}|${st.done}|${st.sounding}`;
+    + `${st.asks}|${st.scrolls}|${st.editing}|${st.done}|${st.sounding}|${st.levels}`;
   const view = viewNow();
   if (view + key !== hintKey) {
     hintKey = view + key;
@@ -3064,6 +3179,10 @@ function decorateRow(row) {
     const sum = PROG.folderSummary(agg, progress, pathNode);
     return { label: row.label, value: sum.played ? `${sum.done}/${sum.count}` : '' };
   }
+  if (row.levels) {
+    const v = ROWS.levelValue(progress, row.levels);
+    return { label: row.label, value: v.value, mark: v.mark };
+  }
   if (CAT.isFolder(row)) {
     if (row.untracked) return plain;
     const sum = PROG.folderSummary(agg, progress, row);
@@ -3229,7 +3348,7 @@ function draw() {
       listening: heard >= 0,
       rightLabel: at > 0 ? `${CH.barBeatOf(chart, at).bar}/${CH.barBeatOf(chart, at).bars}` : chartLength,
       footerRight: '', progress: 0, warning: chartWarning, scrubbed: at > 0,
-      hint: at > 0 && !shiftHeld ? '' : hint,
+      ...readyFooter(), level: readyLevel(),
     });
     return;
   }
@@ -3258,8 +3377,8 @@ function draw() {
       rightLabel: tp.songBeats > 0
         ? `${CH.barBeatOf(chart, tp.songBeats).bar}/${CH.barBeatOf(chart, tp.songBeats).bars || '?'}`
         : chartLength,
-      /* At home the keys; scrubbed into the drill, how far through it is. */
-      hint: tp.songBeats > 0 && !shiftHeld ? '' : hint,
+      /* The bottom line: the level, or what the pads cannot reach, and the keys. */
+      ...readyFooter(), level: readyLevel(),
     });
     return;
   }
@@ -3648,7 +3767,9 @@ function knobTouched(knob) {
 
 function jog(delta) {
   const target = C.jogTarget(screen, settingsEditing);
-  if (target === 'menu' && onMap()) {
+  if (target === 'level') {
+    levelJog(delta);
+  } else if (target === 'menu' && onMap()) {
     mapJog(delta);
   } else if (target === 'menu') {
     const top = CAT.navTop(nav);
@@ -3738,6 +3859,11 @@ function click() {
   if (screen === SUMMARY || screen === LADDER) {
     if (!chart) { screen = MENU; return; }
     if (ladder || clockMode) { restart(); return; }
+    /* A groove's next rung, before the next row. */
+    if (levelNav && levelNav.at + 1 < levelCount()) {
+      levelJog(1);
+      return;
+    }
     const top = CAT.navTop(nav);
     if (top.cursor + 1 < top.node.children.length) {
       top.cursor++;

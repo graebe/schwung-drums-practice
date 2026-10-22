@@ -68,6 +68,8 @@ export function transportColors(mode, armed, phase) {
 export function jogTarget(screen, editing) {
   if (screen === 'settings') return editing ? 'value' : 'row';
   if (screen === 'menu') return 'menu';
+  /* On the ready screen the jog picks a groove's level. */
+  if (screen === 'ready') return 'level';
   if (screen === 'quiz') return 'choice';
   if (screen === 'progress') return 'drill';
   if (screen === 'card') return 'page';

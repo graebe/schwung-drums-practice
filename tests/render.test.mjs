@@ -578,12 +578,10 @@ function readyFrame(opts = {}) {
   return { ctx, text };
 }
 
-test('the ready box holds three controls, and names all three', () => {
+test('the ready box holds three controls, a word each', () => {
   const { text } = readyFrame();
-  const joined = text.join('|');
-  for (const word of ['PLAY', 'REC', 'SCRUB']) {
-    assert.ok(joined.includes(word), `no ${word} row: ${joined}`);
-  }
+  for (const word of ['listen', 'practise', 'scrub']) assert.ok(text.includes(word), `no ${word}: ${text.join('|')}`);
+  assert.ok(!text.includes('LEVEL'), 'a drill of one rung has no level');
 });
 
 test('the box is over the chart at home and gone once you scrub', () => {
@@ -591,19 +589,37 @@ test('the box is over the chart at home and gone once you scrub', () => {
    * would defeat the scrubbing. */
   const home = readyFrame({ songBeats: 0 });
   const away = readyFrame({ songBeats: 4 });
-  assert.ok(home.text.join('|').includes('SCRUB'));
-  assert.ok(!away.text.join('|').includes('SCRUB'), 'the box stayed up');
+  assert.ok(home.text.includes('scrub'));
+  assert.ok(!away.text.includes('scrub'), 'the box stayed up');
   const b = READY_BOX;
   assert.ok(countOn(home.ctx, b.x, b.y, b.w, 1) > b.w / 2, 'the box has no top edge');
   assert.ok(countOn(away.ctx, b.x, b.y, b.w, 1) < b.w / 2, 'the box outline survived');
 });
 
-test('a warning takes the scrub row, being rarer and more urgent', () => {
-  const { text } = readyFrame({ warning: 'no pad for HF' });
-  const joined = text.join('|');
-  assert.ok(joined.includes('no pad for HF'));
-  assert.ok(!joined.includes('SCRUB'), 'the warning and the hint both claimed the row');
-  assert.ok(joined.includes('PLAY') && joined.includes('REC'));
+test('a groove\'s box splits: the controls left, LEVEL right with its digit and the arrows it can take', async () => {
+  const { READY_SPLIT } = await import('../src/chrome.mjs');
+  const mid = readyFrame({ level: { digit: '2', down: true, up: true, done: false } });
+  assert.ok(mid.text.includes('LEVEL') && mid.text.includes('<') && mid.text.includes('>'), mid.text.join('|'));
+  const b = READY_BOX;
+  assert.equal(countOn(mid.ctx, b.x + READY_SPLIT, b.y, 1, b.h), b.h, 'no line between the halves');
+  /* The digit is big: drawn as blocks, not as text. */
+  assert.ok(!mid.text.includes('2'));
+  assert.ok(countOn(mid.ctx, b.x + READY_SPLIT + 15, b.y + 13, 12, 15) > 20, 'no digit');
+  const low = readyFrame({ level: { digit: '0', down: false, up: true, done: true } });
+  assert.ok(!low.text.includes('<') && low.text.includes('>'), 'an arrow where the jog cannot go');
+  const top = readyFrame({ level: { digit: '4', down: true, up: false, done: false } });
+  assert.ok(top.text.includes('<') && !top.text.includes('>'));
+  /* The words keep to their half. */
+  for (const t of ['listen', 'practise', 'scrub']) {
+    assert.ok(b.x + 14 + t.length * 6 - 1 < b.x + READY_SPLIT - 1, `${t} runs into the level`);
+  }
+  /* The music still shows above and below the box. */
+  assert.ok(countOn(mid.ctx, 0, 10, L.SCREEN_W, b.y - 10) + countOn(mid.ctx, 0, b.y + b.h + 1, L.SCREEN_W, 6) > 0);
+});
+
+test('the bottom line carries the level at the left and the keys at the right', () => {
+  const { text } = readyFrame({ hintLeft: 'L2  + kick', hint: 'REC start' });
+  assert.ok(text.includes('L2  + kick') && text.includes('REC start'), text.join('|'));
 });
 
 test('the scrub glyph is a BROKEN ring, not a closed one', () => {

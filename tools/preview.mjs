@@ -18,6 +18,8 @@
  *   npm run preview -- --exercise rock-backbeat --screen untimed-summary
  *   npm run preview -- --exercise kit --px 14 --film 2,8,14,20   (all 21 voices engraved)
  *   npm run preview -- --screen padmap --layout mirror --flip
+ *   npm run preview -- --screen ready --level 0..4 [--done] [--beats N] [--part K]
+ *                       (the split box: LEVEL at the right, the level's name on the bottom line)
  *   npm run preview -- --screen menu      (the top list, its hint line; --shift for Shift's)
  *   npm run preview -- --screen sheet     (the action sheet of a stage)
  *   npm run preview -- --screen help      (MENU's help on the list; --top N scrolls it)
@@ -178,6 +180,19 @@ function dump(label, ctx) {
   console.log();
 }
 
+/* The ready box's LEVEL and bottom line for --level N (0..4; --done marks
+ * it learned), as ui.js hands them over: the keys beside the level's name. */
+function readyLevel(n) {
+  if (arg('level', null) === null && n !== 0) return { hint: H.hintFor(H.SCREENS.READY)[0] };
+  const names = ['Own pace', 'Time only', '+ kick', '+ snare', 'Everything'];
+  const left = `L${n}  ${names[n]}`;
+  const parts = H.besideParts(left, H.hintFor(H.SCREENS.READY,
+    { levels: true, untimed: n === 0, width: Math.max(7, 21 - left.length - 2) }));
+  const part = parts[Number(arg('part', 0)) % parts.length];
+  return { level: { digit: String(n), down: n > 0, up: n < 4, done: Boolean(arg('done', false)) },
+    hintLeft: part[0], hint: part[1] };
+}
+
 if (screen) {
   const ctx = createScreen();
   const run = runAt(8, { sloppy: true });
@@ -207,14 +222,15 @@ if (screen) {
     });
   } else if (screen === 'untimed-ready') {
     const st = untimedState(untimedAt(0));
-    V.drawUntimedReady(ctx, { ...st, rightLabel: '16 stacks', footerRight: '' });
+    const lv = readyLevel(0);
+    V.drawUntimedReady(ctx, { ...st, rightLabel: '16 stacks', footerRight: '', ...lv });
   } else if (screen === 'ladder') {
     V.drawLadder(ctx, { ladder: Object.assign(createLadder({ bpm: 112 }), { rungs: 6 }), barsDone: 2 });
   } else if (screen === 'ready') {
     V.drawReady(ctx, {
       run: runAt(0), chart, bpm: chart.bpm, title: chart.name,
       songBeats: Number(arg('beats', 0)), pxPerBeat: px, view,
-      dynamics: true, rightLabel: '8 bars', hint: H.hintFor(H.SCREENS.READY)[0],
+      dynamics: true, rightLabel: '8 bars', ...readyLevel(Number(arg('level', 2))),
     });
   } else if (screen === 'padmap') {
     const lay = resolveLayout(String(arg('layout', 'mpc')), { flip: Boolean(arg('flip', false)) });

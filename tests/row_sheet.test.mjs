@@ -100,12 +100,18 @@ test('a step: skip it or undo the skip; a drill with a tempo goes on the Ladder 
   assert.deepEqual(labels(guess, env(P.emptyProgress())), ['I know this: skip', 'Settings...']);
 });
 
-test('L0 and a Clock step are no drills for the Ladder or the Clock', () => {
+test('a groove of the Path is one row: skip its rung, or all of it; a Clock step is no drill for the Clock', () => {
   const p = P.emptyProgress();
   const grooves = byLabel(byLabel(path, '0 Hello'), 'Grooves');
   const firstBeat = byLabel(grooves, 'First beat');
-  assert.deepEqual(labels(firstBeat.children[0], env(p)), ['I know this: skip', 'Settings...'], 'L0');
-  assert.ok(labels(firstBeat.children[1], env(p)).includes('Practise: Ladder'), 'L1 has a tempo');
+  assert.equal(firstBeat.levelRow, true, 'no folder of rungs');
+  const sheet = SH.sheetFor(firstBeat, env(p));
+  assert.deepEqual(sheet.map((a) => a.label),
+    ['I know this: skip', 'I know it all: skip', 'Practise: Ladder', 'Practise: Clock', 'Settings...']);
+  assert.equal(sheet[0].step.id, 'first-beat:l0', 'the rung it opens on');
+  assert.equal(sheet[1].ids.length, firstBeat.steps.length, 'the whole groove');
+  P.recordTake(p, 'first-beat:l1', { speed: 100, accuracy: 1, sd: 5, clean: true, bpm: 70, at: T0 });
+  assert.equal(SH.sheetFor(firstBeat, env(p))[0].step.id, 'first-beat:l2', 'L1 learned carries L0: on to L2');
   const clock = byLabel(byLabel(path, '1 Eighth'), 'Time').children.find((r) => r.step.wrap);
   assert.ok(clock, 'stage 1 has a Clock step');
   assert.ok(!labels(clock, env(p)).includes('Practise: Clock'));

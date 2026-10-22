@@ -120,6 +120,45 @@ export function stepRowOf(row, pc) {
 }
 
 /*
+ * A groove of the Path, one row for its rungs: the rung it would open and how
+ * that stands — "L1 45/60" — and a tick once every rung is through.
+ */
+function levelRowOf(row, pc) {
+  const st = PLAN.levelRowStep(row.steps, pc.progress, pc.nextKey);
+  const one = stepRowOf({ label: row.label, step: st }, pc);
+  const rung = st.label.split(' ')[0];
+  const all = row.steps.every((x) => PLAN.stepDone(pc.progress, x));
+  return { label: row.label, value: one.value ? `${rung} ${one.value}` : rung, mark: all ? MARK_DONE : one.mark };
+}
+
+/*
+ * A groove of the library, one row for its rungs (catalog.mjs chartNode):
+ * the highest rung played and its best — "L2 80%" — a tick once the top rung
+ * is learned, which carries every rung below it, a ring when played but never
+ * clean.
+ */
+export function levelValue(progress, levels) {
+  let value = '';
+  let tried = false;
+  for (let i = levels.length - 1; i >= 0 && !value; i--) {
+    const it = item(progress, levels[i].id);
+    if (!it || !it.plays) continue;
+    const v = itemValue(progress, levels[i].id);
+    value = v ? `${levels[i].step} ${v}` : levels[i].step;
+    tried = !v;
+  }
+  const top = levels[levels.length - 1];
+  const mark = itemMark(progress, top.id) === MARK_DONE ? MARK_DONE : tried ? MARK_TRIED : null;
+  return { value, mark };
+}
+
+/* The rung a groove opens on: the first not yet learned, else the last. */
+export function defaultLevel(progress, levels) {
+  const open = levels.findIndex((lv) => itemMark(progress, lv.id) !== MARK_DONE);
+  return open >= 0 ? open : levels.length - 1;
+}
+
+/*
  * A row of the Path as the list shows it — and the Continue row, and the
  * rows of Settings › Path — or null for a row this module does not speak for
  * (a library drill, Review, a plain folder), which the caller decorates as it
@@ -146,6 +185,7 @@ export function pathRow(row, pc) {
       : row.stage === pc.current ? MARK_NEXT : null;
     return { label: row.label, value: sum.played ? `${sum.done}/${sum.count}` : '>', mark };
   }
+  if (row.levelRow) return levelRowOf(row, pc);
   if (row.steps && isFolder(row)) {
     const sum = PLAN.stepsSummary(progress, row.steps);
     return { label: row.label, value: sum.played ? `${sum.done}/${sum.count}` : '>' };

@@ -645,6 +645,31 @@ export function findStep(program, key) {
   return null;
 }
 
+/*
+ * The rungs a step's groove offers on the ready screen, in order: the steps of
+ * its stage and part on the same groove (a stage that asks for L0 to L3 walks
+ * those four; a checkpoint's top rung walks none). A step that is no rung is
+ * alone.
+ */
+export function levelSteps(program, step) {
+  if (!step || step.rung === undefined) return step ? [step] : [];
+  const stage = program.stages.find((s) => s.key === step.stage);
+  if (!stage) return [step];
+  const base = baseOf(step.id);
+  const out = allSteps(stage).filter((st) => st.part === step.part && st.rung !== undefined
+    && baseOf(st.id) === base && st.style === step.style);
+  const seen = new Set();
+  return out.filter((st) => (seen.has(st.id) ? false : seen.add(st.id)));
+}
+
+/* The step a groove row opens: Continue's when it is one of them, else the
+ * first not done or skipped, else the last. */
+export function levelRowStep(steps, progress, nextKey = '') {
+  const next = steps.find((st) => st.key === nextKey);
+  if (next) return next;
+  return steps.find((st) => !stepDone(progress, st) && !stepSkipped(progress, st)) || steps[steps.length - 1];
+}
+
 /* Every step of a stage, every option — the folder shows them all. */
 function allSteps(stage) {
   const out = [];
@@ -730,8 +755,10 @@ function stepRows(steps) {
       rows.push({ ...stepRow(st), label: stepTitle(st) });
       continue;
     }
+    /* One row for the groove: its rungs are chosen on the ready screen, among
+     * those this stage asks for (ui.js, levelSteps). */
     const name = st.title.slice(0, st.title.lastIndexOf(' '));
-    rows.push({ label: name, value: '>', steps: g, children: g.map(stepRow) });
+    rows.push({ label: name, value: '', steps: g, levelIds: g.map((x) => x.id), levelRow: true });
   }
   return rows;
 }

@@ -225,3 +225,24 @@ test('the Path map sits between the title rule and the hint line, and its cells 
     assert.equal(pads.size, n, `${n} places share a pad`);
   }
 });
+
+test('the split ready box: the words keep left of the line, LEVEL and its digit inside the right', async () => {
+  const { READY_SPLIT } = await import('../src/chrome.mjs');
+  const { bigTextWidth } = await import('../src/staff_render.mjs');
+  const b = L.READY_BOX;
+  const w = (s) => s.length * 6 - 1;
+  for (const word of ['listen', 'practise', 'scrub', 'hear bar', 'own pace']) {
+    assert.ok(b.x + 3 + 11 + w(word) + 2 < b.x + READY_SPLIT, `"${word}" crosses into the level`);
+  }
+  const right = b.w - READY_SPLIT - 1;
+  assert.ok(3 + w('LEVEL') + 5 + 2 <= right, 'LEVEL and the done mark do not fit their half');
+  for (const d of ['0', '1', '2', '3', '4']) {
+    const dw = bigTextWidth(d, 3);
+    const cx = b.x + READY_SPLIT + 1 + (right >> 1);
+    assert.ok(cx - (dw >> 1) - 10 > b.x + READY_SPLIT, `the < of ${d} crosses the line`);
+    assert.ok(cx + (dw >> 1) + 5 + 5 < b.x + b.w, `the > of ${d} leaves the box`);
+  }
+  assert.ok(b.y + 13 + 15 <= b.y + b.h, 'the digit runs out of the box');
+  /* The longest level name beside its keys, or taking turns with them. */
+  assert.ok('L4  Everything'.length <= 21);
+});

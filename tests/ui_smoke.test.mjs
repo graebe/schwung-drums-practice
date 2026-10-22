@@ -537,19 +537,14 @@ test('Back walks up one folder at a time, and leaves only from the top', async (
   assert.ok(drawn.includes('DRUMS'), `not back at the top: ${drawn.join('|')}`);
 });
 
-test('the Ladder and the Clock are offered on a drill with a tempo — not on L0, not on a quiz', async () => {
+test('the Ladder and the Clock are offered on a drill with a tempo — a groove, not a quiz', async () => {
   await loadUi();
   globalThis.init();
   ticks(2);
   toFirstDrill();
-  cc(CC.jogClick, 127);                      /* its rungs, highlight on L0 */
-  shiftClick();
-  assert.deepEqual(globalThis.drumsPracticeScreen().sheet, ['Settings...'], 'L0 has no tempo to climb');
-  assert.ok(drawnText(1).includes('L0 OWN PACE'), 'the sheet is titled with its row');
-  cc(CC.back, 127);
-  cc(CC.jogTurn, 1);                         /* L1 */
   shiftClick();
   assert.deepEqual(globalThis.drumsPracticeScreen().sheet, ['Practise: Ladder', 'Practise: Clock', 'Settings...']);
+  assert.ok(drawnText(1).includes('ROCK BACKBEAT'), 'the sheet is titled with its row');
   cc(CC.back, 127);
   toTop();
   goTo('Quiz', { open: true });
@@ -678,14 +673,14 @@ test('Back restarts, and Back twice leaves without a gesture of its own', async 
   ticks(4);
   /* The ready screen IS the chart now, with the control box over it — so the
    * proof it restarted is the box being back, which only happens at the top. */
-  assert.ok(drawnText().some((t) => /SCRUB/.test(t)), 'Back did not restart the drill');
+  assert.ok(drawnText().some((t) => t === 'scrub'), 'Back did not restart the drill');
   assert.equal(log.exited || 0, 0);
 
   cc(CC.back, 127);                 /* ready -> the folder it came from */
   ticks(4);
-  /* The groove's own ladder: having just played one rung, the next thing you
-   * want is the next rung, one step away rather than back at the top. */
-  assert.ok(drawnText().some((t) => /ROCK BACKBEAT/.test(t)), 'Back did not land on the ladder');
+  /* The groove's own folder, the groove on the highlight: its rungs are on
+   * the ready screen now. */
+  assert.ok(drawnText().some((t) => /ROCK & POP/.test(t)), 'Back did not land on the folder');
   assert.equal(log.exited || 0, 0, 'it left the module instead of going to the list');
 });
 
@@ -877,14 +872,14 @@ test('the knob scrubs on READY, and the box gets out of the way', async () => {
   toFirstRung(); ticks(2);
   cc(CC.jogClick, 127); ticks(2);          /* a level, so READY is armed */
 
-  assert.ok(drawnText().some((t) => /SCRUB/.test(t)), 'the control box is not on screen');
+  assert.ok(drawnText().some((t) => t === 'scrub'), 'the control box is not on screen');
   const atHome = screen.pixels.slice();
 
   /* 36 clicks to the bar; a bar's worth should move the chart. */
   for (let i = 0; i < 40; i++) cc(CC.knob1, 1);
   ticks(3);
   assert.ok(screen.pixels.some((p, i) => p !== atHome[i]), 'the knob is dead on READY');
-  assert.ok(!drawnText().some((t) => /SCRUB/.test(t)),
+  assert.ok(!drawnText().some((t) => t === 'scrub'),
     'the box stayed up over the music being scrubbed through');
 });
 
@@ -896,10 +891,10 @@ test('the box comes back when you scroll home, which is how you find it', async 
   cc(CC.jogClick, 127); ticks(2);
   for (let i = 0; i < 40; i++) cc(CC.knob1, 1);
   ticks(2);
-  assert.ok(!drawnText().some((t) => /SCRUB/.test(t)));
+  assert.ok(!drawnText().some((t) => t === 'scrub'));
   for (let i = 0; i < 80; i++) cc(CC.knob1, 127);   /* 127 decodes as -1 */
   ticks(2);
-  assert.ok(drawnText().some((t) => /SCRUB/.test(t)), 'the box never came back');
+  assert.ok(drawnText().some((t) => t === 'scrub'), 'the box never came back');
 });
 
 test('Play from a scrubbed position starts THERE, not at the top', async () => {
@@ -915,8 +910,10 @@ test('Play from a scrubbed position starts THERE, not at the top', async () => {
   ticks(2);
   /* One tick in, the picture must still be the bar we chose — not the top,
    * and not a count-in. */
+  /* The chart, above the bottom line: that is the level and the keys on the
+   * ready screen, the progress bar once playing. */
   let differing = 0;
-  for (let i = 0; i < scrubbed.length; i++) if (scrubbed[i] !== screen.pixels[i]) differing++;
+  for (let i = 0; i < 56 * 128; i++) if (scrubbed[i] !== screen.pixels[i]) differing++;
   assert.ok(differing < 420, `${differing} pixels changed — it restarted from the top`);
 });
 
@@ -1413,11 +1410,11 @@ test('the Clock stays with the drill it wrapped', async () => {
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  toFirstRung();
+  toFirstDrill();
   sheetPick('Practise: Clock'); ticks(2);          /* Rock backbeat L1, on the Clock */
   assert.match(log.announces.join('|'), /Clock: Rock backbeat/);
-  cc(CC.back, 127); ticks(1);                      /* the list, on L1 */
-  cc(CC.jogClick, 127); ticks(2);                  /* a plain level again */
+  cc(CC.back, 127); ticks(1);                      /* the list, on the groove */
+  cc(CC.jogClick, 127); cc(CC.jogTurn, 1); ticks(2);   /* a plain L1 again */
   cc(CC.record, 127);
   const drawn = drawnText(200);
   assert.ok(!drawn.some((t) => /LISTEN|ON YOUR OWN/.test(t)), 'the Clock banner followed into a plain drill');
@@ -1462,7 +1459,7 @@ test('Back from a result goes to the start of the drill, Back again to the list'
   assert.ok(runUntil(/REC again/, 3000));
   cc(CC.back, 127);
   const ready = drawnText(2);
-  assert.ok(ready.some((t) => /REC/.test(t)) && !ready.some((t) => /REC again/.test(t)),
+  assert.ok(ready.includes('practise') && !ready.some((t) => /REC again/.test(t)),
     'the ready screen: ' + ready.slice(0, 8).join('|'));
   cc(CC.back, 127);
   assert.ok(drawnText(2).some((t) => /ROCK/.test(t)), 'then the list it came from');
@@ -1482,7 +1479,7 @@ test('Settings opened over a run pauses it, and leaving returns to it', async ()
   shiftClick();
   cc(CC.back, 127);                              /* Back leaves Settings too */
   const back = drawnText(2);
-  assert.ok(!back.some((t) => /SETTINGS/.test(t)) && back.some((t) => /REC/.test(t)),
+  assert.ok(!back.some((t) => /SETTINGS/.test(t)) && back.includes('practise'),
     'Back from Settings returns to the ready screen, not the list');
 });
 
@@ -1535,7 +1532,7 @@ test('the Ladder climbs from 70% of the drill\'s tempo', async () => {
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  toFirstRung();
+  toFirstDrill();
   sheetPick('Practise: Ladder');
   ticks(2);
   assert.match(log.announces.join(' | '), /Ladder: .*, from 65/);
@@ -1545,7 +1542,7 @@ test('the Clock ends by itself on a result', async () => {
   await loadUi();
   globalThis.init();
   ticks(2);
-  toFirstRung();
+  toFirstDrill();
   sheetPick('Practise: Clock');
   ticks(2);
   cc(CC.record, 127);
@@ -1690,7 +1687,7 @@ test('Click on a path result opens the next step of the track', async () => {
   ticks(2);
   /* Time has nothing more installed in this stage: on to the track left longest. */
   const shown = drawnText(2);
-  assert.ok(shown.some((t) => /First bea/.test(t)) && shown.includes('REC   own pace'), `not on to the first beat: ${shown.join('|')}`);
+  assert.ok(shown.some((t) => /First bea/.test(t)) && shown.includes('own pace'), `not on to the first beat: ${shown.join('|')}`);
 });
 
 test('a take short of the step\'s target reads as its speed; the row shows it against the target', async () => {
@@ -2074,8 +2071,8 @@ test('a drill a layout cannot fully play names the drum on the ready screen', as
   ticks(2);
   goTo('Practice', 'Grooves', 'Latin & World');
   for (let i = 0; i < 40; i++) cc(CC.jogTurn, 1);   /* its last groove: Bell */
-  cc(CC.jogClick, 127); ticks(2);                    /* its ladder */
-  cc(CC.jogTurn, 1); cc(CC.jogClick, 127); ticks(2); /* L1, the timed rung with the bell */
+  cc(CC.jogClick, 127); ticks(2);                    /* its ready screen, on L0 */
+  cc(CC.jogTurn, 1); ticks(2);                       /* L1, the timed rung with the bell */
   assert.ok(drawnText(2).includes('NO P1 ON PADS'), drawnText(2).join('|'));
 });
 
@@ -2563,12 +2560,12 @@ test('L0 is the first rung, and its ready screen offers own pace with no count-i
   globalThis.init();
   ticks(2);
   toFirstDrill();
-  cc(CC.jogClick, 127);
-  assert.ok(drawnText(2).some((t) => /^L0 Own pace/.test(t)), 'the ladder starts at L0');
-  cc(CC.jogClick, 127);
+  cc(CC.jogClick, 127);                       /* straight to its ready screen */
   const ready = drawnText(2);
-  assert.ok(ready.includes('REC   own pace'), ready.join('|'));
-  assert.ok(ready.includes('PLAY  hear bar'));
+  assert.ok(ready.includes('L0  Own pace'), `the groove opens on L0: ${ready.join('|')}`);
+  assert.ok(ready.includes('LEVEL') && ready.includes('>') && !ready.includes('<'), 'L0 is the bottom rung');
+  assert.ok(ready.includes('own pace'), ready.join('|'));
+  assert.ok(ready.includes('hear bar'));
   assert.ok(ready.some((t) => /stacks/.test(t)), 'the length is counted in stacks');
   cc(CC.record, 127);
   const running = drawnText(2);
@@ -2645,7 +2642,7 @@ test('Play on L0 sounds the bar, spread over time, and starts nothing', async ()
   ticks(120);                                   /* three seconds: past the bar at 92 */
   const all = log.params.filter(isHit).length;
   assert.ok(early >= 1 && all > early, `${early} then ${all}`);
-  assert.ok(drawnText(2).includes('REC   own pace'), 'still on the ready screen');
+  assert.ok(drawnText(2).includes('own pace'), 'still on the ready screen');
 });
 
 test('Play on L0 takes the ready box away, and the cursor walks the bar as it sounds', async () => {
@@ -2654,7 +2651,7 @@ test('Play on L0 takes the ready box away, and the cursor walks the bar as it so
   globalThis.init();
   ticks(2);
   armL0();
-  assert.ok(drawnText(2).includes('REC   own pace'), 'the box, before Play');
+  assert.ok(drawnText(2).includes('own pace'), 'the box, before Play');
   /* The cursor's arrow: its wide top row sits alone under the header rule. */
   const arrowX = () => {
     for (let x = 0; x < 128; x++) if (screen.pixels[L.CURSOR_TOP_Y * 128 + x]) return x;
@@ -2662,13 +2659,13 @@ test('Play on L0 takes the ready box away, and the cursor walks the bar as it so
   };
   cc(CC.play, 127);
   ticks(2);
-  assert.ok(!drawnText(1).includes('REC   own pace'), 'the box still covers the page');
+  assert.ok(!drawnText(1).includes('own pace'), 'the box still covers the page');
   const first = arrowX();
   ticks(40);                                    /* a second into the bar */
   const later = arrowX();
   assert.ok(first >= 0 && later > first, `the cursor did not walk: ${first} -> ${later}`);
   ticks(120);                                   /* past the bar */
-  assert.ok(drawnText(2).includes('REC   own pace'), 'the box comes back when the bar is through');
+  assert.ok(drawnText(2).includes('own pace'), 'the box comes back when the bar is through');
 });
 
 test('Record pauses an L0 take, and a press while paused is not a stroke', async () => {
@@ -2687,14 +2684,16 @@ test('Record pauses an L0 take, and a press while paused is not a stroke', async
   assert.ok(drawnText(3).some((t) => /100% 1st try/.test(t)));
 });
 
-test('L0 offers no Ladder: it has no tempo to climb', async () => {
-  await loadUi();
+test('a groove\'s Ladder is on its first timed rung: L0 has no tempo to climb', async () => {
+  const { log } = await loadUi();
   globalThis.init();
   ticks(2);
   armL0();
   toList();
-  shiftClick();
-  assert.ok(!globalThis.drumsPracticeScreen().sheet.includes('Practise: Ladder'));
+  sheetPick('Practise: Ladder');
+  ticks(2);
+  assert.match(log.announces.join('|'), /Ladder: Rock backbeat/);
+  assert.ok(drawnText(2).includes('practise'), 'the Ladder is on a timed rung');
 });
 
 test('Click on an L0 result goes on to L1', async () => {
@@ -2707,7 +2706,7 @@ test('Click on an L0 result goes on to L1', async () => {
   stepThrough();
   cc(CC.jogClick, 127);
   const ready = drawnText(2);
-  assert.ok(ready.includes('REC   practise'), `the timed ready screen: ${ready.join('|')}`);
+  assert.ok(ready.includes('practise'), `the timed ready screen: ${ready.join('|')}`);
 });
 
 test('looking back over an L0 take walks its page', async () => {
@@ -2923,7 +2922,8 @@ test('each first visit shows its tip once, and Show tips again brings them back'
   ticks(1);
   assert.equal(screenNow(), 'sheet', 'the tip came back');
   cc(CC.back, 127);
-  armFirstRung();
+  toFirstDrill();
+  cc(CC.jogClick, 127);                      /* the first ready screen */
   ticks(1);
   assert.equal(screenNow(), 'tip');
   assert.ok(drawnText(1).some((t) => /^REC plays and scores/.test(t)), drawnText(1).join('|'));
@@ -3273,4 +3273,86 @@ test('Meet the pads: Back leaves it unrecorded; on Sticking it tours the kit', a
   globalThis.onUnload();
   const text = log.writes[`${DATA}progress.json`];
   assert.ok(!text || !JSON.parse(text).items['tour:pads'], 'Back recorded the tour');
+});
+
+/* ---- the level, on the ready screen ------------------------------------------ */
+
+test('a groove opens on its ready screen; the jog walks its rungs, clamped, and L0 to L1 switches the screen', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  toFirstDrill();
+  cc(CC.jogClick, 127);
+  ticks(2);
+  assert.equal(screenNow(), 'ready');
+  assert.ok(drawnText(1).includes('own pace'), 'a fresh groove opens on L0');
+  cc(CC.jogTurn, 127);                           /* below L0: nothing */
+  assert.ok(drawnText(1).includes('own pace'));
+  cc(CC.jogTurn, 1);
+  ticks(1);
+  let shown = drawnText(1);
+  assert.ok(shown.includes('practise') && shown.includes('<') && shown.includes('>'), shown.join('|'));
+  assert.match(log.announces.slice(-1)[0], /^level 1, Time only/);
+  cc(CC.jogTurn, 10);                            /* past the top: clamped at L3 */
+  ticks(1);
+  shown = drawnText(1);
+  assert.ok(shown.includes('<') && !shown.includes('>'), shown.join('|'));
+  assert.match(log.announces.slice(-1)[0], /^level 3, plus snare/);
+  cc(CC.jogTurn, 127);
+  assert.match(log.announces.slice(-1)[0], /^level 2, plus kick/);
+});
+
+test('a groove opens on the first rung not yet learned, and its row shows the best rung', async () => {
+  const now = Math.round(Date.now() / 1000);
+  const learned = { best: 100, bpm: 84, plays: 1, t: now, done: now, skip: 0, rep: null, h: [] };
+  const progress = { version: 2, items: { 'rock-backbeat:l1': learned } };
+  await loadUi({ dataFiles: { 'progress.json': JSON.stringify(progress) } });
+  globalThis.init();
+  ticks(2);
+  toFirstDrill();
+  ticks(1);
+  assert.ok(drawnText(1).includes('L1 100%'), `the row: ${drawnText(1).join('|')}`);
+  cc(CC.jogClick, 127);
+  ticks(1);
+  const shown = drawnText(1);
+  assert.ok(shown.some((t) => /^L2 {2}\+ kick$/.test(t)) || shown.includes('practise'), shown.join('|'));
+  assert.ok(globalThis.drumsPracticeScreen().screen === 'ready');
+});
+
+test('on the Path a groove is one row; the jog walks only the rungs the stage asks for', async () => {
+  const { log } = await loadUi({ walked: true });
+  globalThis.init();
+  ticks(2);
+  goTo('Path', '0 Hello, kit', 'Grooves', { open: true });
+  const labels = globalThis.drumsPracticeMenu().labels;
+  assert.ok(labels.includes('First beat') && !labels.some((l) => /^L\d/.test(l)), labels.join('|'));
+  goTo('First beat');
+  ticks(1);
+  assert.match(log.announces.join('|'), /First beat L0 ready|First beat ready/);
+  cc(CC.jogTurn, 10);
+  const top = log.announces.slice(-1)[0];
+  assert.match(top, /^level 3/, 'stage 0 asks for L0 to L3');
+  /* The sheet's skip acts on the rung the row opens on. */
+  cc(CC.back, 127);
+  sheetPick('I know this: skip');
+  assert.match(log.announces.slice(-1)[0], /^Skipped First beat L0/);
+});
+
+test('a review arms the rung that is due, whatever the groove would open on', async () => {
+  const day = 86400;
+  const now = Math.round(Date.now() / 1000);
+  const progress = { version: 2, items: { 'rock-backbeat:l2': {
+    best: 100, bpm: 84, plays: 1, t: now - 3 * day, done: now - 3 * day, skip: 0,
+    rep: { due: now - day, step: 0, at: 0, ok: false }, h: [],
+  } } };
+  const { log } = await loadUi({ dataFiles: { 'progress.json': JSON.stringify(progress) }, walked: true });
+  globalThis.init();
+  ticks(2);
+  goTo('Path');
+  sheetPick('Show as list');
+  goTo('Review', 'Rock backbeat');
+  ticks(1);
+  assert.ok(drawnText(1).includes('L2  + kick'), drawnText(1).join('|'));
+  cc(CC.jogTurn, 1);
+  assert.match(log.announces.slice(-1)[0], /^level 3/, 'and the jog walks all the rungs from there');
 });

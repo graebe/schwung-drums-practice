@@ -16,7 +16,7 @@ import * as L from './layout.mjs';
 import { barBeatOf } from './chart.mjs';
 import { recentStats } from './timing.mjs';
 import * as SR from './staff_render.mjs';
-import { drawMark, MARK_W } from './glyphs.mjs';
+import { drawMark, MARK_W, drawPlayGlyph, drawRecordGlyph, drawScrubGlyph } from './glyphs.mjs';
 
 /* ---- Header ------------------------------------------------------------- */
 /*
@@ -131,11 +131,64 @@ export function drawLaneCallout(ctx, text) {
  * and drawn over whatever the band held — the ready screen's empty progress
  * bar, a paused take's — so any screen can carry it.
  */
-export function drawHint(ctx, text) {
-  if (!text) return;
+export function drawHint(ctx, text, left = '') {
+  if (!text && !left) return;
   ctx.fillRect(0, L.HINT_Y, L.SCREEN_W, L.SCREEN_H - L.HINT_Y, 0);
-  const s = fitText(ctx, text, L.TEXT_MAX_PX);
-  ctx.text((L.SCREEN_W - ctx.textWidth(s)) >> 1, L.HINT_Y, s, 1);
+  if (!left) {
+    const s = fitText(ctx, text, L.TEXT_MAX_PX);
+    ctx.text((L.SCREEN_W - ctx.textWidth(s)) >> 1, L.HINT_Y, s, 1);
+    return;
+  }
+  /* What is on screen at the left — the ready screen's level — and the keys
+   * at the right. The keys come in parts short enough to leave the left its
+   * room; a part that would not, takes the line alone. */
+  const tw = text ? ctx.textWidth(text) : 0;
+  if (tw && ctx.textWidth(left) + 6 + tw > L.TEXT_MAX_PX) {
+    ctx.text(L.SCREEN_W - tw - 1, L.HINT_Y, fitText(ctx, text, L.TEXT_MAX_PX), 1);
+    return;
+  }
+  ctx.text(1, L.HINT_Y, fitText(ctx, left, L.TEXT_MAX_PX), 1);
+  if (tw) ctx.text(L.SCREEN_W - tw - 1, L.HINT_Y, text, 1);
+}
+
+/* ---- The ready box ------------------------------------------------------ */
+/*
+ * The controls over the chart before a take, at L.READY_BOX: on the left a
+ * glyph and one word each — listen, practise, scrub (or hear bar, own pace
+ * for L0) — and, for a groove of rungs, on the right the LEVEL: its digit,
+ * big, with an arrow on each side the jog can still go, and the done mark
+ * once that rung is learned. The music shows above and below it.
+ *
+ *   rows   [['play'|'rec'|'scrub', word], …]
+ *   level  { digit, down, up, done } or null
+ */
+export const READY_SPLIT = 64;
+
+export function drawReadyBox(ctx, { rows = [], level = null } = {}) {
+  const b = L.READY_BOX;
+  ctx.fillRect(b.x, b.y, b.w, b.h, 0);
+  ctx.drawRect(b.x, b.y, b.w, b.h, 1);
+  const gx = b.x + 3;
+  const tx = gx + 11;
+  for (let i = 0; i < rows.length; i++) {
+    const y = b.y + 4 + i * 9;
+    const [glyph, word] = rows[i];
+    if (glyph === 'play') drawPlayGlyph(ctx, gx + 1, y, 7);
+    else if (glyph === 'rec') drawRecordGlyph(ctx, gx + 1, y, 7);
+    else drawScrubGlyph(ctx, gx, y);
+    ctx.text(tx, y, word, 1);
+  }
+  if (!level) return;
+  const sx = b.x + READY_SPLIT;
+  ctx.fillRect(sx, b.y, 1, b.h, 1);
+  const rw = b.w - READY_SPLIT - 1;
+  const cx = sx + 1 + (rw >> 1);
+  ctx.text(sx + 3, b.y + 3, 'LEVEL', 1);
+  if (level.done) drawMark(ctx, b.x + b.w - MARK_W - 2, b.y + 3, 'done', 1);
+  const w = SR.bigTextWidth(level.digit, 3);
+  SR.drawBigText(ctx, cx - (w >> 1), b.y + 13, level.digit, 3);
+  if (level.down) ctx.text(cx - (w >> 1) - 10, b.y + 17, '<', 1);
+  if (level.up) ctx.text(cx + (w >> 1) + 5, b.y + 17, '>', 1);
 }
 
 /* ---- Lists (the menu and the settings page) ----------------------------- */

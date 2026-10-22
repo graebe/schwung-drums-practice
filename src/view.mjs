@@ -26,8 +26,7 @@ import { visibleEntries, runProgress, blockingNotes, handsWritten } from './scor
 import { visibleBars, rulerBars, beatToX, practiceBeats } from './chart.mjs';
 import { voiceById, voicesInChart } from './kit.mjs';
 import { diatonicToY } from './notation.mjs';
-import { drawHeader, drawFooter, drawHint, drawCountIn, drawBarRuler, drawLaneCallout } from './chrome.mjs';
-import { drawPlayGlyph, drawRecordGlyph, drawScrubGlyph } from './glyphs.mjs';
+import { drawHeader, drawFooter, drawHint, drawCountIn, drawBarRuler, drawLaneCallout, drawReadyBox } from './chrome.mjs';
 
 /* Re-exported so ui.js and the tests have one place to draw from. */
 export { drawHeader, drawFooter, drawHint, drawCountIn, drawBarRuler };
@@ -63,8 +62,9 @@ export function drawReadingView(ctx, s) {
   const progress = s.progress !== undefined ? s.progress
     : s.run ? runProgress(s.run, s.songBeats) : 0;
   /* The hint line takes the footer's band when there is one to show: on the
-   * ready screen, while paused, and while Shift is held. */
-  if (s.hint) drawHint(ctx, s.hint);
+   * ready screen (with the level at its left), while paused, and while Shift
+   * is held. */
+  if (s.hint || s.hintLeft) drawHint(ctx, s.hint, s.hintLeft);
   else drawFooter(ctx, progress, s.run ? `${s.run.hits}/${s.run.misses}` : '');
   /* Paused and stuck both show a motionless scroll, and only one of them is
    * waiting for you to play something — so each SAYS which it is. */
@@ -191,6 +191,10 @@ export function drawReady(ctx, s) {
   drawReadingView(ctx, s);
 
   /*
+   * The box (chrome.mjs drawReadyBox): the controls, a word each, and the
+   * level of a groove, which the jog changes. A drill a layout cannot fully
+   * play says so on the bottom line instead of the level's name (ui.js).
+   *
    * THE BOX GETS OUT OF THE WAY ONCE YOU LEAVE THE START. It is an overlay
    * across the middle of the chart, so it covers exactly the music you are
    * scrubbing through; keeping it up would defeat the scrubbing. It comes
@@ -198,32 +202,7 @@ export function drawReady(ctx, s) {
    */
   if ((s.songBeats || 0) > 0) return;
 
-  const b = READY_BOX;
-  ctx.fillRect(b.x, b.y, b.w, b.h, 0);
-  ctx.drawRect(b.x, b.y, b.w, b.h, 1);
-
-  /* Three controls, three symbols, three words. Which one does what is the
-   * thing that has to be readable without being learned — and the knob was
-   * the one you could only find by turning it. The words share one column,
-   * a space after SCRUB: at two, "practise" ran into the box's right edge. */
-  const gx = b.x + 6;
-  const tx = gx + 13;
-  drawPlayGlyph(ctx, gx + 1, b.y + 4, 7);
-  ctx.text(tx, b.y + 4, 'PLAY  listen', 1);
-  drawRecordGlyph(ctx, gx + 1, b.y + 13, 7);
-  ctx.text(tx, b.y + 13, 'REC   practise', 1);
-
-  /*
-   * A drill asking for a voice no pad can reach takes the scrub row: it is
-   * rarer and it matters more, and finding out at the summary that every one
-   * of those notes was scored a miss is far worse than losing a hint.
-   */
-  if (s.warning) {
-    ctx.text(gx, b.y + 22, s.warning.slice(0, 17), 1);
-  } else {
-    drawScrubGlyph(ctx, gx, b.y + 22);
-    ctx.text(tx, b.y + 22, 'SCRUB view', 1);
-  }
+  drawReadyBox(ctx, { rows: [['play', 'listen'], ['rec', 'practise'], ['scrub', 'scrub']], level: s.level });
 }
 
 /* ---- Clock -------------------------------------------------------------- */

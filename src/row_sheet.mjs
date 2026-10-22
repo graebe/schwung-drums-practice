@@ -47,15 +47,21 @@ const act = (kind, extra = {}) => ({ label: LABELS[kind], act: kind, ...extra })
 export function wrappableLeaf(row, leafOf) {
   let node = null;
   if (row.step) {
-    if (row.step.quiz || row.step.wrap) return null;
+    if (row.step.quiz || row.step.wrap || row.step.tour) return null;
     node = leafOf(row.step.id);
+  } else if (row.levelRow) {
+    node = leafOf(row.steps[0].id);
   } else if (row.repId) {
     node = leafOf(row.repId);
   } else if (row.kind === 'chart') {
     node = row;
   }
-  if (!node || node.kind !== 'chart' || isUntimedId(node.id || '')) return null;
-  return node;
+  if (!node || node.kind !== 'chart') return null;
+  /* A groove of rungs is wrapped on a timed one (ui.js picks it); L0 alone
+   * has no clock to climb or to take away. */
+  if (node.levels) return node.levels.some((lv) => !lv.untimed) ? node : null;
+  if (row.step && isUntimedId(row.step.id)) return null;
+  return isUntimedId(node.id || '') ? null : node;
 }
 
 /*
@@ -64,6 +70,7 @@ export function wrappableLeaf(row, leafOf) {
  *   env.pick       what Continue would open (path_rows.mjs continuePick)
  *   env.hasCards   (stage) => whether it has lesson cards to read
  *   env.leafOf     (id) => the tree's leaf, for the Ladder and the Clock
+ *   env.nextKey    the step key Continue would open, for a groove's row
  *   env.view       'map' when the folder is shown as its map, 'list' when a
  *                  map folder is shown as a list; else absent
  */
@@ -82,6 +89,14 @@ export function sheetFor(row, env) {
     /* A checkpoint is passed, not skipped: Test out is how it is taken. */
     if (skipped(row.step)) out.push(act('unskip', { ids: [row.step.id] }));
     else if (!done(row.step)) out.push(act('skip', { step: row.step }));
+  } else if (row.levelRow) {
+    /* A groove, one row: skip the rung it opens on, or the whole groove. */
+    const st = PLAN.levelRowStep(row.steps, progress, env.nextKey || '');
+    const open = row.steps.filter((x) => !done(x) && !skipped(x));
+    const back = row.steps.filter(skipped);
+    if (!done(st) && !skipped(st)) out.push(act('skip', { step: st }));
+    if (open.length) out.push(act('skipAll', { ids: open.map((x) => x.id) }));
+    if (back.length) out.push(act('unskip', { ids: back.map((x) => x.id) }));
   } else if (row.steps && 'children' in row) {
     /* A folder of the path: a stage, a track, a groove's rungs, electives. */
     const open = row.steps.filter((st) => !done(st) && !skipped(st));
