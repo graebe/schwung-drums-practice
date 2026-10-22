@@ -158,22 +158,27 @@ test('a wrong hand under strict sticking moves on, but is not first time', () =>
   assert.equal(run.entries[0].notes[0].state, SC.HIT, 'a wrong hand is a ring, not a cross');
 });
 
-test('a soft accent, once the touch is known, is counted against the dynamics', () => {
+test('a soft accent goes into the dynamics and keeps the stack right first time', () => {
   const u = setup();
   stack(u, ['HH', 'KK'], 0, 70);
   stack(u, ['HH'], 500, 70);
   /* Three normal strokes known: the accent needs 70 + 15. */
   stack(u, ['HH', 'SN'], 1000, (v) => (v === 'SN' ? 72 : 70));
-  assert.equal(u.firstTry, 2);
-  assert.equal(u.causes.accents.n, 1);
-  assert.equal(u.causes.accents.vel, 72);
-  assert.equal(u.causes.accents.need, 85);
+  assert.equal(u.firstTry, 3, 'the right drums with the right hands are the right stack');
+  const c = UT.counts(u);
+  assert.equal(c.softAccents.n, 1);
+  assert.equal(c.softAccents.vel, 72);
+  assert.equal(c.softAccents.need, 85);
+  assert.equal(c.dynErrors, 1);
+  assert.equal(c.accents.n, 1);
+  assert.ok(Math.abs(c.accents.credit - 2 / 15) < 1e-9, 'two of the fifteen steps it needed');
 
   const off = setup({ dynamics: false });
   stack(off, ['HH', 'KK'], 0, 70);
   stack(off, ['HH'], 500, 70);
   stack(off, ['HH', 'SN'], 1000, (v) => (v === 'SN' ? 72 : 70));
-  assert.equal(off.firstTry, 3, 'Dynamics off judges no accent');
+  assert.equal(off.firstTry, 3);
+  assert.equal(UT.counts(off).accents.n, 0, 'Dynamics off judges no accent');
 });
 
 test('the take runs both passes, across the seam, and then is through', () => {

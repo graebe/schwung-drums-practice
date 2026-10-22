@@ -51,6 +51,16 @@ test('a record keeps its note count and whether it was clean', () => {
   assert.equal(ST.makeRecord({ drill: 'x', bpm: 90 }).cl, undefined);
 });
 
+test('a record keeps its dynamics: the score and what the misses were', () => {
+  const r = ST.makeRecord({ drill: 'drill:x:normal', bpm: 90, dyn: 42.4, breakdown: {
+    strays: 0, stickErrors: 0, dynErrors: 3,
+    softAccents: { n: 2, vel: 148, need: 170 }, loudGhosts: { n: 1, vel: 61, need: 48 } } });
+  assert.equal(r.dp, 42);
+  assert.equal(r.dy, 3);
+  assert.deepEqual([r.av, r.an, r.gv, r.gn], [74, 85, 61, 48]);
+  assert.equal(ST.makeRecord({ drill: 'x', bpm: 90 }).dp, undefined, 'none judged, none kept');
+});
+
 test('a corrupt file reads as no history rather than failing to open', () => {
   /* Losing the plot is a great deal better than being unable to get back in —
    * and a file written while the power went is exactly that case. */

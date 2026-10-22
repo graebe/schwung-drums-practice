@@ -687,10 +687,10 @@ test('a take that did not count headlines how much was right, and what cost the 
   /* The reported take: at the written tempo, so its speed was 100 — and the
    * screen headlined that 100 over a take that did not count. */
   const failed = result({ status: 'NOT CLEAN', clean: false, speed: 100, accuracy: 0.8333,
-    failAcc: true, cause: '16 soft accents 74<83' });
+    failAcc: true, cause: '16 wrong hands' });
   const { c, seen } = capture();
   drawSummary(c, failed);
-  for (const t of ['NOT CLEAN', 'right, need 90', '16 soft accents 74<83']) {
+  for (const t of ['NOT CLEAN', 'right, need 90', '16 wrong hands']) {
     assert.ok(seen.includes(t), `${t}: ${seen.join('|')}`);
   }
   assert.ok(!seen.includes('90 bpm'), 'the cause takes the tempo row');
@@ -714,6 +714,28 @@ test('a take that failed on its spread keeps the tempo and the loosest limb', ()
   const { c, seen } = capture();
   drawSummary(c, result({ status: 'NOT CLEAN', clean: false, accuracy: 0.97, failSd: true }));
   for (const t of ['right', '90 bpm', 'SN +3 s12']) assert.ok(seen.includes(t), `${t}: ${seen.join('|')}`);
+});
+
+test('the dynamics have the end of the row to themselves, with what to fix beside them', () => {
+  /* Clean, with soft accents: the advice, then the score. */
+  let { c, seen } = capture();
+  drawSummary(c, result({ status: 'LEARNED', dyn: 30, dynAdvice: '16 soft 74<83' }));
+  for (const t of ['LEARNED', 'dyn 30%', '16 soft 74<83']) assert.ok(seen.includes(t), `${t}: ${seen.join('|')}`);
+  assert.ok(!seen.includes('90 bpm'), 'the advice takes the tempo\'s place');
+  /* Good dynamics: the score stays, and the loosest limb comes back. */
+  ({ c, seen } = capture());
+  drawSummary(c, result({ dyn: 95, dynAdvice: '' }));
+  for (const t of ['dyn 95%', 'SN +3 s12']) assert.ok(seen.includes(t), `${t}: ${seen.join('|')}`);
+  /* Not clean: what stopped the take keeps the left end, the score the right. */
+  ({ c, seen } = capture());
+  drawSummary(c, result({ clean: false, failAcc: true, cause: '3 missed', dyn: 30, dynAdvice: '16 soft 74<83' }));
+  for (const t of ['3 missed', 'dyn 30%']) assert.ok(seen.includes(t), `${t}: ${seen.join('|')}`);
+  assert.ok(!seen.includes('16 soft 74<83'), 'one correction at a time');
+  /* Nothing judged: the row as it always was. */
+  ({ c, seen } = capture());
+  drawSummary(c, result({ dyn: -1 }));
+  assert.ok(!seen.some((t) => /^dyn /.test(t)), seen.join('|'));
+  assert.ok(seen.includes('90 bpm') && seen.includes('SN +3 s12'));
 });
 
 test('the result chart is the drill\'s takes, this one last', () => {
@@ -777,6 +799,59 @@ test('the result screen draws nothing over anything else, at its worst', () => {
     assert.ok(t.y + L.TEXT_H <= SUMMARY_PLOT.y || t.y > SUMMARY_PLOT.y + SUMMARY_PLOT.h,
       `${t.s} is drawn over the chart`);
   }
+});
+
+test('the result screen with dynamics draws nothing over anything else, at its worst', () => {
+  const texts = [];
+  const c = createScreen();
+  const text = c.text.bind(c);
+  c.text = (x, y, s, v) => { texts.push({ x, y, w: c.textWidth(s), s }); return text(x, y, s, v); };
+  /* A three-digit speed, a three-digit spread and bias, the longest name. */
+  drawSummary(c, result({
+    name: 'Seventeen stroke roll L4 everything', status: 'NOT CLEAN', speed: 120,
+    accuracy: 0.07, sdMs: 154, meanMs: -133, failAcc: true, failSd: true, bpm: 270,
+    limb: 'KD -133 s154', cause: '128 stray hits', dyn: 100, dynAdvice: '128 soft',
+  }));
+  const bad = [];
+  for (const t of texts) {
+    if (t.x < 0 || t.x + t.w > L.SCREEN_W || t.y < 0 || t.y + L.TEXT_H > L.SCREEN_H) bad.push(`off screen: ${t.s}`);
+  }
+  for (let i = 0; i < texts.length; i++) {
+    for (let j = i + 1; j < texts.length; j++) {
+      const a = texts[i];
+      const b = texts[j];
+      if (Math.abs(a.y - b.y) >= L.TEXT_H) continue;
+      if (a.x + a.w <= b.x || b.x + b.w <= a.x) continue;
+      bad.push(`${JSON.stringify(a.s)} over ${JSON.stringify(b.s)}`);
+    }
+  }
+  assert.deepEqual(bad, []);
+  assert.ok(texts.some((t) => t.s === 'NOT CLEAN'));
+  assert.ok(texts.some((t) => t.s === 'dyn 100%'));
+  assert.ok(texts.some((t) => /^Seventeen/.test(t.s)), 'the drill is named');
+  /* Nothing written into the chart. */
+  for (const t of texts) {
+    assert.ok(t.y + L.TEXT_H <= SUMMARY_PLOT.y || t.y > SUMMARY_PLOT.y + SUMMARY_PLOT.h,
+      `${t.s} is drawn over the chart`);
+  }
+});
+
+test('the Progress chart dots the dynamics under the speed', async () => {
+  const { drawProgress } = await import('../src/view.mjs');
+  const box = L.PROGRESS_PLOT;
+  const h = [[0, 100, 95, 12, 1, 0], [1, 100, 95, 12, 1, 100]];
+  const base = { title: 'X', best: 100, bpm: 90, plays: 2, footer: 'dyn 100%  JOG 1/2' };
+  const lit = (series) => {
+    const c = createScreen();
+    drawProgress(c, { ...base, series });
+    return countOn(c, box.x, box.y, box.w, box.h);
+  };
+  const withDyn = percentSeries(h, box.w - 2, box.h - 2);
+  const without = { ...withDyn, dyn: [] };
+  assert.ok(lit(withDyn) > lit(without) + 20, 'no dotted dynamics line');
+  const { c, seen } = capture();
+  drawProgress(c, { ...base, series: withDyn });
+  assert.ok(seen.includes('dyn 100%  JOG 1/2'), seen.join('|'));
 });
 
 test('the result screen says when a take was not kept', () => {

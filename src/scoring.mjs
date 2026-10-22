@@ -16,7 +16,7 @@
  *   timing    how far from the beat        -> the mean and sigma
  *   voice     which drum                   -> hit or miss
  *   hand      which stick                  -> a sticking error
- *   dynamic   accent or ghost              -> a dynamic error
+ *   dynamic   accent or ghost              -> the dynamics score, apart
  *
  * Collapsing those into one percentage is what makes most rhythm trainers
  * useless past the first week: "72%" does not tell you what to go and
@@ -35,6 +35,14 @@
  * and hitting everything flat out passed every accent without any contrast.
  * Until the take has TOUCH_MIN normal strokes there is nothing to be louder
  * than, and a dynamic is not judged.
+ *
+ * A DYNAMIC IS NOT A WRONG NOTE. Whether a take counts asks "the right drum,
+ * the right hand, in time?"; the dynamics answer "how did it sound?", in a
+ * score of their own. They used to be one question, and a player who struck
+ * every note on time but an accent too softly was told the take was not clean
+ * — the same verdict as playing it badly. So every judged accent and ghost
+ * also earns CREDIT for how far it got, 0..1: an accent halfway to its target
+ * earns half, which shows movement long before the stroke is right.
  */
 
 import { msToBeats, beatsToMs, beatToX, expandEvents, loopBeats, repeatsOf,
@@ -131,6 +139,7 @@ function makeEntry(event, iter) {
       dynOk: true,
       velocity: null,  /* as played, once hit                                */
       need: 0,         /* the velocity its dynamic was judged against, or 0  */
+      credit: null,    /* how far the dynamic got, 0..1, or null: not judged */
     })),
   };
 }
@@ -141,20 +150,64 @@ function unscore(run, note) {
     run.hits--;
     if (Math.abs(note.offsetBeats) <= run.perfect) run.perfects--;
     if (!note.handOk && run.sticking === STICK_STRICT) run.stickErrors--;
-    if (!note.dynOk) countDyn(run, note, -1);
+    addDynamic(run, note, -1);
   } else if (note.state === MISSED) {
     run.misses--;
   }
 }
 
-/* A dynamic error into (sign 1) or out of (sign -1) the run's counts, split
- * by kind so the result can say which, and by how much. */
-function countDyn(run, note, sign) {
-  run.dynErrors += sign;
-  const d = note.wantDyn === 'accent' ? run.softAccents : run.loudGhosts;
+/*
+ * A judged dynamic into (sign 1) or out of (sign -1) a set of counts: its
+ * credit into the score, and, when it missed, the error split by kind so the
+ * result can say which, and by how much. Shared with untimed.mjs, which keeps
+ * the same counts per stack.
+ */
+export function emptyDynamics() {
+  return {
+    dynErrors: 0,
+    softAccents: { n: 0, vel: 0, need: 0 },
+    loudGhosts: { n: 0, vel: 0, need: 0 },
+    accents: { n: 0, credit: 0 },
+    ghosts: { n: 0, credit: 0 },
+  };
+}
+
+export function addDynamic(into, note, sign = 1) {
+  if (note.credit === null || note.credit === undefined) return;
+  const accent = note.wantDyn === 'accent';
+  const k = accent ? into.accents : into.ghosts;
+  k.n += sign;
+  k.credit += sign * note.credit;
+  if (note.dynOk) return;
+  into.dynErrors += sign;
+  const d = accent ? into.softAccents : into.loudGhosts;
   d.n += sign;
   d.vel += sign * note.velocity;
   d.need += sign * note.need;
+}
+
+/* The dynamic counts of `a` less those of `b`: a window of a run. */
+export function dynamicsSince(a, b) {
+  const d = (x, y) => ({ n: x.n - y.n, vel: x.vel - y.vel, need: x.need - y.need });
+  const c = (x, y) => ({ n: x.n - y.n, credit: x.credit - y.credit });
+  return {
+    dynErrors: a.dynErrors - b.dynErrors,
+    softAccents: d(a.softAccents, b.softAccents),
+    loudGhosts: d(a.loudGhosts, b.loudGhosts),
+    accents: c(a.accents, b.accents),
+    ghosts: c(a.ghosts, b.ghosts),
+  };
+}
+
+/* A copy of the dynamic counts, so a later change to the run cannot reach it. */
+export function dynamicsOf(src) {
+  return {
+    dynErrors: src.dynErrors,
+    softAccents: { ...src.softAccents },
+    loudGhosts: { ...src.loudGhosts },
+    accents: { ...src.accents },
+    ghosts: { ...src.ghosts },
+  };
 }
 
 /*
@@ -226,11 +279,10 @@ export function createRun(chart, opts = {}) {
     misses: 0,
     strays: 0,
     stickErrors: 0,
-    dynErrors: 0,
-    /* The dynamic errors by kind: how many, and the summed velocity played
-     * and needed, so the result can say "74 against 83". */
-    softAccents: { n: 0, vel: 0, need: 0 },
-    loudGhosts: { n: 0, vel: 0, need: 0 },
+    /* The dynamics, apart from right and wrong: the errors by kind with the
+     * velocities played and needed ("74 against 83"), and the credit every
+     * judged accent and ghost earned. */
+    ...emptyDynamics(),
     combo: 0,
     bestCombo: 0,
     lastJudgement: null,
@@ -345,6 +397,23 @@ export function dynNeed(run, wantDyn, velocity) {
 function dynOk(note, velocity) {
   if (!note.need) return true;
   return note.wantDyn === 'accent' ? velocity >= note.need : velocity <= note.need;
+}
+
+/*
+ * How far a judged dynamic got, 0..1, or null when it was not judged. The
+ * distance is measured from the reference the need was set against — the
+ * median of the take's normal strokes — so an accent no louder than a normal
+ * stroke earns nothing, one at the need earns all of it, and one halfway
+ * earns half. A lift of 0 leaves no distance to cover: reaching it is all.
+ */
+export function dynCredit(run, note, velocity) {
+  if (!note.need) return null;
+  const accent = note.wantDyn === 'accent';
+  const span = accent ? run.accentLift : run.ghostDrop;
+  if (!(span > 0)) return dynOk(note, velocity) ? 1 : 0;
+  const ref = accent ? note.need - span : note.need + span;
+  const got = accent ? velocity - ref : ref - velocity;
+  return Math.max(0, Math.min(1, got / span));
 }
 
 /* A normal stroke goes into the reference AFTER it is judged, so a note is
@@ -474,6 +543,7 @@ export function judgeStroke(run, note, hand, velocity) {
   note.velocity = velocity === undefined ? null : velocity;
   note.need = dynNeed(run, note.wantDyn, velocity);
   note.dynOk = dynOk(note, velocity);
+  note.credit = dynCredit(run, note, velocity);
   learnTouch(run, note, velocity);
   return note;
 }
@@ -504,7 +574,7 @@ function hitNote(run, hit, entryIndex, noteIndex, songBeats) {
    * while you are still working out the pattern.
    */
   if (!note.handOk && run.sticking === STICK_STRICT) run.stickErrors++;
-  if (!note.dynOk) countDyn(run, note, 1);
+  addDynamic(run, note, 1);
 
   pushOffset(run.timing, voice, offsetMs, songBeats);
 
@@ -717,6 +787,7 @@ export function seekTo(run, beat) {
         note.dynOk = true;
         note.velocity = null;
         note.need = 0;
+        note.credit = null;
       }
     }
     settleEntry(entry);
@@ -934,9 +1005,7 @@ export function runStats(run) {
     misses: run.misses,
     strays: run.strays,
     stickErrors: run.stickErrors,
-    dynErrors: run.dynErrors,
-    softAccents: { ...run.softAccents },
-    loudGhosts: { ...run.loudGhosts },
+    ...dynamicsOf(run),
     combo: run.combo,
     bestCombo: run.bestCombo,
     asked: run.hits + run.misses,
@@ -953,13 +1022,9 @@ export function snapshot(run, beat = 0) {
     misses: run.misses,
     strays: run.strays,
     stickErrors: run.stickErrors,
-    dynErrors: run.dynErrors,
-    softAccents: { ...run.softAccents },
-    loudGhosts: { ...run.loudGhosts },
+    ...dynamicsOf(run),
   };
 }
-
-const diff = (a, b) => ({ n: a.n - b.n, vel: a.vel - b.vel, need: a.need - b.need });
 
 export function since(run, snap) {
   const hits = run.hits - snap.hits;
@@ -970,9 +1035,7 @@ export function since(run, snap) {
     misses,
     strays: run.strays - snap.strays,
     stickErrors: run.stickErrors - snap.stickErrors,
-    dynErrors: run.dynErrors - snap.dynErrors,
-    softAccents: diff(run.softAccents, snap.softAccents),
-    loudGhosts: diff(run.loudGhosts, snap.loudGhosts),
+    ...dynamicsSince(run, snap),
     asked: hits + misses,
   };
 }

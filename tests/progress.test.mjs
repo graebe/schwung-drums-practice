@@ -13,10 +13,11 @@ const take = (speed, clean = true, at = T0) =>
 
 /* ---- judging a take ------------------------------------------------------- */
 
-test('accuracy: wrong hands, wrong dynamics and strays all count against you', () => {
+test('accuracy: wrong hands and strays count against you, dynamics do not', () => {
   assert.equal(P.takeAccuracy({ asked: 10, hits: 10 }), 1);
   assert.equal(P.takeAccuracy({ asked: 10, hits: 10, stickErrors: 1 }), 0.9);
-  assert.equal(P.takeAccuracy({ asked: 10, hits: 10, dynErrors: 2 }), 0.8);
+  /* A soft accent on the right drum, in time, is a right note. */
+  assert.equal(P.takeAccuracy({ asked: 10, hits: 10, dynErrors: 2 }), 1);
   /* Sweeping the pads under every note is not playing it. */
   assert.equal(P.takeAccuracy({ asked: 10, hits: 10, strays: 10 }), 0.5);
   assert.equal(P.takeAccuracy({ asked: 0, hits: 0 }), 0);
@@ -47,16 +48,12 @@ test('a clean take is 90% right AND inside the good window — exactly on either
 
 test('a take that did not count says what cost the most, with its count', () => {
   /* The reported take: every note hit, the timing tight, every accented
-   * snare too soft — it read "83% right" and nothing else. */
+   * snare too soft. It used to read "83% right, NOT CLEAN"; the notes were
+   * right, so it is clean, and the accents are the dynamics' business. */
   const st = { asked: 96, hits: 96, dynErrors: 16, softAccents: { n: 16, vel: 16 * 74, need: 16 * 83 } };
   const v = P.verdictOf(st, 12, RULE);
-  assert.equal(v.clean, false);
-  assert.equal(v.cause, 'accents');
-  assert.equal(v.reason, '16 soft accents 74<83');
-  assert.equal(Math.floor(v.accuracy * 100), 83);
-  const ghosts = P.verdictOf({ asked: 10, hits: 10, dynErrors: 2,
-    loudGhosts: { n: 2, vel: 140, need: 100 } }, 0, RULE);
-  assert.equal(ghosts.reason, '2 loud ghosts 70>50');
+  assert.equal(v.clean, true);
+  assert.equal(v.accuracy, 1);
   /* The biggest cost is named, not the first in some fixed order. */
   const many = P.verdictOf({ asked: 20, hits: 19, misses: 1, strays: 4, stickErrors: 1 }, 0, RULE);
   assert.equal(many.cause, 'strays');
@@ -76,30 +73,55 @@ test('a stricter rule is the same verdict: share and spread are parameters', () 
 });
 
 test('the reasons fit a result line', () => {
-  const big = (n, vel, need) => ({ n, vel: n * vel, need: n * need });
   for (const r of [
     P.verdictOf({ asked: 100, hits: 89, misses: 11 }, 0, RULE).reason,
     P.verdictOf({ asked: 10, hits: 10 }, 199, { spreadMs: 100 }).reason,
     /* Offsets are bounded by the widest late window (160ms), so a spread
      * never runs to four digits. */
     P.verdictOf({ asked: 10, hits: 10 }, 160, { spreadMs: 35 }).reason,
-    P.verdictOf({ asked: 512, hits: 512, dynErrors: 128, softAccents: big(128, 120, 135) }, 0, RULE).reason,
-    P.verdictOf({ asked: 512, hits: 512, dynErrors: 128, loudGhosts: big(128, 100, 90) }, 0, RULE).reason,
     P.verdictOf({ asked: 512, hits: 512, strays: 300 }, 0, RULE).reason,
+    P.verdictOf({ asked: 512, hits: 512, stickErrors: 300 }, 0, RULE).reason,
     'nothing played']) {
     assert.ok(r.length <= P.REASON_MAX, r);
   }
+});
+
+const credit = (n, c) => ({ n, credit: c });
+
+test('the dynamics score is the mean credit of the judged accents and ghosts', () => {
+  const st = { accents: credit(4, 2), ghosts: credit(4, 4) };
+  assert.deepEqual(P.dynamicsScore(st), { score: 75, accents: 50, ghosts: 100, judged: 8 });
+  /* Too few judged to be a measurement: no overall score, but a kind with
+   * any judged says what it got. */
+  assert.deepEqual(P.dynamicsScore({ accents: credit(3, 3), ghosts: credit(0, 0) }),
+    { score: -1, accents: 100, ghosts: -1, judged: 3 });
+  assert.equal(P.dynamicsScore({}).score, -1, 'nothing judged, nothing to say');
+  assert.equal(P.dynamicsScore({ accents: credit(4, 0) }).score, 0);
+});
+
+test('the dynamics advice names the kind that missed most, and fits beside the score', () => {
+  const big = (n, vel, need) => ({ n, vel: n * vel, need: n * need });
+  assert.equal(P.dynamicsAdvice({ softAccents: big(16, 74, 83), loudGhosts: big(2, 70, 50) }),
+    '16 soft 74<83');
+  assert.equal(P.dynamicsAdvice({ softAccents: big(1, 74, 83), loudGhosts: big(5, 61, 48) }),
+    '5 loud 61>48');
+  assert.equal(P.dynamicsAdvice({ softAccents: big(0, 0, 0), loudGhosts: big(0, 0, 0) }), '');
+  assert.equal(P.dynamicsAdvice({}), '');
   /* Too long with its velocities, it keeps the count and the word. */
-  assert.equal(P.verdictOf({ asked: 512, hits: 512, dynErrors: 128, softAccents: big(128, 120, 135) },
-    0, RULE).reason, '128 soft accents');
+  const long = P.dynamicsAdvice({ softAccents: big(128, 120, 135) });
+  assert.equal(long, '128 soft');
+  for (const r of [long, P.dynamicsAdvice({ loudGhosts: big(999, 100, 90) })]) {
+    assert.ok(r.length <= P.DYN_ADVICE_MAX, r);
+  }
 });
 
 test('a take is judged on standard settings, or it is practice', () => {
-  const std = { strictness: 'normal', dynamics: true, guide: false, study: false };
+  const std = { strictness: 'normal', guide: false, study: false };
   assert.equal(P.easedBy(std), '');
   assert.equal(P.easedBy({ ...std, strictness: 'tight' }), '');
   assert.equal(P.easedBy({ ...std, strictness: 'loose' }), 'Loose');
-  assert.equal(P.easedBy({ ...std, dynamics: false }), 'Dyn off');
+  /* Dynamics no longer decide a ✓, so switching them off eases nothing. */
+  assert.equal(P.easedBy({ ...std, dynamics: false }), '');
   assert.equal(P.easedBy({ ...std, guide: true }), 'Guide');
   assert.equal(P.easedBy({ ...std, study: true, guide: true }), 'Study');
 });
@@ -114,6 +136,49 @@ test('the status line comes from the verdict: a failed take is never BEST YET', 
   assert.equal(s({ whole: false, study: true }), 'not kept');
   assert.equal(s({ eased: 'Loose', best: true }), 'PRACTICE', 'an eased take moved nothing');
   assert.equal(s({ eased: 'Loose', clean: false }), 'NOT CLEAN');
+});
+
+test('a drill keeps the best dynamics of a take that counted at tempo', () => {
+  const p = P.emptyProgress();
+  P.recordTake(p, 'x', { ...take(80), dyn: 95 });
+  assert.equal(P.item(p, 'x').dyn, -1, 'a slow take does not set the dynamics');
+  P.recordTake(p, 'x', { ...take(100), dyn: 40 });
+  P.recordTake(p, 'x', { ...take(100), dyn: 70 });
+  P.recordTake(p, 'x', { ...take(100), dyn: 55 });
+  assert.equal(P.item(p, 'x').dyn, 70, 'the best, which never drops');
+  P.recordTake(p, 'x', { ...take(100, false), dyn: 99 });
+  assert.equal(P.item(p, 'x').dyn, 70, 'nor does a take that did not count');
+  const h = P.item(p, 'x').h;
+  assert.deepEqual(h.map((e) => e[5]), [95, 40, 70, 55, 99], 'every take keeps its own');
+  P.recordTake(p, 'y', take(100));
+  assert.equal(P.item(p, 'y').h[0][5], -1, 'none judged');
+  const back = P.readProgress(P.serialiseProgress(p)).progress;
+  assert.equal(back.items.x.dyn, 70);
+});
+
+test('progress rebuilt from stats judges each take by today\'s rule', () => {
+  const written = () => 100;
+  const recs = [
+    /* Every note on time, its eight errors all dynamics: clean today. */
+    { t: 10, d: 'drill:a:normal', bpm: 100, sd: 9, n: 32, err: 8, tot: 32, st: 0, sk: 0, dy: 8, dp: 20 },
+    /* Four wrong hands in thirty-two: 87.5% right, not clean. */
+    { t: 20, d: 'drill:b:normal', bpm: 100, sd: 9, n: 32, err: 4, tot: 32, st: 0, sk: 4, dy: 0 },
+    /* An old record with no breakdown: any error is read as a miss. */
+    { t: 30, d: 'drill:c:normal', bpm: 100, sd: 9, n: 32, err: 1 },
+    /* A rung's id has a colon in it: its strictness is still found. */
+    { t: 40, d: 'drill:g:l2:loose', bpm: 100, sd: 9, n: 32, err: 0, tot: 32, st: 0, sk: 0 },
+    /* L0 keeps the verdict it was given. */
+    { t: 50, d: 'untimed:g:l0:normal', bpm: 50, n: 16, err: 0, tot: 16, cl: 1, dp: 80 },
+  ];
+  const p = P.importStats(P.emptyProgress(), recs, (r) => r.d.split(':').slice(1, -1).join(':'), written);
+  assert.ok(P.item(p, 'a').done, 'failed only on its accents, and learned now');
+  assert.equal(P.item(p, 'a').dyn, 20);
+  assert.equal(P.item(p, 'b').done, 0);
+  assert.equal(P.item(p, 'c').done, 0);
+  assert.equal(P.item(p, 'g:l2').done, 0, 'a Loose take is practice');
+  assert.ok(P.item(p, 'g:l0').done);
+  assert.equal(P.item(p, 'g:l0').best, 50);
+  assert.equal(P.item(p, 'g:l0').dyn, 80);
 });
 
 test('a take on eased settings is kept for its chart and moves nothing else', () => {
@@ -240,16 +305,28 @@ test('it survives a round trip, and a damaged file reads as not ok', () => {
 });
 
 test('bad fields read as defaults rather than failing the file', () => {
-  const r = P.readProgress(JSON.stringify({ items: {
-    a: { best: 'x', plays: 3, h: [[1, 50, 90, 20, 1], 'junk', [1]], rep: { due: 'soon' } },
+  const r = P.readProgress(JSON.stringify({ version: P.PROGRESS_VERSION, items: {
+    a: { best: 'x', plays: 3, h: [[1, 50, 90, 20, 1, -1], 'junk', [1], [1, 50, 90, 20, 1]],
+      rep: { due: 'soon' } },
     b: null,
   } }));
   assert.equal(r.ok, true);
   assert.equal(r.progress.items.a.best, 0);
+  assert.equal(r.progress.items.a.dyn, -1);
   assert.equal(r.progress.items.a.plays, 3);
-  assert.equal(r.progress.items.a.h.length, 1);
+  assert.equal(r.progress.items.a.h.length, 1, 'a five-value entry is from version 1');
   assert.equal(r.progress.items.a.rep.due, 0);
   assert.equal(r.progress.items.b, undefined);
+});
+
+test('a progress file of an earlier version reads as stale, not as damaged', () => {
+  const v1 = JSON.stringify({ version: 1, items: { a: { best: 80, h: [[1, 80, 95, 20, 1]] } } });
+  const r = P.readProgress(v1);
+  assert.equal(r.ok, false);
+  assert.equal(r.stale, true);
+  assert.deepEqual(r.progress.items, {});
+  assert.equal(P.readProgress('{').stale, false, 'damaged is not stale');
+  assert.equal(P.readProgress(P.serialiseProgress(P.emptyProgress())).ok, true);
 });
 
 /* ---- repetition --------------------------------------------------------------- */
@@ -340,6 +417,15 @@ test('the chart is on a fixed scale with the line to reach where it belongs', ()
   assert.equal(q.lineY, 4);
 });
 
+test('the dynamics ride the chart on a scale of their own, only where judged', () => {
+  const h = [[0, 80, 0, 0, 1, 0], [1, 90, 0, 0, 1, -1], [2, 100, 0, 0, 1, 50], [3, 100, 0, 0, 1, 100]];
+  const s = P.percentSeries(h, 31, 41);
+  assert.deepEqual(s.dyn, [
+    { x: 0, y: 40, percent: 0 }, { x: 20, y: 20, percent: 50 }, { x: 30, y: 0, percent: 100 },
+  ]);
+  assert.deepEqual(P.percentSeries([], 31, 41).dyn, []);
+});
+
 /* ---- from the stats log ----------------------------------------------------------- */
 
 test('takes in stats.json from before progress existed are read in once', () => {
@@ -396,10 +482,8 @@ test('L0 is clean at 90% right first time, and says what cost the most', () => {
   assert.equal(v.reason, '2 not together');
   assert.equal(P.untimedVerdictOf(counts(20, 15, { wrong: 5 })).reason, '5 wrong pads');
   assert.equal(P.untimedVerdictOf(counts(0, 0)).cause, 'nothing');
-  const acc = P.untimedVerdictOf(counts(16, 12,
-    { softAccents: { n: 4, vel: 4 * 74, need: 4 * 83 } }));
-  assert.equal(acc.reason, '4 soft accents 74<83');
-  for (const r of [acc, v]) assert.ok(r.reason.length <= P.REASON_MAX);
+  assert.equal(P.untimedVerdictOf(counts(16, 12, { hand: 4 })).reason, '4 wrong hands');
+  assert.ok(v.reason.length <= P.REASON_MAX);
 });
 
 test('L0 is learned at any pace, keeps its best pace, and never comes back for repetition', () => {

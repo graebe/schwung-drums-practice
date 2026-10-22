@@ -32,11 +32,19 @@ export { drawList };
  * tempo it read 100 on every one of them. Beside it the two things that
  * decide whether it was clean — how much was right, and how tight — and
  * whichever one stopped it counting is drawn inverted. Under it, what cost
- * the most ("16 soft accents 74<83"), or else the tempo and the loosest
- * limb, the one to go and practise.
+ * the most ("4 wrong hands"), or else the tempo and the loosest limb, the
+ * one to go and practise.
+ *
+ * The DYNAMICS have the right end of that row to themselves whenever they
+ * were judged — "dyn 30%" — because they are a second question, not part of
+ * the first: a take is clean or not on its notes and time, and sounds as it
+ * sounds. The left end keeps what stopped the take; on a take that counted it
+ * says what to fix in the dynamics ("16 soft 74<83") — `dynAdvice`, empty
+ * once they are good — and then the loosest limb again. One correction at a
+ * time.
  *
  * s = { name, status, mark, clean, speed, accuracy, share, sdMs, meanMs,
- *       failAcc, failSd, cause, bpm, limb, series, footer }
+ *       failAcc, failSd, cause, bpm, limb, dyn, dynAdvice, series, footer }
  *     — all worked out once, when the take ends
  *
  * An L0 take is the same screen with other words in it — it has no spread,
@@ -67,7 +75,16 @@ export function drawSummary(ctx, s) {
     : `s${Math.round(s.sdMs || 0)} ${bias >= 0 ? '+' : ''}${bias}ms`;
   sideText(ctx, SIDE_B_Y, sideB, minX, s.failSd);
 
-  if (s.cause) {
+  const judged = s.dyn !== undefined && s.dyn >= 0;
+  if (judged) {
+    const dyn = `dyn ${Math.round(s.dyn)}%`;
+    const dw = ctx.textWidth(dyn);
+    ctx.text(L.SCREEN_W - dw - 1, L.RESULT_ROW_A_Y, dyn, 1);
+    const left = s.cause || s.dynAdvice || s.limb
+      || (s.rowLeft !== undefined ? s.rowLeft : s.bpm ? `${Math.round(s.bpm)} bpm` : '');
+    ctx.text(L.RESULT_LEFT_X, L.RESULT_ROW_A_Y,
+      fit(ctx, left, L.SCREEN_W - dw - L.RESULT_LEFT_X - 5), 1);
+  } else if (s.cause) {
     /* Centred, as the Ladder's reason is: a full line (progress.mjs
      * REASON_MAX) is 125px and does not fit from the left margin. */
     const cause = fit(ctx, s.cause, L.SCREEN_W - 2);
@@ -129,6 +146,29 @@ export function drawPercentPlot(ctx, box, series) {
     } else {
       ctx.fillRect(x, y, 3, 3, 0);
       ctx.drawRect(x, y, 3, 3, 1);
+    }
+  }
+}
+
+/*
+ * The takes' dynamics, dotted, under the speed line it shares the box with:
+ * dots, not a line, so the two can cross and still be told apart. Each take
+ * is a single pixel with every other pixel dotted between them.
+ */
+export function drawDynamicsLine(ctx, box, dyn) {
+  if (!dyn || !dyn.length) return;
+  const ox = box.x + 1;
+  const oy = box.y + 1;
+  for (let i = 0; i < dyn.length; i++) {
+    const a = dyn[i];
+    ctx.fillRect(ox + a.x, oy + a.y, 1, 1, 1);
+    const b = dyn[i + 1];
+    if (!b) continue;
+    const steps = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y));
+    for (let k = 2; k < steps; k += 2) {
+      const x = Math.round(a.x + ((b.x - a.x) * k) / steps);
+      const y = Math.round(a.y + ((b.y - a.y) * k) / steps);
+      ctx.fillRect(ox + x, oy + y, 1, 1, 1);
     }
   }
 }
@@ -275,6 +315,7 @@ export function drawProgress(ctx, s) {
   drawTitle(ctx, s.title || 'PROGRESS', s.best ? `${s.best}%` : '', s.done ? 'done' : null);
   const box = L.PROGRESS_PLOT;
   drawPercentPlot(ctx, box, s.series);
+  if (s.series) drawDynamicsLine(ctx, box, s.series.dyn);
   if (!s.series || !s.series.points.length) {
     const none = 'not played yet';
     ctx.text((L.SCREEN_W - ctx.textWidth(none)) >> 1, box.y + (box.h >> 1) - 3, none, 1);

@@ -34,10 +34,11 @@
  *
  * FIRST TIME RIGHT is the score: a stack struck with no wrong pad, no lapsed
  * partial and no second stroke on the way, with the right hands (when the
- * sticking is strict) and the right dynamics. A wrong hand or a soft accent
- * still moves the cursor on — asking for the stack again would feed the extra
- * strokes into the touch the dynamics are judged against, and punish a mode
- * without time for touch — but the stack is not right first time.
+ * sticking is strict). A wrong hand still moves the cursor on — asking for the
+ * stack again would feed the extra strokes into the touch the dynamics are
+ * judged against — but the stack is not right first time. A soft accent or a
+ * loud ghost is not a wrong stack at all: it goes into the dynamics score,
+ * which is kept apart, as in a timed take.
  *
  * A pad fault marks the stack's notes MISSED once it is through, so the page
  * shows it struck out, as Study shows a note it had to wait for: what went
@@ -45,7 +46,7 @@
  */
 
 import { HIT, MISSED, PENDING, STICK_STRICT, judgeStroke, settleEntry,
-         ensureEntries } from './scoring.mjs';
+         ensureEntries, emptyDynamics, addDynamic, dynamicsOf } from './scoring.mjs';
 
 /* A gap slower than this many times the take's typical gap is a stop — a
  * look at the page, a breath, a pause — and is left out of the pace. */
@@ -74,8 +75,9 @@ export function createUntimed(run, { togetherMs = 60, from = 0 } = {}) {
     stacks: 0,           /* stacks completed                                  */
     firstTry: 0,         /* ...of which right first time                      */
     total: Math.max(0, total - from),
-    causes: { wrong: 0, apart: 0, again: 0, hand: 0,
-              accents: { n: 0, vel: 0, need: 0 }, ghosts: { n: 0, vel: 0, need: 0 } },
+    causes: { wrong: 0, apart: 0, again: 0, hand: 0 },
+    /* The dynamics of every completed stack, apart from right first time. */
+    dyn: emptyDynamics(),
     gaps: [],            /* [Δbeats, Δms] between completed stacks            */
     lastAt: null,        /* when the last stack sounded; null after a pause   */
     lastBeat: 0,
@@ -204,8 +206,7 @@ export function counts(u) {
     apart: c.apart,
     again: c.again,
     hand: c.hand,
-    softAccents: { ...c.accents },
-    loudGhosts: { ...c.ghosts },
+    ...dynamicsOf(u.dyn),
     pace: u.pace,
   };
 }
@@ -269,6 +270,7 @@ function resetPartial(u) {
     n.played = false;
     n.velocity = null;
     n.need = 0;
+    n.credit = null;
     n.handOk = true;
     n.dynOk = true;
   }
@@ -277,34 +279,21 @@ function resetPartial(u) {
 function complete(u, entry) {
   const run = u.run;
   let handOk = true;
-  let soft = null;
-  let loud = null;
   for (const n of entry.notes) {
     if (!n.handOk && run.sticking === STICK_STRICT) handOk = false;
-    if (!n.dynOk) {
-      const d = n.wantDyn === 'accent' ? (soft = soft || { n: 0, vel: 0, need: 0 })
-        : (loud = loud || { n: 0, vel: 0, need: 0 });
-      d.n++;
-      d.vel += n.velocity || 0;
-      d.need += n.need;
-    }
   }
 
+  /* A dynamic is scored apart and never costs the stack its first try: a
+   * soft accent struck on the right drum with the right hand is the right
+   * stack, played with a sound still to work on. */
   const c = u.causes;
   if (u.fault) {
     c[u.fault]++;
     for (const n of entry.notes) n.state = MISSED;
-  } else if (!handOk) {
-    c.hand++;
-  } else if (soft || loud) {
-    for (const [d, into] of [[soft, c.accents], [loud, c.ghosts]]) {
-      if (!d) continue;
-      into.n += d.n;
-      into.vel += d.vel;
-      into.need += d.need;
-    }
   } else {
-    u.firstTry++;
+    for (const n of entry.notes) addDynamic(u.dyn, n);
+    if (handOk) u.firstTry++;
+    else c.hand++;
   }
   u.stacks++;
   settleEntry(entry);

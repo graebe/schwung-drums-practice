@@ -32,6 +32,7 @@ test('a run starts with every note pending and nothing scored', () => {
   assert.deepEqual(S.runStats(run), {
     hits: 0, perfects: 0, misses: 0, strays: 0, stickErrors: 0, dynErrors: 0,
     softAccents: { n: 0, vel: 0, need: 0 }, loudGhosts: { n: 0, vel: 0, need: 0 },
+    accents: { n: 0, credit: 0 }, ghosts: { n: 0, credit: 0 },
     combo: 0, bestCombo: 0, asked: 0, total: 4,
   });
 });
@@ -157,6 +158,64 @@ test('a dynamic error scrubbed back over is taken back with its kind', () => {
   const note = run.entries[3].notes[0];
   assert.equal(note.velocity, null);
   assert.equal(note.need, 0);
+});
+
+test('a judged dynamic earns credit for how far it got, 0..1', () => {
+  /* Normal strokes at 70: an accent needs 85, so 70 earns nothing, 77.5
+   * half, 85 and above all of it. */
+  const at = (dyn, normal, last, opts) => playDyn(dyn, normal, last, opts).run.entries[3].notes[0].credit;
+  assert.equal(at('accent', 70, 70), 0);
+  assert.equal(at('accent', 70, 60), 0, 'quieter than normal is no less than nothing');
+  assert.equal(at('accent', 70, 77.5), 0.5);
+  assert.equal(at('accent', 70, 85), 1);
+  assert.equal(at('accent', 70, 127), 1, 'never more than all of it');
+  /* A ghost needs 70 - 20 = 50. */
+  assert.equal(at('ghost', 70, 70), 0);
+  assert.equal(at('ghost', 70, 60), 0.5);
+  assert.equal(at('ghost', 70, 30), 1);
+  /* A lift of 0 leaves no distance: reaching the reference is all. */
+  assert.equal(at('accent', 70, 70, { accentLift: 0 }), 1);
+  assert.equal(at('accent', 70, 69, { accentLift: 0 }), 0);
+});
+
+test('the dynamics are counted apart: credit per kind, errors with their velocities', () => {
+  const { run } = playDyn('accent', 70, 77.5);
+  const st = S.runStats(run);
+  assert.deepEqual(st.accents, { n: 1, credit: 0.5 });
+  assert.deepEqual(st.ghosts, { n: 0, credit: 0 });
+  assert.equal(st.dynErrors, 1);
+  assert.equal(st.hits, 4);
+  /* A normal stroke, or one judged before the touch is known, is not in it. */
+  const early = mk(lastDyn('accent'), { dynamics: true });
+  S.judgeHit(early, { voice: 'SN', velocity: 70 }, 0);
+  assert.equal(early.entries[0].notes[0].credit, null);
+});
+
+test('a missed accent is a missed note, and is not judged for its dynamic', () => {
+  const run = mk(lastDyn('accent'), { dynamics: true });
+  for (let b = 0; b < 3; b++) S.judgeHit(run, { voice: 'SN', velocity: 70 }, b);
+  S.expireMissed(run, 4);
+  const st = S.runStats(run);
+  assert.equal(st.misses, 1);
+  assert.equal(st.accents.n, 0, 'one mistake, one error');
+  assert.equal(st.dynErrors, 0);
+});
+
+test('a dynamic scrubbed back over takes its credit back too', () => {
+  const { run } = playDyn('accent', 70, 77.5);
+  S.seekTo(run, 2.5);
+  assert.deepEqual(run.accents, { n: 0, credit: 0 });
+  assert.equal(run.entries[3].notes[0].credit, null);
+});
+
+test('since() measures the dynamics of a window, as the Ladder reads it', () => {
+  const run = mk(lastDyn('accent'), { dynamics: true });
+  for (let b = 0; b < 3; b++) S.judgeHit(run, { voice: 'SN', velocity: 70 }, b);
+  const snap = S.snapshot(run, 3);
+  S.judgeHit(run, { voice: 'SN', velocity: 85 }, 3);
+  const w = S.since(run, snap);
+  assert.deepEqual(w.accents, { n: 1, credit: 1 });
+  assert.equal(w.dynErrors, 0);
 });
 
 test('dynamics off, or a velocity the host did not send, never penalises', () => {
