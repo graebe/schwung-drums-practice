@@ -30,6 +30,7 @@ import { announce } from '/data/UserData/schwung/shared/screen_reader.mjs';
 import * as L from './layout.mjs';
 import * as PAD from './padmap.mjs';
 import * as PIO from './pads_io.mjs';
+import * as PMS from './padmap_screen.mjs';
 import * as KIT from './kit.mjs';
 import * as C from './controls.mjs';
 import * as SET from './settings_def.mjs';
@@ -2129,10 +2130,8 @@ function layoutNow() {
  * every pad is the snare and eight of nine prompts could not be answered.
  */
 let customPads = null;
-/* The Pad map screen: the Custom pad being edited (grid index, -1 none),
- * whether an edit lands on both halves, the voice last struck, and whether
- * Custom changed since it was opened (Back saves it). */
-const pm = { sel: -1, both: true, note: '', noteUntil: 0, edited: false };
+/* The Pad map screen's state (padmap_screen.mjs). */
+const pm = PMS.createPadMap();
 let padLayout = PAD.resolveLayout(PAD.DEFAULT_LAYOUT);
 let quizLayout = padLayout;
 function refreshLayout() {
@@ -2144,69 +2143,41 @@ function refreshLayout() {
 
 /* ---- the Pad map screen ------------------------------------------------- */
 /*
- * Settings › Pad map: the layout in force, every pad named. On a preset a pad
- * sounds its drum and names it, the jog steps through the layouts, and Click
- * makes an editable copy of it — Custom. On Custom a pad is picked, the jog
- * gives it a sound, and knob 1 says whether the edit lands on both halves (the
- * pad its layout pairs it with: the same column of the other half, or its
- * mirror image). Back saves Custom to pads.json and returns to Settings.
+ * Its rules are padmap_screen.mjs's; what is done here is what only the host
+ * can do: sound a pad, change and save the settings, save pads.json.
  */
+function padMapView() {
+  return { layout: padLayout, custom: settings.layout === PAD.CUSTOM,
+    sticking: settings.layout === 'sticking', flip: settings.flip };
+}
+
 function openPadMap() {
-  pm.sel = -1;
-  pm.note = '';
-  pm.edited = false;
+  PMS.reset(pm);
   screen = PADMAP;
   announce(`Pad map: ${padLayout.name}`);
 }
 
-const isCustom = () => settings.layout === PAD.CUSTOM;
-
-/* A pad of the grid as an index into Custom's own, unflipped rows. */
-function customIndex(i) {
-  if (!settings.flip) return i;
-  const row = Math.floor(i / PAD.COLS);
-  return row * PAD.COLS + (PAD.COLS - 1 - (i % PAD.COLS));
-}
-
 function padMapPress(pad, vel) {
-  const i = pad - PAD.PAD_FIRST;
-  const voice = padLayout.grid[i];
-  if (voice) sound(voice, vel || 100);
-  const v = voice ? KIT.voiceById(voice) : null;
-  pm.note = v ? v.label : 'no sound';
-  pm.noteUntil = now() + 2000;
-  if (isCustom()) pm.sel = i;
-  announce(pm.note);
+  const r = PMS.press(pm, padMapView(), pad, now());
+  if (r.voice) sound(r.voice, vel || 100);
+  announce(r.note);
 }
 
 function padMapJog(delta) {
-  if (isCustom() && pm.sel >= 0) {
-    /* No sound, then every voice in staff order. */
-    const list = [null].concat(KIT.VOICE_IDS);
-    const at = Math.max(0, list.indexOf(padLayout.grid[pm.sel]));
-    const next = list[Math.max(0, Math.min(list.length - 1, at + delta))];
-    customPads = PIO.setPad(customPads || PIO.copyPreset(PAD.DEFAULT_LAYOUT), customIndex(pm.sel), next, pm.both);
-    pm.edited = true;
+  const r = PMS.jog(pm, padMapView(), delta, customPads || PIO.copyPreset(PAD.DEFAULT_LAYOUT), now());
+  if (r.custom) {
+    customPads = r.custom;
     refreshLayout();
-    pm.note = next ? KIT.voiceById(next).label : 'no sound';
-    pm.noteUntil = now() + 2000;
-    return;
+  } else {
+    editSetting('layout', r.layoutDelta);
   }
-  editSetting('layout', delta);
-  pm.sel = -1;
-  pm.note = '';
 }
 
 /* Click on a preset: Custom becomes a copy of it, to edit. */
 function padMapClick() {
-  if (isCustom()) {
-    pm.sel = -1;
-    return;
-  }
-  if (settings.layout === 'sticking') return;
+  if (!PMS.click(pm, padMapView()).copy) return;
   const from = padLayout.name;
   customPads = PIO.copyPreset(settings.layout);
-  pm.edited = true;
   settings.layout = PAD.CUSTOM;
   settingsRowsCache = SET.settingsRows(settings);
   saveSettings();
@@ -2219,20 +2190,8 @@ function savePads() {
   if (writeFile(PADS_PATH, PIO.serialisePads(customPads))) pm.edited = false;
 }
 
-/* The pads an edit is landing on, lit on the grid. Flip leaves the pairing
- * where it was: a twin is four columns away, a mirror image 7 - c, either way. */
 function padMapSelected() {
-  if (screen !== PADMAP || !isCustom() || pm.sel < 0) return null;
-  const row = Math.floor(pm.sel / PAD.COLS);
-  const out = [PAD.PAD_FIRST + pm.sel];
-  if (pm.both) out.push(PAD.padAt(row, PAD.pairCol(pm.sel % PAD.COLS, padLayout.pair)));
-  return out;
-}
-
-function padMapFooter() {
-  if (isCustom()) return pm.sel >= 0 ? 'JOG sound KNOB1 both' : 'PAD pick  JOG layout';
-  if (settings.layout === 'sticking') return 'JOG layout';
-  return 'PAD hear CLICK edit';
+  return screen === PADMAP ? PMS.selectedPads(pm, padMapView()) : null;
 }
 
 function loadPads() {
@@ -2575,14 +2534,7 @@ function draw() {
     return;
   }
   if (screen === PADMAP) {
-    const sel = padMapSelected();
-    V.drawPadMap(ctx, {
-      title: pm.note && now() < pm.noteUntil ? pm.note : padLayout.name,
-      right: isCustom() ? (pm.both ? 'both' : 'one') : settings.flip ? 'flip' : '',
-      grid: padLayout.grid,
-      selected: sel ? sel.map((p) => p - PAD.PAD_FIRST) : [],
-      footer: padMapFooter(),
-    });
+    V.drawPadMap(ctx, PMS.screenOf(pm, padMapView(), now()));
     return;
   }
   if (screen === CARD && card) {
@@ -3009,7 +2961,7 @@ function midiInner(data) {
       return;
     }
     if (screen === PADMAP) {
-      if (k === 0 && isCustom()) pm.both = !pm.both;
+      if (k === 0) PMS.toggleBoth(pm, padMapView());
       return;
     }
     if (screen === SETTINGS) {
