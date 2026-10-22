@@ -101,3 +101,30 @@ test('the card screen: title, page count, text and footer apart', () => {
   }
   assert.ok(CARD_TEXT_Y + LES.LINES_PER_PAGE * L.TEXT_H <= L.SCREEN_H - L.TEXT_H, 'text runs into the footer');
 });
+
+test('a guided deck: Click reads each card, the last one opens the step; Play reads them all', () => {
+  const measure = (t) => t.length * 6;
+  const d = LES.createDeck(cards, ['stage-0', 'pulse', 'result'], { guided: true, measure, width: 126 });
+  assert.equal(LES.deckScreen(d).title, '0 Hello, kit');
+  assert.equal(LES.deckScreen(d).footer, 'CLICK next  PLAY hear');
+  assert.deepEqual(LES.advance(d), { read: ['stage-0'], done: false });
+  assert.equal(LES.deckScreen(d).title, 'The pulse');
+  assert.deepEqual(LES.skipToEnd(d), { read: ['pulse', 'result'], done: true });
+  const e = LES.createDeck(cards, ['result'], { guided: true, measure, width: 126 });
+  assert.equal(LES.deckScreen(e).footer, 'CLICK start PLAY hear');
+  assert.deepEqual(LES.advance(e), { read: ['result'], done: true });
+});
+
+test('a Lessons deck reads again; Play does nothing there; the jog turns pages within a card', () => {
+  const measure = (t) => t.length * 6;
+  const d = LES.createDeck(cards, ['ghost-notes', 'feel'], { measure, width: 60 });
+  assert.equal(LES.deckScreen(d).footer, 'CLICK next  BACK list');
+  assert.deepEqual(LES.skipToEnd(d), { read: [], done: false });
+  assert.ok(LES.deckScreen(d).pages > 1, 'narrow enough to need pages');
+  LES.turnPage(d, 5);
+  assert.equal(LES.deckScreen(d).page, LES.deckScreen(d).pages - 1, 'stops at the last page');
+  LES.turnPage(d, -9);
+  assert.equal(LES.deckScreen(d).page, 0);
+  LES.advance(d);
+  assert.equal(LES.deckScreen(d).footer, 'CLICK done');
+});

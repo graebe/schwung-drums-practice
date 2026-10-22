@@ -104,3 +104,57 @@ export function stageCards(cards, stage, steps) {
   for (const st of steps) for (const id of st.cards || []) add(id);
   return out;
 }
+
+/* ---- A deck on screen ------------------------------------------------------ */
+/*
+ * The cards shown in a row: before a step (`guided`, with the practice
+ * waiting behind the last one) or from a stage's Lessons row. Each card is
+ * wrapped to the screen when it comes up, by the caller's `measure` — the
+ * font it is drawn in. ui.js holds the deck and does what only the host can
+ * (marking a card read in progress, opening the step); what the deck does is
+ * decided here.
+ */
+export function createDeck(cards, ids, { guided = false, measure, width }) {
+  const deck = { cards, ids: ids.slice(), at: 0, page: 0, pages: [[]], title: '', guided, measure, width };
+  lay(deck);
+  return deck;
+}
+
+function lay(deck) {
+  const c = deck.cards.get(deck.ids[deck.at]);
+  deck.title = c ? c.title : '';
+  deck.pages = paginate(wrapText(c ? c.text : '', deck.width, deck.measure));
+  deck.page = 0;
+}
+
+export function turnPage(deck, delta) {
+  deck.page = Math.max(0, Math.min(deck.pages.length - 1, deck.page + delta));
+}
+
+/* Click: the card on screen is read. Returns { read: [ids], done }: done when
+ * that was the last, and the deck has nothing left to show. */
+export function advance(deck) {
+  const read = [deck.ids[deck.at]];
+  if (deck.at + 1 < deck.ids.length) {
+    deck.at++;
+    lay(deck);
+    return { read, done: false };
+  }
+  return { read, done: true };
+}
+
+/* Play, on a guided deck: every card left counts as read, and the deck is
+ * done — the practice is heard at once. Nothing on a Lessons deck. */
+export function skipToEnd(deck) {
+  if (!deck.guided) return { read: [], done: false };
+  return { read: deck.ids.slice(deck.at), done: true };
+}
+
+/* What drawCard draws. */
+export function deckScreen(deck) {
+  const more = deck.at + 1 < deck.ids.length;
+  let footer;
+  if (deck.guided) footer = more ? 'CLICK next  PLAY hear' : 'CLICK start PLAY hear';
+  else footer = more ? 'CLICK next  BACK list' : 'CLICK done';
+  return { title: deck.title, lines: deck.pages[deck.page], page: deck.page, pages: deck.pages.length, footer };
+}

@@ -170,3 +170,14 @@ test('an L0 best is its fastest clean pace', () => {
   ST.addRecord(s, fast);
   assert.equal(ST.isPersonalBest(s, fast), true, 'measured against clean takes only');
 });
+
+test('a record\'s drill id reads back as it was written, colons in the id and all', () => {
+  const opts = { strictness: 'tight', sticking: 'strict' };
+  for (const [kind, id] of [['drill', 'rock-backbeat:l3'], ['ladder', 'subdiv:quarters'], ['untimed', 'songo:l0'],
+    ['clock', 'reading:4'], ['drill', 'flam']]) {
+    assert.deepEqual(ST.parseDrillId(ST.drillId(kind, id, opts)), { kind, id, strictness: 'tight', sticking: 'strict' });
+    assert.equal(ST.parseDrillId(ST.drillId(kind, id, { strictness: 'normal' })).sticking, '');
+  }
+  assert.deepEqual(ST.parseDrillId('pick:subdiv:qe'), { kind: 'pick', id: 'subdiv:qe', strictness: '', sticking: '' });
+  assert.deepEqual(ST.parseDrillId('guess:voice'), { kind: 'guess', id: 'voice', strictness: '', sticking: '' });
+});

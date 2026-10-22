@@ -258,3 +258,22 @@ test('the folder: Continue, Skip, Your path, the stages, Repetition — and ever
   };
   walk(f);
 });
+
+test('every id the table names is installed or planned — a typo cannot vanish', () => {
+  const quizzes = new Set(DRILLS.map((d) => `quiz:${d.mode}:${d.kind}`));
+  const installed = (id) => entries.some((e) => e.chart.id === id) || generated.has(id);
+  for (const spec of PLAN.STAGES) {
+    for (const s of spec.core.concat(spec.electives, [spec.checkpoint])) {
+      if (s.quiz) {
+        const id = `quiz:${s.quiz.mode}:${s.quiz.kind}`;
+        assert.ok(quizzes.has(id) || PLAN.PLANNED.has(id), `${spec.key}: ${id} is neither a quiz nor planned`);
+        assert.ok(!(quizzes.has(id) && PLAN.PLANNED.has(id)), `${id} ships: take it off PLANNED`);
+        continue;
+      }
+      for (const id of [s.groove || s.id].concat(s.alt || [])) {
+        assert.ok(installed(id) || PLAN.PLANNED.has(id), `${spec.key}: ${id} is neither installed nor planned`);
+        assert.ok(!(installed(id) && PLAN.PLANNED.has(id)), `${id} ships: take it off PLANNED`);
+      }
+    }
+  }
+});

@@ -88,25 +88,37 @@ pub const CLICK_TRIM: f32 = 1.5;
 struct Recorded<const V: usize> {
     bytes: Vec<u8>,
     voices: Sampler<V>,
+    /// Which keys the pack has a zone for, worked out once at load: a hit
+    /// asks this rather than walking every zone on the audio thread.
+    held: [bool; 128],
 }
 
 impl<const V: usize> Recorded<V> {
     /// The pack at `rel` in `dir`, if it can be read and validates.
     fn load(dir: Option<&[u8]>, rel: &[u8]) -> Option<Self> {
         let bytes = read_file(dir?, rel)?;
-        Pack::validate(&bytes).ok()?;
-        Some(Recorded { bytes, voices: Sampler::new(voice::SAMPLE_RATE, Retrigger::Stack) })
+        let pack = Pack::validate(&bytes).ok()?;
+        let mut held = [false; 128];
+        for z in (0..pack.zone_count()).filter_map(|i| pack.zone(i)) {
+            for key in z.lokey..=z.hikey.min(127) {
+                if let Some(h) = held.get_mut(key as usize) {
+                    *h = true;
+                }
+            }
+        }
+        Some(Recorded { bytes, voices: Sampler::new(voice::SAMPLE_RATE, Retrigger::Stack), held })
     }
 
     /// Strike `key` if the pack holds it; false when it does not, so the
     /// caller can try the next pack.
     fn strike(&mut self, key: u8, vel: u8) -> bool {
-        let Ok(p) = Pack::new(&self.bytes) else { return false };
-        let held = (0..p.zone_count()).any(|i| p.zone(i).is_some_and(|z| (z.lokey..=z.hikey).contains(&key)));
-        if held {
+        if !self.held.get(key as usize).copied().unwrap_or(false) {
+            return false;
+        }
+        if let Ok(p) = Pack::new(&self.bytes) {
             self.voices.note_on(&p, key, vel);
         }
-        held
+        true
     }
 
     fn next(&mut self) -> f32 {

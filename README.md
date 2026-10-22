@@ -990,16 +990,11 @@ merely unlikely.
 Building it needs Docker (or a local `aarch64-unknown-linux-gnu` Rust toolchain plus
 `aarch64-linux-gnu-gcc` as its linker); `scripts/build.sh` picks whichever is present.
 
-### Ableton Live
+### Move only
 
-Not built. The kit is meant to become a Live plugin as well as a Move one, and the shape that
-takes is settled even though the work is not: the **synthesis stays in Rust behind a plain C ABI**,
-and a second shell links the same crate. One set of constants, so the two builds cannot drift into
-sounding different.
-
-That shell will be **JUCE**, as for the other Neon Ingvy plugins: JUCE is AGPLv3, which section 13
-of the GPLv3 allows this module's licence to be combined with. Nothing in this repository depends on
-it today — the Schwung module reaches the host through a C ABI it declares itself.
+Drums Practice is a module for the Move and nothing else: there is no Ableton Live or VST3 version,
+and none is planned. It is a trainer built around the Move's pads and screen, so the JavaScript
+core and the Rust kit are shaped for the Schwung host alone.
 
 ## AI assistance disclaimer
 

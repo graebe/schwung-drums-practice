@@ -531,6 +531,9 @@ fn every_voice_of_the_kit_plays_a_recording_when_installed() {
         let in_kit = d.kit.as_ref().is_some_and(|k| holds(&k.bytes, key));
         let in_perc = d.perc.as_ref().is_some_and(|p| holds(&p.bytes, key));
         assert!(in_kit || in_perc, "GM {key} is in neither pack");
+        /* The table a hit asks agrees with the zones themselves. */
+        assert_eq!(d.kit.as_ref().map(|k| k.held[key as usize]), Some(in_kit), "GM {key}");
+        assert_eq!(d.perc.as_ref().map(|p| p.held[key as usize]), Some(in_perc), "GM {key}");
     }
 }
 

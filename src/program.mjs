@@ -39,7 +39,8 @@
  * built, so the table can be the whole curriculum while it ships.
  */
 
-import { availableLevels, isUntimedId, LEVEL_ID_RE } from './levels.mjs';
+import { availableLevels } from './levels.mjs';
+import { isUntimedId, higherLevelIds, parseLevelId, quizItemId as makeQuizId } from './ids.mjs';
 import { item, isDone, isParked, LEARNED } from './progress.mjs';
 import { DRILLS } from './guess.mjs';
 
@@ -302,11 +303,33 @@ export const STAGES = [
   },
 ];
 
+/*
+ * The material the table names that is not written yet (docs/curriculum.md,
+ * the catalogue). A step whose drill is not installed is left out of the
+ * path, which is what lets the table be the whole curriculum while it ships —
+ * and what would let a misspelt id vanish without a word. So every id the
+ * table names is installed or listed here (tests/program.test.mjs), and a
+ * drill that ships is taken off this list.
+ */
+export const PLANNED = new Set([
+  'read:1', 'read:2a', 'read:2b', 'read:3a', 'read:3b', 'read:t', 'offbeat:a', 'partials:&',
+  'partials:a', 'partials:e', 'partials:mix', 'hands:RRLL:8', 'hands:RLRRLRLL:8', 'accent:8',
+  'accent:16', 'ghost:1', 'kickvar:8', 'kickvar:16', 'kickread:8', 'kickread:16', 'switch:8-16',
+  'switch:8-t', 'swing:58', 'swing:66', 'phrase:4:fill8-2', 'phrase:4:fill16-1',
+  'phrase:4:fill16-2', 'phrase:8', 'poly:hemiola', 'poly:3:2', 'poly:4:3',
+  'orchestrate:paradiddle', 'odd:5-4', 'odd:7-8a', 'odd:7-8b', 'group:3', 'group:5',
+  'displace:rock-backbeat:1', 'displace:rock-backbeat:2', 'feel:behind', 'feel:ahead',
+  'clock:gap1', 'clock:gap2', 'clock:gap4', 'clock:24', 'clock:off', 'clock:bar', 'blues-12-8',
+  'ballad-6-8', 'son-clave-3-2', 'son-clave-2-3', 'rumba-clave-3-2', 'groove-5-4', 'groove-7-8',
+  'quiz:echo:8', 'quiz:echo:mixed', 'quiz:pick:swing', 'quiz:pick:meter', 'quiz:pick:clave',
+  'quiz:pick:drift',
+]);
+
 /* ---- Building it ---------------------------------------------------------- */
 
 /* A quiz step's id is the id its rounds are recorded under. */
 export function quizItemId(drill, variant = '') {
-  return `quiz:${drill.mode}:${drill.kind}${variant ? `:${variant}` : ''}`;
+  return makeQuizId(drill.mode, drill.kind, variant);
 }
 
 const POOL_NAMES = { kit3: 'kick, snare, hat', qe: '4ths, 8ths', qes: '4ths-16ths' };
@@ -454,12 +477,7 @@ function stepsOf(slots, prefs) {
  */
 export function stepDone(progress, step) {
   if (step.quiz) return isDone(progress, step.id);
-  const ids = [step.id];
-  const m = LEVEL_ID_RE.exec(step.id);
-  if (m) {
-    const base = step.id.slice(0, -m[0].length);
-    for (let n = Number(m[1]) + 1; n <= 4; n++) ids.push(`${base}:l${n}`);
-  }
+  const ids = [step.id].concat(higherLevelIds(step.id));
   /* L0 asks whether you know the notes: its own ✓, or any rung above it
    * played clean, at any speed. */
   if (isUntimedId(step.id)) {
@@ -674,8 +692,8 @@ export function stepRow(step) {
 /* A groove's rungs share a folder, so a stage lists grooves, not rungs; a
  * groove with a single step here (a checkpoint's top rung) is a row of its own. */
 const baseOf = (id) => {
-  const m = LEVEL_ID_RE.exec(id);
-  return m ? id.slice(0, -m[0].length) : id;
+  const r = parseLevelId(id);
+  return r ? r.base : id;
 };
 
 function stepRows(steps) {

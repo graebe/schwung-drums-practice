@@ -30,6 +30,7 @@ import { announce } from '/data/UserData/schwung/shared/screen_reader.mjs';
 import * as L from './layout.mjs';
 import * as PAD from './padmap.mjs';
 import * as PIO from './pads_io.mjs';
+import * as PMS from './padmap_screen.mjs';
 import * as KIT from './kit.mjs';
 import * as C from './controls.mjs';
 import * as SET from './settings_def.mjs';
@@ -49,8 +50,11 @@ import * as AP from './answer_pads.mjs';
 import * as PROG from './progress.mjs';
 import * as PLAN from './program.mjs';
 import * as LES from './lessons.mjs';
+import * as ROWS from './path_rows.mjs';
 import * as UT from './untimed.mjs';
-import { availableLevels, LEVEL_ID_RE, isUntimedId } from './levels.mjs';
+import { availableLevels } from './levels.mjs';
+import * as IDS from './ids.mjs';
+import { isUntimedId } from './ids.mjs';
 import { paint, flashColor, guideTargets, FLASH_MS } from './led_paint.mjs';
 import { stats as timingStats, statsSince, perVoice, voicesBySpread } from './timing.mjs';
 
@@ -58,6 +62,9 @@ const MODULE_DIR = '/data/UserData/schwung/modules/tools/drums-practice';
 const SETTINGS_PATH = `${MODULE_DIR}/settings.json`;
 /* The Custom pad layout (pads_io.mjs). */
 const PADS_PATH = `${MODULE_DIR}/pads.json`;
+/* Its second copy, as for stats and progress below: the host's write empties
+ * the file before it fills it, so a save cut short leaves the other whole. */
+const PADS_BAK_PATH = `${MODULE_DIR}/pads.bak.json`;
 const STATS_PATH = `${MODULE_DIR}/stats.json`;
 /* A second copy, written after the first: the host has no rename, so a save
  * cut short by the power going leaves one of the two whole. */
@@ -231,9 +238,9 @@ let itemNames = new Map();
 /* The step of the Learning Path the armed drill was opened as, so Click on
  * its result goes on along the path; null when it came from anywhere else. */
 let pathStep = null;
-/* The lesson cards (lessons.json), and the ones on screen:
- * { ids, at, page, pages, then } — `then` is what Click goes on to once the
- * last is read, null when they were opened from Lessons to read again. */
+/* The lesson cards (lessons.json), and the deck on screen (lessons.mjs):
+ * { deck, then } — `then` is what Click goes on to once the last is read,
+ * null when they were opened from Lessons to read again. */
 let lessons = new Map();
 let card = null;
 /* How stuck the learner is on that step, for the result's footer (program.mjs
@@ -631,8 +638,9 @@ function loadProgress() {
   if (main.stale) {
     writeFile(PROGRESS_OLD_PATH, text);
     /* Saved even when stats.json had nothing in it, so the old file is not
-     * found, and set aside, again on every start. */
-    return rebuildProgress(true);
+     * found, and set aside, again on every start. What the old file had
+     * reached is merged in: the stats log is capped, the old file is not. */
+    return PROG.mergeLegacy(rebuildProgress(true), main.legacy);
   }
   if (text) writeFile(PROGRESS_BAD_PATH, text);
   const bakText = readFile(PROGRESS_BAK_PATH);
@@ -654,16 +662,8 @@ function rebuildProgress(always = false) {
  * the item "rock-backbeat:l2". A quiz round is filed as "pick:groove".
  */
 function itemOfRecord(rec) {
-  const parts = String(rec.d).split(':');
-  const kind = parts[0];
-  if (kind === 'guess' || kind === 'hear' || kind === 'pick') return `quiz:${parts.slice(0, 3).join(':')}`;
-  if (kind === 'clock') return CAT.CLOCK_ID;
-  if (kind !== 'drill' && kind !== 'ladder' && kind !== 'untimed') return null;
-  let end = parts.length;
-  for (let i = 1; i < parts.length; i++) {
-    if (SC.WINDOWS[parts[i]]) { end = i; break; }
-  }
-  const id = parts.slice(1, end).join(':');
+  const id = IDS.itemOfDrillId(rec.d);
+  if (!id || IDS.isQuizItemId(id) || IDS.isClockItemId(id)) return id;
   return itemNames.has(id) ? id : null;
 }
 
@@ -684,8 +684,8 @@ function writtenOf(id, rec) {
 }
 
 function fileChartOf(id) {
-  const m = LEVEL_ID_RE.exec(id);
-  const base = m ? id.slice(0, -m[0].length) : id;
+  const r = IDS.parseLevelId(id);
+  const base = r ? r.base : id;
   for (let i = 0; i < fileCharts.length; i++) if (fileCharts[i].id === base) return fileCharts[i];
   return null;
 }
@@ -761,7 +761,7 @@ function rebuildMenu() {
   program = PLAN.buildProgram({
     entries: fileEntries,
     categories: fileCategories,
-    has: (id) => itemNames.has(id) && id.indexOf('quiz:') !== 0,
+    has: (id) => itemNames.has(id) && !IDS.isQuizItemId(id),
     label: itemTitle,
   });
   /* A pooled quiz is an item of its own, named by its step. */
@@ -985,6 +985,7 @@ function startUntimed(practice) {
     SC.seekTo(run, from);
     index = Math.max(0, SC.nextEntryIndex(run, from));
   }
+  beginActivity('untimed');
   untimed = UT.createUntimed(run, { togetherMs: SC.WINDOWS[settings.strictness].goodMs, from: index });
   screen = RUNNING;
   announce('own pace');
@@ -1821,6 +1822,7 @@ function openRow() {
     return;
   }
   pathStep = null;
+  leavePath();
   if (item.repId) {
     if (leafIdx.get(item.repId)) openLeaf(leafIdx.get(item.repId));
     return;
@@ -1828,51 +1830,29 @@ function openRow() {
   openLeaf(item);
 }
 
-/* What a "Skip" row skips: the next open step of its folder, or, at the top
- * of the path, the step Continue would open. */
 function skipTarget(row) {
-  if (row.scope) return PLAN.nextOpen(progress, row.scope);
-  const next = PLAN.continueStep(progress, program);
-  return next ? next.step : null;
+  return ROWS.skipTarget(row, progress, program, Date.now());
 }
 
-/* Skip every open step of a folder — or, when nothing in it is left to skip,
- * take the skips back. One row, so it is never more than a click to undo. */
+/* Skip every open step of a folder, or take its skips back (path_rows.mjs). */
 function skipAll(scope) {
-  const open = scope.filter((st) => !PLAN.stepDone(progress, st) && !PLAN.stepSkipped(progress, st));
-  if (open.length) {
-    for (const st of open) PROG.skipItem(progress, st.id, Date.now());
-    announce(`Skipped ${open.length}`);
+  const change = ROWS.skipAllChange(scope, progress);
+  if (change.skip) {
+    for (const id of change.skip) PROG.skipItem(progress, id, Date.now());
+    announce(`Skipped ${change.skip.length}`);
   } else {
-    for (const st of scope) PROG.unskipItem(progress, st.id);
+    for (const id of change.unskip) PROG.unskipItem(progress, id);
     announce('Skips taken back');
   }
   saveProgress();
 }
 
-/* A row of Your path, turned on by a click: a track or style on or off, the
- * next value of a choice. */
+/* A row of Your path, turned on by a click. */
 function turnPref(row) {
-  const path = progress.path;
-  if (row.group === 'tracks' || row.group === 'styles') {
-    if (!PROG.togglePath(progress, row.group, row.key)) announce('One track stays on');
-  } else if (row.group === 'rungs') {
-    PROG.setPath(progress, 'rungs', path.rungs === 'full' ? 'short' : 'full');
-  } else if (row.group === 'intros') {
-    const i = PROG.INTROS.indexOf(path.intros);
-    PROG.setPath(progress, 'intros', PROG.INTROS[(i + 1) % PROG.INTROS.length]);
-  } else if (row.group === 'start') {
-    PROG.setPath(progress, 'start', ((path.start || 0) + 1) % program.stages.length);
-  }
+  const change = ROWS.prefChange(row, progress.path, program.stages.length);
+  if (change.toggle && !PROG.togglePath(progress, ...change.toggle)) announce('One track stays on');
+  if (change.set) PROG.setPath(progress, ...change.set);
   saveProgress();
-}
-
-/* What a Your path row shows as its value. */
-function prefValue(row) {
-  const path = progress.path;
-  if (row.group === 'tracks' || row.group === 'styles') return path[row.group][row.key] ? 'on' : 'off';
-  if (row.group === 'start') return `Stage ${path.start || 0}`;
-  return path[row.group] || '';
 }
 
 /*
@@ -1897,6 +1877,7 @@ function openStep(step) {
   /* The step's target is the Speed it is played at, so 100% of what it asks
    * is what the take is armed at. L0 has no clock to set. */
   const speed = isUntimedId(step.id) ? settings.speed : speedFor(step.target);
+  if (speedBeforePath === null) speedBeforePath = settings.speed;
   if ((target && settings.bpm !== target) || settings.speed !== speed) {
     if (target) settings.bpm = target;
     settings.speed = speed;
@@ -1905,6 +1886,7 @@ function openStep(step) {
   }
   openLeaf(node);
   if (step.wrap && chart) {
+    beginActivity('clock');
     clockMode = true;
     enterReady();
     announce(`Clock: ${chart.name}`);
@@ -1925,46 +1907,55 @@ function openPathStep(step) {
 }
 
 function showCards(ids, then) {
-  card = { ids, at: 0, page: 0, pages: [[]], then };
-  layCard();
+  beginActivity('cards');
+  card = { deck: LES.createDeck(lessons, ids, { guided: Boolean(then), width: L.SCREEN_W - 2,
+    measure: (t) => ctx.textWidth(t) }), then };
   screen = CARD;
 }
 
-/* The card at `at`, wrapped to the screen in the font it is drawn in. */
-function layCard() {
-  const c = lessons.get(card.ids[card.at]);
-  card.title = c ? c.title : '';
-  card.pages = LES.paginate(LES.wrapText(c ? c.text : '', L.SCREEN_W - 2, (t) => ctx.textWidth(t)));
-  card.page = 0;
+/* The cards read, into progress, so each shows once (Intros `new`). */
+function markRead(ids) {
+  for (const id of ids) PROG.markSeen(progress, id);
+  if (ids.length) saveProgress();
 }
 
-/* Click: this card is read; on to the next, or to what the cards stood before. */
-function nextCard() {
-  PROG.markSeen(progress, card.ids[card.at]);
-  saveProgress();
-  if (card.at + 1 < card.ids.length) {
-    card.at++;
-    layCard();
-    return;
-  }
+/* What the deck stood before, once its last card is through. */
+function leaveCards(r) {
+  markRead(r.read);
+  if (!r.done) return;
   const then = card.then;
   card = null;
   screen = MENU;
   if (then) then();
 }
 
+/* Click: this card is read; on to the next, or to what the cards stood before. */
+function nextCard() {
+  leaveCards(LES.advance(card.deck));
+}
+
 /* Play: the cards are taken as read and the practice is heard at once. */
 function hearFromCard() {
-  if (!card.then) return;
-  for (let i = card.at; i < card.ids.length; i++) PROG.markSeen(progress, card.ids[i]);
-  card.at = card.ids.length - 1;
-  nextCard();
+  const r = LES.skipToEnd(card.deck);
+  if (!r.done) return;
+  leaveCards(r);
   if (screen === READY) start(false);
 }
 
-function cardFooter() {
-  if (!card.then) return card.at + 1 < card.ids.length ? 'CLICK next  BACK list' : 'CLICK done';
-  return card.at + 1 < card.ids.length ? 'CLICK next  PLAY hear' : 'CLICK start PLAY hear';
+/*
+ * The Speed a path step set is the step's, not yours: leaving the path for a
+ * drill of the library gives back the Speed you had before it — a library
+ * drill opened after a 60% step used to open at 60% as well.
+ */
+let speedBeforePath = null;
+function leavePath() {
+  if (speedBeforePath === null) return;
+  if (settings.speed !== speedBeforePath) {
+    settings.speed = speedBeforePath;
+    settingsRowsCache = SET.settingsRows(settings);
+    saveSettings();
+  }
+  speedBeforePath = null;
 }
 
 /* A step's target as a Speed the setting offers: its nearest step of five,
@@ -1988,11 +1979,26 @@ function goNext() {
   screen = MENU;
 }
 
+/*
+ * What the module is doing beyond showing a screen is ONE of: a quiz round, a
+ * Ladder, the Clock, an L0 take, or a deck of lesson cards — each held in its
+ * own variable (quiz, ladder, clockMode, untimed, card). They are exclusive,
+ * and every place that starts one comes through here, which ends the others:
+ * a Clock left armed under a quiz, or a quiz under a deck of cards, is the
+ * kind of state the scattered flags used to allow.
+ */
+function beginActivity(kind) {
+  if (kind !== 'quiz') quiz = null;
+  if (kind !== 'ladder') ladder = null;
+  if (kind !== 'clock') clockMode = false;
+  if (kind !== 'untimed') untimed = null;
+  if (kind !== 'cards') card = null;
+}
+
 function openQuiz(drill, step = null) {
   /* Nothing a quiz could be wrapped in: a Clock step before it on the path
    * must not still be armed when the round is over. */
-  ladder = null;
-  clockMode = false;
+  beginActivity('quiz');
   /* A step of the path asks about what its stage has taught: three drums,
    * two subdivisions, the grooves you have played. From the Quiz folder, all. */
   const pool = step && step.pool;
@@ -2039,8 +2045,8 @@ function openLeaf(item) {
     return;
   }
   if (item.kind === 'clock') {
+    beginActivity('clock');
     clockMode = true;
-    ladder = null;
     enterReady();
     announce(`Clock: ${chart.name}`);
     return;
@@ -2048,7 +2054,7 @@ function openLeaf(item) {
   if (item.kind === 'ladder') {
     /* From 70% of the tempo the drill is played at — its own times Speed —
      * climbing through it. */
-    clockMode = false;
+    beginActivity('ladder');
     ladder = newLadder();
     ladderReason = '';
     enterReady();
@@ -2099,7 +2105,7 @@ function pathGrooves() {
 
 /* The item a quiz round is filed under: its pooled variant's, when it has one. */
 function quizItemOf(q) {
-  return PLAN.quizItemId({ mode: q.mode, kind: q.kind }, q.variant);
+  return IDS.quizItemId(q.mode, q.kind, q.variant);
 }
 
 /* The pad layout a press is read in. A drum quiz always uses the kit: in the
@@ -2116,10 +2122,8 @@ function layoutNow() {
  * every pad is the snare and eight of nine prompts could not be answered.
  */
 let customPads = null;
-/* The Pad map screen: the Custom pad being edited (grid index, -1 none),
- * whether an edit lands on both halves, the voice last struck, and whether
- * Custom changed since it was opened (Back saves it). */
-const pm = { sel: -1, both: true, note: '', noteUntil: 0, edited: false };
+/* The Pad map screen's state (padmap_screen.mjs). */
+const pm = PMS.createPadMap();
 let padLayout = PAD.resolveLayout(PAD.DEFAULT_LAYOUT);
 let quizLayout = padLayout;
 function refreshLayout() {
@@ -2131,69 +2135,41 @@ function refreshLayout() {
 
 /* ---- the Pad map screen ------------------------------------------------- */
 /*
- * Settings › Pad map: the layout in force, every pad named. On a preset a pad
- * sounds its drum and names it, the jog steps through the layouts, and Click
- * makes an editable copy of it — Custom. On Custom a pad is picked, the jog
- * gives it a sound, and knob 1 says whether the edit lands on both halves (the
- * pad its layout pairs it with: the same column of the other half, or its
- * mirror image). Back saves Custom to pads.json and returns to Settings.
+ * Its rules are padmap_screen.mjs's; what is done here is what only the host
+ * can do: sound a pad, change and save the settings, save pads.json.
  */
+function padMapView() {
+  return { layout: padLayout, custom: settings.layout === PAD.CUSTOM,
+    sticking: settings.layout === 'sticking', flip: settings.flip };
+}
+
 function openPadMap() {
-  pm.sel = -1;
-  pm.note = '';
-  pm.edited = false;
+  PMS.reset(pm);
   screen = PADMAP;
   announce(`Pad map: ${padLayout.name}`);
 }
 
-const isCustom = () => settings.layout === PAD.CUSTOM;
-
-/* A pad of the grid as an index into Custom's own, unflipped rows. */
-function customIndex(i) {
-  if (!settings.flip) return i;
-  const row = Math.floor(i / PAD.COLS);
-  return row * PAD.COLS + (PAD.COLS - 1 - (i % PAD.COLS));
-}
-
 function padMapPress(pad, vel) {
-  const i = pad - PAD.PAD_FIRST;
-  const voice = padLayout.grid[i];
-  if (voice) sound(voice, vel || 100);
-  const v = voice ? KIT.voiceById(voice) : null;
-  pm.note = v ? v.label : 'no sound';
-  pm.noteUntil = now() + 2000;
-  if (isCustom()) pm.sel = i;
-  announce(pm.note);
+  const r = PMS.press(pm, padMapView(), pad, now());
+  if (r.voice) sound(r.voice, vel || 100);
+  announce(r.note);
 }
 
 function padMapJog(delta) {
-  if (isCustom() && pm.sel >= 0) {
-    /* No sound, then every voice in staff order. */
-    const list = [null].concat(KIT.VOICE_IDS);
-    const at = Math.max(0, list.indexOf(padLayout.grid[pm.sel]));
-    const next = list[Math.max(0, Math.min(list.length - 1, at + delta))];
-    customPads = PIO.setPad(customPads || PIO.copyPreset(PAD.DEFAULT_LAYOUT), customIndex(pm.sel), next, pm.both);
-    pm.edited = true;
+  const r = PMS.jog(pm, padMapView(), delta, customPads || PIO.copyPreset(PAD.DEFAULT_LAYOUT), now());
+  if (r.custom) {
+    customPads = r.custom;
     refreshLayout();
-    pm.note = next ? KIT.voiceById(next).label : 'no sound';
-    pm.noteUntil = now() + 2000;
-    return;
+  } else {
+    editSetting('layout', r.layoutDelta);
   }
-  editSetting('layout', delta);
-  pm.sel = -1;
-  pm.note = '';
 }
 
 /* Click on a preset: Custom becomes a copy of it, to edit. */
 function padMapClick() {
-  if (isCustom()) {
-    pm.sel = -1;
-    return;
-  }
-  if (settings.layout === 'sticking') return;
+  if (!PMS.click(pm, padMapView()).copy) return;
   const from = padLayout.name;
   customPads = PIO.copyPreset(settings.layout);
-  pm.edited = true;
   settings.layout = PAD.CUSTOM;
   settingsRowsCache = SET.settingsRows(settings);
   saveSettings();
@@ -2203,29 +2179,23 @@ function padMapClick() {
 
 function savePads() {
   if (!pm.edited || !customPads) return;
-  if (writeFile(PADS_PATH, PIO.serialisePads(customPads))) pm.edited = false;
+  const text = PIO.serialisePads(customPads);
+  if (!writeFile(PADS_PATH, text)) return;
+  pm.edited = false;
+  writeFile(PADS_BAK_PATH, text);
 }
 
-/* The pads an edit is landing on, lit on the grid. Flip leaves the pairing
- * where it was: a twin is four columns away, a mirror image 7 - c, either way. */
 function padMapSelected() {
-  if (screen !== PADMAP || !isCustom() || pm.sel < 0) return null;
-  const row = Math.floor(pm.sel / PAD.COLS);
-  const out = [PAD.PAD_FIRST + pm.sel];
-  if (pm.both) out.push(PAD.padAt(row, PAD.pairCol(pm.sel % PAD.COLS, padLayout.pair)));
-  return out;
+  return screen === PADMAP ? PMS.selectedPads(pm, padMapView()) : null;
 }
 
-function padMapFooter() {
-  if (isCustom()) return pm.sel >= 0 ? 'JOG sound KNOB1 both' : 'PAD pick  JOG layout';
-  if (settings.layout === 'sticking') return 'JOG layout';
-  return 'PAD hear CLICK edit';
-}
-
+/* The Custom layout from pads.json or, when that is empty or will not read —
+ * a save cut short — from its backup. */
 function loadPads() {
-  const r = PIO.readPads(readFile(PADS_PATH));
-  customPads = r.custom;
-  if (!r.ok) {
+  const main = PIO.readPads(readFile(PADS_PATH));
+  const r = main.custom ? main : PIO.readPads(readFile(PADS_BAK_PATH));
+  customPads = r.custom || main.custom;
+  if (!r.custom && !(main.ok && r.ok)) {
     menuNote = 'BAD PADS.JSON';
     menuNoteUntil = now() + 8000;
     announce('pads.json would not read: Custom is MPC Classic until it is saved again.');
@@ -2286,7 +2256,7 @@ function progressDetail(index) {
   }
   const id = row.id;
   const it = PROG.item(progress, id) || { h: [], best: 0, bpm: 0, plays: 0 };
-  const isQuiz = id.indexOf('quiz:') === 0;
+  const isQuiz = IDS.isQuizItemId(id);
   /* The best dynamics beside where the jog is: the chart's dotted line. */
   const dyn = it.dyn >= 0 ? `dyn ${it.dyn}%` : '';
   return {
@@ -2398,6 +2368,9 @@ let exited = false;
 function closeModule() {
   if (pendingExitAt || exited) return;
   guard('close:panic', () => dspSet('panic', '1'));
+  /* A Custom layout edited on the Pad map is saved on Back; Shift+Back from
+   * there closes without passing it. */
+  guard('close:pads', savePads);
   tp.mode = C.MODE_IDLE;
   tp.paused = false;
   /*
@@ -2465,52 +2438,22 @@ function menuRows(node) {
 }
 
 function decoratedRows(node) {
-  /* Inside the Learning Path, the step Continue would open is marked ▸. */
+  /* Inside the Learning Path its rows speak for themselves (path_rows.mjs). */
   const inPath = nav.some((n) => n.node === pathNode);
-  const next = inPath ? PLAN.continueStep(progress, program) : null;
-  const stage = inPath ? PLAN.currentStage(progress, program) : null;
+  const pc = inPath ? ROWS.pathContext(progress, program, Date.now()) : null;
   const kids = node.children;
   const out = new Array(kids.length);
-  for (let i = 0; i < kids.length; i++) {
-    out[i] = decorateRow(kids[i], next ? next.step.key : '', stage);
-  }
+  for (let i = 0; i < kids.length; i++) out[i] = (pc && ROWS.pathRow(kids[i], pc)) || decorateRow(kids[i]);
   return out;
 }
 
 /*
- * What a row says about your progress, decided here rather than in the tree:
- * the tree holds what the drills ARE, not how far you have got with them.
+ * What a row of the library says about your progress, decided here rather
+ * than in the tree: the tree holds what the drills ARE, not how far you have
+ * got with them.
  */
-function decorateRow(row, nextKey, current) {
+function decorateRow(row) {
   const plain = { label: row.label, value: row.value || '', mark: row.mark || null };
-  if (row.continueRow) {
-    const next = PLAN.continueStep(progress, program);
-    return next
-      ? { label: `Next: ${PLAN.stepTitle(next.step)}`, value: '', mark: PROG.MARK_NEXT }
-      : { label: 'All learned', value: '', mark: PROG.MARK_DONE };
-  }
-  if (row.skipRow) {
-    const next = skipTarget(row);
-    return { label: next ? `Skip: ${PLAN.stepTitle(next)}` : 'Skip: nothing left', value: '' };
-  }
-  if (row.skipAllRow) {
-    const open = row.scope.some((st) => !PLAN.stepDone(progress, st) && !PLAN.stepSkipped(progress, st));
-    const skipped = row.scope.some((st) => PLAN.stepSkipped(progress, st));
-    return { label: !open && skipped ? 'Unskip all here' : 'Skip all here', value: '' };
-  }
-  if (row.prefRow) return { label: row.label, value: prefValue(row) };
-  if (row.lessonsRow) return plain;
-  if (row.stage) {
-    const sum = PLAN.stepsSummary(progress, row.steps);
-    const mark = PLAN.stageComplete(progress, row.stage) ? PROG.MARK_DONE
-      : row.stage === current ? PROG.MARK_NEXT : null;
-    return { label: row.label, value: sum.played ? `${sum.done}/${sum.count}` : '>', mark };
-  }
-  if (row.steps && CAT.isFolder(row)) {
-    const sum = PLAN.stepsSummary(progress, row.steps);
-    return { label: row.label, value: sum.played ? `${sum.done}/${sum.count}` : '>' };
-  }
-  if (row.step) return stepRowOf(row, nextKey);
   if (row.repetition) {
     const due = PROG.dueCount(PROG.repetitionSession(progress, Date.now()));
     return { label: row.label, value: due ? `${due} due` : '>' };
@@ -2530,24 +2473,6 @@ function decorateRow(row, nextKey, current) {
     mark: PROG.itemMark(progress, row.id) };
 }
 
-/* A step of the path: done at ITS target, which may be short of a ✓ — the
- * spiral brings the drill back faster later — or parked for the day, `~`. */
-function stepRowOf(row, nextKey) {
-  const st = row.step;
-  let mark = null;
-  if (PLAN.stepDone(progress, st)) mark = PROG.MARK_DONE;
-  else if (PLAN.stepSkipped(progress, st)) mark = PROG.MARK_SKIP;
-  else if (st.key === nextKey) mark = PROG.MARK_NEXT;
-  else mark = PROG.itemMark(progress, st.id) === PROG.MARK_TRIED ? PROG.MARK_TRIED : null;
-  if (!mark && PROG.isParked(progress, st.id, Date.now())) return { label: row.label, value: '~', mark };
-  /* Short of 100%, the best is read against the step's own target: 45/60. */
-  const it = PROG.item(progress, st.id);
-  const timed = !st.quiz && !isUntimedId(st.id);
-  let value = PROG.itemValue(progress, st.id);
-  if (value && timed && st.target < 100) value = `${it.best}/${st.target}`;
-  return { label: row.label, value, mark };
-}
-
 function draw() {
   if (screen === ERROR || safeMode) {
     V.drawError(ctx, {
@@ -2559,19 +2484,11 @@ function draw() {
     return;
   }
   if (screen === PADMAP) {
-    const sel = padMapSelected();
-    V.drawPadMap(ctx, {
-      title: pm.note && now() < pm.noteUntil ? pm.note : padLayout.name,
-      right: isCustom() ? (pm.both ? 'both' : 'one') : settings.flip ? 'flip' : '',
-      grid: padLayout.grid,
-      selected: sel ? sel.map((p) => p - PAD.PAD_FIRST) : [],
-      footer: padMapFooter(),
-    });
+    V.drawPadMap(ctx, PMS.screenOf(pm, padMapView(), now()));
     return;
   }
   if (screen === CARD && card) {
-    V.drawCard(ctx, { title: card.title, lines: card.pages[card.page], page: card.page,
-      pages: card.pages.length, footer: cardFooter() });
+    V.drawCard(ctx, LES.deckScreen(card.deck));
     return;
   }
   if (screen === MENU) {
@@ -2993,7 +2910,7 @@ function midiInner(data) {
       return;
     }
     if (screen === PADMAP) {
-      if (k === 0 && isCustom()) pm.both = !pm.both;
+      if (k === 0) PMS.toggleBoth(pm, padMapView());
       return;
     }
     if (screen === SETTINGS) {
@@ -3039,7 +2956,7 @@ function jog(delta) {
   } else if (target === 'padmap') {
     padMapJog(delta);
   } else if (target === 'page' && card) {
-    card.page = Math.max(0, Math.min(card.pages.length - 1, card.page + delta));
+    LES.turnPage(card.deck, delta);
   } else if (target === 'choice' && quiz) {
     Q.moveChoice(quiz, delta);
   } else if ((screen === SUMMARY || screen === LADDER) && review) {
@@ -3153,6 +3070,17 @@ globalThis.onResume = function onResume() {
  * leaving either way, and what they must not be left with is a lit grid and a
  * ringing kit.
  */
+/*
+ * What the list shows, for tests that walk the menu by name rather than by
+ * counting jog turns (tests/ui_smoke.test.mjs goTo). Read-only: it hands out
+ * labels and the cursor, never the tree, so nothing can be changed through it.
+ */
+globalThis.drumsPracticeMenu = function drumsPracticeMenu() {
+  if (screen !== MENU) return null;
+  const top = CAT.navTop(nav);
+  return { title: top.node.label, cursor: top.cursor, labels: menuRows(top.node).map((r) => r.label) };
+};
+
 globalThis.onUnload = function onUnload() {
   /*
    * ONCE, however many times we are asked.
@@ -3191,5 +3119,8 @@ globalThis.onUnload = function onUnload() {
     setButtonLED(C.CC_PLAY, 0);
     setButtonLED(C.CC_RECORD, 0);
   });
-  guard('unload:files', () => flushFiles(true));
+  guard('unload:files', () => {
+    savePads();
+    flushFiles(true);
+  });
 };
