@@ -10,7 +10,10 @@
 #
 #   scripts/build-samples.sh [<piano-practice checkout>]
 #
-# The checkout defaults to the sibling of this repository's main checkout.
+# The checkout defaults to the sibling of this repository's main checkout. It
+# must have nisp-build's piece `tune` (the high tom and Kick 2 are pitched):
+# until that is on Piano Practice's main, pass its feature/nisp-piece-tune
+# worktree.
 # The build is deterministic: the same source and manifest give the same
 # bytes, so an unchanged pack shows no diff. The click (samples/click.*) is
 # Piano Practice's and is not cut here; scripts/check-vendored.sh keeps it

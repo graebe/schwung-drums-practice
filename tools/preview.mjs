@@ -16,6 +16,8 @@
  *   npm run preview -- --exercise rock-backbeat --beats 20 --sloppy
  *   npm run preview -- --exercise rock-backbeat --untimed --cursor 0,3,8 --view grid
  *   npm run preview -- --exercise rock-backbeat --screen untimed-summary
+ *   npm run preview -- --exercise kit --px 14 --film 2,8,14,20   (all 21 voices engraved)
+ *   npm run preview -- --screen padmap --layout mirror --flip
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { createScreen, toAscii } from './screen_buffer.mjs';
@@ -29,6 +31,8 @@ import * as PROG from '../src/progress.mjs';
 import * as L from '../src/layout.mjs';
 import * as UT from '../src/untimed.mjs';
 import { projectLevel } from '../src/levels.mjs';
+import { VOICES } from '../src/kit.mjs';
+import { resolveLayout } from '../src/padmap.mjs';
 
 const exDir = new URL('../src/exercises/', import.meta.url);
 
@@ -50,6 +54,11 @@ function arg(name, fallback) {
 }
 
 const drills = allDrills();
+/* The whole kit, one voice a beat in staff order: the engraving to review. */
+drills.push({
+  id: 'kit', name: 'The kit', bpm: 60, timeSig: [4, 4], loopBars: 6, repeats: 1, sticking: 'off',
+  events: VOICES.map((v, i) => ({ beat: i, voices: [v.id] })),
+});
 if (arg('list', false)) {
   for (const d of drills) console.log(`${d.id}\t${d.name}`);
   process.exit(0);
@@ -163,6 +172,10 @@ if (screen) {
       songBeats: Number(arg('beats', 0)), pxPerBeat: px, view,
       dynamics: true, rightLabel: '8 bars',
     });
+  } else if (screen === 'padmap') {
+    const lay = resolveLayout(String(arg('layout', 'mpc')), { flip: Boolean(arg('flip', false)) });
+    V.drawPadMap(ctx, { title: lay.name, right: lay.flip ? 'flip' : '', grid: lay.grid, selected: [],
+      footer: 'PAD hear CLICK edit' });
   } else if (screen === 'menu') {
     V.drawList(ctx, { title: 'DRUMS', items: drills.map((d) => d.name), selected: 3 });
   } else if (screen === 'progress') {
