@@ -942,7 +942,7 @@ function armChart(c) {
    * again fifty times a second. */
   chartWarning = warningFor(chart);
   chartLanes = GR.lanes(KIT.voicesInChart(chart));
-  chartLength = chart.untimed ? IO.untimedLength(chart) : IO.practiceLength(chart);
+  chartLength = chart.untimed ? IO.untimedLength(chart) : readyLength(chart);
   /* A newly armed drill starts at home, where the box is. */
   T.home(tp);
   review = null;
@@ -1083,6 +1083,17 @@ function startUntimed(practice) {
   untimed = UT.createUntimed(run, { togetherMs: SC.WINDOWS[settings.strictness].goodMs, from: index });
   screen = RUNNING;
   announce('own pace');
+}
+
+/*
+ * The ready header's length: "8 bars  0:21" when the drill's name still fits
+ * beside it, else only "8 bars" — the name is what tells you where you are,
+ * and the duration is the first thing that can go.
+ */
+function readyLength(c) {
+  const full = IO.practiceLength(c);
+  const bars = full.split('  ')[0];
+  return ctx.textWidth(c.name) + ctx.textWidth(full) + 10 <= L.SCREEN_W ? full : bars;
 }
 
 /*

@@ -2680,6 +2680,17 @@ test('Play on L0 sounds the bar, spread over time, and starts nothing', async ()
   assert.ok(drawnText(2).includes('own pace'), 'still on the ready screen');
 });
 
+test('the ready header keeps the drill\'s name: the duration gives way first', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  toFirstRung();                                /* Rock backbeat, a timed level */
+  ticks(2);
+  const header = drawnText(1);
+  assert.ok(header.includes('Rock backbeat'), `name cut: ${header.join('|')}`);
+  assert.ok(header.some((t) => /^\d+ bars/.test(t)), `no length: ${header.join('|')}`);
+});
+
 test('Play on L0 takes the ready box away, and the cursor walks the bar as it sounds', async () => {
   const L = await import('../src/layout.mjs');
   const { screen } = await loadUi();
