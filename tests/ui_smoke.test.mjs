@@ -1578,9 +1578,10 @@ function playEighths(snarePadNo, bpm, vel, beats = 32) {
   }
 }
 
-test('an even take of an accented drill says its accents were soft, and never BEST YET', async () => {
-  /* The reported take, through the real UI: every note hit at one velocity,
-   * so no accent stood out. It must say so — not headline a 100. */
+test('an even take of an accented drill counts, and its dynamics say the accents were soft', async () => {
+  /* The reported take, through the real UI: every note hit on time at one
+   * velocity, so no accent stood out. The notes were right, so it is
+   * learned; the dynamics are their own score beside it, with what to fix. */
   const { log } = await loadUi({ settings: PLAIN });
   const sn = await snare();
   globalThis.init();
@@ -1591,20 +1592,26 @@ test('an even take of an accented drill says its accents were soft, and never BE
   ticks(2);
   playEighths(sn, 100, () => 70);
   let shown = drawnText(2);
-  assert.ok(shown.includes('NOT CLEAN'), shown.join('|'));
-  assert.ok(!shown.includes('BEST YET'), shown.join('|'));
-  assert.ok(shown.some((t) => /^\d+ soft accents 70<85$/.test(t)), shown.join('|'));
-  assert.ok(shown.includes('right, need 90'), shown.join('|'));
-  /* The same take with the accents lifted counts: Record, from the result. */
+  assert.ok(shown.includes('LEARNED'), shown.join('|'));
+  assert.ok(!shown.includes('NOT CLEAN'), shown.join('|'));
+  assert.ok(shown.includes('dyn 0%'), shown.join('|'));
+  assert.ok(shown.some((t) => /^\d+ soft 70<85$/.test(t)), shown.join('|'));
+  /* The same take with the accents lifted: full marks, and no advice. */
   playEighths(sn, 100, (i) => (i % 2 ? 70 : 90));
   shown = drawnText(2);
-  assert.ok(shown.includes('LEARNED'), shown.join('|'));
+  assert.ok(shown.includes('dyn 100%'), shown.join('|'));
+  assert.ok(!shown.some((t) => / soft /.test(t)), shown.join('|'));
   globalThis.onUnload();
   const stats = JSON.parse(log.writes[`${DATA}stats.json`]).records;
   const even = stats.find((r) => r.d.startsWith('drill:subdiv:eighths') && r.dy > 0);
   assert.ok(even, 'the record does not say what its errors were');
   assert.equal(even.av, 70);
   assert.equal(even.an, 85);
+  assert.equal(even.dp, 0);
+  assert.equal(even.err, 0, 'a soft accent is no error of the notes');
+  const progress = JSON.parse(log.writes[`${DATA}progress.json`]);
+  assert.equal(progress.version, 2);
+  assert.equal(progress.items['subdiv:eighths'].dyn, 100);
 });
 
 test('a Study take is not counted', async () => {
@@ -1637,7 +1644,7 @@ test('Skip next moves Continue on to the next track', async () => {
 test('Repetition lists what is due, and opens it', async () => {
   const day = 86400;
   const now = Math.round(Date.now() / 1000);
-  const progress = { version: 1, items: { flam: {
+  const progress = { version: 2, items: { flam: {
     best: 100, bpm: 70, plays: 1, t: now - 3 * day, done: now - 3 * day, skip: 0,
     rep: { due: now - day, step: 0, at: 0, ok: false }, h: [],
   } } };
@@ -1660,9 +1667,9 @@ test('Repetition lists what is due, and opens it', async () => {
 
 test('Progress lists the tracks and what was played, and opens a chart', async () => {
   const now = Math.round(Date.now() / 1000);
-  const progress = { version: 1, items: { 'flam-tap': {
+  const progress = { version: 2, items: { 'flam-tap': {
     best: 85, bpm: 61, plays: 2, t: now, done: 0, skip: 0, rep: null,
-    h: [[now - 60, 70, 95, 20, 1], [now, 85, 93, 18, 1]],
+    h: [[now - 60, 70, 95, 20, 1, -1], [now, 85, 93, 18, 1, -1]],
   } } };
   await loadUi({ dataFiles: { 'progress.json': JSON.stringify(progress) } });
   globalThis.init();
@@ -1695,7 +1702,7 @@ test('Progress lists the tracks and what was played, and opens a chart', async (
 test('the overview draws drills learned over time', async () => {
   const now = Math.round(Date.now() / 1000);
   const learned = (t) => ({ best: 100, bpm: 70, plays: 1, t, done: t, skip: 0, rep: null, h: [] });
-  const progress = { version: 1, items: {
+  const progress = { version: 2, items: {
     'flam-tap': learned(now - 86400 * 3), flam: learned(now - 86400), 'rock-backbeat:l3': learned(now),
   } };
   const { screen } = await loadUi({ dataFiles: { 'progress.json': JSON.stringify(progress) } });
@@ -1728,8 +1735,29 @@ test('takes already in stats.json are read in when there is no progress yet', as
   assert.ok(saved.items.flam.done);
 });
 
+test('a progress.json of version 1 is set aside and rebuilt from stats, judged anew', async () => {
+  const v1 = JSON.stringify({ version: 1, items: { 'subdiv:eighths': { best: 0, plays: 1, h: [] } } });
+  /* An eighths take with every note on time but its accents soft: under
+   * version 1 it was not clean (err counted the dynamics); its breakdown says
+   * the errors were all dynamics, so today it counts. */
+  const stats = { version: 1, records: [
+    { t: 1000, d: 'drill:subdiv:eighths:normal:strict', bpm: 100, sd: 9, n: 32, err: 8, tot: 32,
+      st: 0, sk: 0, dy: 8, av: 70, an: 85 },
+  ] };
+  const { log } = await loadUi({ dataFiles: { 'progress.json': v1, 'stats.json': JSON.stringify(stats) } });
+  globalThis.init();
+  ticks(2);
+  globalThis.onUnload();
+  assert.equal(log.writes[`${DATA}progress.v1.json`], v1, 'the old file is kept whole');
+  assert.equal(log.writes[`${DATA}progress.bad.json`], undefined, 'an old file is not a damaged one');
+  const saved = JSON.parse(log.writes[`${DATA}progress.json`]);
+  assert.equal(saved.version, 2);
+  assert.equal(saved.items['subdiv:eighths'].best, 100);
+  assert.ok(saved.items['subdiv:eighths'].done, 'a take that failed only on dynamics is learned');
+});
+
 test('a damaged progress.json is kept aside and the backup read', async () => {
-  const good = JSON.stringify({ version: 1, items: { flam: { best: 90, plays: 1, h: [] } } });
+  const good = JSON.stringify({ version: 2, items: { flam: { best: 90, plays: 1, h: [] } } });
   const { log } = await loadUi({ dataFiles: { 'progress.json': '{"items": {trunc',
     'progress.bak.json': good } });
   globalThis.init();

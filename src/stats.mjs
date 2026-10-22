@@ -39,16 +39,18 @@ export function drillId(kind, id, opts = {}) {
  *   sd    timing spread, ms
  *   mean  timing bias, ms
  *   n     hits
- *   err   misses + sticking + dynamic errors, together
+ *   err   misses + wrong hands, together — what cost right notes
  *   tot   notes asked, when known, so a take's accuracy can be worked out
  *   cl    1 when the take was clean (progress.mjs)
  *   st    stray hits        } what `err` and the strays were made of, when
  *   sk    wrong hands       } known: a take that failed can be explained
  *   dy    wrong dynamics    } from the record, not only counted
  *   av    soft accents' mean velocity, and `an` the mean they needed
+ *   gv    loud ghosts' mean velocity, and `gn` the mean they had to stay under
+ *   dp    the dynamics score (progress.mjs dynamicsScore), when judged
  */
 export function makeRecord({ drill, bpm, sd = 0, mean = 0, n = 0, err = 0, at = 0, context = null,
-  total = 0, clean = false, breakdown = null }) {
+  total = 0, clean = false, breakdown = null, dyn = -1 }) {
   const rec = {
     t: Math.round(at),
     d: drill,
@@ -69,7 +71,13 @@ export function makeRecord({ drill, bpm, sd = 0, mean = 0, n = 0, err = 0, at = 
       rec.av = Math.round(a.vel / a.n);
       rec.an = Math.round(a.need / a.n);
     }
+    const g = breakdown.loudGhosts;
+    if (g && g.n > 0) {
+      rec.gv = Math.round(g.vel / g.n);
+      rec.gn = Math.round(g.need / g.n);
+    }
   }
+  if (dyn >= 0) rec.dp = Math.round(dyn);
   /*
    * What the take was played WITH: Speed, and whether Guide pads or Study
    * helped. Kept on the record rather than in the drill's id, so one drill

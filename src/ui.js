@@ -64,6 +64,8 @@ const STATS_BAD_PATH = `${MODULE_DIR}/stats.bad.json`;
 const PROGRESS_PATH = `${MODULE_DIR}/progress.json`;
 const PROGRESS_BAK_PATH = `${MODULE_DIR}/progress.bak.json`;
 const PROGRESS_BAD_PATH = `${MODULE_DIR}/progress.bad.json`;
+/* A progress file of an earlier version, set aside when progress is rebuilt. */
+const PROGRESS_OLD_PATH = `${MODULE_DIR}/progress.v1.json`;
 const CRASH_PATH = `${MODULE_DIR}/crash.log`;
 const EXERCISE_DIR = `${MODULE_DIR}/exercises`;
 
@@ -603,19 +605,31 @@ function loadStats() {
  * Progress, the same way: the main file, else its backup, a damaged main file
  * kept aside. With neither file there — the first start of a version that
  * has progress — the takes already in stats.json are read into it, so a week
- * of practice before the update is not lost to it.
+ * of practice before the update is not lost to it. A file of an earlier
+ * version is set aside whole and progress is rebuilt from stats.json the same
+ * way, judged by today's rules.
  */
 function loadProgress() {
   const text = readFile(PROGRESS_PATH);
   const main = PROG.readProgress(text);
   if (main.ok) return main.progress;
+  if (main.stale) {
+    writeFile(PROGRESS_OLD_PATH, text);
+    /* Saved even when stats.json had nothing in it, so the old file is not
+     * found, and set aside, again on every start. */
+    return rebuildProgress(true);
+  }
   if (text) writeFile(PROGRESS_BAD_PATH, text);
   const bakText = readFile(PROGRESS_BAK_PATH);
   const bak = PROG.readProgress(bakText);
   if (bak.ok) return bak.progress;
   if (text || bakText) return PROG.emptyProgress();
+  return rebuildProgress();
+}
+
+function rebuildProgress(always = false) {
   const fresh = PROG.importStats(PROG.emptyProgress(), stats.records, itemOfRecord, writtenOf);
-  if (fresh.rev) saveProgress();
+  if (fresh.rev || always) saveProgress();
   return fresh;
 }
 
@@ -629,7 +643,7 @@ function itemOfRecord(rec) {
   const kind = parts[0];
   if (kind === 'guess' || kind === 'hear' || kind === 'pick') return `quiz:${parts[0]}:${parts[1]}`;
   if (kind === 'clock') return CAT.CLOCK_ID;
-  if (kind !== 'drill' && kind !== 'ladder') return null;
+  if (kind !== 'drill' && kind !== 'ladder' && kind !== 'untimed') return null;
   let end = parts.length;
   for (let i = 1; i < parts.length; i++) {
     if (SC.WINDOWS[parts[i]]) { end = i; break; }
@@ -1143,6 +1157,7 @@ function stopUntimed() {
     verdict: PROG.untimedVerdictOf(c),
     eased: PROG.easedBy({ ...judgingContext(), study: false }),
     pace: untimed.pace,
+    dyn: PROG.dynamicsScore(c),
   };
   const whole = !tp.scrubbed && c.stacks > 0;
   if (whole) recordUntimed(judged);
@@ -1153,7 +1168,7 @@ function stopUntimed() {
   screen = SUMMARY;
 }
 
-function recordUntimed({ c, verdict, eased, pace }) {
+function recordUntimed({ c, verdict, eased, pace, dyn }) {
   const rec = ST.makeRecord({
     drill: ST.drillId('untimed', recordIdOf(chart), settings),
     bpm: pace,
@@ -1163,15 +1178,16 @@ function recordUntimed({ c, verdict, eased, pace }) {
     context: attemptContext(),
     total: c.stacks,
     clean: verdict.clean && !eased,
-    breakdown: { strays: c.wrong, stickErrors: c.hand,
-      dynErrors: c.softAccents.n + c.loudGhosts.n, softAccents: c.softAccents },
+    breakdown: { strays: c.wrong, stickErrors: c.hand, dynErrors: c.dynErrors,
+      softAccents: c.softAccents, loudGhosts: c.loudGhosts },
+    dyn: dyn.score,
   });
   stats = ST.addRecord(stats, rec);
   summaryIsBest = ST.forDrill(stats, rec.d).length > 1 && ST.isPersonalBest(stats, rec);
   saveStats();
   const r = PROG.recordUntimed(progress, armedItemId(), {
     pace: PROG.speedOf(pace, armedWrittenBpm()), accuracy: verdict.accuracy,
-    clean: verdict.clean, eased, bpm: pace, at: Date.now(),
+    clean: verdict.clean, eased, bpm: pace, dyn: dyn.score, at: Date.now(),
   });
   saveProgress();
   takeLearned = r.learned;
@@ -1185,7 +1201,7 @@ function recordUntimed({ c, verdict, eased, pace }) {
  * first time when it did not. Beside it: right first time, and the pace in
  * beats a minute against the tempo it is written at.
  */
-function untimedResultOf(whole, { c, verdict, eased, pace }) {
+function untimedResultOf(whole, { c, verdict, eased, pace, dyn }) {
   const clean = verdict.clean;
   const counted = whole;
   const share = Math.round(PROG.CLEAN_SHARE * 100);
@@ -1212,6 +1228,8 @@ function untimedResultOf(whole, { c, verdict, eased, pace }) {
     sideB: pace > 0 ? `${Math.round(pace)} of ${armedWrittenBpm()}bpm` : 'pace --',
     rowLeft: `${c.stacks} stacks`,
     limb: '',
+    dyn: dyn.score,
+    dynAdvice: dyn.score >= 0 && dyn.score < PROG.DYN_GOOD ? PROG.dynamicsAdvice(c) : '',
     series: PROG.percentSeries(it ? it.h : [], box.w - 2, box.h - 2, PROG.UNTIMED_SCALE),
     footer: 'REC again  CLICK next',
   };
@@ -1226,14 +1244,13 @@ function judgeRun() {
   const t = timingStats(run.timing);
   const st = SC.runStats(run);
   const verdict = PROG.verdictOf(st, t.sdMs, { spreadMs: SC.WINDOWS[settings.strictness].goodMs });
-  return { t, st, verdict, eased: PROG.easedBy(judgingContext()) };
+  return { t, st, verdict, eased: PROG.easedBy(judgingContext()), dyn: PROG.dynamicsScore(st) };
 }
 
 /* What the take was judged WITH, for easedBy. */
 function judgingContext() {
   return {
     strictness: settings.strictness,
-    dynamics: settings.dynamics,
     guide: settings.guide,
     study: settings.study,
   };
@@ -1251,7 +1268,7 @@ function judgingContext() {
  * headline the speed — 100 for every take at the written tempo — and a failed
  * take read like a perfect one.
  */
-function resultOf(whole, { t, st, verdict, eased }) {
+function resultOf(whole, { t, st, verdict, eased, dyn }) {
   const counted = whole && !settings.study;
   const clean = verdict.clean;
   const status = PROG.takeStatus({ whole, study: settings.study, learned: takeLearned, clean,
@@ -1286,30 +1303,33 @@ function resultOf(whole, { t, st, verdict, eased }) {
     mark: takeLearned ? PROG.MARK_DONE : null,
     cause,
     limb,
+    dyn: dyn.score,
+    dynAdvice: dyn.score >= 0 && dyn.score < PROG.DYN_GOOD ? PROG.dynamicsAdvice(st) : '',
     series: PROG.percentSeries(it ? it.h : [], box.w - 2, box.h - 2),
     footer: clockMode && !pathTrack ? 'REC again  BACK start' : 'REC again  CLICK next',
   };
 }
 
-function recordRun({ t, st, verdict, eased }) {
+function recordRun({ t, st, verdict, eased, dyn }) {
   const rec = ST.makeRecord({
     drill: ST.drillId(clockMode ? 'clock' : 'drill', recordIdOf(chart), settings),
     bpm: chart.bpm,
     sd: t.sdMs,
     mean: t.meanMs,
     n: t.n,
-    err: st.misses + st.stickErrors + st.dynErrors,
+    err: st.misses + st.stickErrors,
     at: Date.now() / 1000,
     context: attemptContext(),
     total: st.asked,
     clean: verdict.clean && !eased,
     breakdown: st,
+    dyn: dyn.score,
   });
   stats = ST.addRecord(stats, rec);
   summaryIsBest = ST.forDrill(stats, rec.d).length > 1 && ST.isPersonalBest(stats, rec);
   saveStats();
   recordProgress({ clean: verdict.clean, reason: verdict.reason, accuracy: verdict.accuracy,
-    sd: t.sdMs, bpm: chart.bpm, eased });
+    sd: t.sdMs, bpm: chart.bpm, eased, dyn: dyn.score });
 }
 
 /* The item the armed drill's takes are filed under. */
@@ -1338,7 +1358,7 @@ function recordProgress(take) {
   const speed = PROG.speedOf(take.bpm, armedWrittenBpm());
   const r = PROG.recordTake(progress, armedItemId(), {
     speed, accuracy: take.accuracy, sd: take.sd, clean: take.clean, eased: take.eased,
-    bpm: take.bpm, at: Date.now(),
+    bpm: take.bpm, dyn: take.dyn, at: Date.now(),
   });
   saveProgress();
   takeLearned = r.learned;
@@ -1938,6 +1958,8 @@ function progressDetail(index) {
   const id = row.id;
   const it = PROG.item(progress, id) || { h: [], best: 0, bpm: 0, plays: 0 };
   const isQuiz = id.indexOf('quiz:') === 0;
+  /* The best dynamics beside where the jog is: the chart's dotted line. */
+  const dyn = it.dyn >= 0 ? `dyn ${it.dyn}%` : '';
   return {
     title: itemTitle(id),
     best: it.best,
@@ -1947,7 +1969,7 @@ function progressDetail(index) {
     isQuiz,
     series: PROG.percentSeries(it.h, box.w - 2, box.h - 2,
       isQuiz ? { lo: 0, hi: 100, line: PROG.QUIZ_PASS } : isUntimedId(id) ? PROG.UNTIMED_SCALE : {}),
-    footer,
+    footer: [dyn, footer].filter(Boolean).join('  '),
   };
 }
 

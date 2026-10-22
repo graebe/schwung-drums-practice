@@ -161,9 +161,11 @@
         "everything hard and",
         "nothing stands out.",
         "",
-        "Under the result:",
-        "16 soft accents 74<83",
-        "= played 74, needed 83."
+        "Scored apart: dyn 30%.",
+        "A soft accent is never",
+        "a wrong note. Beside",
+        "it: 16 soft 74<83 =",
+        "played 74, needed 83."
       ]
     },
     {
@@ -174,16 +176,16 @@
         "written tempo:",
         "",
         "90% of notes right -",
-        "right drum, hand and",
-        "dynamic, no strays -",
+        "right drum and hand,",
+        "no strays -",
         "and the spread inside",
         "the Strict window.",
         "",
         "Your % is the fastest",
         "clean take. 100% earns",
         "the tick - but not on",
-        "Loose, Guide pads,",
-        "Study or Dynamics off."
+        "Loose, Guide pads or",
+        "Study."
       ]
     },
     {
@@ -250,7 +252,9 @@
         "inverted. Not clean:",
         "big is % right, and",
         "under it what cost the",
-        "most: 16 soft accents.",
+        "most: 4 wrong hands.",
+        "dyn 30%: how accents",
+        "and ghosts sounded.",
         "",
         "JOG back: the take as",
         "you played it - rings",

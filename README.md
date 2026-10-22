@@ -49,9 +49,11 @@ fingers, in the same way its sister module is a reading trainer rather than a pi
 - **Scores your hands.** The pads are split down the middle: left half is your left hand, right
   half your right. So `RLRR LRLL` is not a suggestion printed under the staff — it is checked, and
   a wrong hand is its own kind of error, counted apart from a missed note.
-- **Scores your dynamics.** An accent has to stand out and a ghost note has to sit back — judged
-  against *your own* strokes, not a fixed number, so it works on any pads and any touch. That is
-  most of what separates a groove that feels good from the same notes played flat.
+- **Scores your dynamics — on their own.** An accent has to stand out and a ghost note has to sit
+  back — judged against *your own* strokes, not a fixed number, so it works on any pads and any
+  touch. That is most of what separates a groove that feels good from the same notes played flat.
+  It is a score of its own, `dyn 30%`, beside the verdict and never inside it: a soft accent on the
+  right drum, in time, is a right note with a sound still to work on, not a wrong one.
 - **Has a length.** Every drill is a file, and the file says how long the practice is: a one-bar
   beat with `"repeats": 8` is an eight-bar practice that ends by itself and shows you the result.
   Nothing runs until you interrupt it.
@@ -275,7 +277,24 @@ A run ends on its result, laid out as Piano Practice ends an exercise:
 - **Beside it** the two things that decide whether the take was clean: how much was right, and
   how tight it was (spread σ, and whether you sat early or late). Whichever one stopped the take
   counting is drawn **inverted** — that is the one to fix.
-- **Under it** the tempo, and your loosest limb: the one to go and practise.
+- **Under it** the tempo, and your loosest limb: the one to go and practise — and, at the right
+  end, **the dynamics** whenever the drill had accents or ghosts to judge (below).
+
+```
+ Rock backbeat · L3     ✓LEARNED
+ 100 %             97% right
+                    s12 +3ms
+  16 soft 74<83          dyn 30%     ← the notes counted; the accents are the next thing
+```
+
+**The dynamics are a second question.** Whether a take is clean asks *the right drum, the right
+hand, in time?* The dynamics ask *how did it sound?* — and answer with their own number, `dyn 30%`:
+how far your accents and ghost notes got towards standing out (or sitting back), on average. An
+accent halfway to its target earns half, so the number moves while you work on it, long before
+every accent is right. Below 90%, the left of the row says what to fix — `16 soft 74<83` is sixteen
+accents played at 74 on average where your own strokes asked for 83, `5 loud 61>48` five ghosts
+that came in too loud. At 90% and over the advice gives way to your loosest limb again. A take is
+never NOT CLEAN for its dynamics.
 
 A take that did **not** count looks different, because its speed is not a score. At the written
 tempo every take is at 100% speed, clean or not, and a big **100** over a take that failed reads
@@ -286,14 +305,13 @@ most**:
  Rock backbeat · L3    NOT CLEAN
   83 %      ▐right, need 90▌         ← inverted: this is what stopped it
                     s12 +3ms
-     16 soft accents 74<83           ← what to fix, counted
+  16 wrong hands         dyn 30%     ← what to fix, counted
 ```
 
-`16 soft accents 74<83` says that sixteen accents came in at a velocity of 74 on average, where
-your own strokes asked for 83 (see *Accents and ghost notes* below). It names whichever cost the
-most right notes: **missed** notes, **stray hits**, **soft accents**, **loud ghosts** or **wrong
-hands**. When the take failed on its spread instead, the line keeps the tempo and the loosest limb
-— that is the one to practise.
+`16 wrong hands` names whichever cost the most right notes: **missed** notes, **stray hits** or
+**wrong hands**. One correction at a time: while the notes are what stopped the take, the dynamics
+keep only their number. When the take failed on its spread instead, the line keeps the tempo and
+the loosest limb — that is the one to practise.
 - **The chart** is every recent take of this drill, oldest on the left, this one last, against
   the dotted 100% line. A filled dot was clean, an open one did not count — so a run of slow,
   clean takes climbing to the line reads as what it is.
@@ -328,8 +346,8 @@ An **L0** take ends on the same screen with its own words in it, because it has 
 
 The number is your pace as a share of the written tempo. When the take did not count it is how
 much was right first time instead, and the line under it names what cost the most: **wrong pads**,
-stacks **not together**, a drum **struck twice**, **soft accents**, **loud ghosts** or **wrong
-hands**. Click goes on to L1.
+stacks **not together**, a drum **struck twice** or **wrong hands**. The dynamics are scored
+apart here too, `dyn` at the end of the row. Click goes on to L1.
 
 ### Looking back over a take
 
@@ -349,9 +367,9 @@ they do on the result. A new take forgets the last one.
 A drummer has learned a pattern when they can play it **clean at its written tempo**, so that is
 what Drums Practice measures. A take is **clean** when, played whole from the top:
 
-- at least **90% of the notes are right** — the right drum, with the right hand and the right
-  dynamic. A wrong hand or a flat accent is not right, and a stray hit counts against you, so
-  sweeping the pads under every note scores nothing;
+- at least **90% of the notes are right** — the right drum, with the right hand. A wrong hand is
+  not right, and a stray hit counts against you, so sweeping the pads under every note scores
+  nothing. A flat accent *is* right: the dynamics are their own score;
 - and the **timing spread** σ is inside the good window of your Strict setting — 60 ms on normal.
 
 Its **clean speed** is the tempo you played over the tempo the drill is written at. Play a flam tap
@@ -359,6 +377,9 @@ written at 72 with Speed at 80% and get it clean, and the flam tap reads **80%**
 step at a time and the number follows you; at **100%** the drill is **learned** and gets a tick.
 The Ladder counts too: its top clean rung is a clean speed, and since it climbs past the written
 tempo it can carry a drill beyond 100%.
+
+A drill also keeps its best **dynamics**: the best `dyn` of a clean take at tempo, shown in its
+Progress chart beside the speed.
 
 Every row in the list shows where you are:
 
@@ -378,10 +399,11 @@ that waited has no timing to judge.
 ### What a tick means
 
 A tick means the same thing on every drill: clean at tempo **on the standard settings** — Strict at
-*normal* or *tight*, **Dynamics** on, **Guide pads** and **Study** off. The easier settings are
-there to get you to it, and a take on them still goes on the drill's chart, but it does not move
-your best or earn the tick; its result says **PRACTICE** and `not counted: Loose` (or `Guide`,
-`Dyn off`). Otherwise a tick would mean whatever the settings happened to be that day.
+*normal* or *tight*, **Guide pads** and **Study** off. The easier settings are there to get you to
+it, and a take on them still goes on the drill's chart, but it does not move your best or earn the
+tick; its result says **PRACTICE** and `not counted: Loose` (or `Guide`). Otherwise a tick would mean
+whatever the settings happened to be that day. **Dynamics** off is no easier setting — the dynamics
+never decide a tick — it only leaves the take without a dynamics score.
 
 ### Accents and ghost notes
 
@@ -397,7 +419,12 @@ hard as the pad goes and nothing is an accent at all, because nothing stands out
 This is why the pads, the velocity curve and your touch do not matter: only the difference does.
 Until a take has three normal strokes there is nothing to compare against, so a dynamic is not
 judged — and a drill that is accents only, like quarter notes accented on every beat, is not judged
-for dynamics at all.
+for dynamics at all. A take needs four judged accents or ghosts before it has a `dyn` score.
+
+The score is the **credit** the judged notes earned, on average: an accent at the reference (your
+normal stroke) earns nothing, one at the need earns all of it, one halfway earns half — and a ghost
+the same, downwards. A missed note is a missed note and is not judged for its dynamic as well: one
+mistake, one error.
 
 ### One mistake, one error
 
@@ -540,8 +567,9 @@ Take as long as you like over any of it.
   closes, so a pad too many in that moment — or a drum struck twice — spoils it and it is asked
   for again. Pressing every pad at once never moves the cursor. Either way the stack is no longer
   *right first time*.
-- **Hands and dynamics are still judged.** A wrong hand or a soft accent lets the cursor move on —
-  asking again would only add strokes — but the stack does not count as right first time.
+- **Hands are still judged, dynamics scored.** A wrong hand lets the cursor move on — asking again
+  would only add strokes — but the stack does not count as right first time. A soft accent or a
+  loud ghost keeps the stack right first time and goes into the take's `dyn` score.
 - **Play sounds the bar** at its written tempo times **Speed**, its pads lighting as it goes, so you
   can hear the groove before you step it. **Record** begins at once: there is nothing to count in to.
   Record again pauses; time spent paused never counts against your pace.
@@ -715,7 +743,7 @@ mapping rather than having to remember it.
 | View | **grid** | `grid` is drum tab — what a drummer reads; `staff` is real percussion notation, for reading practice |
 | Strict | **normal** | the timing windows, above |
 | Sticking | **strict** | `strict` counts a wrong hand as its own error; `loose` shows it amber but does not count it; `off` ignores hands, which is right for grooves |
-| Dynamics | on | score accents and ghost notes |
+| Dynamics | on | score accents and ghost notes, apart from whether a take is clean |
 | Accent + | 15 | how much louder than your own normal strokes an accent must be |
 | Ghost - | 20 | how much softer than your own normal strokes a ghost note must be |
 | Guide pads | **off** | light the voice you need next. This is a reading trainer first |

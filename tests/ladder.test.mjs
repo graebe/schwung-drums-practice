@@ -50,14 +50,13 @@ test('a clean rung climbs and records the tempo', () => {
   assert.equal(LAD.ladderFinished(l), false);
 });
 
-test('clean means all four axes at once', () => {
-  /* A rung climbed on three of the four would put the tempo up on a pattern
+test('clean means notes, hands and time at once — the dynamics are apart', () => {
+  /* A rung climbed on two of the three would put the tempo up on a pattern
    * the player is not actually playing. The bar before the rung is played
    * clean: an accent is judged against the strokes before it, and the bar's
    * accent is its first note. */
   const cases = [
     ['sticking', { hand: false }, /^4 wrong hands$/],
-    ['accents', { dyn: false }, /^1 soft accent 30<105$/],
     ['missed', { skip: 2 }, /^1 missed$/],
   ];
   for (const [cause, opts, reason] of cases) {
@@ -72,6 +71,15 @@ test('clean means all four axes at once', () => {
     assert.equal(v.cause, cause);
     assert.match(v.reason, reason);
   }
+  /* A soft accent is a sound to work on, not a wrong note: the rung climbs. */
+  const run = runFor();
+  playBar(run, 0);
+  const l = LAD.createLadder({ bpm: 80, bars: 1 });
+  LAD.beginRung(l, run, 4);
+  playBar(run, 4, { dyn: false });
+  expireMissed(run, 8);
+  const v = LAD.judgeRung(l, run, 8);
+  assert.equal(v.clean, true, 'a soft accent must not stop the ladder');
 });
 
 test('a scattered bar fails even with every note hit', () => {

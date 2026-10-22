@@ -10,11 +10,13 @@
  * TEMPO. So an item has one stage, and its number is a speed:
  *
  *   clean take    a whole take with at least CLEAN_SHARE of the notes right
- *                 (a wrong hand or a wrong dynamic is not right, and stray
- *                 hits count against you) and the timing spread inside the
- *                 Strict setting's good window — judged by verdictOf, on the
- *                 standard settings (easedBy): no Study, no Guide pads, not
- *                 Loose, Dynamics on
+ *                 (a wrong hand is not right, and stray hits count against
+ *                 you) and the timing spread inside the Strict setting's
+ *                 good window — judged by verdictOf, on the standard settings
+ *                 (easedBy): no Study, no Guide pads, not Loose
+ *   dynamics      how the accents and ghosts sounded, 0..100, kept APART from
+ *                 clean: a soft accent on the right drum in time is a right
+ *                 note with a sound still to work on, never a wrong one
  *   clean speed   the tempo of a clean take over the drill's written tempo:
  *                 80% is clean at 80% of the written tempo
  *   learned (✓)   clean at LEARNED% or faster
@@ -31,7 +33,9 @@
 
 import { LEVEL_ID_RE } from './levels.mjs';
 
-export const PROGRESS_VERSION = 1;
+/* 2: dynamics apart from clean, a take's dynamics in its history entry. A
+ * version 1 file is set aside and progress rebuilt from the stats log. */
+export const PROGRESS_VERSION = 2;
 export const CLEAN_SHARE = 0.9;
 export const LEARNED = 100;
 export const QUIZ_PASS = 90;
@@ -45,7 +49,8 @@ const DAY_S = 86400;
 export const REP_INTERVALS = [1, 3, 7, 14, 30];
 export const REP_SESSION = 5;
 
-/* History flags: [t, percent, accuracy, spread ms, flags]. */
+/* A history entry: [t, percent, accuracy, spread ms, flags, dynamics].
+ * `dynamics` is the take's dynamics score, or -1 when none was judged. */
 export const F_CLEAN = 1;
 export const F_REPEAT = 2;
 export const F_TEMPO = 4;
@@ -65,6 +70,7 @@ function emptyItem() {
   return {
     best: 0,       /* best clean speed, or best round, in percent; 0 = none */
     bpm: 0,        /* the tempo the best was played at                      */
+    dyn: -1,       /* best dynamics of a counted take at tempo; -1 = none   */
     plays: 0,
     t: 0,          /* last take, unix seconds                               */
     done: 0,       /* when it was first learned, or 0                       */
@@ -85,20 +91,23 @@ function ensure(progress, id) {
 
 const num = (v, d = 0) => (typeof v === 'number' && isFinite(v) ? v : d);
 
-/* { progress, ok }. Never throws: `ok` is false when the text would not read,
- * which the caller needs to tell apart from no progress yet — a damaged file
- * is kept aside rather than overwritten by the next save. */
+/* { progress, ok, stale }. Never throws: `ok` is false when the text would
+ * not read, which the caller needs to tell apart from no progress yet — a
+ * damaged file is kept aside rather than overwritten by the next save.
+ * `stale` is a file of an earlier version: it read, but it is not used —
+ * the caller sets it aside and rebuilds progress from the stats log. */
 export function readProgress(text) {
-  if (!text) return { progress: emptyProgress(), ok: false };
+  if (!text) return { progress: emptyProgress(), ok: false, stale: false };
   let obj;
   try {
     obj = JSON.parse(text);
   } catch (e) {
-    return { progress: emptyProgress(), ok: false };
+    return { progress: emptyProgress(), ok: false, stale: false };
   }
   if (!obj || typeof obj !== 'object' || !obj.items || typeof obj.items !== 'object') {
-    return { progress: emptyProgress(), ok: false };
+    return { progress: emptyProgress(), ok: false, stale: false };
   }
+  if (obj.version !== PROGRESS_VERSION) return { progress: emptyProgress(), ok: false, stale: true };
   const out = emptyProgress();
   for (const id in obj.items) {
     const src = obj.items[id];
@@ -106,6 +115,7 @@ export function readProgress(text) {
     const it = emptyItem();
     it.best = num(src.best);
     it.bpm = num(src.bpm);
+    it.dyn = num(src.dyn, -1);
     it.plays = num(src.plays);
     it.t = num(src.t);
     it.done = num(src.done);
@@ -114,12 +124,12 @@ export function readProgress(text) {
       it.rep = { due: num(src.rep.due), step: num(src.rep.step), at: num(src.rep.at), ok: Boolean(src.rep.ok) };
     }
     if (Array.isArray(src.h)) {
-      it.h = src.h.filter((r) => Array.isArray(r) && r.length >= 5
+      it.h = src.h.filter((r) => Array.isArray(r) && r.length >= 6
         && typeof r[0] === 'number' && typeof r[1] === 'number').slice(-HISTORY_CAP);
     }
     out.items[id] = it;
   }
-  return { progress: out, ok: true };
+  return { progress: out, ok: true, stale: false };
 }
 
 export function serialiseProgress(progress) {
@@ -135,41 +145,69 @@ export function serialiseProgress(progress) {
  * — and every way the result screen misled sat in a seam between them.
  */
 
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const avg = (d, key) => Math.round(d[key] / d.n);
+
 /*
- * The share of a take that was right: notes hit with the right hand and the
- * right dynamic, over the notes asked PLUS stray hits. Without the strays a
- * player could sweep the pads under every note and score full marks.
- *   st = scoring.mjs runStats: { asked, hits, strays, stickErrors, dynErrors }
+ * The share of a take that was right: notes hit with the right hand, over the
+ * notes asked PLUS stray hits. Without the strays a player could sweep the
+ * pads under every note and score full marks. The dynamics are not in it —
+ * they are their own score (dynamicsScore).
+ *   st = scoring.mjs runStats: { asked, hits, strays, stickErrors }
  */
 export function takeAccuracy(st) {
   const asked = (st.asked || 0) + (st.strays || 0);
-  const right = Math.max(0, (st.hits || 0) - (st.stickErrors || 0) - (st.dynErrors || 0));
+  const right = Math.max(0, (st.hits || 0) - (st.stickErrors || 0));
   return asked > 0 ? Math.min(1, right / asked) : 0;
 }
 
-const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-const avg = (d, key) => Math.round(d[key] / d.n);
+/* Judged accents and ghosts needed before a take has a dynamics score: one
+ * soft accent out of two is not a measurement. */
+export const DYN_MIN_JUDGED = 4;
+/* The dynamics a take must reach before the result stops advising on them. */
+export const DYN_GOOD = 90;
+
+/*
+ * How the accents and ghosts of a take sounded: the mean credit they earned
+ * (scoring.mjs dynCredit), in percent — overall, and for each kind — or -1
+ * where too few were judged to say. Read from runStats, since() or the
+ * untimed counts, which all carry { accents, ghosts }.
+ */
+export function dynamicsScore(st) {
+  const a = st.accents || { n: 0, credit: 0 };
+  const g = st.ghosts || { n: 0, credit: 0 };
+  const pct = (k, min) => (k.n >= min ? Math.round((k.credit * 100) / k.n) : -1);
+  const all = { n: a.n + g.n, credit: a.credit + g.credit };
+  return { score: pct(all, DYN_MIN_JUDGED), accents: pct(a, 1), ghosts: pct(g, 1), judged: all.n };
+}
+
+/*
+ * What to work on in the dynamics, in one short line beside the score — the
+ * kind that missed most often, with the velocities played against needed:
+ * "16 soft 74<83", "5 loud 61>48". '' when nothing missed.
+ */
+export const DYN_ADVICE_MAX = 13;
+export function dynamicsAdvice(st) {
+  const acc = st.softAccents || { n: 0 };
+  const gho = st.loudGhosts || { n: 0 };
+  if (!acc.n && !gho.n) return '';
+  const [d, word, sign] = acc.n >= gho.n ? [acc, 'soft', '<'] : [gho, 'loud', '>'];
+  const long = `${d.n} ${word} ${avg(d, 'vel')}${sign}${avg(d, 'need')}`;
+  return long.length <= DYN_ADVICE_MAX ? long : `${d.n} ${word}`;
+}
+
 /* A reason is one result line: 21 characters of the 6px font across 128. */
 export const REASON_MAX = 21;
-/* The velocities played against needed, when they fit beside the count. */
-const withVel = (text, d, sign) => {
-  const long = `${text} ${avg(d, 'vel')}${sign}${avg(d, 'need')}`;
-  return long.length <= REASON_MAX ? long : text;
-};
 
 /*
  * What cost the most right notes, as a cause and a line that says it with
- * its count: "16 soft accents 74<83" says what to practise, "83% right" does
- * not. Ties go to the order below — a missed note before a stray, and so on.
+ * its count: "4 wrong hands" says what to practise, "83% right" does not.
+ * Ties go to the order below — a missed note before a stray, and so on.
  */
 function costliest(st) {
-  const acc = st.softAccents || { n: 0 };
-  const gho = st.loudGhosts || { n: 0 };
   const causes = [
     ['missed', st.misses || 0, (n) => `${n} missed`],
     ['strays', st.strays || 0, (n) => plural(n, 'stray hit', 'stray hits')],
-    ['accents', acc.n, (n) => withVel(plural(n, 'soft accent', 'soft accents'), acc, '<')],
-    ['ghosts', gho.n, (n) => withVel(plural(n, 'loud ghost', 'loud ghosts'), gho, '>')],
     ['sticking', st.stickErrors || 0, (n) => plural(n, 'wrong hand', 'wrong hands')],
   ];
   let best = null;
@@ -201,25 +239,20 @@ export function verdictOf(st, sdMs, { spreadMs, share = CLEAN_SHARE, minHits = 1
 /*
  * L0's verdict. A take with no clock has no spread to judge, so it is judged
  * on what it does have: the stacks right FIRST TIME — no wrong pad, no lapsed
- * partial, no second stroke, the right hands and the right dynamics — over
- * every stack, against the same CLEAN_SHARE as a timed take. The pace is
- * measured, not judged: getting faster is what L0 is FOR, and a ✓ that
- * waited on a tempo would be L1's ✓.
- *   c = untimed.mjs counts: { stacks, firstTry, wrong, apart, again, hand,
- *                             softAccents, loudGhosts }
+ * partial, no second stroke, the right hands — over every stack, against the
+ * same CLEAN_SHARE as a timed take; dynamics are scored apart, as there. The
+ * pace is measured, not judged: getting faster is what L0 is FOR, and a ✓
+ * that waited on a tempo would be L1's ✓.
+ *   c = untimed.mjs counts: { stacks, firstTry, wrong, apart, again, hand }
  */
 export function untimedVerdictOf(c, { share = CLEAN_SHARE } = {}) {
   const accuracy = c.stacks > 0 ? c.firstTry / c.stacks : 0;
   if (!c.stacks) return { accuracy, clean: false, cause: 'nothing', reason: 'nothing played' };
   if (accuracy >= share) return { accuracy, clean: true, cause: '', reason: '' };
-  const acc = c.softAccents || { n: 0 };
-  const gho = c.loudGhosts || { n: 0 };
   const causes = [
     ['wrong', c.wrong || 0, (n) => plural(n, 'wrong pad', 'wrong pads')],
     ['apart', c.apart || 0, (n) => `${n} not together`],
     ['again', c.again || 0, (n) => `${n} struck twice`],
-    ['accents', acc.n, (n) => withVel(plural(n, 'soft accent', 'soft accents'), acc, '<')],
-    ['ghosts', gho.n, (n) => withVel(plural(n, 'loud ghost', 'loud ghosts'), gho, '>')],
     ['sticking', c.hand || 0, (n) => plural(n, 'wrong hand', 'wrong hands')],
   ];
   let best = null;
@@ -230,18 +263,18 @@ export function untimedVerdictOf(c, { share = CLEAN_SHARE } = {}) {
 
 /*
  * Whether a take was judged by the standard that a ✓ means: Strict at Normal
- * or Tight, Dynamics on, and no help — Guide pads light the answer and Study
- * waits for you. Easier settings are for getting there; a take on them is
+ * or Tight, and no help — Guide pads light the answer and Study waits for
+ * you. Dynamics off is not easier: the dynamics no longer decide a ✓, so
+ * switching them off only leaves the take without a dynamics score. Easier settings are for getting there; a take on them is
  * kept, but it cannot learn a drill, or a ✓ would mean whatever the settings
  * were that day.
- *   ctx = { strictness, dynamics, guide, study }
+ *   ctx = { strictness, guide, study }
  * Returns '' when standard, else the first setting that is not, for the screen.
  */
 export function easedBy(ctx) {
   if (ctx.study) return 'Study';
   if (ctx.guide) return 'Guide';
   if (ctx.strictness === 'loose') return 'Loose';
-  if (!ctx.dynamics) return 'Dyn off';
   return '';
 }
 
@@ -277,9 +310,12 @@ export function roundScore(correct, wrong, hinted = 0) {
 
 /* ---- Recording ------------------------------------------------------------ */
 
+const dynOf = (take) => (take.dyn >= 0 ? Math.round(take.dyn) : -1);
+
 /*
  * One whole take of a drill.
- *   take = { speed, accuracy, sd, clean, eased, bpm, at (ms) }
+ *   take = { speed, accuracy, sd, clean, eased, bpm, dyn, at (ms) }
+ *   dyn    the take's dynamics score (dynamicsScore), -1 when none
  *   eased  '' for standard judging, else what eased it (easedBy)
  * Returns what it changed, for the result screen:
  *   { learned  first time at LEARNED% clean,
@@ -304,14 +340,18 @@ export function recordTake(progress, id, take) {
     bpm: take.bpm,
     entry: [Math.round(take.speed), Math.round((take.accuracy || 0) * 100),
       Math.round(take.sd || 0),
-      (counted ? F_CLEAN : 0) | (atTempo ? F_TEMPO : 0) | (standard ? F_STANDARD : 0)],
+      (counted ? F_CLEAN : 0) | (atTempo ? F_TEMPO : 0) | (standard ? F_STANDARD : 0),
+      dynOf(take)],
+    /* The dynamics a drill is credited with are those of a take that counted
+     * at tempo: a slow take's accents are easier to place. */
+    dyn: counted && atTempo ? dynOf(take) : -1,
     at: take.at,
   });
 }
 
 /*
  * One whole L0 take.
- *   take = { pace, accuracy, clean, eased, bpm, at (ms) }
+ *   take = { pace, accuracy, clean, eased, bpm, dyn, at (ms) }
  *   pace   the pace as a share of the written tempo, in percent
  *
  * It is learned the first time it is clean on the standard settings, at ANY
@@ -333,7 +373,8 @@ export function recordUntimed(progress, id, take) {
     schedule: false,
     bpm: take.bpm,
     entry: [Math.round(take.pace), Math.round((take.accuracy || 0) * 100), 0,
-      (counted ? F_CLEAN : 0) | (standard ? F_STANDARD : 0)],
+      (counted ? F_CLEAN : 0) | (standard ? F_STANDARD : 0), dynOf(take)],
+    dyn: counted ? dynOf(take) : -1,
     at: take.at,
   });
 }
@@ -347,7 +388,7 @@ export function recordRound(progress, id, { correct, wrong, hinted = 0, at = 0 }
     learned: pass,
     counts: true,
     bpm: 0,
-    entry: [score, score, 0, (pass ? F_CLEAN : 0) | F_TEMPO],
+    entry: [score, score, 0, (pass ? F_CLEAN : 0) | F_TEMPO, -1],
     at,
   });
 }
@@ -361,6 +402,7 @@ function apply(progress, id, r) {
     it.best = r.value;
     it.bpm = Math.round(r.bpm) || 0;
   }
+  if (r.dyn > it.dyn) it.dyn = r.dyn;
   let learned = false;
   if (r.learned && !it.done) {
     it.done = t || 1;
@@ -580,6 +622,10 @@ export function recentIds(progress) {
  * `lo` to `hi` percent: an autoscaled axis turns 96 -> 98 into a cliff, and
  * two visits to the same item would draw the same history differently. The
  * line to beat — 100% speed, or the quiz pass mark — comes back as `lineY`.
+ *
+ * `dyn` is the takes' dynamics, where they had any, on a scale of their own:
+ * 0 at the bottom of the box, 100 at the top. A second question gets a second
+ * line rather than a share of the first one's axis.
  */
 /* L0's chart scale: from nothing, because a first pace of 30% is where
  * L0 begins, and the default floor of 40 would flatten it into the axis. */
@@ -590,13 +636,21 @@ export function percentSeries(history, w, h, { lo = 40, hi = 140, line = LEARNED
   const lastX = w - 1;
   const lastY = h - 1;
   const yOf = (pct) => Math.round(lastY - ((Math.max(lo, Math.min(hi, pct)) - lo) / (hi - lo)) * lastY);
+  const xOf = (i) => (use.length === 1 ? lastX : Math.round((i * lastX) / (use.length - 1)));
   const points = use.map((r, i) => ({
-    x: use.length === 1 ? lastX : Math.round((i * lastX) / (use.length - 1)),
+    x: xOf(i),
     y: yOf(r[1]),
     percent: r[1],
     clean: Boolean(r[4] & F_CLEAN),
   }));
-  return { points, lineY: yOf(line) };
+  const dyn = [];
+  for (let i = 0; i < use.length; i++) {
+    const d = use[i][5];
+    if (typeof d === 'number' && d >= 0) {
+      dyn.push({ x: xOf(i), y: Math.round(lastY - (Math.min(100, d) / 100) * lastY), percent: d });
+    }
+  }
+  return { points, lineY: yOf(line), dyn };
 }
 
 /*
@@ -645,40 +699,58 @@ export function learnedTimeline(progress, ids, w, h, atMs) {
 /* ---- From the stats log --------------------------------------------------- */
 
 /*
- * The first time progress is opened there is a stats.json from earlier
- * versions with takes in it, and they are worth keeping. A record has no
- * note count, so it is judged by what it does have: a Ladder record is clean
- * by construction, and a drill take is clean when it had no errors, enough
- * hits and a spread inside the normal good window.
- *   itemOf(rec)     the item id a record belongs to, or null to skip it
+ * Progress rebuilt from the stats log: on the first start of a version with
+ * progress, and when a progress file of an earlier version is set aside. Every
+ * record is judged again by today's rule from what it carries. A record with
+ * its breakdown (`tot`, `sk`, `st`) has the notes asked, the wrong hands and
+ * the strays, so it gets the full verdict — without the dynamics, which no
+ * longer decide clean; a take that failed only on its accents counts now. An
+ * older record lumps every error into `err` and is read as misses: a take
+ * with any error is not clean, which is the most it can say. A Ladder record
+ * is clean by construction; an L0 record keeps the verdict it was given.
+ *   itemOf(rec)         the item id a record belongs to, or null to skip it
  *   writtenOf(id, rec)  the written tempo the record's tempo is measured on
  */
 export const IMPORT_GOOD_MS = 60;
 export const IMPORT_MIN_HITS = 8;
+const STRICTNESS = ['loose', 'normal', 'tight'];
 
 export function importStats(progress, records, itemOf, writtenOf) {
   for (let i = 0; i < records.length; i++) {
     const r = records[i];
     const id = itemOf(r);
     if (!id) continue;
-    const kind = String(r.d).split(':')[0];
+    const parts = String(r.d).split(':');
+    const kind = parts[0];
     if (kind === 'guess' || kind === 'hear' || kind === 'pick') {
       recordRound(progress, id, { correct: r.n, wrong: r.err, at: r.t * 1000 });
       continue;
     }
     if (r.s) continue;  /* a Study take never counted */
-    /* The record lumps every error into `err`, so it is read as misses: a
-     * take with any error is not clean, which is the most it can say. */
-    const v = verdictOf({ hits: r.n, misses: r.err, asked: r.n + r.err }, r.sd,
-      { spreadMs: IMPORT_GOOD_MS, share: 1, minHits: IMPORT_MIN_HITS });
-    const strictness = String(r.d).split(':')[2];
+    const strictness = parts.find((p) => STRICTNESS.indexOf(p) >= 0);
+    const eased = easedBy({ strictness, guide: r.g === 1, study: false });
+    const dyn = typeof r.dp === 'number' ? r.dp : -1;
+    const speed = speedOf(r.bpm, writtenOf(id, r));
+    if (kind === 'untimed') {
+      recordUntimed(progress, id, {
+        pace: speed, accuracy: r.tot > 0 ? r.n / r.tot : 0, clean: r.cl === 1,
+        eased, bpm: r.bpm, dyn, at: r.t * 1000,
+      });
+      continue;
+    }
+    const v = r.tot > 0 && typeof r.sk === 'number'
+      ? verdictOf({ hits: r.n, misses: Math.max(0, r.tot - r.n), strays: r.st || 0,
+        stickErrors: r.sk, asked: r.tot }, r.sd, { spreadMs: IMPORT_GOOD_MS, minHits: IMPORT_MIN_HITS })
+      : verdictOf({ hits: r.n, misses: r.err, asked: r.n + r.err }, r.sd,
+        { spreadMs: IMPORT_GOOD_MS, share: 1, minHits: IMPORT_MIN_HITS });
     recordTake(progress, id, {
-      speed: speedOf(r.bpm, writtenOf(id, r)),
+      speed,
       accuracy: v.accuracy,
       sd: r.sd,
       clean: kind === 'ladder' || v.clean,
-      eased: easedBy({ strictness, dynamics: true, guide: r.g === 1, study: false }),
+      eased,
       bpm: r.bpm,
+      dyn,
       at: r.t * 1000,
     });
   }
