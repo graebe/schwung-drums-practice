@@ -335,3 +335,11 @@ test('every bundled drill plays on every preset, flipped or not — Chromatic al
   }
   assert.deepEqual(cowbell.sort(), ['mozambique', 'songo']);
 });
+
+test('a manifest names files in exercises/ only', () => {
+  const m = IO.parseManifest(JSON.stringify({ exercises: [
+    { id: 'a', file: 'a.json' }, { id: 'b', file: '../settings.json' }, { id: 'c', file: '/etc/passwd.json' },
+    { id: 'd', file: 'sub/d.json' }, { id: 'e', file: 'e.txt' }, { id: 'f', file: 'my-groove_2.json' },
+  ] }));
+  assert.deepEqual(m.entries.map((e) => e.id), ['a', 'f']);
+});

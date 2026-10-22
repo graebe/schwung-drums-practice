@@ -1567,6 +1567,22 @@ test('Continue opens the first step, a clean take at tempo learns it, Click goes
   assert.equal(settingsSaved.speed, 60, 'Speed is the step\'s');
 });
 
+test('leaving the path for the library gives back your own Speed', async () => {
+  const { log } = await loadUi({ settings: { ...PLAIN, speed: 90 } });
+  globalThis.init();
+  ticks(2);
+  continuePath();                  /* Quarters, at the step's 60% */
+  cc(CC.menu, 127);
+  for (let i = 0; i < 4; i++) cc(CC.back, 127);
+  for (let i = 0; i < 20; i++) cc(CC.jogTurn, 127);
+  toFirstRung();                   /* Grooves › Rock & Pop › Rock backbeat › L1 */
+  cc(CC.jogClick, 127);
+  ticks(2);
+  globalThis.onUnload();
+  assert.equal(JSON.parse(log.writes[SETTINGS_FILE]).speed, 90);
+  assert.match(log.announces.join('|'), /83 bpm|Rock backbeat/);
+});
+
 test('Click on a path result opens the next step of the track', async () => {
   await loadUi({ settings: PLAIN });
   const sn = await snare();
@@ -1848,6 +1864,22 @@ test('Click on a preset makes Custom a copy of it; an edit lands on both halves;
   assert.equal(JSON.parse(log.writes[SETTINGS_FILE]).layout, 'custom');
 });
 
+test('a Custom edit survives closing straight from the Pad map', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  await toPadMap();
+  cc(CC.jogClick, 127);
+  pad(68, 100); pad(68, 0);
+  cc(CC.jogTurn, 1);
+  cc(CC.shift, 127); cc(CC.back, 127); cc(CC.shift, 0);   /* close, not Back */
+  ticks(40);
+  globalThis.onUnload();
+  const saved = log.writes['/data/UserData/schwung/modules/tools/drums-practice/pads.json'];
+  assert.ok(saved, 'the edit was lost');
+  assert.equal(JSON.parse(saved).rows[3].split(' ')[0], 'K2');
+});
+
 test('knob 1 on Custom edits one half only', async () => {
   const { log } = await loadUi();
   globalThis.init();
@@ -2107,7 +2139,9 @@ test('takes already in stats.json are read in when there is no progress yet', as
 });
 
 test('a progress.json of version 1 is set aside and rebuilt from stats, judged anew', async () => {
-  const v1 = JSON.stringify({ version: 1, items: { 'subdiv:eighths': { best: 0, plays: 1, h: [] } } });
+  /* `flam` was learned long ago: its takes have been trimmed from stats.json. */
+  const v1 = JSON.stringify({ version: 1, items: { 'subdiv:eighths': { best: 0, plays: 1, h: [] },
+    flam: { best: 100, bpm: 70, plays: 12, t: 500, done: 400, h: [] } } });
   /* An eighths take with every note on time but its accents soft: under
    * version 1 it was not clean (err counted the dynamics); its breakdown says
    * the errors were all dynamics, so today it counts. */
@@ -2125,6 +2159,7 @@ test('a progress.json of version 1 is set aside and rebuilt from stats, judged a
   assert.equal(saved.version, 2);
   assert.equal(saved.items['subdiv:eighths'].best, 100);
   assert.ok(saved.items['subdiv:eighths'].done, 'a take that failed only on dynamics is learned');
+  assert.equal(saved.items.flam.done, 400, 'a ✓ the stats log no longer holds survives the update');
 });
 
 test('a damaged progress.json is kept aside and the backup read', async () => {

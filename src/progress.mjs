@@ -164,10 +164,24 @@ export function readProgress(text) {
   if (!obj || typeof obj !== 'object' || !obj.items || typeof obj.items !== 'object') {
     return { progress: emptyProgress(), ok: false, stale: false };
   }
-  if (obj.version !== PROGRESS_VERSION) return { progress: emptyProgress(), ok: false, stale: true };
+  if (obj.version !== PROGRESS_VERSION) {
+    /* An earlier version: not used as it is, but what it had reached is
+     * kept for mergeLegacy — the stats log it is rebuilt from is capped,
+     * and a drill learned long ago would otherwise lose its ✓. */
+    return { progress: emptyProgress(), ok: false, stale: true, legacy: readItems(obj.items, 5) };
+  }
   const out = emptyProgress();
-  for (const id in obj.items) {
-    const src = obj.items[id];
+  out.items = readItems(obj.items, 6);
+  out.path = readPath(obj.path);
+  return { progress: out, ok: true, stale: false };
+}
+
+/* The items of a file, coerced field by field; history entries shorter than
+ * `minEntry` (an earlier version's) are left out. */
+function readItems(items, minEntry) {
+  const out = {};
+  for (const id in items) {
+    const src = items[id];
     if (!src || typeof src !== 'object') continue;
     const it = emptyItem();
     it.best = num(src.best);
@@ -182,13 +196,38 @@ export function readProgress(text) {
       it.rep = { due: num(src.rep.due), step: num(src.rep.step), at: num(src.rep.at), ok: Boolean(src.rep.ok) };
     }
     if (Array.isArray(src.h)) {
-      it.h = src.h.filter((r) => Array.isArray(r) && r.length >= 6
+      it.h = src.h.filter((r) => Array.isArray(r) && r.length >= minEntry
         && typeof r[0] === 'number' && typeof r[1] === 'number').slice(-HISTORY_CAP);
     }
-    out.items[id] = it;
+    out[id] = it;
   }
-  out.path = readPath(obj.path);
-  return { progress: out, ok: true, stale: false };
+  return out;
+}
+
+/*
+ * What an earlier version's file had reached, merged into progress rebuilt
+ * from the stats log. Every earlier rule was the stricter one — dynamics
+ * used to count against clean — so a best or a ✓ earned under it still
+ * holds: the higher best, the earlier ✓, a skip still standing, and the
+ * repetition schedule when the rebuild has none. The rebuilt history stays:
+ * only it carries the dynamics.
+ */
+export function mergeLegacy(progress, legacy) {
+  for (const id in legacy || {}) {
+    const old = legacy[id];
+    const it = ensure(progress, id);
+    if (old.best > it.best) {
+      it.best = old.best;
+      it.bpm = old.bpm;
+    }
+    if (old.done && (!it.done || old.done < it.done)) it.done = old.done;
+    if (old.skip && !it.done && !it.plays) it.skip = old.skip;
+    if (!it.rep && old.rep && it.done) it.rep = old.rep;
+    it.plays = Math.max(it.plays, old.plays);
+    it.t = Math.max(it.t, old.t);
+  }
+  progress.rev++;
+  return progress;
 }
 
 export function serialiseProgress(progress) {

@@ -148,6 +148,8 @@ export function parseExercise(text, id) {
  * iterated `undefined` at startup, and a typo in user.json (the one file you
  * are told to edit) put the error screen up on every launch.
  */
+const SAFE_FILE = /^[A-Za-z0-9][A-Za-z0-9._-]*\.json$/;
+
 export function parseManifest(text, name = 'index.json') {
   let obj;
   try {
@@ -159,6 +161,9 @@ export function parseManifest(text, name = 'index.json') {
   const entries = [];
   for (const e of list) {
     if (!e || typeof e.file !== 'string' || typeof e.id !== 'string') continue;
+    /* A plain file name in exercises/, nothing else: the manifest is a file
+     * people edit by hand, and "../settings.json" would be read as a drill. */
+    if (!SAFE_FILE.test(e.file)) continue;
     /* No category, or one the shipped manifest does not declare, files the
      * drill under Other — which is what a user.json written before categories
      * looks like. */

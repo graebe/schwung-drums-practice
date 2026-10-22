@@ -302,6 +302,28 @@ export const STAGES = [
   },
 ];
 
+/*
+ * The material the table names that is not written yet (docs/curriculum.md,
+ * the catalogue). A step whose drill is not installed is left out of the
+ * path, which is what lets the table be the whole curriculum while it ships —
+ * and what would let a misspelt id vanish without a word. So every id the
+ * table names is installed or listed here (tests/program.test.mjs), and a
+ * drill that ships is taken off this list.
+ */
+export const PLANNED = new Set([
+  'read:1', 'read:2a', 'read:2b', 'read:3a', 'read:3b', 'read:t', 'offbeat:a', 'partials:&',
+  'partials:a', 'partials:e', 'partials:mix', 'hands:RRLL:8', 'hands:RLRRLRLL:8', 'accent:8',
+  'accent:16', 'ghost:1', 'kickvar:8', 'kickvar:16', 'kickread:8', 'kickread:16', 'switch:8-16',
+  'switch:8-t', 'swing:58', 'swing:66', 'phrase:4:fill8-2', 'phrase:4:fill16-1',
+  'phrase:4:fill16-2', 'phrase:8', 'poly:hemiola', 'poly:3:2', 'poly:4:3',
+  'orchestrate:paradiddle', 'odd:5-4', 'odd:7-8a', 'odd:7-8b', 'group:3', 'group:5',
+  'displace:rock-backbeat:1', 'displace:rock-backbeat:2', 'feel:behind', 'feel:ahead',
+  'clock:gap1', 'clock:gap2', 'clock:gap4', 'clock:24', 'clock:off', 'clock:bar', 'blues-12-8',
+  'ballad-6-8', 'son-clave-3-2', 'son-clave-2-3', 'rumba-clave-3-2', 'groove-5-4', 'groove-7-8',
+  'quiz:echo:8', 'quiz:echo:mixed', 'quiz:pick:swing', 'quiz:pick:meter', 'quiz:pick:clave',
+  'quiz:pick:drift',
+]);
+
 /* ---- Building it ---------------------------------------------------------- */
 
 /* A quiz step's id is the id its rounds are recorded under. */

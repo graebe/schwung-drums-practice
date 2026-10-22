@@ -5,11 +5,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "npm run test:js && npm run test:dsp && npm run test:rust && npm run test:package",
-    "test:js": "node --test tests/*.test.mjs",
-    "test:dsp": "sh tests/dsp/run.sh",
-    "test:package": "sh tests/package/run.sh",
-    "test:rust": "cd dsp && cargo test --no-default-features",
+    "test": "bash scripts/test.sh",
+    "test:js": "bash scripts/test.sh js",
+    "test:dsp": "bash scripts/test.sh dsp",
+    "test:package": "bash scripts/test.sh package",
+    "test:rust": "bash scripts/test.sh rust",
     "build": "sh scripts/build.sh",
     "preview": "node tools/preview.mjs",
     "coverage:ui": "node tools/ui_coverage.mjs"

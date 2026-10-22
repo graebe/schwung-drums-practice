@@ -631,8 +631,9 @@ function loadProgress() {
   if (main.stale) {
     writeFile(PROGRESS_OLD_PATH, text);
     /* Saved even when stats.json had nothing in it, so the old file is not
-     * found, and set aside, again on every start. */
-    return rebuildProgress(true);
+     * found, and set aside, again on every start. What the old file had
+     * reached is merged in: the stats log is capped, the old file is not. */
+    return PROG.mergeLegacy(rebuildProgress(true), main.legacy);
   }
   if (text) writeFile(PROGRESS_BAD_PATH, text);
   const bakText = readFile(PROGRESS_BAK_PATH);
@@ -1821,6 +1822,7 @@ function openRow() {
     return;
   }
   pathStep = null;
+  leavePath();
   if (item.repId) {
     if (leafIdx.get(item.repId)) openLeaf(leafIdx.get(item.repId));
     return;
@@ -1897,6 +1899,7 @@ function openStep(step) {
   /* The step's target is the Speed it is played at, so 100% of what it asks
    * is what the take is armed at. L0 has no clock to set. */
   const speed = isUntimedId(step.id) ? settings.speed : speedFor(step.target);
+  if (speedBeforePath === null) speedBeforePath = settings.speed;
   if ((target && settings.bpm !== target) || settings.speed !== speed) {
     if (target) settings.bpm = target;
     settings.speed = speed;
@@ -1965,6 +1968,22 @@ function hearFromCard() {
 function cardFooter() {
   if (!card.then) return card.at + 1 < card.ids.length ? 'CLICK next  BACK list' : 'CLICK done';
   return card.at + 1 < card.ids.length ? 'CLICK next  PLAY hear' : 'CLICK start PLAY hear';
+}
+
+/*
+ * The Speed a path step set is the step's, not yours: leaving the path for a
+ * drill of the library gives back the Speed you had before it — a library
+ * drill opened after a 60% step used to open at 60% as well.
+ */
+let speedBeforePath = null;
+function leavePath() {
+  if (speedBeforePath === null) return;
+  if (settings.speed !== speedBeforePath) {
+    settings.speed = speedBeforePath;
+    settingsRowsCache = SET.settingsRows(settings);
+    saveSettings();
+  }
+  speedBeforePath = null;
 }
 
 /* A step's target as a Speed the setting offers: its nearest step of five,
@@ -2398,6 +2417,9 @@ let exited = false;
 function closeModule() {
   if (pendingExitAt || exited) return;
   guard('close:panic', () => dspSet('panic', '1'));
+  /* A Custom layout edited on the Pad map is saved on Back; Shift+Back from
+   * there closes without passing it. */
+  guard('close:pads', savePads);
   tp.mode = C.MODE_IDLE;
   tp.paused = false;
   /*
@@ -3191,5 +3213,8 @@ globalThis.onUnload = function onUnload() {
     setButtonLED(C.CC_PLAY, 0);
     setButtonLED(C.CC_RECORD, 0);
   });
-  guard('unload:files', () => flushFiles(true));
+  guard('unload:files', () => {
+    savePads();
+    flushFiles(true);
+  });
 };

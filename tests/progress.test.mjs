@@ -524,3 +524,26 @@ test('the L0 chart scale starts at nothing, so a slow first pace still shows', (
   assert.ok(s.points[0].y > s.points[1].y, 'a faster pace is higher');
   assert.ok(s.points[0].y < 19, 'and 20% is above the floor');
 });
+
+test('a version 1 file is read for what it reached, and merged into the rebuild', () => {
+  const v1 = JSON.stringify({ version: 1, items: {
+    old: { best: 100, bpm: 92, plays: 30, t: 50, done: 40, rep: { due: 99, step: 2, at: 60, ok: true },
+      h: [[40, 100, 98, 12, 13]] },
+    skipped: { skip: 7, plays: 0 },
+    slow: { best: 60, plays: 3, t: 10 },
+  } });
+  const r = P.readProgress(v1);
+  assert.equal(r.stale, true);
+  assert.equal(r.legacy.old.best, 100, 'the old file is read');
+  /* The stats log had long trimmed the drill learned first; it rebuilt a
+   * slower best for another. */
+  const rebuilt = P.emptyProgress();
+  P.recordTake(rebuilt, 'slow', { speed: 80, accuracy: 1, sd: 10, clean: true, bpm: 80, at: 20000 });
+  const p = P.mergeLegacy(rebuilt, r.legacy);
+  assert.equal(P.item(p, 'old').best, 100);
+  assert.equal(P.item(p, 'old').done, 40, 'the ✓ earned under the stricter rule holds');
+  assert.deepEqual(P.item(p, 'old').rep, { due: 99, step: 2, at: 60, ok: true });
+  assert.equal(P.item(p, 'skipped').skip, 7);
+  assert.equal(P.item(p, 'slow').best, 80, 'the better of the two');
+  assert.equal(P.item(p, 'slow').h.length, 1, 'the rebuilt history, which carries the dynamics');
+});
