@@ -53,9 +53,10 @@ const played = (progress, steps) => steps.some((st) => {
 
 /*
  * The world map: an island per stage. `targets[i]` is the child of the Path
- * folder the island opens — the stages come first there, so it is i.
+ * folder the island opens — the stages come after `first` rows (Continue),
+ * so it is first + i.
  */
-export function worldPlaces(progress, program, { dueIds = new Set() } = {}) {
+export function worldPlaces(progress, program, { dueIds = new Set(), first = 0 } = {}) {
   const prefs = progress.path || {};
   const cur = PLAN.currentStage(progress, program);
   const places = [];
@@ -71,7 +72,7 @@ export function worldPlaces(progress, program, { dueIds = new Set() } = {}) {
     else if (cur && stage.index > cur.index) state = 'ahead';
     places.push(makePlace({ id: stage.key, label: `${stage.index} ${stage.name}`, short: String(stage.index),
       percent: percentOf(sum), state, due: countIn(all, dueIds), kind: 'island' }));
-    targets.push(stage.index);
+    targets.push(first + stage.index);
   }
   return { places, targets };
 }

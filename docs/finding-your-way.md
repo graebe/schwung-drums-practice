@@ -27,8 +27,8 @@ go on.
    ```
 
 3. **New to drums?** — turn the jog to pick, click to go on:
-   - **From the start** puts the path at its first stage and the cursor on **Continue**. Click it
-     and your first lesson begins.
+   - **From the start** puts the path at its first stage and opens the **Path**'s map, your
+     avatar on the first island. Press **PLAY** and your first lesson begins.
    - **I already play** opens the **Path** — the map — with a tip: *Know a stage already? SHIFT+CLICK a stage,
      then Test out: checkpoint. Pass it and the path moves on.* See
      [Skipping what you already know](#skipping-what-you-already-know) below.
@@ -37,32 +37,33 @@ go on.
 this version, you are not greeted at all — you know your way already. To see it again: *Settings ›
 Help › Welcome again*.
 
-## The list
+## Home
 
-Everything starts from one list. It shows four rows at a time, with the keys under them:
+Everything starts from home: five circles, one per section, each with its picture.
 
 ```
  DRUMS
- Continue     Quarters        <- the next step, named
- Path                >
- Practice            >
- Quiz                >
-     CLICK open  MENU help    <- the hint line
+  (flag) (drum) ( ? ) (bars) (gear)    <- the chosen one filled and bigger
+                Path                   <- its name
+             JOG choose                <- the hint line
 ```
 
-Turn the jog past Quiz and two more rows come into view:
+**Turn the jog** to choose a circle — it grows as you land on it — and **CLICK** to open it. The
+five pads under the circles, on the bottom row, are lit: press one to open its section at once.
+Pads make no sound here. **Back** at home closes the module; **Back** from a section comes home
+with that circle chosen. **SHIFT+CLICK** and *Show as list* gives the same five as rows, until you
+Back out of it.
 
-| Row | What is in it |
+| Circle | What is in it |
 | --- | --- |
-| **Continue** | the one button: opens the next step for you (below) |
-| **Path** | the course, as a map: seven stages from *0 Hello, kit* to *6 Pro* (see [The map](#the-map)) |
+| **Path** | the course, as a map: seven stages from *0 Hello, kit* to *6 Pro* (see [The map](#the-map)); PLAY there is Continue |
 | **Practice** | the free library: **Subdivisions**, **Grooves** by style, **Rudiments** by family, **Random** |
 | **Quiz** | five ear and reading drills |
 | **Progress** | how far you have got: overall, per track, and every drill you played |
 | **Settings** | **Path**, **Practice**, **Sound**, **Pads**, **MIDI**, **Help** |
 
-**Click** opens a row, **Back** goes up one level, and Back at the top closes the module. Inside a
-folder the hint line says so: `CLICK open  BACK up`.
+Inside a section everything is a list, four rows at a time with the keys under them: **Click**
+opens a row, **Back** goes up one level. The hint line says so: `CLICK open  BACK up`.
 
 ## The hint line, and what Shift does
 
@@ -70,7 +71,7 @@ The bottom line of every screen names the keys that work there, in the Move's ow
 
 | Screen | Says |
 | --- | --- |
-| the list | `CLICK open  MENU help` |
+| home | `JOG choose`, then `CLICK open  PAD open`, `MENU help` |
 | a folder | `CLICK open  BACK up` |
 | a drill, ready | the level at the left — `L2  + kick` — and `JOG level`, `REC start`, … at the right |
 | a take, paused | `REC go on  BACK stop` |
@@ -87,10 +88,10 @@ back.
 
 ## Continue: your one button
 
-**Continue** is the top row, and the row says what it will open: `Continue   Quarters`. A long
-name that does not fit shows only its rung — `Continue   L0` for *First beat L0* — and the title bar
-names the whole step while the cursor is on the row: `FIRST BEAT L0`.
-Click it and
+**Continue** lives in the Path: on its map it is **PLAY**, and in the Path as a list it is the
+first row, which says what it will open: `Continue   Quarters`. A long name that does not fit shows
+only its rung — `Continue   L0` for *First beat L0* — and the title bar names the whole step while
+the cursor is on the row: `FIRST BEAT L0`. Press it and
 you are in that step — its lesson card first if it is new, then the drill, set to the speed the step
 asks for. When you are done, **Click** on the result goes on to the next step.
 
@@ -100,7 +101,7 @@ again. Everything due today is also in **Path › Review**.
 
 Example: a first session.
 
-1. Click **Continue** — `0 Hello, kit` introduces itself on a card. Click.
+1. Open **Path** and press **PLAY** (Continue) — `0 Hello, kit` introduces itself on a card. Click.
 2. **Meet the pads**: each drum of your layout in turn, its name on screen, its pads pulsing on both
    halves, its sound once. Strike a pulsing pad to meet the next; another pad is only named, the jog
    skips, **PLAY** sounds it again, **Back** leaves without counting it. At the end, **Click** goes on.
@@ -202,7 +203,8 @@ You can play already? Test out instead of working through what you know:
 2. Choose **Test out: checkpoint**. The stage's checkpoint opens — a piece of music, not a list.
 3. Play it clean. The stage is through, and Continue moves on to the next one.
 
-Just one step in your way? **SHIFT+CLICK Continue** and choose **I know this: skip**.
+Just one step in your way? Show the Path as a list, **SHIFT+CLICK Continue** and choose **I know
+this: skip**.
 
 ### The Ladder and the Clock
 
@@ -259,5 +261,5 @@ CLICK** opens every setting at once over the drill, and the same again takes you
 ## Lost?
 
 Press **MENU**. It always tells you where you are and which keys work. **BACK** always goes one
-level up — press it a few times and you are back at the top of the list, where **Continue** knows
-what to do next.
+level up — press it a few times and you are home; open **Path** and **PLAY** knows what to do
+next.

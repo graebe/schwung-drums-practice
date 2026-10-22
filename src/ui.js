@@ -59,6 +59,8 @@ import * as MP from './map_places.mjs';
 import { layoutPlaces, placeOfPad } from './pathmap/layout.mjs';
 import { createWalk, walkTo, walkStep, posAt, arrived } from './pathmap/walk.mjs';
 import { mapPadColors } from './pathmap/leds.mjs';
+import { drawHome, createGrow, startGrow, itemOfPad } from './home/render.mjs';
+import { homePadColors } from './home/leds.mjs';
 import * as UT from './untimed.mjs';
 import * as PT from './pad_tour.mjs';
 import { availableLevels } from './levels.mjs';
@@ -99,7 +101,7 @@ const OUTBOX_MAX = 512;
 /* Screens: named in hints.mjs, so none can go without a hint line. */
 const {
   MENU, READY, RUNNING, SUMMARY, LADDER, QUIZ, RESULT, PROGRESS, PROGRESS_ITEM, SETTINGS, ERROR, CARD,
-  PADMAP, SHEET, HELP, WELCOME, TIP, MAP, TOUR,
+  PADMAP, SHEET, HELP, WELCOME, TIP, MAP, TOUR, HOME,
 } = H.SCREENS;
 
 /* MIDI out routes. */
@@ -570,6 +572,13 @@ function answerBarActive() {
 }
 
 function paintLeds(t) {
+  /* At home the pads are the circles. */
+  if (onHome()) {
+    homePadColors({ count: CAT.navTop(nav).node.children.length, selected: CAT.navTop(nav).cursor, now: t,
+      palette: PAD.HOME_PALETTE, out: ledBuf });
+    pushLeds();
+    return;
+  }
   /* On the map the pads are its places: lit means you can walk there. */
   const m = onMap() ? mapNow() : null;
   if (m) {
@@ -1801,6 +1810,11 @@ function padDown(pad, vel) {
     if (r === 'right') quizSolvedAt = now();
     return;
   }
+  /* At home a pad is a circle, and makes no sound. */
+  if (onHome()) {
+    homePad(pad);
+    return;
+  }
   /* On the map a pad is a place, and makes no sound. */
   if (onMap()) {
     mapPad(pad);
@@ -2026,7 +2040,62 @@ function onMap() {
 
 /* The screen the hint line and help speak for: the map is drawn on MENU. */
 function viewNow() {
-  return screen === MENU && isMapNode(CAT.navTop(nav).node) ? MAP : screen;
+  if (screen !== MENU) return screen;
+  const top = CAT.navTop(nav).node;
+  return isHomeNode(top) ? HOME : isMapNode(top) ? MAP : screen;
+}
+
+/* ---- the home screen ------------------------------------------------------ */
+/*
+ * The top of the list as five circles (src/home, vendored from Piano
+ * Practice): Path, Practice, Quiz, Progress, Settings, each with its icon.
+ * The jog chooses and the chosen circle grows; Click or a circle's pad opens
+ * it; the pads make no sound here. The nav cursor stays the child index, so
+ * Back from a section comes home with its circle chosen. Show as list on the
+ * sheet gives the five rows, for the session.
+ */
+let homeGrow = null;
+
+function isHomeNode(node) {
+  return Boolean(node && node.view === 'home' && !listViews.has(node));
+}
+
+function onHome() {
+  return screen === MENU && isHomeNode(CAT.navTop(nav).node);
+}
+
+/* The grow, kept on the circle of the cursor: coming back from a section
+ * shows it chosen, without a grow. */
+function homeGrowNow() {
+  const top = CAT.navTop(nav);
+  if (!homeGrow || homeGrow.to !== top.cursor) homeGrow = createGrow(top.cursor);
+  return homeGrow;
+}
+
+function homeChoose(i) {
+  const top = CAT.navTop(nav);
+  const n = top.node.children.length;
+  const to = Math.max(0, Math.min(n - 1, i));
+  homeGrowNow();
+  startGrow(homeGrow, to, now());
+  top.cursor = to;
+}
+
+function homePad(note) {
+  const i = itemOfPad(note);
+  if (i < 0 || i >= CAT.navTop(nav).node.children.length) return;
+  homeChoose(i);
+  openRow();
+}
+
+function drawHomeView(hint) {
+  const top = CAT.navTop(nav);
+  const items = top.node.children.map((c) => ({ key: c.label, label: c.label, icon: c.icon }));
+  ctx.clear();
+  ctx.text(1, 0, menuNote && now() < menuNoteUntil ? menuNote : top.node.label.toUpperCase(), 1);
+  ctx.fillRect(0, L.HEADER_RULE_Y, L.SCREEN_W, 1, 1);
+  drawHome(ctx, { items, selected: top.cursor, grow: homeGrowNow(), now: now() });
+  V.drawHint(ctx, hint);
 }
 
 /* How much of a stage's lesson cards are read, for its hut. */
@@ -2048,7 +2117,8 @@ function mapNow() {
   const day = Math.floor(Date.now() / 86400000);
   if (map && map.node === top.node && map.rev === progress.rev && map.day === day) return map;
   const env = { dueIds: MP.dueIdsOf(progress, Date.now()), atMs: Date.now(), hutPercent };
-  const built = top.node === pathNode ? MP.worldPlaces(progress, program, env)
+  /* The stages follow the Path's Continue row. */
+  const built = top.node === pathNode ? MP.worldPlaces(progress, program, { ...env, first: 1 })
     : MP.islandPlaces(progress, program, top.node, env);
   if (!built.places.length) return null;
   const layout = layoutPlaces(built.places.length);
@@ -2159,7 +2229,8 @@ function openSheet() {
         const p = ROWS.continuePick(progress, program, Date.now(), continueTurn);
         return p && p.kind === 'step' ? p.step.key : '';
       })(),
-      view: top.node.view !== 'map' ? undefined : listViews.has(top.node) ? 'list' : 'map',
+      view: isHomeNode(top.node) || isMapNode(top.node) ? 'map'
+        : top.node.view === 'map' && listViews.has(top.node) ? 'list' : undefined,
     }),
     sel: 0,
   };
@@ -2888,18 +2959,20 @@ function welcomeClick() {
     return;
   }
   finishWelcome();
+  /* Either way onto the Path's map: from the start with the avatar on the
+   * first stage, Play to begin; already playing with the tip on testing out. */
   nav = CAT.navStart(catalog);
-  if (answer === 'start') {
-    PROG.setPath(progress, 'start', 0);
-    saveProgress();
-    announce('Continue.');
-    return;
-  }
   const at = catalog.children.indexOf(pathNode);
   if (at >= 0) {
     nav[0].cursor = at;
     CAT.navPush(nav);
     enterMap();
+  }
+  if (answer === 'start') {
+    PROG.setPath(progress, 'start', 0);
+    saveProgress();
+    announce('Path. Play continues.');
+    return;
   }
   showTip('placement', MENU);
 }
@@ -3239,6 +3312,10 @@ function draw() {
   if (screen === SHEET && sheet) {
     V.drawList(ctx, { title: sheet.title.toUpperCase().slice(0, 21), items: sheet.items, selected: sheet.sel,
       footer: hint });
+    return;
+  }
+  if (screen === MENU && onHome()) {
+    drawHomeView(hint);
     return;
   }
   if (screen === MENU && onMap()) {
@@ -3769,6 +3846,8 @@ function jog(delta) {
   const target = C.jogTarget(screen, settingsEditing);
   if (target === 'level') {
     levelJog(delta);
+  } else if (target === 'menu' && onHome()) {
+    homeChoose(CAT.navTop(nav).cursor + delta);
   } else if (target === 'menu' && onMap()) {
     mapJog(delta);
   } else if (target === 'menu') {
@@ -3945,7 +4024,8 @@ globalThis.drumsPracticeMenu = function drumsPracticeMenu() {
 globalThis.drumsPracticeScreen = function drumsPracticeScreen() {
   const m = onMap() ? mapNow() : null;
   return { screen, sheet: sheet ? sheet.items.map((a) => a.label) : null, help: help ? help.lines.slice() : null,
-    map: m ? { at: m.walk.target, places: m.places.map((p) => `${p.label}:${p.state}`) } : null };
+    map: m ? { at: m.walk.target, places: m.places.map((p) => `${p.label}:${p.state}`) } : null,
+    home: onHome() ? { selected: CAT.navTop(nav).cursor, grow: homeGrow ? { ...homeGrow } : null } : null };
 };
 
 globalThis.onUnload = function onUnload() {

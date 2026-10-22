@@ -27,6 +27,8 @@
  *   npm run preview -- --screen tip --tip sheet|practice|quiz|placement [--top N]
  *   npm run preview -- --screen map --level world|island [--to N --t ms]   (stage 0 done, 1 current;
  *                       --to walks the avatar to place N and draws it --t ms into the walk)
+ *   npm run preview -- --screen home [--selected N] [--from M --t ms]   (the five circles; --from
+ *                       grows N out of M, --t ms into the 160 ms grow)
  *   npm run preview -- --screen map-sheet   (a stage's options on the map, with Show as list)
  *   npm run preview -- --screen map --level island --stage 0 --fresh [--walked]
  *                       (stage 0 from the start: Meet the pads not walked, or walked)
@@ -56,6 +58,8 @@ import * as MP from '../src/map_places.mjs';
 import { layoutPlaces } from '../src/pathmap/layout.mjs';
 import { createWalk, walkTo, posAt } from '../src/pathmap/walk.mjs';
 import { RANDOM_DRILLS } from '../src/generator.mjs';
+import * as HOME from '../src/home/render.mjs';
+import { PRACTICE_DRUMS } from '../src/home/icons.mjs';
 
 /* The real Path, with stage 0 through on its checkpoint and stage 1 begun, for
  * the map previews: every state shows somewhere. */
@@ -275,12 +279,24 @@ if (screen) {
     const lines = HP.fitPage(TIPS.tipItems(key), (t) => ctx.textWidth(t));
     V.drawPage(ctx, { title: TIPS.TIP_TITLE, lines, top: Number(arg('top', 0)),
       footer: H.hintFor(H.SCREENS.TIP, { scrolls: lines.length > L.PAGE_ROWS })[0] });
+  } else if (screen === 'home') {
+    /* The top as ui.js draws it: the title, the circles, the hint line. */
+    const items = [['Path', 'path'], ['Practice', PRACTICE_DRUMS], ['Quiz', 'quiz'], ['Progress', 'progress'],
+      ['Settings', 'settings']].map(([label, icon]) => ({ key: label, label, icon }));
+    const to = Number(arg('selected', 0));
+    const grow = HOME.createGrow(Number(arg('from', to)));
+    if (arg('from', null) !== null) HOME.startGrow(grow, to, 0);
+    ctx.clear();
+    ctx.text(1, 0, 'DRUMS', 1);
+    ctx.fillRect(0, L.HEADER_RULE_Y, L.SCREEN_W, 1, 1);
+    HOME.drawHome(ctx, { items, selected: to, grow, now: Number(arg('t', 1000)) });
+    V.drawHint(ctx, H.hintFor(H.SCREENS.HOME)[0]);
   } else if (screen === 'map' || screen === 'map-sheet') {
     const { program, progress, folder } = samplePath({ fresh: Boolean(arg('fresh', false)),
       walked: Boolean(arg('walked', false)) });
     const island = arg('level', 'world') === 'island';
     const built = island
-      ? MP.islandPlaces(progress, program, folder.children[Number(arg('stage', 1))], { atMs: Date.UTC(2026, 9, 2) })
+      ? MP.islandPlaces(progress, program, folder.children[Number(arg('stage', 1)) + 1], { atMs: Date.UTC(2026, 9, 2) })
       : MP.worldPlaces(progress, program, {});
     const layout = layoutPlaces(built.places.length);
     const walk = createWalk(layout, MP.startPlace(built.places));

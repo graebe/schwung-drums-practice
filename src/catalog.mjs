@@ -34,6 +34,7 @@
 
 import { CLOCK_ID, quizItemId } from './ids.mjs';
 import { GROUPS } from './settings_def.mjs';
+import { PRACTICE_DRUMS } from './home/icons.mjs';
 import { availableLevels, projectLevel } from './levels.mjs';
 import { subdivisionDrills, RANDOM_DRILLS } from './generator.mjs';
 
@@ -188,16 +189,26 @@ export function drumsTree({ entries = [], categories = [], bpm = 90, drills = []
     }))),
     ...(lib.other ? [lib.other] : []),
   ]);
-  return folder('Drums', [
-    { label: 'Continue', value: '', continueRow: true },
+  /* The top is the home screen (src/home, vendored from Piano Practice): a
+   * circle per section, each with its icon. Continue is no row of it: it is
+   * Play on the Path's map, and the Path list's first row. */
+  const quiz = folder('Quiz', drills.map((d) => ({
+    label: d.name, value: '?', kind: 'quiz', quiz: d, id: quizItemId(d.mode, d.kind),
+  })));
+  const settings = settingsFolder(pathPrefs);
+  if (path) path.icon = 'path';
+  practice.icon = PRACTICE_DRUMS;
+  quiz.icon = 'quiz';
+  settings.icon = 'settings';
+  const root = folder('Drums', [
     ...(path ? [path] : []),
     practice,
-    folder('Quiz', drills.map((d) => ({
-      label: d.name, value: '?', kind: 'quiz', quiz: d, id: quizItemId(d.mode, d.kind),
-    }))),
-    { label: 'Progress', value: '', kind: 'progress' },
-    settingsFolder(pathPrefs),
+    quiz,
+    { label: 'Progress', value: '', kind: 'progress', icon: 'progress' },
+    settings,
   ]);
+  root.view = 'home';
+  return root;
 }
 
 export { CLOCK_ID };

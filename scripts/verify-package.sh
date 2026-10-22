@@ -31,7 +31,7 @@ done
 # The siblings are stamped per build, so check by count rather than by name —
 # and the count is READ from package.sh's MODULES, not restated here, so adding
 # a module cannot leave this check asserting last month's number.
-EXPECT=$(sed -n -e 's/^MODULES="\(.*\)"$/\1/p' -e 's/^PATHMAP="\(.*\)"$/\1/p' \
+EXPECT=$(sed -n -e 's/^MODULES="\(.*\)"$/\1/p' -e 's/^PATHMAP="\(.*\)"$/\1/p' -e 's/^HOMESCREEN="\(.*\)"$/\1/p' \
   "$(dirname "$0")/package.sh" | wc -w | tr -d ' ')
 MJS=$(echo "$LIST" | grep -c '/[A-Za-z0-9_]*-[0-9][0-9]*\.mjs$' || true)
 [ "$MJS" -eq "$EXPECT" ] || { echo "expected $EXPECT stamped modules, found $MJS" >&2; exit 1; }
@@ -43,7 +43,7 @@ MJS=$(echo "$LIST" | grep -c '/[A-Za-z0-9_]*-[0-9][0-9]*\.mjs$' || true)
 TMPD=$(mktemp -d)
 tar -xzf "$ARCHIVE" -C "$TMPD"
 MODDIR="$TMPD/drums-practice"
-for f in "$MODDIR/ui.js" "$MODDIR"/*.mjs "$MODDIR"/pathmap/*.mjs; do
+for f in "$MODDIR/ui.js" "$MODDIR"/*.mjs "$MODDIR"/pathmap/*.mjs "$MODDIR"/home/*.mjs; do
   for imp in $(sed -n "s/.*from '\.\/\([A-Za-z0-9_/-]*\.mjs\)'.*/\1/p" "$f"); do
     if [ ! -f "$(dirname "$f")/$imp" ]; then
       echo "$(basename "$f") imports $imp, which is not in the package" >&2

@@ -261,23 +261,24 @@ test('on from a step: the next open one of its track in its stage, never itself'
   assert.equal(PLAN.stepAfter(p, prog, fb0, T0).id, 'first-beat:l1', 'the next rung');
 });
 
-test('the Path: the stages, then Review only while something is due', () => {
+test('the Path: Continue, the stages, then Review only while something is due', () => {
   let due = [];
   const f = PLAN.programFolder(build(), () => due);
-  const stages = ['0 Hello, kit', '1 Eighth notes', '2 Sixteenths', '3 Ghosts & flams',
+  const stages = ['Continue', '0 Hello, kit', '1 Eighth notes', '2 Sixteenths', '3 Ghosts & flams',
     '4 Triplets/swing', '5 Clave & world', '6 Pro'];
   assert.deepEqual(f.children.map((c) => c.label), stages, 'nothing due, no Review');
+  assert.equal(f.children[0].continueRow, true, 'Continue lives in the Path now');
   due = [{ label: 'due', repId: 'x' }];
   assert.deepEqual(f.children.map((c) => c.label), stages.concat('Review'));
-  assert.equal(f.children[7].children[0].repId, 'x', 'asked for each time');
+  assert.equal(f.children[8].children[0].repId, 'x', 'asked for each time');
 });
 
 test('a stage lists its places in teaching order, the checkpoint last, and no rows with a job', () => {
   const f = PLAN.programFolder(build());
-  const s0 = f.children[0];
+  const s0 = f.children[1];
   assert.deepEqual(s0.children.map((c) => c.label),
     ['Lessons', 'Ear', 'Time', 'Grooves', 'Electives', 'Checkpoint'], 'Hello, kit has no Hands');
-  assert.deepEqual(f.children[2].children.map((c) => c.label),
+  assert.deepEqual(f.children[3].children.map((c) => c.label),
     ['Lessons', 'Ear', 'Time', 'Hands', 'Grooves', 'Electives', 'Checkpoint']);
   const cp = s0.children[s0.children.length - 1];
   assert.equal(cp.checkpoint, true);

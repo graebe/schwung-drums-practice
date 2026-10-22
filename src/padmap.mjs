@@ -287,6 +287,10 @@ export const LED_STICK = 3;        /* BrightOrange #C93C00 — wrong hand      *
 export const LED_DYN = 16;         /* AzureBlue    #31ADFF — wrong dynamic   */
 export const LED_MISS = 127;       /* Red          #FF0000                   */
 
+/* The home screen's pads (home/leds.mjs): a circle each, the chosen one
+ * bright and pulsing, the rest dim; everything else dark. */
+export const HOME_PALETTE = Object.freeze({ off: LED_OFF, item: 119, selected: 120, selectedDim: 118 });
+
 /*
  * The Path map's pads (pathmap/leds.mjs): a lit pad is a place you can walk
  * to, coloured by its state; water is dark. Move palette indices.

@@ -66,8 +66,10 @@ fingers, in the same way its sister module is a reading trainer rather than a pi
 - **Knows how far you have got.** Every drill shows your best **clean speed** — 80% means you can
   play it clean at 80% of its written tempo — and a tick once you can play it clean at tempo. The
   **Path** walks you through seven stages, time, hands, grooves and ear side by side, and
-  **Review** brings back what you learned on a schedule, so it stays learned. **Continue**, the top
-  row, always names the one thing to do next.
+  **Review** brings back what you learned on a schedule, so it stays learned. **Continue** — Play
+  on the Path's map — always knows the one thing to do next.
+- **Starts at home.** Five circles with pictures — Path, Practice, Quiz, Progress, Settings — chosen
+  with the jog (the chosen one grows) or by the five lit pads under them.
 - **Always says what to press.** The bottom line of every screen names its keys — `CLICK open  BACK
   up` — and **Menu** opens help for the screen you are on. Hold **Shift** and the line shows what
   Shift does there.
@@ -508,7 +510,7 @@ right here. **90%** is learned.
 
 ### The Path
 
-Second in the list, after Continue: a course from your first beat to pro rhythms, in **seven
+The first circle at home: a course from your first beat to pro rhythms, in **seven
 stages**. It does not hold drills of its own — every step is a row from elsewhere in the tree, so
 **a take anywhere counts**: play the flam tap from Practice › Rudiments › Flams at the tempo a step
 asks and the step is done. Nothing is locked; the path only recommends. The whole plan, step by step
@@ -561,8 +563,8 @@ thing each), **Electives** (never required) and its **Checkpoint**. Pass the che
 stage is through, whatever else is open — take it at any time to test out. Closing every core step
 does it too. The current stage is marked `▸`, a finished one ✓.
 
-**Continue**, the top row of the list, opens the next step of the current stage, from the track you
-have left longest, and names it: `Continue   Quarters`. A name too long for the row shows only its
+**Continue** — **Play** on the Path's map, and the first row of the Path as a list — opens the next
+step of the current stage, from the track you have left longest, and names it: `Continue   Quarters`. A name too long for the row shows only its
 rung (`Continue   L0`), and the title bar names the whole step while the cursor is on it. When something you learned is due again it
 offers that instead — `Review   Flam tap` — one review, then one new step, in turn.
 
@@ -631,12 +633,13 @@ into it.
 
 ## The drills
 
-The list is a tree, the same at the top as Piano Practice's. **Click** opens a folder, **Back**
-goes up one, and Back at the top leaves. Four rows show at a time, with the keys under them.
+The top is **home**, the same as Piano Practice's: five circles, chosen with the jog or by the lit
+pads 69–73 under them (they make no sound there), opened with Click or the pad; *Show as list* on
+the sheet shows them as rows. Below home the list is a tree: **Click** opens a folder, **Back** goes
+up one, and Back at home leaves. Four rows show at a time, with the keys under them.
 
 ```
-Continue    the next step, or a review that is due — named on the row
-Path        0 Hello, kit … 6 Pro · Review (while something is due)
+Path        a map: 0 Hello, kit … 6 Pro; as a list Continue first, Review (while something is due) last
 Practice    Subdivisions · Grooves › Rock & Pop … Techno · Rudiments › Rolls … Drags · Random
 Quiz        Guess / Hear / Pick
 Progress

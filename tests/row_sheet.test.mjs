@@ -127,7 +127,7 @@ test('the checkpoint is tested out of, never skipped', () => {
 
 test('Continue skips the step it would open, never a review', () => {
   const p = P.emptyProgress();
-  const row = tree.children[0];
+  const row = path.children[0];
   const sheet = SH.sheetFor(row, env(p));
   assert.deepEqual(sheet.map((a) => a.act), ['skip', 'settings']);
   assert.equal(sheet[0].step.id, 'tour:pads', 'Meet the pads leads');

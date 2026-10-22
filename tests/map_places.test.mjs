@@ -63,7 +63,7 @@ test('an island\'s percent is its core done, and its due count today\'s reviews 
 });
 
 test('a stage\'s island: hut, a place per track, cove, fort — the folder\'s rows in its order', () => {
-  const stage = folder.children[1];
+  const stage = folder.children[2];
   const r = MP.islandPlaces(P.emptyProgress(), program, stage, { atMs: T0 });
   assert.deepEqual(r.places.map((p) => [p.label, p.kind]),
     [['Lessons', 'hut'], ['Ear', 'place'], ['Time', 'place'], ['Grooves', 'place'], ['Electives', 'cove'],
@@ -74,7 +74,7 @@ test('a stage\'s island: hut, a place per track, cove, fort — the folder\'s ro
 
 test('on the current island Continue\'s track is current, a skipped track skipped, a passed fort done', () => {
   const p = P.emptyProgress();
-  const stage = folder.children[0];
+  const stage = folder.children[1];
   let r = MP.islandPlaces(p, program, stage, { atMs: T0, hutPercent: () => 50 });
   const by = (label) => r.places.find((x) => x.label === label);
   assert.equal(by('Ear').state, 'current', 'Continue opens Meet the pads first, under Ear');

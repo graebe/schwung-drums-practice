@@ -36,9 +36,13 @@ function leavesOf(node, path = [], out = []) {
   return out;
 }
 
-test('the top of the list is the one both practice modules share', () => {
-  assert.deepEqual(labels(tree()), ['Continue', 'Path', 'Practice', 'Quiz', 'Progress', 'Settings']);
-  assert.equal(tree().children[0].continueRow, true);
+test('the top is the home screen both practice modules share: five sections, an icon each', () => {
+  const t = tree();
+  assert.deepEqual(labels(t), ['Path', 'Practice', 'Quiz', 'Progress', 'Settings']);
+  assert.equal(t.view, 'home');
+  assert.ok(!t.children.some((c) => c.continueRow), 'Continue is Play on the Path, no row at the top');
+  assert.deepEqual(t.children.map((c) => typeof c.icon), ['string', 'object', 'string', 'string', 'string']);
+  assert.ok(t.children[1].icon.small && t.children[1].icon.large, 'Practice carries the drums icon');
 });
 
 test('Practice is the free library: subdivisions, grooves, rudiments, random', () => {

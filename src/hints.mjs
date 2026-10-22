@@ -39,6 +39,9 @@ export const SCREENS = Object.freeze({
   /* A folder of the Path shown as its map (map_places.mjs): ui.js keeps the
    * screen MENU and draws the map when the open folder is one. */
   MAP: 'map',
+  /* The top of the list as five circles (src/home): ui.js keeps the screen
+   * MENU and draws them when the open folder is the root. */
+  HOME: 'home',
   /* Meet the pads (pad_tour.mjs). */
   TOUR: 'tour',
 });
@@ -64,6 +67,9 @@ export function keysFor(screen, st = {}) {
   switch (screen) {
     case S.MENU:
       return { keys: st.depth > 1 ? [['CLICK', 'open'], ['BACK', 'up']] : [['CLICK', 'open'], ['MENU', 'help']],
+        shift: [['CLICK', 'options'], QUIT] };
+    case S.HOME:
+      return { keys: [['JOG', 'choose'], ['CLICK', 'open'], ['PAD', 'open'], ['MENU', 'help']],
         shift: [['CLICK', 'options'], QUIT] };
     case S.MAP:
       return { keys: [['PAD', 'go'], ['CLICK', 'enter'], ['PLAY', 'continue'], ['MENU', 'help']],

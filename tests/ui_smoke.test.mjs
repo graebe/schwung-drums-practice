@@ -198,6 +198,27 @@ function sheetPick(label) {
   if (at) cc(CC.jogTurn, at);
   cc(CC.jogClick, 127);
 }
+/* Into a list, where the pads are the kit: at home they are the circles. */
+function toKit() {
+  goTo('Practice');
+}
+/* The Path list's Review folder: its last row — the first, Continue, may
+ * read Review too. */
+function toReview(open = true) {
+  const m = globalThis.drumsPracticeMenu();
+  const at = m.labels.lastIndexOf('Review');
+  assert.ok(at > 0, `no Review: ${m.labels.join(' | ')}`);
+  if (at !== m.cursor) cc(CC.jogTurn, at > m.cursor ? at - m.cursor : 128 - (m.cursor - at));
+  if (open) cc(CC.jogClick, 127);
+}
+/* The Path as a list, cursor on its Continue row. */
+function toPathList() {
+  toTop();
+  goTo('Path');
+  sheetPick('Show as list');
+  const at = globalThis.drumsPracticeMenu().cursor;
+  if (at) cc(CC.jogTurn, 128 - at);
+}
 /* Settings › a group: the editor with that group's rows. */
 function toSettings(group = 'Practice') {
   toTop();
@@ -257,6 +278,7 @@ test('a pad press reaches the engine as a hit', async () => {
   const { log } = await loadUi();
   globalThis.init();
   ticks(3);
+  toKit();                /* pads are the kit in a list; at home they are circles */
   const before = log.params.length;
   pad(80, 100);
   globalThis.tick();
@@ -271,6 +293,7 @@ test('a pad sounds as its voice\'s GM note, in the engine and down a MIDI route 
   let { log } = await loadUi();
   globalThis.init();
   ticks(3);
+  toKit();                /* pads are the kit in a list; at home they are circles */
   for (const [p, voice] of pads) {
     assert.equal(PADMAP.padVoice(p), voice, `MPC Classic pad ${p}`);
     const before = log.params.length;
@@ -282,6 +305,7 @@ test('a pad sounds as its voice\'s GM note, in the engine and down a MIDI route 
   ({ log } = await loadUi({ settings: { midiOut: 1 } }));
   globalThis.init();
   ticks(3);
+  toKit();                /* pads are the kit in a list; at home they are circles */
   for (const [p, voice] of pads) {
     const before = log.midi.length;
     pad(p, 100);
@@ -504,17 +528,16 @@ test('a finished practice records a score without being asked', async () => {
   assert.ok(parsed.records.length >= 1, 'a finished practice recorded no score');
 });
 
-test('the list opens on Continue, naming the step it opens, with the keys under it', async () => {
+test('the top is home: five circles, the chosen one named, the keys under it; no Continue', async () => {
   await loadUi({ walked: true });
   globalThis.init();
   ticks(3);
   const drawn = drawnText(2);
-  for (const row of ['Continue', 'Quarters', 'Path', 'Practice', 'Quiz', 'CLICK open  MENU help']) {
-    assert.ok(drawn.includes(row), `the top list does not show ${row}: ${drawn.join('|')}`);
+  for (const t of ['DRUMS', 'Path', 'JOG choose']) {
+    assert.ok(drawn.includes(t), `home does not show ${t}: ${drawn.join('|')}`);
   }
-  assert.deepEqual(globalThis.drumsPracticeMenu().labels,
-    ['Continue', 'Path', 'Practice', 'Quiz', 'Progress', 'Settings']);
-  assert.equal(globalThis.drumsPracticeMenu().cursor, 0, 'the cursor starts on Continue');
+  assert.deepEqual(globalThis.drumsPracticeMenu().labels, ['Path', 'Practice', 'Quiz', 'Progress', 'Settings']);
+  assert.equal(globalThis.drumsPracticeScreen().home.selected, 0, 'Path is chosen first');
   goTo('Practice');
   assert.ok(drawnText(1).includes('CLICK open  BACK up'), 'a folder says Back goes up');
   assert.deepEqual(globalThis.drumsPracticeMenu().labels, ['Subdivisions', 'Grooves', 'Rudiments', 'Random']);
@@ -1000,6 +1023,7 @@ test('after notes went to a Move track, exit sweeps every channel there, and onl
   const { log } = await loadUi({ settings: { midiOut: 1 } });
   globalThis.init();
   ticks(3);
+  toKit();                /* pads are the kit in a list; at home they are circles */
   globalThis.onMidiMessageInternal([0x90, 68, 100]);   /* a pad: a note to the track */
   globalThis.onMidiMessageInternal([0x80, 68, 0]);
   ticks(5);
@@ -1020,6 +1044,7 @@ test('the exit paces its note-offs rather than flooding the ring', async () => {
   const { log } = await loadUi({ settings: { midiOut: 3 } });
   globalThis.init();
   ticks(2);
+  toKit();                /* pads are the kit in a list; at home they are circles */
   globalThis.onMidiMessageInternal([0x90, 68, 100]);
   globalThis.onMidiMessageInternal([0x80, 68, 0]);
   ticks(4);
@@ -1227,6 +1252,7 @@ test('the host may ask to unload as often as it likes; we tear down once', async
   const { log } = await loadUi({ settings: { midiOut: 1 } });
   globalThis.init();
   ticks(6);
+  toKit();                /* pads are the kit in a list; at home they are circles */
   globalThis.onMidiMessageInternal([0x90, 68, 100]);   /* something went to the track */
   globalThis.onMidiMessageInternal([0x80, 68, 0]);
   ticks(6);
@@ -1605,7 +1631,7 @@ test('a broken user.json is reported, and the shipped drills still load', async 
   globalThis.init();
   const shown = drawnText(2);
   assert.ok(shown.some((t) => /BAD USER\.JSON/.test(t)), shown.join('|'));
-  assert.ok(shown.some((t) => /Practice/.test(t)), 'the list is there underneath');
+  assert.ok(shown.some((t) => /^Path$/.test(t)), 'home is there underneath');
 });
 
 /* ---- the Learning Path and progress ---------------------------------------- */
@@ -1620,10 +1646,11 @@ async function snare() {
   return snarePad;
 }
 
-/* Continue: the top row of the list. */
+/* Continue: Play on the Path's map. */
 function continuePath() {
   toTop();
-  goTo('Continue');
+  goTo('Path');
+  cc(CC.play, 127);
   ticks(2);
 }
 
@@ -1780,14 +1807,16 @@ test('I know this: skip on Continue moves it on to the next track', async () => 
   const { log } = await loadUi({ walked: true });
   globalThis.init();
   ticks(2);
+  toPathList();
+  ticks(1);
   assert.ok(drawnText(1).includes('Quarters'));
   sheetPick('I know this: skip');
   ticks(1);
   assert.match(log.announces.join('|'), /Skipped Quarters/);
   assert.ok(drawnText(1).includes('FIRST BEAT L0'), 'skipping did not move on');
-  goTo('Path', '0 Hello, kit', 'Time', 'Quarters', { open: false });
+  goTo('0 Hello, kit', 'Time', 'Quarters', { open: false });
   sheetPick('Undo skip');
-  toTop();
+  toPathList();
   ticks(1);
   assert.ok(drawnText(1).includes('Quarters'), 'the skip was not taken back');
 });
@@ -1819,10 +1848,10 @@ test('a stage\'s sheet starts the path there, and its Settings... opens Settings
   cc(CC.jogTurn, 1);
   cc(CC.jogClick, 127);
   assert.match(log.announces.join('|'), /The path starts at stage 2/);
-  toTop();
+  toPathList();
   ticks(1);
   assert.ok(drawnText(1).includes('Sixteenths'), 'Continue is not in stage 2');
-  goTo('Path', '2 Sixteenths', { open: false });
+  goTo('2 Sixteenths', { open: false });
   sheetPick('Settings...');
   assert.equal(globalThis.drumsPracticeMenu().title, 'Settings');
   cc(CC.back, 127);
@@ -1850,7 +1879,7 @@ test('Settings › Path: a track switched off, and Continue no longer offers it'
   goTo('Time');                   /* Time: off */
   ticks(1);
   assert.ok(drawnText(1).includes('off'), drawnText(1).join('|'));
-  toTop();
+  toPathList();
   ticks(1);
   assert.ok(drawnText(1).includes('FIRST BEAT L0'), drawnText(1).join('|'));
 });
@@ -1864,7 +1893,7 @@ test('Settings › Path: the short ladder, and starting at a later stage', async
   ticks(1);
   const shown = drawnText(1);
   assert.ok(shown.includes('short') && shown.includes('Stage 1'), shown.join('|'));
-  toTop();
+  toPathList();
   ticks(1);
   assert.ok(drawnText(1).includes('Eighths'), drawnText(1).join('|'));
 });
@@ -1899,7 +1928,7 @@ test('stuck on a step: a hint after three failed takes, parked after six', async
     else if (n < 6) assert.ok(shown.includes('stuck? knob 8 slower'), `take ${n}: ${shown.join('|')}`);
     else assert.ok(shown.includes('parked: CLICK other'), `take ${n}: ${shown.join('|')}`);
   }
-  toTop();
+  toPathList();
   ticks(1);
   assert.ok(drawnText(1).includes('FIRST BEAT L0'), 'Continue still offers the parked step');
   globalThis.onUnload();
@@ -2006,6 +2035,7 @@ test('a Custom from pads.json is what the pads play; a broken one is said and fa
     dataFiles: { 'pads.json': JSON.stringify({ version: 1, pair: 'twin', rows }) } });
   globalThis.init();
   ticks(2);
+  toKit();                /* pads are the kit in a list; at home they are circles */
   let before = loaded.log.params.length;
   pad(68, 100); pad(68, 0);
   globalThis.tick();
@@ -2013,6 +2043,7 @@ test('a Custom from pads.json is what the pads play; a broken one is said and fa
   loaded = await loadUi({ settings: { layout: 'custom' }, dataFiles: { 'pads.json': '{"rows": 3}' } });
   globalThis.init();
   ticks(2);
+  toKit();                /* pads are the kit in a list; at home they are circles */
   assert.ok(drawnText(1).includes('BAD PADS.JSON'), drawnText(1).join('|'));
   before = loaded.log.params.length;
   pad(68, 100); pad(68, 0);
@@ -2026,6 +2057,7 @@ test('a pads.json emptied by a save cut short is read from its backup, unannounc
     dataFiles: { 'pads.json': '', 'pads.bak.json': JSON.stringify({ version: 1, pair: 'twin', rows }) } });
   globalThis.init();
   ticks(2);
+  toKit();                /* pads are the kit in a list; at home they are circles */
   assert.ok(!drawnText(1).includes('BAD PADS.JSON'), drawnText(1).join('|'));
   const before = loaded.log.params.length;
   pad(68, 100); pad(68, 0);
@@ -2037,6 +2069,7 @@ test('Flip puts the kick under the left hand\'s right finger', async () => {
   const { log } = await loadUi({ settings: { flip: true } });
   globalThis.init();
   ticks(2);
+  toKit();                /* pads are the kit in a list; at home they are circles */
   const before = log.params.length;
   pad(PADMAP.padAt(0, 3), 100); pad(PADMAP.padAt(0, 3), 0);
   globalThis.tick();
@@ -2096,7 +2129,7 @@ test('a lesson card stands before a new concept, and Click is all it costs', asy
   assert.ok(drawnText(2).some((t) => /Quart/.test(t)), 'Click on the last card did not open the step');
   /* Read once, never again: Continue goes straight to the step. */
   toList(); ticks(1);
-  cc(CC.jogClick, 127); ticks(2);
+  cc(CC.play, 127); ticks(2);                  /* Continue: Play on the map */
   assert.ok(drawnText(2).some((t) => /Quart/.test(t)), 'a card read came back');
   globalThis.onUnload();
   const seen = JSON.parse(log.writes[`${DATA}progress.json`]).path.seen;
@@ -2109,10 +2142,11 @@ test('Back from a card returns to the list and marks nothing read; Intros off sh
   ticks(2);
   continuePath();
   cc(CC.back, 127); ticks(1);
-  assert.ok(drawnText(1).includes('Quarters'), 'Back did not return to the list');
-  cc(CC.jogClick, 127); ticks(1);
+  assert.equal(globalThis.drumsPracticeMenu().title, 'Path', 'Back did not return to the map');
+  cc(CC.play, 127); ticks(1);
   assert.ok(drawnText(1).includes('0 Hello, kit'), 'the card was marked read by Back');
   cc(CC.back, 127);
+  toTop();
   /* Settings › Path › Intros: new -> always -> off. */
   goTo('Settings', 'Path', 'Intros');
   goTo('Intros');
@@ -2163,7 +2197,7 @@ test('Path › Review lists what is due, and opens it; with nothing due there is
   ticks(2);
   goTo('Path');
   sheetPick('Show as list');                         /* Review is no island: it is in the list */
-  goTo('Review', { open: false });                   /* the last row, after the stages */
+  toReview(false);                                   /* the last row, after the stages */
   ticks(1);
   assert.ok(drawnText(1).includes('1 due'), 'the due count is not on the row');
   cc(CC.jogClick, 127);
@@ -2190,10 +2224,11 @@ test('Continue alternates a due review with the next step, one each', async () =
   const { log } = await loadUi({ dataFiles: { 'progress.json': JSON.stringify(progress) }, walked: true });
   globalThis.init();
   ticks(2);
+  toPathList();
   assert.equal(globalThis.drumsPracticeMenu().labels[0], 'Review', 'a due review comes first');
   assert.ok(drawnText(1).includes('Flam'));
   shiftClick();
-  assert.deepEqual(globalThis.drumsPracticeScreen().sheet, ['Settings...'], 'a review is not skipped');
+  assert.deepEqual(globalThis.drumsPracticeScreen().sheet, ['Show as map', 'Settings...'], 'a review is not skipped');
   cc(CC.back, 127);
   cc(CC.jogClick, 127);
   ticks(2);
@@ -2863,11 +2898,15 @@ test('a newcomer is welcomed: what it is, the keys, then new or already playing'
   assert.ok(shown.includes('JOG pick  CLICK go on'), shown.join('|'));
   cc(CC.jogClick, 127);                      /* From the start */
   ticks(1);
-  assert.deepEqual(globalThis.drumsPracticeMenu().labels.slice(0, 2), ['Continue', 'Path']);
-  assert.equal(globalThis.drumsPracticeMenu().cursor, 0, 'the cursor is on Continue');
+  /* The map's own tip comes first: it is a newcomer's first map. */
+  assert.equal(screenNow(), 'tip');
+  cc(CC.jogClick, 127);
+  assert.equal(globalThis.drumsPracticeMenu().title, 'Path', 'From the start lands on the Path');
+  assert.ok(globalThis.drumsPracticeScreen().map, 'on its map');
+  assert.equal(globalThis.drumsPracticeScreen().map.at, 0, 'the avatar on the first stage');
   globalThis.onUnload();
   const saved = JSON.parse(log.writes[`${DATA}progress.json`]);
-  assert.deepEqual(saved.tips, ['welcome']);
+  assert.deepEqual(saved.tips, ['welcome', 'map'], 'and the map tip, read on the way');
   assert.equal(saved.path.start, 0);
 });
 
@@ -2956,7 +2995,7 @@ test('Shift held shows Shift\'s layer on the hint line; a long hint rotates', as
   let shown = drawnText(1);
   assert.ok(shown.includes('SHIFT: CLICK options') || shown.includes('SHIFT: BACK quit'), shown.join('|'));
   cc(CC.shift, 0);
-  assert.ok(drawnText(1).includes('CLICK open  MENU help'));
+  assert.ok(drawnText(1).includes('JOG choose'));
   shiftClick();
   const parts = new Set();
   for (let i = 0; i < 300; i++) for (const t of drawnText(1)) parts.add(t);
@@ -3015,7 +3054,8 @@ test('Click on the result of a review Continue opened goes on as Continue would'
   const { log } = await loadUi({ settings: PLAIN, dataFiles: { 'progress.json': JSON.stringify(progress) }, walked: true });
   globalThis.init();
   ticks(2);
-  cc(CC.jogClick, 127);                      /* Review: Flam */
+  goTo('Path');
+  cc(CC.play, 127);                          /* Continue: Review: Flam */
   ticks(2);
   cc(CC.record, 127);
   assert.ok(runUntil(/REC again/, 4000), 'the review take never ended');
@@ -3028,6 +3068,7 @@ test('Menu on Continue reads the card of the step it would open', async () => {
   await loadUi({ withLessons: true });
   globalThis.init();
   ticks(2);
+  toPathList();
   cc(CC.menu, 127);
   const help = globalThis.drumsPracticeScreen().help;
   assert.ok(help.includes('HELP: LIST') || drawnText(1).includes('HELP: LIST'));
@@ -3057,7 +3098,7 @@ test('the Path is a world map: a pad walks the avatar there, a second press goes
   const p3 = await padOfPlace(7, 3);
   pad(p3, 100); pad(p3, 0);
   assert.equal(mapNow().at, 3, 'the pad did not walk there');
-  assert.equal(globalThis.drumsPracticeMenu().cursor, 3, 'the cursor is the place\'s row');
+  assert.equal(globalThis.drumsPracticeMenu().cursor, 4, 'the cursor is the place\'s row, after Continue');
   ticks(40);
   assert.match(log.announces.join('|'), /3 Ghosts & flams, 0 percent/, 'arriving says where');
   pad(p3, 100); pad(p3, 0);
@@ -3102,6 +3143,7 @@ test('pads make no sound on the map, and are the kit again in a list', async () 
   assert.equal(log.params.slice(before).filter(isHit).length, 0, 'a pad sounded on the map');
   assert.equal(globalThis.drumsPracticeMenu().title, 'Path', 'water took us somewhere');
   cc(CC.back, 127);
+  toKit();
   before = log.params.length;
   pad(69, 100); pad(69, 0);
   ticks(2);
@@ -3204,8 +3246,9 @@ test('Meet the pads: Continue opens it first, the drum pulses and sounds, its pa
   globalThis.init();
   ticks(2);
   /* Continue's first offer; too long for the row, so the title bar names it. */
+  toPathList();
   assert.ok(drawnText(1).includes('MEET THE PADS'), drawnText(1).join('|'));
-  goTo('Continue');
+  cc(CC.jogClick, 127);
   ticks(1);
   /* The stage's card, then the tour's own. */
   assert.ok(drawnText(1).includes('0 Hello, kit'), drawnText(1).join('|'));
@@ -3269,6 +3312,7 @@ test('Meet the pads: Back leaves it unrecorded; on Sticking it tours the kit', a
   assert.ok(drawnText(1).includes('1/16'), `Sticking tours the kit: ${drawnText(1).join('|')}`);
   cc(CC.jogTurn, 1); ticks(1);
   cc(CC.back, 127); ticks(1);
+  toPathList();
   assert.ok(drawnText(1).includes('MEET THE PADS'), drawnText(1).join('|'));
   globalThis.onUnload();
   const text = log.writes[`${DATA}progress.json`];
@@ -3350,9 +3394,78 @@ test('a review arms the rung that is due, whatever the groove would open on', as
   ticks(2);
   goTo('Path');
   sheetPick('Show as list');
-  goTo('Review', 'Rock backbeat');
+  toReview();
+  goTo('Rock backbeat');
   ticks(1);
   assert.ok(drawnText(1).includes('L2  + kick'), drawnText(1).join('|'));
   cc(CC.jogTurn, 1);
   assert.match(log.announces.slice(-1)[0], /^level 3/, 'and the jog walks all the rungs from there');
+});
+
+/* ---- home ---------------------------------------------------------------- */
+
+const homeNow = () => globalThis.drumsPracticeScreen().home;
+
+test('home: the jog chooses a circle and it grows over 160 ms; clamped at both ends', async () => {
+  const HR = await import('../src/home/render.mjs');
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  cc(CC.jogTurn, 2);
+  assert.equal(homeNow().selected, 2);
+  const g = homeNow().grow;
+  assert.equal(g.to, 2);
+  assert.ok(HR.radiusAt(g, 2, g.t0) < HR.R_LARGE && HR.radiusAt(g, 2, g.t0 + HR.GROW_MS) === HR.R_LARGE,
+    'the circle grows to full size over the grow');
+  assert.ok(drawnText(1).includes('Quiz'), 'the chosen circle is named');
+  cc(CC.jogTurn, 20);
+  assert.equal(homeNow().selected, 4, 'clamped at Settings');
+  cc(CC.jogTurn, 108);
+  assert.equal(homeNow().selected, 0, 'clamped at Path');
+});
+
+test('home: click opens a section, Back comes home with its circle chosen; the pads open and are silent', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  for (const [i, title] of [[0, 'Path'], [1, 'Practice'], [2, 'Quiz'], [4, 'Settings']]) {
+    cc(CC.jogTurn, 20); cc(CC.jogTurn, 108);
+    if (i) cc(CC.jogTurn, i);
+    cc(CC.jogClick, 127);
+    assert.equal(globalThis.drumsPracticeMenu().title, title);
+    cc(CC.back, 127);
+    assert.equal(homeNow().selected, i, `${title}: Back did not come home on its circle`);
+  }
+  cc(CC.jogTurn, 108); cc(CC.jogTurn, 3); cc(CC.jogClick, 127);
+  assert.equal(screenNow(), 'progress');
+  cc(CC.back, 127);
+  /* The pads: one per circle on the bottom row, 69..73, lit; the rest dark. */
+  ticks(3);
+  const lit = new Map();
+  for (const [n, c] of log.leds) lit.set(n, c);
+  for (const n of [69, 70, 71, 72, 73]) assert.notEqual(lit.get(n), 0, `pad ${n} is dark`);
+  assert.equal(lit.get(68), 0);
+  assert.equal(lit.get(80), 0);
+  const before = log.params.length;
+  pad(80, 100); pad(80, 0);
+  pad(71, 100); pad(71, 0);
+  ticks(2);
+  assert.equal(log.params.slice(before).filter(isHit).length, 0, 'a pad sounded at home');
+  assert.equal(globalThis.drumsPracticeMenu().title, 'Quiz', 'pad 71 is the third circle');
+});
+
+test('home: Menu is its help, Shift+click shows it as a list of five, Back makes it circles again', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  cc(CC.menu, 127);
+  assert.ok(drawnText(1).includes('HELP: HOME'));
+  cc(CC.menu, 127);
+  sheetPick('Show as list');
+  assert.equal(homeNow(), null, 'still circles');
+  const shown = drawnText(1);
+  for (const t of ['Path', 'Practice', 'Quiz', 'Progress']) assert.ok(shown.includes(t), shown.join('|'));
+  cc(CC.back, 127);
+  assert.ok(homeNow(), 'Back did not bring the circles back');
+  assert.equal(globalThis.drumsPracticeScreen().exited, undefined);
 });

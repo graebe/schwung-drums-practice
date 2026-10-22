@@ -841,6 +841,10 @@ export function programFolder(program, reviewRows = () => []) {
     pointers: true,
     /* Shown as the world map: an island per stage. */
     view: 'map',
-    get children() { return reviewRows().length ? stages.concat(review) : stages; },
+    /* Continue first, for the list: on the map it is Play. */
+    get children() {
+      const head = [{ label: 'Continue', value: '', continueRow: true }];
+      return reviewRows().length ? head.concat(stages, review) : head.concat(stages);
+    },
   };
 }

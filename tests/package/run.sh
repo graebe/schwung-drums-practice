@@ -83,6 +83,16 @@ done
 for m in $PMODS; do
   test -f "$ROOT/src/pathmap/$m.mjs" || fail "PATHMAP names $m, which does not exist"
 done
+# And the home screen's, the same way.
+HMODS=$(sed -n 's/^HOMESCREEN="\(.*\)"$/\1/p' "$ROOT/scripts/package.sh")
+test -n "$HMODS" || fail "scripts/package.sh declares no HOMESCREEN"
+for f in "$ROOT"/src/home/*.mjs; do
+  base=$(basename "$f" .mjs)
+  echo " $HMODS " | grep -q " $base " || fail "src/home/$base.mjs is not in the packaged HOMESCREEN list"
+done
+for m in $HMODS; do
+  test -f "$ROOT/src/home/$m.mjs" || fail "HOMESCREEN names $m, which does not exist"
+done
 ok
 
 # The install must carry the player's settings, history, progress and hand-added drills
