@@ -22,7 +22,7 @@ import * as L from './layout.mjs';
 import * as SR from './staff_render.mjs';
 import * as GR from './grid_render.mjs';
 import * as B from './beam.mjs';
-import { visibleEntries, runProgress, blockingNotes } from './scoring.mjs';
+import { visibleEntries, runProgress, blockingNotes, handsWritten } from './scoring.mjs';
 import { visibleBars, rulerBars, beatToX, practiceBeats } from './chart.mjs';
 import { voiceById, voicesInChart } from './kit.mjs';
 import { diatonicToY } from './notation.mjs';
@@ -73,14 +73,14 @@ export function drawReadingView(ctx, s) {
  * What Study is waiting for, in words: "Snare R", "Kick + Hi-hat". The note is
  * on the hit line, but on a drum chart the staff position alone is a thing you
  * have to have learned, and this is the moment you evidently have not yet.
- * The hand is named only when the drill enforces one.
+ * The hand is named only when the drill has one written.
  */
 export function stuckLabel(run) {
   const notes = blockingNotes(run);
   const parts = [];
   for (let i = 0; i < notes.length; i++) {
     const v = voiceById(notes[i].voice);
-    const hand = run.sticking !== 'off' && notes[i].wantHand ? ` ${notes[i].wantHand}` : '';
+    const hand = handsWritten(run) && notes[i].wantHand ? ` ${notes[i].wantHand}` : '';
     parts.push((v ? v.label : notes[i].voice) + hand);
   }
   return parts.join(' + ');
@@ -155,7 +155,7 @@ function drawGridBody(ctx, s, visible, px, bars) {
  * The ticks are drawn either way; they cost one row and hang off the rule.
  */
 function drawUnderLane(ctx, s, visible, bars) {
-  const sticking = s.run && s.run.sticking !== 'off';
+  const sticking = handsWritten(s.run);
   drawBarRuler(ctx, bars, !sticking);
   if (!sticking) return;
   for (let i = 0; i < visible.length; i++) {

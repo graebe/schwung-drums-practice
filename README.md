@@ -410,9 +410,9 @@ they do on the result. A new take forgets the last one.
 A drummer has learned a pattern when they can play it **clean at its written tempo**, so that is
 what Drums Practice measures. A take is **clean** when, played whole from the top:
 
-- at least **90% of the notes are right** — the right drum, with the right hand. A wrong hand is
-  not right, and a stray hit counts against you, so sweeping the pads under every note scores
-  nothing. A flat accent *is* right: the dynamics are their own score;
+- at least **90% of the notes are right** — the right drum (and, with Sticking on `strict`, the
+  right hand: then a wrong hand is not right). A stray hit counts against you, so sweeping the pads
+  under every note scores nothing. A flat accent *is* right: the dynamics are their own score;
 - and the **timing spread** σ is inside the good window of your Strict setting — 60 ms on normal.
 
 Its **clean speed** is the tempo you played over the tempo the drill is written at. Play a flam tap
@@ -640,8 +640,8 @@ Take as long as you like over any of it.
   closes, so a pad too many in that moment — or a drum struck twice — spoils it and it is asked
   for again. Pressing every pad at once never moves the cursor. Either way the stack is no longer
   *right first time*.
-- **Hands are still judged, dynamics scored.** A wrong hand lets the cursor move on — asking again
-  would only add strokes — but the stack does not count as right first time. A soft accent or a
+- **Hands are judged only with Sticking on `strict`.** There a wrong hand lets the cursor move on —
+  asking again would only add strokes — but the stack does not count as right first time. A soft accent or a
   loud ghost keeps the stack right first time and goes into the take's `dyn` score.
 - **Play sounds the bar** at its written tempo times **Speed**, its pads lighting as it goes, so you
   can hear the groove before you step it. **Record** begins at once: there is nothing to count in to.
@@ -817,7 +817,7 @@ mapping rather than having to remember it.
 | Pad map | › | every pad's drum on screen, and the Custom editor |
 | View | **grid** | `grid` is drum tab — what a drummer reads; `staff` is real percussion notation, for reading practice |
 | Strict | **normal** | the timing windows, above |
-| Sticking | **strict** | `strict` counts a wrong hand as its own error; `loose` shows it amber but does not count it; `off` ignores hands, which is right for grooves |
+| Sticking | **off** | whether the written hand is judged. `off`: only the drum counts, either half of the grid will do — the R and L are still shown as a guide; `loose` shows a wrong hand amber but does not count it; `strict` counts it as its own error. Settings saved before 2026.10.22.4 with `strict` move to `off` once |
 | Dynamics | on | score accents and ghost notes, apart from whether a take is clean |
 | Accent + | 15 | how much louder than your own normal strokes an accent must be |
 | Ghost - | 20 | how much softer than your own normal strokes a ghost note must be |
@@ -899,7 +899,8 @@ practice**, and together they are the whole length of it. Leave `repeats` out an
 
 `voices` names any of the nine ids above; several at once is a simultaneous hit, judged per voice,
 so nailing the kick and missing the hat marks one of each in the same stack. `hand` is `"R"` or
-`"L"` and is only checked when the drill's `sticking` is not `off`.
+`"L"` and is shown whenever the drill's `sticking` is not `off`; whether it is checked is the
+Sticking setting's.
 
 `dyn` is `"accent"` or `"ghost"`. A plain string applies to every voice in the stack; a **map**
 gives each voice its own, which is what a backbeat needs — an accented snare under a hi-hat that

@@ -1083,3 +1083,28 @@ test('a tour stop draws its drum, where it is, a line, and what to do; the end p
   PT.press(tour, 'P2', 1);
   assert.equal(draw(tour).length, 3, 'title, place and line; no empty footer while it sounds');
 });
+
+/* ---- Hands shown, not judged ------------------------------------------- */
+test('Sticking off still shows the written hands: on the scroll, on the page, in Study', () => {
+  const drill = subdivisionDrill(2);
+  const scroll = frame(drill, { view: 'grid', songBeats: 5.2, repeats: 4, sticking: 'off' }).ctx;
+  assert.equal(countOn(scroll, 0, L.UNDER_LANE_Y, 12, L.TEXT_H), 0, 'a bar number over the hands');
+  assert.ok(countOn(scroll, 0, L.UNDER_LANE_Y, L.SCREEN_W, L.TEXT_H) > 0, 'the hands are gone');
+
+  const c = projectLevel({ ...ROCKISH, sticking: 'strict',
+    events: ROCKISH.events.map((e, i) => ({ ...e, hand: i % 2 ? 'L' : 'R' })) }, 'l0');
+  const run = createRun(c, { sticking: 'off' });
+  const u = UT.createUntimed(run, { togetherMs: 60 });
+  const ctx = createScreen();
+  const seen = [];
+  const text = ctx.text.bind(ctx);
+  ctx.text = (x, y, s, v) => { seen.push(s); text(x, y, s, v); };
+  drawUntimedView(ctx, { run, chart: c, view: 'grid', dynamics: true, cursor: u.index,
+    title: c.name, rightLabel: '--', progress: 0, footerRight: '' });
+  assert.ok(seen.includes('R') && seen.includes('L'), seen.join('|'));
+
+  const study = createRun({ id: 'x', name: 'X', bpm: 120, timeSig: [4, 4], loopBars: 1, repeats: 1,
+    sticking: 'strict', events: [{ beat: 0, voices: ['SN'], hand: 'R' }] }, { sticking: 'off' });
+  expireMissed(study, 0.5, true);
+  assert.equal(stuckLabel(study), 'Snare R', 'Study names the hand as a guide');
+});

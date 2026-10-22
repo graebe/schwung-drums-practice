@@ -32,7 +32,7 @@ import * as L from './layout.mjs';
 import * as SR from './staff_render.mjs';
 import * as GR from './grid_render.mjs';
 import * as B from './beam.mjs';
-import { entriesIn } from './scoring.mjs';
+import { entriesIn, handsWritten } from './scoring.mjs';
 import { beatsPerBar } from './chart.mjs';
 import { voicesInChart } from './kit.mjs';
 import { drawHeader, drawFooter, drawBarRuler, drawLaneCallout } from './chrome.mjs';
@@ -130,7 +130,7 @@ function closeBar(ctx, peek, line) {
  * on the scroll; the header already says which bar it is.
  */
 function drawUnder(ctx, s, page, bar, curItem, left, px, perBar) {
-  const sticking = s.run && s.run.sticking !== 'off';
+  const sticking = handsWritten(s.run);
   drawBarRuler(ctx, [{ bar: bar + 1, x: -1 }], !sticking);
   /* The beats, ticked on the rule: the lanes have no rule of their own here.
    * The downbeat is the longer tick, as on a ruler. */
