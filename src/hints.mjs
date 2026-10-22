@@ -191,10 +191,11 @@ export function besideParts(left, parts, chars = HINT_CHARS) {
   return out;
 }
 
-/* The part on screen at `nowMs`: each stays ROTATE_MS. */
-export function hintAt(parts, nowMs) {
+/* The part on screen `ms` after the parts first showed (ui.js counts from
+ * then, not from the clock's zero): each stays ROTATE_MS. */
+export function hintAt(parts, ms) {
   if (!parts || !parts.length) return '';
-  return parts[Math.floor(Math.max(0, nowMs) / ROTATE_MS) % parts.length];
+  return parts[Math.floor(Math.max(0, ms) / ROTATE_MS) % parts.length];
 }
 
 /*

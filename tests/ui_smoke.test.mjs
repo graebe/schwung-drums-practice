@@ -3019,6 +3019,62 @@ test('Shift held shows Shift\'s layer on the hint line; a long hint rotates', as
   cc(CC.shift, 0);
 });
 
+/*
+ * The bottom line's turns, as [text, ticks] runs over `ms` of 25 ms ticks:
+ * what the hint line (y 54 and below) shows each frame, equal frames joined.
+ */
+function hintRuns(ms) {
+  const runs = [];
+  const orig = globalThis.print;
+  for (let i = 0; i < ms / 25; i++) {
+    const line = [];
+    globalThis.print = (x, y, s, v) => { if (y >= 54) line.push(s); orig(x, y, s, v); };
+    ticks(1);
+    const text = line.join(' ');
+    if (runs.length && runs[runs.length - 1][0] === text) runs[runs.length - 1][1]++;
+    else runs.push([text, 1]);
+  }
+  globalThis.print = orig;
+  return runs;
+}
+
+/*
+ * A hint's turns are counted from when it first showed, not from the clock's
+ * zero: whatever the clock's phase, a screen opens on its first part and
+ * every part stays a full turn (3 s, 120 ticks). Counted from zero, which part
+ * you met was the time of day's choice and the first turn could be a frame.
+ */
+test('the map, home and ready screens open on their first hint part, each part a full turn', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  /* Each screen is left for another one that shows a frame, then entered
+   * with no frame before the count: the phase is what the clock says then. */
+  const away = () => { toTop(); goTo('Practice'); ticks(1); toTop(); };
+  const open = {
+    home: () => {},
+    map: () => goTo('Learning Path'),
+    ready: () => { toFirstRung(); cc(CC.jogClick, 127); },
+  };
+  const first = { home: 'JOG choose', map: 'PAD go  CLICK enter', ready: 'L1  Time only' };
+  for (const name of Object.keys(open)) {
+    let seen = null;
+    for (let phase = 0; phase < 3000; phase += 130) {
+      away();
+      globalThis.__advance(phase);
+      open[name]();
+      const runs = hintRuns(4 * 3000 + 500);
+      const where = `${name} at phase ${phase}: ${runs.map(([t, n]) => `${t}x${n}`).join(' | ')}`;
+      assert.equal(runs[0][0], first[name], `does not open on its first part — ${where}`);
+      assert.ok(runs.length > 2, `the hint does not take turns — ${where}`);
+      for (const [, n] of runs.slice(0, -1)) assert.equal(n, 120, `a turn is cut — ${where}`);
+      const order = runs.slice(0, -1).map(([t]) => t).join(' | ');
+      if (seen === null) seen = order;
+      assert.equal(order, seen, `the turns depend on the clock — ${where}`);
+    }
+  }
+});
+
 test('Settings is a folder of groups; Shift+click over a drill still shows every setting', async () => {
   await loadUi();
   globalThis.init();

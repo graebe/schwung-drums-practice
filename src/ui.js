@@ -2616,7 +2616,7 @@ function readyFooter() {
     footKey = key;
     footParts = H.besideParts(left, H.hintFor(READY, st));
   }
-  const part = H.hintAt(footParts, now());
+  const part = shownPart(footParts, 'ready\n' + footParts.map((p) => p.join('|')).join('\n'));
   return { hint: part[1], hintLeft: part[0] };
 }
 
@@ -3053,6 +3053,24 @@ function hintState(shift = shiftHeld) {
   return st;
 }
 
+/*
+ * The part of the bottom line on screen now. Its turns are counted from when
+ * that set of parts first showed, not from the clock's zero: a new screen,
+ * Shift, or a new level's name on the ready screen opens on the first part,
+ * and every part gets its full turn. Counted from zero, which part you met
+ * was the time of day's choice, and a first turn could be a single frame.
+ */
+let turnKey = null;
+let turnSince = 0;
+function shownPart(parts, key) {
+  const t = now();
+  if (key !== turnKey) {
+    turnKey = key;
+    turnSince = t;
+  }
+  return H.hintAt(parts, t - turnSince);
+}
+
 /* The hint line's part on screen now: the parts are made when what they
  * depend on changes, and only picked from on a frame. */
 let hintKey = '';
@@ -3067,7 +3085,7 @@ function hintLine() {
     hintKey = view + key;
     hintParts = H.hintFor(view, st);
   }
-  return H.hintAt(hintParts, now());
+  return shownPart(hintParts, hintParts.join('\n'));
 }
 
 /*
@@ -3289,8 +3307,9 @@ function draw() {
     return;
   }
   /* Every screen's bottom line names its keys (hints.mjs); while Shift is
-   * held it names what Shift does there instead. */
-  const hint = hintLine();
+   * held it names what Shift does there instead. The ready screen's is its
+   * own (readyFooter): both counting turns on one frame would restart them. */
+  const hint = screen === READY && chart ? '' : hintLine();
   if (screen === PADMAP) {
     V.drawPadMap(ctx, PMS.screenOf(pm, padMapView(), now()));
     if (shiftHeld) V.drawHint(ctx, hint);
@@ -3541,6 +3560,7 @@ function initInner() {
   progress = loadProgress();
   pathStep = null;
   progressNote = null;
+  turnKey = null;
   if (manifestError) {
     menuNote = 'BAD USER.JSON';
     if (manifestError.indexOf('index.json') >= 0) menuNote = 'BAD INDEX.JSON';
