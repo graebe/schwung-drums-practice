@@ -234,9 +234,9 @@ let itemNames = new Map();
 /* The step of the Learning Path the armed drill was opened as, so Click on
  * its result goes on along the path; null when it came from anywhere else. */
 let pathStep = null;
-/* The lesson cards (lessons.json), and the ones on screen:
- * { ids, at, page, pages, then } — `then` is what Click goes on to once the
- * last is read, null when they were opened from Lessons to read again. */
+/* The lesson cards (lessons.json), and the deck on screen (lessons.mjs):
+ * { deck, then } — `then` is what Click goes on to once the last is read,
+ * null when they were opened from Lessons to read again. */
 let lessons = new Map();
 let card = null;
 /* How stuck the learner is on that step, for the result's footer (program.mjs
@@ -1923,46 +1923,38 @@ function openPathStep(step) {
 }
 
 function showCards(ids, then) {
-  card = { ids, at: 0, page: 0, pages: [[]], then };
-  layCard();
+  card = { deck: LES.createDeck(lessons, ids, { guided: Boolean(then), width: L.SCREEN_W - 2,
+    measure: (t) => ctx.textWidth(t) }), then };
   screen = CARD;
 }
 
-/* The card at `at`, wrapped to the screen in the font it is drawn in. */
-function layCard() {
-  const c = lessons.get(card.ids[card.at]);
-  card.title = c ? c.title : '';
-  card.pages = LES.paginate(LES.wrapText(c ? c.text : '', L.SCREEN_W - 2, (t) => ctx.textWidth(t)));
-  card.page = 0;
+/* The cards read, into progress, so each shows once (Intros `new`). */
+function markRead(ids) {
+  for (const id of ids) PROG.markSeen(progress, id);
+  if (ids.length) saveProgress();
 }
 
-/* Click: this card is read; on to the next, or to what the cards stood before. */
-function nextCard() {
-  PROG.markSeen(progress, card.ids[card.at]);
-  saveProgress();
-  if (card.at + 1 < card.ids.length) {
-    card.at++;
-    layCard();
-    return;
-  }
+/* What the deck stood before, once its last card is through. */
+function leaveCards(r) {
+  markRead(r.read);
+  if (!r.done) return;
   const then = card.then;
   card = null;
   screen = MENU;
   if (then) then();
 }
 
-/* Play: the cards are taken as read and the practice is heard at once. */
-function hearFromCard() {
-  if (!card.then) return;
-  for (let i = card.at; i < card.ids.length; i++) PROG.markSeen(progress, card.ids[i]);
-  card.at = card.ids.length - 1;
-  nextCard();
-  if (screen === READY) start(false);
+/* Click: this card is read; on to the next, or to what the cards stood before. */
+function nextCard() {
+  leaveCards(LES.advance(card.deck));
 }
 
-function cardFooter() {
-  if (!card.then) return card.at + 1 < card.ids.length ? 'CLICK next  BACK list' : 'CLICK done';
-  return card.at + 1 < card.ids.length ? 'CLICK next  PLAY hear' : 'CLICK start PLAY hear';
+/* Play: the cards are taken as read and the practice is heard at once. */
+function hearFromCard() {
+  const r = LES.skipToEnd(card.deck);
+  if (!r.done) return;
+  leaveCards(r);
+  if (screen === READY) start(false);
 }
 
 /*
@@ -2538,8 +2530,7 @@ function draw() {
     return;
   }
   if (screen === CARD && card) {
-    V.drawCard(ctx, { title: card.title, lines: card.pages[card.page], page: card.page,
-      pages: card.pages.length, footer: cardFooter() });
+    V.drawCard(ctx, LES.deckScreen(card.deck));
     return;
   }
   if (screen === MENU) {
@@ -3007,7 +2998,7 @@ function jog(delta) {
   } else if (target === 'padmap') {
     padMapJog(delta);
   } else if (target === 'page' && card) {
-    card.page = Math.max(0, Math.min(card.pages.length - 1, card.page + delta));
+    LES.turnPage(card.deck, delta);
   } else if (target === 'choice' && quiz) {
     Q.moveChoice(quiz, delta);
   } else if ((screen === SUMMARY || screen === LADDER) && review) {
