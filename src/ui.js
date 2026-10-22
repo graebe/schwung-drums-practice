@@ -56,7 +56,8 @@ import * as SH from './row_sheet.mjs';
 import * as HP from './help.mjs';
 import * as TIPS from './tips.mjs';
 import * as MP from './map_places.mjs';
-import { layoutPlaces, placeOfPad } from './pathmap/layout.mjs';
+import * as SCN from './scenes.mjs';
+import { placeOfPad } from './pathmap/layout.mjs';
 import { createWalk, walkTo, walkStep, posAt, arrived } from './pathmap/walk.mjs';
 import { mapPadColors } from './pathmap/leds.mjs';
 import { drawHome, createGrow, startGrow, itemOfPad } from './home/render.mjs';
@@ -101,7 +102,7 @@ const OUTBOX_MAX = 512;
 /* Screens: named in hints.mjs, so none can go without a hint line. */
 const {
   MENU, READY, RUNNING, SUMMARY, LADDER, QUIZ, RESULT, PROGRESS, PROGRESS_ITEM, SETTINGS, ERROR, CARD,
-  PADMAP, SHEET, HELP, WELCOME, TIP, MAP, TOUR, HOME,
+  PADMAP, SHEET, HELP, WELCOME, TIP, MAP, TOUR, HOME, ANIM,
 } = H.SCREENS;
 
 /* MIDI out routes. */
@@ -596,6 +597,12 @@ function quizWarning() {
 }
 
 function paintLeds(t) {
+  /* A scene's pads are its own. */
+  if (screen === ANIM && anim) {
+    sceneLeds(t);
+    pushLeds();
+    return;
+  }
   /* At home the pads are the circles. */
   if (onHome()) {
     homePadColors({ count: CAT.navTop(nav).node.children.length, selected: CAT.navTop(nav).cursor, now: t,
@@ -1314,6 +1321,7 @@ function stop() {
   review = { run: SC.reviewOf(run), end: endAt, at: null };
   T.home(tp);
   screen = ladder ? LADDER : SUMMARY;
+  if (!ladder) starIfLearned(takeLearned, SUMMARY);
 }
 
 /*
@@ -1343,6 +1351,7 @@ function stopUntimed() {
   untimed = null;
   T.home(tp);
   screen = SUMMARY;
+  starIfLearned(takeLearned, SUMMARY);
 }
 
 function recordUntimed({ c, verdict, eased, pace, dyn }) {
@@ -1368,7 +1377,6 @@ function recordUntimed({ c, verdict, eased, pace, dyn }) {
   });
   saveProgress();
   takeLearned = r.learned;
-  if (r.learned) announce('learned');
 }
 
 /*
@@ -1564,10 +1572,7 @@ function stuckFooter() {
 }
 
 function noteFor(r, value, reason, eased) {
-  if (r.learned) {
-    announce('learned');
-    return { mark: PROG.MARK_DONE, text: `learned at ${value}%` };
-  }
+  if (r.learned) return { mark: PROG.MARK_DONE, text: `learned at ${value}%` };
   if (value === null) return { text: reason };
   if (eased) return { text: `clean ${value}%, not counted: ${eased}` };
   const done = PROG.isDone(progress, armedItemId());
@@ -1952,6 +1957,7 @@ function finishQuiz() {
   };
   screen = RESULT;
   announce(`round done, ${Math.round(resultCache.rate)} per minute`);
+  starIfLearned(round.learned, RESULT);
 }
 
 /* Open the highlighted row: into a folder, or do what the row holds. */
@@ -1959,9 +1965,13 @@ function openRow() {
   const item = CAT.navCurrent(nav);
   if (!item) return;
   fromContinue = false;
+  const world = onMap() && CAT.navTop(nav).node === pathNode ? mapNow() : null;
   if (CAT.navPush(nav)) {
-    announce(`${item.label}.`);
     enterMap();
+    /* From the world into a stage: zoom in on its island. */
+    const island = world && onMap() ? mapNow() : null;
+    if (island) zoom('in', world, island, `${item.label}.`);
+    else announce(`${item.label}.`);
     return;
   }
   if (item.continueRow) {
@@ -2156,12 +2166,12 @@ function mapNow() {
   if (!isMapNode(top.node)) return null;
   const day = Math.floor(Date.now() / 86400000);
   if (map && map.node === top.node && map.rev === progress.rev && map.day === day) return map;
-  const env = { dueIds: MP.dueIdsOf(progress, Date.now()), atMs: Date.now(), hutPercent };
+  const env = mapEnv();
   /* The stages follow the Path's Continue row. */
   const built = top.node === pathNode ? MP.worldPlaces(progress, program, { ...env, first: 1 })
     : MP.islandPlaces(progress, program, top.node, env);
   if (!built.places.length) return null;
-  const layout = layoutPlaces(built.places.length);
+  const layout = MP.mapLayout(top.node === pathNode ? 'world' : 'island', built.places.length);
   const same = map && map.node === top.node && map.layout === layout;
   let at = MP.placeOfChild(built.targets, top.cursor);
   if (at < 0) {
@@ -2241,11 +2251,165 @@ function showFolderAs(view) {
 
 function drawMapView(hint) {
   const m = mapNow();
+  drawPlaces(m, m.walk, hint);
+}
+
+/* A map with its avatar, and the place under it named in the title bar. */
+function drawPlaces(m, walk, hint) {
   const t = now();
-  const place = m.places[posAt(m.walk, t).at];
+  const place = m.places[posAt(walk, t).at];
   const head = MP.mapTitle(place, L.SCREEN_W - 2, measure);
   V.drawMapScreen(ctx, { title: head.title, right: head.right, places: m.places, layout: m.layout,
-    walk: m.walk, now: t, footer: hint });
+    walk, now: t, footer: hint });
+}
+
+/* The Path's world map, the avatar on the stage Continue is in. */
+function showPathMap() {
+  nav = CAT.navStart(catalog);
+  const at = catalog.children.indexOf(pathNode);
+  if (at < 0) return;
+  nav[0].cursor = at;
+  CAT.navPush(nav);
+  enterMap();
+}
+
+/* ---- scenes: the Learning Path in motion ---------------------------------- */
+/*
+ * scenes.mjs works out what to show; this plays it on its own screen (ANIM):
+ * a queue of scenes, each announced and drawn on the maps the learner knows,
+ * with the pads its own while it plays. Any key or pad skips to the end and
+ * goes on to what the scenes stood before (`then`). Nothing is recorded or
+ * sounded: the screen takes no other input.
+ *
+ * The engine's frames (pathmap/anim.mjs) are slots, filled as it lands — a
+ * frame draws over its scene's map or result, (ctx, scene, ms into it), and a
+ * pad pattern fills the LEDs, (out, scene, ms). Empty, a celebration, a zoom,
+ * the finale and the star hold their map or result for their length.
+ */
+const SCENE_FRAMES = { celebrate: null, zoom: null, finale: null, star: null };
+const SCENE_LEDS = { celebrate: null, finale: null };
+let anim = null;
+
+function playScenes(queue, then) {
+  if (!queue.length) {
+    then();
+    return;
+  }
+  anim = { queue, at: -1, scene: null, since: 0, walk: null, then };
+  screen = ANIM;
+  nextScene();
+}
+
+function nextScene() {
+  anim.at++;
+  if (anim.at >= anim.queue.length) {
+    endScenes();
+    return;
+  }
+  const sc = anim.queue[anim.at];
+  anim.scene = sc;
+  anim.since = now();
+  anim.walk = sceneWalk(sc, anim.since);
+  if (sc.say) announce(sc.say);
+}
+
+/* The map a scene is drawn on: a zoom shows where it is going. */
+function sceneMap(sc) {
+  if (sc.kind === 'zoom') return sc.dir === 'in' ? sc.island : sc.world;
+  return sc.map || null;
+}
+
+/* Its avatar: walking from place to place, or standing where the scene is —
+ * on the island zoomed out of, at the first place of one zoomed into. */
+function sceneWalk(sc, t) {
+  const m = sceneMap(sc);
+  if (!m) return null;
+  if (sc.kind === 'walk') return walkTo(createWalk(m.layout, sc.from), sc.to, t);
+  return createWalk(m.layout, sc.kind === 'zoom' && sc.dir === 'in' ? 0 : sc.at);
+}
+
+function serviceScenes(t) {
+  const sc = anim.scene;
+  if (sc.kind === 'walk' ? arrived(anim.walk, t) : t - anim.since >= SCN.sceneMs(sc)) nextScene();
+}
+
+/* The end, played through or skipped: on to what the scenes stood before. */
+function endScenes() {
+  const then = anim.then;
+  anim = null;
+  screen = MENU;
+  then();
+}
+
+/* Any key or pad, while a scene plays: to its end. Shift is still tracked,
+ * so a Shift let go during a scene is not held after it. */
+function sceneInput(type, d1, d2) {
+  if (type === 0xB0 && d1 === C.CC_SHIFT) {
+    shiftHeld = d2 > 0;
+    return;
+  }
+  const key = type === 0xB0 && d2 > 0;
+  const pad = type === 0x90 && d2 > 0 && PAD.isPad(d1);
+  if (key || pad) endScenes();
+}
+
+function drawScene(hint) {
+  const sc = anim.scene;
+  if (sc.kind === 'star') {
+    if (sc.under === RESULT && resultCache) V.drawResult(ctx, { ...resultCache, footer: hint });
+    else if (summaryInfo) V.drawSummary(ctx, { ...summaryInfo, footer: hint });
+  } else {
+    drawPlaces(sceneMap(sc), anim.walk, hint);
+  }
+  const frame = SCENE_FRAMES[sc.kind];
+  if (frame) frame(ctx, sc, now() - anim.since);
+}
+
+function sceneLeds(t) {
+  const sc = anim.scene;
+  const m = sceneMap(sc);
+  const fill = SCENE_LEDS[sc.kind];
+  if (fill) fill(ledBuf, sc, t - anim.since);
+  else if (m) mapPadColors({ places: m.places, layout: m.layout, walk: anim.walk, now: t, palette: PAD.MAP_PALETTE,
+    out: ledBuf });
+  else ledBuf.fill(PAD.LED_OFF);
+}
+
+/*
+ * What a step of the path finished, for the scenes on along it: the path as
+ * it stood when the step opened, against now. The stage folders are the
+ * Path's children with a stage.
+ */
+let pathBefore = null;
+function stageFolders() {
+  return pathNode ? pathNode.children.filter((c) => c.stage) : [];
+}
+
+function pathStateNow() {
+  return SCN.pathState(progress, program, stageFolders(), mapEnv());
+}
+
+function mapEnv() {
+  return { dueIds: MP.dueIdsOf(progress, Date.now()), atMs: Date.now(), hutPercent };
+}
+
+/* The scenes from `step` on to `next`, for what the step finished. */
+function scenesOnto(step, next) {
+  if (!pathBefore) return [];
+  const change = SCN.changes(pathBefore, pathStateNow());
+  return SCN.pathScenes({ progress, program, folders: stageFolders(), step, next, change, env: mapEnv() });
+}
+
+/* Between the world and a stage's island, on the maps as they stand: the
+ * world's avatar is on that island either way. */
+function zoom(dir, world, island, say) {
+  playScenes([{ kind: 'zoom', dir, world, island, at: world.walk.target, say }], () => {});
+}
+
+/* A level learned for the first time: the star round the result's score. */
+function starIfLearned(learned, under) {
+  if (!learned) return;
+  playScenes([{ kind: 'star', under, say: 'learned' }], () => { screen = under; });
 }
 
 /* ---- the action sheet ---------------------------------------------------- */
@@ -2380,6 +2544,7 @@ function rewrap(kind) {
  */
 function openStep(step) {
   stuckNow = 0;
+  pathBefore = pathStateNow();
   if (step.quiz) {
     openQuiz(step.quiz, step);
     pathStep = step;
@@ -2493,16 +2658,23 @@ function speedFor(target) {
 
 /* On from a result along the path: the next open step after this one. */
 function goNext() {
-  const next = PLAN.stepAfter(progress, program, pathStep);
+  const step = pathStep;
+  const next = PLAN.stepAfter(progress, program, step);
+  const scenes = scenesOnto(step, next);
+  pathBefore = null;
   quiz = null;
   resultCache = null;
-  if (next) {
-    openPathStep(next);
-    return;
-  }
-  ladder = null;
-  clockMode = false;
-  screen = MENU;
+  playScenes(scenes, () => {
+    if (next) {
+      openPathStep(next);
+      return;
+    }
+    ladder = null;
+    clockMode = false;
+    screen = MENU;
+    /* The whole path through: its world map, where the finale played. */
+    if (scenes.some((sc) => sc.kind === 'finale')) showPathMap();
+  });
 }
 
 /*
@@ -3001,13 +3173,7 @@ function welcomeClick() {
   finishWelcome();
   /* Either way onto the Path's map: from the start with the avatar on the
    * first stage, Play to begin; already playing with the tip on testing out. */
-  nav = CAT.navStart(catalog);
-  const at = catalog.children.indexOf(pathNode);
-  if (at >= 0) {
-    nav[0].cursor = at;
-    CAT.navPush(nav);
-    enterMap();
-  }
+  showPathMap();
   if (answer === 'start') {
     PROG.setPath(progress, 'start', 0);
     saveProgress();
@@ -3049,7 +3215,8 @@ function closeTip() {
  * whether Shift's layer shows.
  */
 function hintState(shift = shiftHeld) {
-  const st = { shift, depth: nav.length };
+  /* A scene has no Shift layer: every key there skips it. */
+  const st = { shift: shift && screen !== ANIM, depth: nav.length };
   if (screen === READY) st.levels = levelCount() > 1;
   if (screen === RUNNING || screen === READY) {
     st.mode = tp.mode;
@@ -3164,7 +3331,11 @@ function back() {
       showFolderAs('map');
       return true;
     }
-    return CAT.navPop(nav);
+    const island = onMap() && top.node !== pathNode ? mapNow() : null;
+    if (!CAT.navPop(nav)) return false;
+    /* Out of a stage onto the world: zoom out, the avatar on its island. */
+    if (island && onMap() && CAT.navTop(nav).node === pathNode) zoom('out', mapNow(), island, 'Learning Path.');
+    return true;
   }
   if (screen === CARD) { card = null; screen = MENU; return true; }
   if (screen === TOUR) { tour = null; screen = MENU; return true; }
@@ -3340,6 +3511,10 @@ function draw() {
    * held it names what Shift does there instead. The ready screen's is its
    * own (readyFooter): both counting turns on one frame would restart them. */
   const hint = screen === READY && chart ? '' : hintLine();
+  if (screen === ANIM && anim) {
+    drawScene(hint);
+    return;
+  }
   if (screen === PADMAP) {
     V.drawPadMap(ctx, PMS.screenOf(pm, padMapView(), now()));
     if (shiftHeld) V.drawHint(ctx, hint);
@@ -3708,6 +3883,7 @@ function tickInner() {
   }
   serviceTips();
   if (onMap()) serviceMap(t);
+  if (screen === ANIM && anim) serviceScenes(t);
   if (t - lastDraw >= DRAW_INTERVAL_MS) {
     lastDraw = t;
     draw();
@@ -3754,6 +3930,10 @@ function midiInner(data) {
   const d2 = data[2];
   const type = status & 0xF0;
 
+  if (screen === ANIM && anim) {
+    sceneInput(type, d1, d2);
+    return;
+  }
   if (type === 0x90 || type === 0x80) {
     /*
      * Notes below 10 are capacitive KNOB TOUCH, not pads — a module that

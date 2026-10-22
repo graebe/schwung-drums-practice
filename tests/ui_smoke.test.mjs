@@ -161,7 +161,10 @@ function goTo(...path) {
     const at = m.labels.findIndex((l) => l === path[i] || l.startsWith(path[i]));
     assert.ok(at >= 0, `no "${path[i]}" in ${m.title}: ${m.labels.join(' | ')}`);
     if (at !== m.cursor) cc(CC.jogTurn, at > m.cursor ? at - m.cursor : 128 - (m.cursor - at));
-    if (i < path.length - 1 || opts.open !== false) cc(CC.jogClick, 127);
+    if (i < path.length - 1 || opts.open !== false) {
+      cc(CC.jogClick, 127);
+      skipScene();
+    }
   }
 }
 
@@ -176,6 +179,11 @@ const toQuizzes = () => goTo('Quiz');
 const cc = (n, v) => globalThis.onMidiMessageInternal([0xb0, n, v]);
 const shiftClick = () => { cc(CC.shift, 127); cc(CC.jogClick, 127); cc(CC.shift, 0); };
 const screenNow = () => globalThis.drumsPracticeScreen().screen;
+/* Past a scene of the Learning Path (scenes.mjs), a zoom or a walk: any key
+ * skips it to its end. */
+function skipScene() {
+  if (screenNow() === 'anim') cc(CC.back, 127);
+}
 /* Back to the list from a drill, a result, a quiz or a card: Back until it shows. */
 function toList() {
   for (let i = 0; i < 6 && !globalThis.drumsPracticeMenu(); i++) cc(CC.back, 127);
@@ -184,7 +192,10 @@ function toList() {
 /* Up to the top of the list, the cursor on Continue. */
 function toTop() {
   toList();
-  for (let i = 0; i < 8 && globalThis.drumsPracticeMenu().title !== 'Drums'; i++) cc(CC.back, 127);
+  for (let i = 0; i < 8 && globalThis.drumsPracticeMenu().title !== 'Drums'; i++) {
+    cc(CC.back, 127);
+    skipScene();
+  }
   const at = globalThis.drumsPracticeMenu().cursor;
   if (at) cc(CC.jogTurn, 128 - at);
 }
@@ -1711,10 +1722,116 @@ test('Click on a path result opens the next step of the track', async () => {
   continuePath();
   playQuarters(sn, 60);
   cc(CC.jogClick, 127);
+  /* Time has nothing more installed in this stage: it is done, its flag goes
+   * up, and the avatar walks to the track left longest — then its step. */
+  assert.equal(screenNow(), 'anim', 'no scene for a finished place');
+  for (let i = 0; i < 400 && screenNow() === 'anim'; i++) ticks(1);
+  const said = globalThis.__log.announces.join('|');
+  assert.match(said, /Time done\|Walking to [^|]+\|/, said);
   ticks(2);
-  /* Time has nothing more installed in this stage: on to the track left longest. */
   const shown = drawnText(2);
   assert.ok(shown.some((t) => /First bea/.test(t)) && shown.includes('own pace'), `not on to the first beat: ${shown.join('|')}`);
+});
+
+/*
+ * The scenes of the Learning Path (scenes.mjs) play on their own screen:
+ * any key or pad skips to their end and on to the next step, and nothing in
+ * them sounds or is recorded.
+ */
+test('a scene of the path: any pad or key skips straight on, and nothing sounds or is recorded', async () => {
+  for (const skip of [() => { pad(70, 100); pad(70, 0); }, () => cc(CC.play, 127), () => cc(CC.jogTurn, 1)]) {
+    const { log } = await loadUi({ settings: PLAIN, walked: true });
+    const sn = await snare();
+    globalThis.init();
+    ticks(2);
+    continuePath();
+    playQuarters(sn, 60);
+    cc(CC.jogClick, 127);                     /* Time done: its flag, then the walk */
+    ticks(2);
+    assert.equal(screenNow(), 'anim');
+    assert.ok(drawnText(1).includes('ANY KEY skip'), drawnText(1).join('|'));
+    const hits = log.params.filter(isHit).length;
+    const writes = Object.keys(log.writes).length;
+    skip();
+    assert.notEqual(screenNow(), 'anim', 'the scene did not skip');
+    ticks(2);
+    assert.ok(drawnText(2).some((t) => /First bea/.test(t)), `not on to the next step: ${drawnText(2).join('|')}`);
+    assert.equal(log.params.filter(isHit).length, hits, 'a key in a scene sounded');
+    assert.equal(Object.keys(log.writes).length, writes, 'a scene wrote a file');
+  }
+});
+
+test('a scene owns the pads: the map it plays on, and Shift is no layer there', async () => {
+  const { log } = await loadUi({ settings: PLAIN, walked: true });
+  const sn = await snare();
+  globalThis.init();
+  ticks(2);
+  continuePath();
+  playQuarters(sn, 60);
+  cc(CC.jogClick, 127);
+  log.leds.length = 0;
+  ticks(4);
+  const { MAP_PALETTE } = await import('../src/padmap.mjs');
+  const colours = new Set(Object.values(MAP_PALETTE).flatMap((v) => (typeof v === 'object' ? Object.values(v) : [v])));
+  const lit = log.leds.filter(([, c]) => c);
+  assert.ok(lit.length > 0 && lit.every(([, c]) => colours.has(c)), `not the map's pads: ${JSON.stringify(lit)}`);
+  cc(CC.shift, 127);
+  ticks(1);
+  assert.equal(screenNow(), 'anim', 'Shift alone skipped');
+  assert.ok(drawnText(1).includes('ANY KEY skip'), 'a Shift layer on a scene');
+  cc(CC.shift, 0);
+});
+
+test('the last step of a stage: fireworks, zoom out, sail, zoom in, walk, then the next stage\'s step', async () => {
+  /* Stage 0 through but for Meet the pads (its last step, Groove 3 skipped). */
+  const p = PROG.emptyProgress();
+  const at = Date.now();
+  for (const id of ['quiz:guess:voice:kit3', 'quiz:hear:voice:kit3']) {
+    PROG.recordRound(p, id, { correct: 20, wrong: 0, hinted: 0, at });
+  }
+  PROG.recordUntimed(p, 'first-beat:l0', { pace: 100, accuracy: 1, clean: true, bpm: 90, dyn: 1, at });
+  for (const id of ['subdiv:quarters', 'first-beat:l1', 'first-beat:l2']) {
+    PROG.recordTake(p, id, { speed: 100, accuracy: 1, sd: 10, clean: true, bpm: 90, at });
+  }
+  PROG.skipItem(p, 'first-beat:l3', at);
+  const progress = JSON.stringify({ ...JSON.parse(PROG.serialiseProgress(p)), tips: ALL_TIPS });
+  const { log } = await loadUi({ settings: PLAIN, dataFiles: { 'progress.json': progress } });
+  globalThis.init();
+  ticks(2);
+  continuePath();                             /* Meet the pads, its last step */
+  for (let i = 0; i < 16; i++) { cc(CC.jogTurn, 1); ticks(1); }
+  for (let i = 0; i < 200 && !drawnText(1).includes('CLICK next  BACK list'); i++) ticks(1);
+  const from = log.announces.length;
+  cc(CC.jogClick, 127);
+  const kinds = [];
+  for (let i = 0; i < 600 && screenNow() === 'anim'; i++) ticks(1);
+  kinds.push(...log.announces.slice(from));
+  const said = kinds.join('|');
+  assert.match(said, /^Stage 0 complete\|Learning Path\|Walking to 1 Eighth notes\|1 Eighth notes(\|Walking to [^|]+)?\|/, said);
+  ticks(2);
+  assert.ok(drawnText(2).some((t) => /Eighth/.test(t)), `not on to stage 1: ${drawnText(2).join('|')}`);
+});
+
+test('a level learned for the first time: the star round the result, then the result', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  armL0();
+  cc(CC.record, 127);
+  ticks(2);
+  stepThrough();
+  assert.equal(screenNow(), 'anim', 'no star for a level learned');
+  assert.ok(log.announces.includes('learned'));
+  ticks(30);                                  /* its 600 ms */
+  assert.equal(screenNow(), 'summary');
+  assert.ok(drawnText(1).includes('LEARNED'), drawnText(1).join('|'));
+  /* Learned already: another take is just its result. */
+  cc(CC.back, 127);
+  ticks(2);
+  cc(CC.record, 127);
+  ticks(2);
+  stepThrough();
+  assert.equal(screenNow(), 'summary', 'the star again for a level already learned');
 });
 
 test('a take short of the step\'s target reads as its speed; the row shows it against the target', async () => {
@@ -2823,6 +2940,7 @@ test('Click on an L0 result goes on to L1', async () => {
   cc(CC.record, 127);
   ticks(2);
   stepThrough();
+  skipScene();                                  /* learned: the star, skipped */
   cc(CC.jogClick, 127);
   const ready = drawnText(2);
   assert.ok(ready.includes('practise'), `the timed ready screen: ${ready.join('|')}`);
@@ -2836,6 +2954,7 @@ test('looking back over an L0 take walks its page', async () => {
   cc(CC.record, 127);
   ticks(2);
   stepThrough();
+  skipScene();                                  /* learned: the star, skipped */
   cc(CC.jogTurn, 127);                          /* back into the take */
   assert.ok(drawnText(2).includes('REVIEW'));
   cc(CC.back, 127);
@@ -3242,7 +3361,8 @@ test('the Path is a world map: a pad walks the avatar there, a second press goes
   ticks(40);
   assert.match(log.announces.join('|'), /3 Ghosts & flams, 0 percent/, 'arriving says where');
   pad(p3, 100); pad(p3, 0);
-  ticks(1);
+  assert.equal(screenNow(), 'anim', 'going in zooms');
+  ticks(16);                                    /* the zoom's 350 ms, played through */
   assert.equal(globalThis.drumsPracticeMenu().title, '3 Ghosts & flams', 'the second press did not go in');
   assert.ok(mapNow(), 'a stage is drawn as its island');
   assert.ok(mapNow().places.some((p) => p.startsWith('Checkpoint:')));
@@ -3258,10 +3378,15 @@ test('the jog walks the map, click goes in, Back comes out to the island it left
   cc(CC.jogTurn, 127);
   assert.equal(mapNow().at, 1, 'the jog walks back too');
   cc(CC.jogClick, 127);
+  assert.equal(screenNow(), 'anim', 'into an island zooms in');
+  assert.match(globalThis.__log.announces.slice(-1)[0], /^1 Eighth notes/);
+  skipScene();
   assert.equal(globalThis.drumsPracticeMenu().title, '1 Eighth notes');
   assert.deepEqual(mapNow().places.map((p) => p.split(':')[0]),
     ['Lessons', 'Ear', 'Time', 'Grooves', 'Electives', 'Checkpoint'], 'the island\'s places, in the folder\'s order');
   cc(CC.back, 127);
+  assert.equal(screenNow(), 'anim', 'Back from an island zooms out');
+  skipScene();
   assert.equal(globalThis.drumsPracticeMenu().title, 'Learning Path');
   assert.equal(mapNow().at, 1, 'Back puts the avatar on the island it came from');
   cc(CC.back, 127);
@@ -3344,11 +3469,13 @@ test('Menu on the map is its help, with the place\'s lesson card; the map and is
   assert.ok(help.includes('PAD    go') && help.includes('0 HELLO, KIT') && help.includes('THE MAP'), help.join('|'));
   cc(CC.menu, 127);
   cc(CC.jogClick, 127);
+  skipScene();
   ticks(1);
   assert.equal(globalThis.drumsPracticeScreen().screen, 'tip', 'no island tip');
   assert.ok(drawnText(1).some((t) => /^Each place is part/.test(t)));
   cc(CC.back, 127);
   cc(CC.back, 127);
+  skipScene();
   ticks(1);
   assert.equal(globalThis.drumsPracticeScreen().screen, 'menu', 'the map tip came again');
 });

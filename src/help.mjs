@@ -51,6 +51,7 @@ const ABOUT = {
   [S.MAP]: ['MAP', ['The map: a place per', 'pad. Walk, go in.']],
   [S.HOME]: ['HOME', ['The sections, a', 'circle and a pad', 'each.']],
   [S.TOUR]: ['PADS', ['Meet the pads: every', 'drum, one by one.']],
+  [S.ANIM]: ['ON THE MAP', ['The path moving on.', 'Any key or pad', 'skips it.']],
   [S.HELP]: ['HELP', ['This help.']],
   [S.WELCOME]: ['WELCOME', ['Your first steps.']],
   [S.TIP]: ['TIP', ['A tip, shown once.']],
@@ -90,7 +91,7 @@ export function topicsFor(screen, st = {}) {
   switch (screen) {
     case S.MENU: return SECTION_TOPICS[st.section] || ['The list', 'The sheet'];
     case S.SHEET: return ['The sheet'];
-    case S.MAP: return ['The map', 'Learning Path', 'Review', 'The sheet'];
+    case S.MAP: case S.ANIM: return ['The map', 'Learning Path', 'Review', 'The sheet'];
     case S.HOME: return ['The list', 'The sheet'];
     case S.TOUR: return ['The pads', 'Colours'];
     case S.WELCOME: case S.TIP: return ['The list'];

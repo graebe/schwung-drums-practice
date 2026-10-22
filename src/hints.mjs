@@ -44,6 +44,9 @@ export const SCREENS = Object.freeze({
   HOME: 'home',
   /* Meet the pads (pad_tour.mjs). */
   TOUR: 'tour',
+  /* The Learning Path in motion (scenes.mjs): a walk, a zoom, a celebration.
+   * Any key or pad skips it. */
+  ANIM: 'anim',
 });
 
 const S = SCREENS;
@@ -51,7 +54,7 @@ const S = SCREENS;
 /* One line of the host font: 21 characters on a 6px advance is 126px. */
 export const HINT_CHARS = 21;
 export const ROTATE_MS = 3000;
-export const KEYS = ['JOG', 'CLICK', 'BACK', 'MENU', 'SHIFT', 'PLAY', 'REC', 'PAD'];
+export const KEYS = ['JOG', 'CLICK', 'BACK', 'MENU', 'SHIFT', 'PLAY', 'REC', 'PAD', 'ANY KEY'];
 
 const QUIT = ['BACK', 'quit'];
 const SETTINGS = ['CLICK', 'settings'];
@@ -74,6 +77,9 @@ export function keysFor(screen, st = {}) {
     case S.MAP:
       return { keys: [['PAD', 'go'], ['CLICK', 'enter'], ['PLAY', 'continue'], ['MENU', 'help']],
         shift: [['CLICK', 'options'], QUIT] };
+    /* A scene has one key: every key, and every pad, skips to its end. */
+    case S.ANIM:
+      return { keys: [['ANY KEY', 'skip']], shift: [['ANY KEY', 'skip']] };
     case S.TOUR: {
       let keys;
       if (st.done) keys = [['CLICK', 'next'], ['BACK', 'list']];

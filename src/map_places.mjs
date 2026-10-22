@@ -21,6 +21,13 @@
 import * as PLAN from './program.mjs';
 import { item, repetitionSession } from './progress.mjs';
 import { makePlace } from './pathmap/model.mjs';
+import { layoutPlaces } from './pathmap/layout.mjs';
+
+/* The layout of a map of `n` places, the world's or a stage's island: one
+ * place to choose it, for the map screen and the scenes alike. */
+export function mapLayout(level, n) {
+  return layoutPlaces(n);
+}
 
 /* The items of today's review session still to do. */
 export function dueIdsOf(progress, atMs) {
@@ -171,4 +178,12 @@ export function mapTitle(place, width, measure) {
     if (title) return { title, right };
   }
   return { title: fit(pct) || place.label, right: pct };
+}
+
+/* The place on a stage's island a step of the path is in: the row of its
+ * folder that holds it (a track, the electives, the checkpoint), or -1. */
+export function placeOfStep(folder, step) {
+  if (!folder || !step) return -1;
+  return folder.children.findIndex((row) => (row.step && row.step.key === step.key)
+    || (row.steps || []).some((st) => st.key === step.key));
 }

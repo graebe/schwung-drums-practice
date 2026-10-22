@@ -22,7 +22,7 @@ PATHMAP="model layout walk render leds"
 # The home screen's circles, vendored the same way into src/home/.
 HOMESCREEN="icons render leds"
 
-MODULES="answer_pads beam catalog chart choices chrome controls events exercise_io generator glyphs grid_render guess kit ladder layout led_paint levels notation padmap rng scoring screens settings_def staff_render stats timing view transport progress program untimed page_view lessons pads_io padmap_screen ids path_rows hints row_sheet help tips map_places pad_tour"
+MODULES="answer_pads beam catalog chart choices chrome controls events exercise_io generator glyphs grid_render guess kit ladder layout led_paint levels notation padmap rng scoring screens settings_def staff_render stats timing view transport progress program untimed page_view lessons pads_io padmap_screen ids path_rows hints row_sheet help tips map_places scenes pad_tour"
 
 # Cache-bust the sibling modules.
 #
