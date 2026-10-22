@@ -3121,6 +3121,17 @@ globalThis.onResume = function onResume() {
  * leaving either way, and what they must not be left with is a lit grid and a
  * ringing kit.
  */
+/*
+ * What the list shows, for tests that walk the menu by name rather than by
+ * counting jog turns (tests/ui_smoke.test.mjs goTo). Read-only: it hands out
+ * labels and the cursor, never the tree, so nothing can be changed through it.
+ */
+globalThis.drumsPracticeMenu = function drumsPracticeMenu() {
+  if (screen !== MENU) return null;
+  const top = CAT.navTop(nav);
+  return { title: top.node.label, cursor: top.cursor, labels: menuRows(top.node).map((r) => r.label) };
+};
+
 globalThis.onUnload = function onUnload() {
   /*
    * ONCE, however many times we are asked.
