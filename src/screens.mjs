@@ -230,13 +230,29 @@ export function drawPadMap(ctx, s) {
 export const CARD_TEXT_Y = 10;
 
 export function drawCard(ctx, s) {
-  ctx.clear();
   const pages = s.pages || 1;
-  drawTitle(ctx, s.title || '', pages > 1 ? `${(s.page || 0) + 1}/${pages}` : '', null);
-  const lines = s.lines || [];
+  drawTextPage(ctx, s.title, pages > 1 ? `${(s.page || 0) + 1}/${pages}` : '', s.lines, s.footer || 'CLICK start');
+}
+
+/* A title over a rule, a page of text, a footer: the card and the tour. */
+function drawTextPage(ctx, title, right, lines = [], footer = '') {
+  ctx.clear();
+  drawTitle(ctx, title || '', right || '', null);
   for (let i = 0; i < lines.length; i++) ctx.text(1, CARD_TEXT_Y + i * L.TEXT_H, lines[i], 1);
-  const foot = fit(ctx, s.footer || 'CLICK start', L.SCREEN_W - 2);
-  ctx.text((L.SCREEN_W - ctx.textWidth(foot)) >> 1, L.SCREEN_H - L.TEXT_H, foot, 1);
+  const foot = fit(ctx, footer, L.SCREEN_W - 2);
+  if (foot) ctx.text((L.SCREEN_W - ctx.textWidth(foot)) >> 1, L.SCREEN_H - L.TEXT_H, foot, 1);
+}
+
+/* ---- Meet the pads ------------------------------------------------------ */
+/*
+ * A stop of the pad tour (pad_tour.mjs): the drum's name over a rule, where it
+ * is in the tour, a line about it, and what to do. The pads say where it is;
+ * the screen says what it is.
+ *
+ * s = { title, right, lines, footer }
+ */
+export function drawTour(ctx, s) {
+  drawTextPage(ctx, s.title, s.right, s.lines, s.footer);
 }
 
 /* ---- Ladder ------------------------------------------------------------- */

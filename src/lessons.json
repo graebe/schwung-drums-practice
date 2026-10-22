@@ -12,8 +12,8 @@
     },
     {
       "id": "your-pads",
-      "title": "Your pads",
-      "text": "MPC Classic: kick, snare and hats along the bottom row, cymbals on top. Settings > Pads picks another layout, Flip mirrors it, Pad map names every pad."
+      "title": "Meet the pads",
+      "text": "Each lit pad is a drum. The right half repeats the left: one half per hand. Hit the pad that pulses."
     },
     {
       "id": "pulse",
@@ -250,5 +250,28 @@
       "title": "Feel",
       "text": "Behind the beat is relaxed (hip-hop, neo-soul), ahead is urgent (punk). Your mean in ms shows where you sit: now choose it."
     }
-  ]
+  ],
+  "pads": {
+    "KK": "The low thump. A real kit plays it with the foot. Beats stand on it, often on 1 and 3.",
+    "SN": "The crack in the middle of the kit. It plays the backbeat: 2 and 4.",
+    "HH": "Closed hi-hat: a short tick. It keeps time, on every beat or between them.",
+    "HO": "Open hi-hat: the same cymbal left ringing. It lifts the end of a bar.",
+    "HF": "The hi-hat closed by the pedal: a soft chick. Jazz plays it on 2 and 4.",
+    "RM": "A stick laid across the snare rim: a dry click, for ballads and bossa nova.",
+    "CL": "Hands, not a drum. It takes the snare part in house, hip-hop and trap.",
+    "S2": "A second snare with another colour, for a change of sound.",
+    "K2": "A second, deeper kick, for electronic beats.",
+    "HT": "The smallest tom. Fills often start here and run down.",
+    "HM": "A tom between the high and the mid.",
+    "MT": "The middle tom, in the middle of a fill.",
+    "LT": "A deeper tom. Fills end low.",
+    "F1": "The big tom beside the snare: deep and long.",
+    "F2": "The deepest tom of the kit.",
+    "CR": "The big splash that marks the 1 of a new part.",
+    "RD": "A cymbal that rings under a steady pattern. Jazz keeps time on it.",
+    "FX": "A trashy, cutting crash, for a hard accent.",
+    "P1": "A bright clank, in Latin music and disco.",
+    "P2": "Jingles, often on 2 and 4.",
+    "SH": "A soft, steady swish between the beats."
+  }
 }

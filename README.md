@@ -122,7 +122,9 @@ played before 2026-10-22 had those on the snare and the ride.
 ## The pads
 
 The pads are the finger drummer's. **Settings › Pads** chooses the layout, **Flip** mirrors it left to
-right for a left-hander, and **Settings › Pad map** shows every pad's drum on screen.
+right for a left-hander, and **Settings › Pad map** shows every pad's drum on screen. New to the
+layout? The Learning Path starts with **Meet the pads**: each drum in turn, its pads pulsing, its
+sound once — strike it to meet the next.
 
 ```
  MPC Classic (default)  MPC Family Rows     MPC Centre Core     Chromatic GM 36-51
@@ -492,7 +494,7 @@ done. Nothing is locked; the path only recommends. The whole plan, step by step 
 
 | Stage | The world it opens |
 | --- | --- |
-| **0 Hello, kit** | the three drums of a beat, the pulse, rests — and your first beat, in session one |
+| **0 Hello, kit** | every pad met by name, the three drums of a beat, the pulse, rests — and your first beat, in session one |
 | **1 Eighth notes** | 1 & 2 &, off-beats, kicks on the "&", the open hat, a phrase and keeping time alone |
 | **2 Sixteenths** | 1 e & a, accents and ghost notes on purpose, the first rudiments, house and funk |
 | **3 Ghosts & flams** | ghost-note grooves, reading a kick line under steady hands, flams and drags |

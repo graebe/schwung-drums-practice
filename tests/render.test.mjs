@@ -1058,3 +1058,28 @@ test('the page marks its beats on the rule under the chart', () => {
     assert.ok(isOn(ctx, Math.round(left + b * px), L.UNDER_TICK_Y), `no tick on beat ${b + 1}`);
   }
 });
+
+/* ---- Meet the pads ------------------------------------------------------ */
+import { drawTour } from '../src/view.mjs';
+import * as PT from '../src/pad_tour.mjs';
+import { resolveLayout } from '../src/padmap.mjs';
+
+test('a tour stop draws its drum, where it is, a line, and what to do; the end page too', () => {
+  const s = createScreen();
+  let texts = [];
+  const ctx = Object.create(s);
+  ctx.text = (x, y, t, v) => { texts.push(t); s.text(x, y, t, v); };
+  const draw = (tour) => { texts = []; drawTour(ctx, PT.screenOf(tour)); return texts; };
+  const tour = PT.createTour(resolveLayout('mpc'), { texts: new Map([['KK', 'The low thump.']]),
+    measure: (t) => s.textWidth(t), width: L.SCREEN_W - 2 });
+  const stop = draw(tour);
+  for (const t of ['Kick', '1/16', 'The low thump.', 'HIT lit pad  JOG skip']) {
+    assert.ok(stop.includes(t), `${t} not drawn: ${stop.join('|')}`);
+  }
+  PT.skip(tour, 100);
+  const end = draw(tour);
+  assert.ok(end.includes(PT.END_TITLE) && end.includes('CLICK next  BACK list'), end.join('|'));
+  PT.skip(tour, -1);
+  PT.press(tour, 'P2', 1);
+  assert.equal(draw(tour).length, 3, 'title, place and line; no empty footer while it sounds');
+});

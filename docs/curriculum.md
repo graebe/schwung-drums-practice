@@ -60,7 +60,17 @@ spiral); ◆ existing drill, ★ new (specified in *Exercise catalogue*). "Pass"
 line each. *Learner:* what the student is likely thinking. *Why:* what the step does for them.
 
 ### Stage 0 — Hello, kit (1–2 sessions)
-Goal: find kick, snare, hat without searching; play a steady beat at 70.
+Goal: know where every pad is; find kick, snare, hat without searching; play a steady beat at 70.
+
+0.0 **Meet the pads** ◆ `tour:pads` — the first step, offered by Continue before anything else. Each
+sound of the layout in force, the beat first (kick, snare, hi-hat), then hats, snares, toms, cymbals
+and percussion: its name and a line about it on screen, its pads pulsing on both halves, its sound
+once. Striking one of them moves on; another pad sounds and is named; the jog skips; reaching the
+end is done (no score, no repetition). On Sticking it tours MPC Classic, as the drum quizzes do.
+*New:* the grid itself, and that the right half repeats the left.
+*Learner:* "So that's where the crash is — and the same drums again under my right hand."
+*Why:* every later step asks for a pad by name; someone who has never seen the layout should
+meet each one before being asked to find it.
 
 0.1 **Guess: drum** ◆ — pool KK·SN·HH, round 10. *New:* the staff/grid ↔ pad map.
 *Learner:* "Kick bottom-left, and it's the bottom of the staff too — that's logical."
@@ -405,7 +415,7 @@ re-read at any time.
 |---|---|---|
 | Stage 0: Hello, kit | stage | Three drums make a beat: kick (low thump), snare (crack), hi-hat (tick). Find them, then play your first beat today. |
 | The kit on paper | 0.1–0.2 | Each row is one drum. Kick at the bottom, snare in the middle, cymbals on top — as on any drum chart. |
-| Your pads | 0.1 | MPC Classic: kick, snare and hats along the bottom row, cymbals on top. Settings › Pads picks another layout, Flip mirrors it, Pad map names every pad. |
+| Meet the pads | 0.0 | Each lit pad is a drum. The right half repeats the left: one half per hand. Hit the pad that pulses. |
 | The pulse | 0.3 | Music has a steady beat you could clap to. Count it: 1 2 3 4. Steady matters more than fast. |
 | Your result | 0.3 | % right: right pad, right time. s12: your spread in ms — smaller is steadier. +3ms: a little late; minus is early. |
 | Rests | 0.4 | A rest is a beat you count but do not play. Keep counting through it — the next note depends on it. |

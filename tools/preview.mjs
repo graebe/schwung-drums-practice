@@ -18,6 +18,8 @@
  *   npm run preview -- --exercise rock-backbeat --screen untimed-summary
  *   npm run preview -- --exercise kit --px 14 --film 2,8,14,20   (all 21 voices engraved)
  *   npm run preview -- --screen padmap --layout mirror --flip
+ *   npm run preview -- --screen tour --stop 0      (Meet the pads; --stop 99 is the end page,
+ *                                                   --struck SN a wrong pad named)
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { createScreen, toAscii } from './screen_buffer.mjs';
@@ -33,6 +35,8 @@ import * as UT from '../src/untimed.mjs';
 import { projectLevel } from '../src/levels.mjs';
 import { VOICES } from '../src/kit.mjs';
 import { resolveLayout } from '../src/padmap.mjs';
+import * as PT from '../src/pad_tour.mjs';
+import { parseLessons } from '../src/lessons.mjs';
 
 const exDir = new URL('../src/exercises/', import.meta.url);
 
@@ -176,6 +180,13 @@ if (screen) {
     const lay = resolveLayout(String(arg('layout', 'mpc')), { flip: Boolean(arg('flip', false)) });
     V.drawPadMap(ctx, { title: lay.name, right: lay.flip ? 'flip' : '', grid: lay.grid, selected: [],
       footer: 'PAD hear CLICK edit' });
+  } else if (screen === 'tour') {
+    const { pads } = parseLessons(readFileSync(new URL('../src/lessons.json', import.meta.url), 'utf8'));
+    const tour = PT.createTour(resolveLayout(String(arg('layout', 'mpc'))), { texts: pads,
+      measure: (t) => ctx.textWidth(t), width: L.SCREEN_W - 2 });
+    PT.skip(tour, Number(arg('stop', 0)));
+    if (arg('struck', false)) PT.press(tour, String(arg('struck')), 0);
+    V.drawTour(ctx, PT.screenOf(tour));
   } else if (screen === 'menu') {
     V.drawList(ctx, { title: 'DRUMS', items: drills.map((d) => d.name), selected: 3 });
   } else if (screen === 'progress') {
