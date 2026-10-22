@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as P from '../src/padmap.mjs';
-import { VOICE_IDS } from '../src/kit.mjs';
+import { VOICE_IDS, CORE_VOICES, gmOf } from '../src/kit.mjs';
 
 test('the grid covers 32 pads, four rows of eight', () => {
   assert.equal(P.PAD_LAST - P.PAD_FIRST + 1, P.PAD_COUNT);
@@ -28,8 +28,8 @@ test('the hand split is the left half of the grid', () => {
   assert.equal(P.twinCol(7), 3);
 });
 
-test('every layout assigns every pad a known voice', () => {
-  for (const layout of P.LAYOUT_IDS) {
+test('every preset assigns every pad a known voice', () => {
+  for (const layout of P.PRESET_IDS) {
     for (let pad = P.PAD_FIRST; pad <= P.PAD_LAST; pad++) {
       const v = P.padVoice(pad, layout);
       assert.ok(v !== null, `${layout} pad ${pad} is unassigned`);
@@ -38,49 +38,67 @@ test('every layout assigns every pad a known voice', () => {
   }
 });
 
-test('the halves DUPLICATE, so the Ableton order reads the same under each hand', () => {
-  /* Not mirrored: a Drum Rack reads left to right, and reversing it for the
-   * right hand would put the kick under the wrong finger. */
-  for (const layout of P.LAYOUT_IDS) {
+const DUPLICATED = ['mpc', 'family', 'centre', 'gm', 'sticking'];
+
+test('a 4x4 preset is duplicated: the same voice under the same finger of either hand', () => {
+  for (const id of DUPLICATED) {
     for (let row = 0; row < P.ROWS; row++) {
-      for (let col = 0; col < P.COLS; col++) {
-        assert.equal(
-          P.padVoice(P.padAt(row, col), layout),
-          P.padVoice(P.padAt(row, P.twinCol(col)), layout),
-          `${layout} row ${row} col ${col} differs from its twin`,
-        );
+      for (let col = 0; col < 4; col++) {
+        assert.equal(P.padVoice(P.padAt(row, col), id), P.padVoice(P.padAt(row, P.twinCol(col)), id),
+          `${id} row ${row} col ${col}`);
       }
     }
   }
 });
 
-test('the kit follows Ableton\'s Drum Rack order', () => {
-  /*
-   * Move lays a Drum Rack on the left 16 pads as a 4x4, General MIDI from C1
-   * ascending left to right, bottom to top. Matching it means muscle memory
-   * carries between this module and Move's own kits.
-   */
-  const at = (row, col) => P.padVoice(P.padAt(row, col), 'kit');
-  assert.equal(at(0, 0), 'KK', 'GM 36 — the kick is the bottom-left corner');
-  assert.equal(at(0, 2), 'SN', 'GM 38 — the snare');
-  assert.equal(at(1, 2), 'HH', 'GM 42 — closed hi-hat, directly above the snare');
-  assert.equal(at(2, 2), 'HO', 'GM 46 — open hi-hat, above the closed one');
-  assert.equal(at(2, 0), 'HF', 'GM 44 — hi-hat pedal');
-  assert.equal(at(3, 1), 'CR', 'GM 49 — crash');
-  assert.equal(at(3, 3), 'RD', 'GM 51 — ride');
-  /* And the three the Basics need sit in the bottom-left corner together. */
-  for (const v of ['KK', 'SN', 'HH']) {
-    assert.ok(P.padsForVoice(v, 'kit', P.LEFT).length > 0, `${v} is not under the left hand`);
+test('MPC Classic is the default: kick, snare and hats along the bottom, from the corner', () => {
+  assert.equal(P.DEFAULT_LAYOUT, 'mpc');
+  assert.deepEqual([68, 69, 70, 71].map((p) => P.padVoice(p)), ['KK', 'SN', 'HH', 'HO']);
+  assert.equal(P.padVoice(P.padAt(1, 3)), 'HF', 'its shaker pad is the hat foot, for jazz and Latin');
+});
+
+test('Chromatic is General MIDI 36..51, bottom left to top right, as Move\'s drum mode', () => {
+  for (let n = 0; n < 16; n++) {
+    const pad = P.padAt(Math.floor(n / 4), n % 4);
+    assert.equal(gmOf(P.padVoice(pad, 'gm')), 36 + n, `pad ${n}`);
   }
 });
 
-test('every voice a layout reaches is reachable with BOTH hands', () => {
-  /* Sticking is only scoreable if each voice exists under each hand. A voice
-   * on one side only would make half its written stickings impossible. */
-  for (const layout of P.LAYOUT_IDS) {
-    for (const voice of P.layoutVoices(layout)) {
-      assert.ok(P.padsForVoice(voice, layout, P.LEFT).length > 0, `${layout}/${voice} left`);
-      assert.ok(P.padsForVoice(voice, layout, P.RIGHT).length > 0, `${layout}/${voice} right`);
+test('Mirrored sits in the middle, its outer columns the mirror of each other', () => {
+  for (let row = 0; row < P.ROWS; row++) {
+    for (const col of [0, 1]) {
+      assert.equal(P.padVoice(P.padAt(row, col), 'mirror'), P.padVoice(P.padAt(row, 7 - col), 'mirror'));
+    }
+  }
+  /* The kick under both hands, at the centre's edge. */
+  assert.equal(P.padVoice(P.padAt(0, 2), 'mirror'), 'KK');
+  assert.equal(P.padVoice(P.padAt(0, 5), 'mirror'), 'KK');
+  assert.equal(P.PRESETS.mirror.pair, P.MIRROR);
+});
+
+test('Flip mirrors the grid, column c to 7-c; the hand stays the physical half', () => {
+  for (const id of P.PRESET_IDS) {
+    const flat = P.resolveLayout(id);
+    const flipped = P.resolveLayout(id, { flip: true });
+    for (let pad = P.PAD_FIRST; pad <= P.PAD_LAST; pad++) {
+      const { row, col } = P.padRowCol(pad);
+      assert.equal(P.padVoice(pad, flipped), P.padVoice(P.padAt(row, 7 - col), flat));
+    }
+  }
+  const f = P.resolveLayout('mpc', { flip: true });
+  assert.equal(P.padVoice(P.padAt(0, 3), f), 'KK', 'the kick is under the left hand\'s right finger');
+  assert.equal(P.padHand(P.padAt(0, 3)), P.LEFT);
+});
+
+test('a duplicated layout puts every voice it reaches under BOTH hands', () => {
+  /* Mirrored is a two-handed kit by design: its crash is the left hand's. */
+  for (const id of DUPLICATED) {
+    for (const flip of [false, true]) {
+      const lay = P.resolveLayout(id, { flip });
+      for (const v of P.layoutVoices(lay)) {
+        assert.ok(P.padsForVoice(v, lay, P.LEFT).length > 0, `${id}: ${v} has no left-hand pad`);
+        assert.ok(P.padsForVoice(v, lay, P.RIGHT).length > 0, `${id}: ${v} has no right-hand pad`);
+      }
     }
   }
 });
@@ -98,25 +116,44 @@ test('padsForVoice round-trips against padVoice', () => {
   }
 });
 
-test('sticking is one surface; the kit reaches every voice', () => {
+test('every preset reaches the nine core voices; together they reach all twenty-one', () => {
+  const all = new Set();
+  for (const id of P.PRESET_IDS) {
+    if (id === 'sticking') continue;
+    for (const v of CORE_VOICES) assert.ok(P.layoutVoices(id).includes(v), `${id} has no ${v}`);
+    for (const v of P.layoutVoices(id)) all.add(v);
+  }
+  for (const v of VOICE_IDS) assert.ok(all.has(v), `no preset has ${v}`);
   assert.deepEqual(P.layoutVoices('sticking'), ['SN']);
-  assert.equal(P.layoutVoices('kit').length, 9, 'the whole legend is playable');
 });
 
-test('layoutForChart picks the narrowest layout that can play it', () => {
-  assert.equal(P.layoutForChart({ events: [{ voices: ['SN'] }] }), 'sticking');
-  assert.equal(P.layoutForChart({ events: [{ voices: ['KK', 'SN', 'HH'] }] }), 'kit');
-  assert.equal(P.layoutForChart({ events: [{ voices: ['HF'] }] }), 'kit',
-    'the hi-hat pedal has a pad now, at its GM slot');
+test('missingVoices names what a layout cannot play; layoutForChart finds one that can', () => {
+  const groove = { events: [{ voices: ['KK', 'HH'] }, { voices: ['SN'] }, { voices: ['P1'] }] };
+  assert.deepEqual(P.missingVoices(groove, 'gm'), ['P1'], 'Chromatic has no cowbell');
+  assert.deepEqual(P.missingVoices(groove, 'mpc'), []);
+  assert.deepEqual(P.missingVoices(groove, 'sticking'), ['P1', 'HH', 'KK']);
+  assert.equal(P.layoutForChart({ events: [{ voices: ['SN'] }] }), 'mpc');
+  assert.equal(P.layoutForChart({ events: [{ voices: ['XX'] }] }), null);
 });
 
-test('unknown layouts and pads are refused rather than guessed at', () => {
-  assert.equal(P.padVoice(68, 'nope'), null);
-  assert.equal(P.padVoice(5, 'kit'), null);
-  assert.deepEqual(P.padsForVoice('SN', 'nope'), []);
-  assert.deepEqual(P.layoutVoices('nope'), []);
-  assert.equal(P.layoutExists('kit'), true);
-  assert.equal(P.layoutExists('nope'), false);
+test('an unknown layout is MPC Classic, an unknown pad no voice', () => {
+  assert.equal(P.resolveLayout('kit').id, 'mpc', 'the old default lands on the new one');
+  assert.equal(P.padVoice(50), null);
+  assert.equal(P.layoutExists('custom'), true);
+  assert.equal(P.layoutExists('kit'), false);
+  assert.equal(P.pairCol(1, P.MIRROR), 6);
+  assert.equal(P.pairCol(1, P.TWIN), 5);
+});
+
+test('Custom without a pads.json is MPC Classic; with one, its own', () => {
+  assert.deepEqual(P.resolveLayout('custom').grid, P.resolveLayout('mpc').grid);
+  const rows = ['. . . . . . . .', '. . . . . . . .', '. . . . . . . .', 'K2 . . . . . . SH'];
+  const c = P.resolveLayout('custom', { custom: { rows, pair: P.MIRROR } });
+  assert.equal(P.padVoice(68, c), 'K2');
+  assert.equal(P.padVoice(75, c), 'SH');
+  assert.equal(P.padVoice(69, c), null);
+  assert.equal(c.pair, P.MIRROR);
+  assert.deepEqual(P.rowsOf(c.grid), rows);
 });
 
 test('a judgement colour is never one of the music colours', () => {

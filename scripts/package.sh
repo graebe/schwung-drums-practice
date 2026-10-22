@@ -14,7 +14,7 @@ mkdir -p "$STAGE/exercises"
 cp "$ROOT/src/module.json" "$STAGE/module.json"
 cp "$ROOT/src/ui.js" "$STAGE/ui.js"
 
-MODULES="answer_pads beam catalog chart choices chrome controls events exercise_io generator glyphs grid_render guess kit ladder layout led_paint levels notation padmap rng scoring screens settings_def staff_render stats timing view transport progress program untimed page_view lessons"
+MODULES="answer_pads beam catalog chart choices chrome controls events exercise_io generator glyphs grid_render guess kit ladder layout led_paint levels notation padmap rng scoring screens settings_def staff_render stats timing view transport progress program untimed page_view lessons pads_io"
 
 # Cache-bust the sibling modules.
 #
@@ -61,7 +61,7 @@ cp "$ROOT/THIRD-PARTY-NOTICES.md" "$STAGE/THIRD-PARTY-NOTICES.md"
 # quietly play the synthesized kit. So a file that does not start like a pack
 # stops the build here.
 mkdir -p "$STAGE/samples/LICENSES"
-for pack in drums click; do
+for pack in drums perc click; do
   f="$ROOT/samples/$pack.nisp"
   [ "$(head -c 4 "$f" 2>/dev/null)" = NISP ] \
     || { echo "samples/$pack.nisp is not a pack (an LFS pointer? run: git lfs pull)" >&2; exit 1; }

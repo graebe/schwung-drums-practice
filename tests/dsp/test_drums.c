@@ -92,7 +92,7 @@ int main(void) {
     CHECK(keep[0] == 1234 && keep[255] == 1234, "silence overwrote the host's buffer");
 
     /* ---- one write carries a whole stack ---- */
-    api->set_param(inst, "n", "7:110,5:100,1:80");
+    api->set_param(inst, "n", "36:110,38:100,42:80");
     memset(out, 0, sizeof out);
     render_peak(128);
     api->get_param(inst, "voices", out, (int)sizeof out);
@@ -108,7 +108,7 @@ int main(void) {
     CHECK(render_peak(256) == 0, "panic left sound behind");
 
     /* ---- malformed input loses only itself ---- */
-    api->set_param(inst, "n", "5:100,rubbish,,7:90,99:100,:5,3:");
+    api->set_param(inst, "n", "38:100,rubbish,,36:90,99:100,:5,3:");
     render_peak(128);
     memset(out, 0, sizeof out);
     api->get_param(inst, "voices", out, (int)sizeof out);
@@ -126,7 +126,7 @@ int main(void) {
     api->set_param(inst, "panic", NULL);
     render_peak(128);
     for (int i = 0; i < 24; i++) {
-        api->set_param(inst, "n", "0:120");
+        api->set_param(inst, "n", "49:120");
         render_peak(64);
     }
     memset(out, 0, sizeof out);
@@ -139,7 +139,7 @@ int main(void) {
 
     /* ---- MIDI is panic-only, on every channel ---- */
     for (int ch = 0; ch < 16; ch++) {
-        api->set_param(inst, "n", "0:120");
+        api->set_param(inst, "n", "49:120");
         render_peak(64);
         uint8_t cc120[3] = { (uint8_t)(0xB0 | ch), 120, 0 };
         api->on_midi(inst, cc120, 3, 0);
@@ -149,7 +149,7 @@ int main(void) {
         CHECK(strcmp(out, "0") == 0, "CC120 was ignored on some channel");
     }
     uint8_t reset[1] = { 0xFF };
-    api->set_param(inst, "n", "0:120");
+    api->set_param(inst, "n", "49:120");
     render_peak(64);
     api->on_midi(inst, reset, 1, 0);
     render_peak(64);
@@ -169,7 +169,7 @@ int main(void) {
     /* ---- gain refuses nonsense rather than muting ---- */
     api->set_param(inst, "gain", "nonsense");
     api->set_param(inst, "gain", "5");
-    api->set_param(inst, "n", "7:120");
+    api->set_param(inst, "n", "36:120");
     CHECK(render_peak(1024) > 0, "an out-of-range gain silenced the kit");
 
     /* ---- odd frame counts, and zero ---- */

@@ -19,6 +19,8 @@
  *   bool  toggles once per gesture regardless of how the delta was batched
  *   list  steps through `values`, stopping at the ends
  *   wrap  like list, but wraps around
+ *   action  a row that opens something rather than holding a value — Click
+ *           on it does what `action` names; it is never saved
  */
 
 export const ROWS = [
@@ -41,7 +43,19 @@ export const ROWS = [
    */
   { key: 'reps',       label: 'Reps',      type: 'list', values: [0, 4, 8, 16, 32], rebuild: true,
     format: (v) => (v === 0 ? 'as written' : `${v}x`) },
-  { key: 'layout',     label: 'Kit',       type: 'list', values: ['kit', 'sticking'] },
+  /*
+   * The pad layout (padmap.mjs). MPC Classic is the default: it is what most
+   * finger drummers learnt on. Chromatic is Move's own drum mode, note for
+   * note; Sticking puts the snare on every pad, for rudiments.
+   */
+  { key: 'layout',     label: 'Pads',      type: 'list',
+    values: ['mpc', 'family', 'centre', 'gm', 'mirror', 'custom', 'sticking'],
+    format: (v) => ({ mpc: 'MPC', family: 'Family', centre: 'Centre', gm: 'GM', mirror: 'Mirror',
+      custom: 'Custom', sticking: 'Sticking' })[v] || `${v}` },
+  /* Mirror the layout left to right, for a left-hander. The hands stay the
+   * physical halves. */
+  { key: 'flip',       label: 'Flip',      type: 'bool' },
+  { key: 'padMap',     label: 'Pad map',   type: 'action', action: 'padmap', format: () => '>' },
 
   /* ---- the rest ---- */
   { key: 'view',       label: 'View',      type: 'list', values: ['staff', 'grid'] },
@@ -87,7 +101,8 @@ export const DEFAULTS = {
   speed: 100,
   pxPerBeat: 32,
   reps: 0,
-  layout: 'kit',
+  layout: 'mpc',
+  flip: false,
   /* Drum tab, not a staff. It is what a drummer reads, it is legible at a
    * glance while playing, and the percussion staff is one setting away for
    * when reading notation is the point. */
@@ -115,7 +130,7 @@ export const DEFAULTS = {
 };
 
 /* Bumped whenever a migration is added below. */
-export const SETTINGS_VERSION = 3;
+export const SETTINGS_VERSION = 4;
 
 const byKey = {};
 for (let i = 0; i < ROWS.length; i++) byKey[ROWS[i].key] = ROWS[i];
@@ -131,7 +146,8 @@ export function formatValue(row, value) {
 }
 
 export function settingsRows(settings) {
-  return ROWS.map((r) => ({ key: r.key, label: r.label, value: formatValue(r, settings[r.key]) }));
+  return ROWS.map((r) => ({ key: r.key, label: r.label, value: formatValue(r, settings[r.key]),
+    action: r.action || null }));
 }
 
 /*
@@ -143,7 +159,7 @@ export function settingsRows(settings) {
  */
 export function applySetting(settings, key, delta) {
   const row = byKey[key];
-  if (!row || !delta) return settings;
+  if (!row || !delta || row.type === 'action') return settings;
   const cur = settings[key];
   if (row.type === 'bool') {
     settings[key] = !cur;
@@ -179,6 +195,7 @@ export function coerceInto(target, loaded) {
   const out = { ...DEFAULTS, ...target };
   if (!loaded || typeof loaded !== 'object') return out;
   for (const row of ROWS) {
+    if (row.type === 'action') continue;
     const v = loaded[row.key];
     if (v === undefined) continue;
     if (row.type === 'bool') {
@@ -229,6 +246,13 @@ export function migrate(settings, fromVersion) {
    */
   if (from < 3) changed = true;
 
+  /*
+   * v4 — the pad layouts. `layout: "kit"`, the Drum Rack order, was the only
+   * default there had ever been, and coerceInto has already replaced it with
+   * the new default, MPC Classic; `sticking` is still a layout and is kept.
+   */
+  if (from < 4) changed = true;
+
   settings.version = SETTINGS_VERSION;
   return changed;
 }
@@ -249,6 +273,6 @@ export function loadSettings(text) {
 
 export function serialiseSettings(settings) {
   const out = { version: SETTINGS_VERSION };
-  for (const row of ROWS) out[row.key] = settings[row.key];
+  for (const row of ROWS) if (row.type !== 'action') out[row.key] = settings[row.key];
   return JSON.stringify(out);
 }

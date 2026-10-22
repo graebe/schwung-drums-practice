@@ -83,6 +83,41 @@ export function drawX(ctx, cx, cy, w = L.XHEAD) {
   ctx.line(cx - r, cy + r, cx + r, cy - r, 1);
 }
 
+/*
+ * The hand-percussion heads, drawn in lines like the x so they scale with it:
+ * a triangle (cowbell, tambourine), a diamond (the second snare) and a slash
+ * (the shaker). Each stays an outline or a stroke, never a filled block, so
+ * none of them can be taken for a drum's head at a glance.
+ */
+export function drawTriangle(ctx, cx, cy, w = L.XHEAD) {
+  const r = Math.max(1, w >> 1);
+  ctx.line(cx - r, cy + r, cx + r, cy + r, 1);
+  ctx.line(cx - r, cy + r, cx, cy - r, 1);
+  ctx.line(cx, cy - r, cx + r, cy + r, 1);
+}
+
+export function drawDiamond(ctx, cx, cy, w = L.XHEAD) {
+  const r = Math.max(1, w >> 1);
+  ctx.line(cx - r, cy, cx, cy - r, 1);
+  ctx.line(cx, cy - r, cx + r, cy, 1);
+  ctx.line(cx + r, cy, cx, cy + r, 1);
+  ctx.line(cx, cy + r, cx - r, cy, 1);
+}
+
+export function drawSlash(ctx, cx, cy, w = L.XHEAD) {
+  const r = Math.max(1, w >> 1);
+  ctx.line(cx - r, cy + r, cx + r, cy - r, 1);
+  ctx.line(cx - r + 1, cy + r, cx + r, cy - r + 1, 1);
+}
+
+/* A non-drum head of any kind: what the views draw for everything but 'note'. */
+export function drawHead(ctx, head, cx, cy, w = L.XHEAD) {
+  if (head === 'triangle') drawTriangle(ctx, cx, cy, w);
+  else if (head === 'diamond') drawDiamond(ctx, cx, cy, w);
+  else if (head === 'slash') drawSlash(ctx, cx, cy, w);
+  else drawX(ctx, cx, cy, w);
+}
+
 /* ---- Interface symbols -------------------------------------------------- */
 /*
  * The transport marks. They live here rather than with the staff because they

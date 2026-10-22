@@ -118,7 +118,7 @@ crates=$(sed -n 's/^name = "\(.*\)"/\1/p' "$ROOT/dsp/Cargo.lock" | sort | tr '\n
 grep -q '^#!\[forbid(unsafe_code)\]' "$ROOT/dsp/ni-sampler/src/lib.rs" || fail "ni-sampler must forbid unsafe"
 
 # The recordings ship with their licence texts and credits.
-for f in samples/drums.nisp samples/click.nisp samples/LICENSES/CC-BY-4.0.txt samples/LICENSES/CC0-1.0.txt; do
+for f in samples/drums.nisp samples/perc.nisp samples/click.nisp samples/LICENSES/CC-BY-4.0.txt samples/LICENSES/CC0-1.0.txt; do
   test -f "$ROOT/$f" || fail "no $f"
 done
 grep -q 'Naked Drums' "$ROOT/THIRD-PARTY-NOTICES.md" || fail "the notices do not credit Naked Drums"

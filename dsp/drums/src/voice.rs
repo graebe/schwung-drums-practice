@@ -59,11 +59,40 @@ pub struct Recipe {
 }
 
 /*
- * The kit, in the same order as src/kit.mjs — the index IS the channel the UI
- * sends. One ordering shared by the screen, the pads and the engine, so a
- * voice cannot mean one thing in the chart and another in the speaker.
+ * The synthesized kit: nine drums, the fallback when the recordings are
+ * missing or damaged, and for a GM note neither pack holds. Every one of the
+ * kit's twenty-one voices (src/kit.mjs) sounds as the nearest of these
+ * (`synth_for`), so a broken install is a plainer kit, never silence.
  */
 pub const NUM_DRUMS: usize = 9;
+
+/// The synthesized drum a General MIDI note falls back to, or `None` for a
+/// note that is no drum of the kit.
+pub fn synth_for(key: u8) -> Option<usize> {
+    const CR: usize = 0;
+    const HH: usize = 1;
+    const HO: usize = 2;
+    const RD: usize = 3;
+    const HT: usize = 4;
+    const SN: usize = 5;
+    const LT: usize = 6;
+    const KK: usize = 7;
+    const HF: usize = 8;
+    Some(match key {
+        35 | 36 => KK,                 /* kick 2, kick */
+        37..=40 => SN,                 /* rim, snare, clap, snare 2 */
+        41 | 43 | 45 => LT,            /* the floor toms and the low tom */
+        42 => HH,
+        44 => HF,
+        46 => HO,
+        47 | 48 | 50 => HT,            /* mid, hi-mid and high tom */
+        49 | 52 => CR,                 /* crash, China */
+        51 | 56 => RD,                 /* ride, and the cowbell's ping */
+        54 => HO,                      /* tambourine: a jingle that rings */
+        70 => HH,                      /* shaker: a short hiss */
+        _ => return None,
+    })
+}
 pub const RECIPES: [Recipe; NUM_DRUMS] = [
     /* 0 CR crash — wideband, long, barely filtered. The longest thing in the
      * kit, and the reason voices are stolen oldest-first. */

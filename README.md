@@ -999,11 +999,12 @@ ask:
 
 - **Kit:** [Naked Drums](https://github.com/sfzinstruments/WilkinsonAudio.NakedDrums) by
   **Wilkinson Audio**, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/);
-  the SFZ edition by kinwie. **Modified:** nine pieces of its "CR" mix, folded to mono and
+  the SFZ edition by kinwie. **Modified:** seventeen pieces of its "CR" mix, folded to mono and
   rebalanced so every voice is clear on the Move, four of ten round robins, tails shortened with
-  a fade.
-- **Metronome:** claves from the [Versilian Community Sample Library](https://github.com/sgossner/VCSL)
-  by Versilian Studios, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+  a fade, the smallest tom pitched up for the high tom and the kick down for Kick 2.
+- **Hand percussion and metronome:** clap, tambourine, cowbell, shaker and claves from the
+  [Versilian Community Sample Library](https://github.com/sgossner/VCSL) by Versilian Studios,
+  [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
 
 Neither author endorses this module. The licence texts ship in the tarball under
 `samples/LICENSES/`, and [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) has the details. The

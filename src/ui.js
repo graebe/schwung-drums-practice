@@ -29,6 +29,7 @@ import { announce } from '/data/UserData/schwung/shared/screen_reader.mjs';
 
 import * as L from './layout.mjs';
 import * as PAD from './padmap.mjs';
+import * as PIO from './pads_io.mjs';
 import * as KIT from './kit.mjs';
 import * as C from './controls.mjs';
 import * as SET from './settings_def.mjs';
@@ -55,6 +56,8 @@ import { stats as timingStats, statsSince, perVoice, voicesBySpread } from './ti
 
 const MODULE_DIR = '/data/UserData/schwung/modules/tools/drums-practice';
 const SETTINGS_PATH = `${MODULE_DIR}/settings.json`;
+/* The Custom pad layout (pads_io.mjs). */
+const PADS_PATH = `${MODULE_DIR}/pads.json`;
 const STATS_PATH = `${MODULE_DIR}/stats.json`;
 /* A second copy, written after the first: the host has no rename, so a save
  * cut short by the power going leaves one of the two whole. */
@@ -379,25 +382,25 @@ function dspSet(key, val) {
   try { host_module_set_param(key, val); } catch (e) { /* nothing to do here */ }
 }
 
+/*
+ * A voice sounds as its General MIDI note (kit.mjs), in the kit and down a
+ * MIDI route alike: the engine plays its recordings by GM note, and a Drum
+ * Rack at the other end of a route answers the same drum.
+ */
 function sound(voice, vel) {
-  const i = KIT.voiceIndex(voice);
-  if (i < 0) return;
+  const gm = KIT.gmOf(voice);
+  if (!gm) return;
   if (settings.midiOut & OUT_INTERNAL) {
-    dspNotes = dspNotes ? `${dspNotes},${i}:${vel}` : `${i}:${vel}`;
+    dspNotes = dspNotes ? `${dspNotes},${gm}:${vel}` : `${gm}:${vel}`;
   }
   const route = settings.midiOut & (OUT_TRACK | OUT_USB);
   /* Both halves or neither: a note-on whose note-off was dropped on a full
    * queue is a note left sounding downstream. */
   if (route && outboxRoom() >= 2) {
-    const gm = GM_NOTES[i] || 38;
     queue(route, 0x90 | midiChannel(), gm, vel);
     queue(route, 0x80 | midiChannel(), gm, 0);
   }
 }
-
-/* General MIDI drum notes, so a Move drum rack answers something sane. Made
- * once: this ran on every hit. */
-const GM_NOTES = [49, 42, 46, 51, 48, 38, 45, 36, 44];
 
 function midiChannel() {
   return settings.midiCh > 0 ? settings.midiCh - 1 : 9; /* 10 is the drum channel */
@@ -496,7 +499,7 @@ function stuckTargets() {
 /* One state object for the LED paint, filled in place: it was a new object
  * literal on every repaint, fifty times a second. */
 const paintState = {
-  layout: 'kit', held: null, flash: null, targets: null, sounding: null,
+  layout: null, held: null, flash: null, targets: null, sounding: null,
   stuck: null, phase: 0, prompt: null, answerPads: null, answerColours: null, dark: false,
 };
 const promptBuf = [null];
@@ -968,7 +971,7 @@ function startUntimed(practice) {
     return;
   }
   if (untimedUnplayable()) {
-    announce('L0 needs every drum of the groove: set Kit to kit.');
+    announce(`L0 needs every drum of the groove: no ${missingOnPads()[0]} on these pads.`);
     return;
   }
   clearPrompt();
@@ -986,24 +989,24 @@ function startUntimed(practice) {
 }
 
 /*
- * Whether the pads cannot reach a drum this L0 chart asks for. A timed rung
- * scores such a note a miss and the clock moves on; L0 has no clock, so the
- * cursor would wait on it for ever. On the `sticking` kit every pad is the
- * snare, so this is any groove with a hat or a kick in it.
+ * The drums the armed chart asks for that the pads in force cannot reach:
+ * a Custom layout without a hat foot, the cowbell on Chromatic, every drum
+ * but the snare on Sticking. A timed rung scores such a note a miss and the
+ * clock moves on — so the ready box says so before it starts, naming the drum
+ * — and L0, which has no clock and would wait on it for ever, refuses.
  */
-const UNTIMED_KIT_WARNING = 'SET KIT TO KIT';
+function missingOnPads(c = chart) {
+  return c ? PAD.missingVoices(c, padLayout) : [];
+}
 
 /* The one line the ready box gives a drill that cannot be played as it is. */
 function warningFor(c) {
-  return IO.playabilityWarnings(c)[0] || (untimedUnplayable() ? UNTIMED_KIT_WARNING : '');
+  const missing = missingOnPads(c);
+  return IO.playabilityWarnings(c)[0] || (missing.length ? `NO ${missing[0]} ON PADS` : '');
 }
 
 function untimedUnplayable() {
-  if (!chart || !chart.untimed) return false;
-  for (const v of KIT.voicesInChart(chart)) {
-    if (!PAD.padsForVoice(v, settings.layout).length) return true;
-  }
-  return false;
+  return Boolean(chart && chart.untimed && missingOnPads().length);
 }
 
 /*
@@ -1710,7 +1713,7 @@ function padDown(pad, vel) {
   if (screen !== RUNNING || !T.judging(tp)) return;
   if (untimed) {
     const j = UT.press(untimed, { voice, hand, velocity: vel }, now());
-    if (j) setFlash(PAD.padsForVoice(voice, settings.layout, hand), flashColor(j));
+    if (j) setFlash(PAD.padsForVoice(voice, layoutNow(), hand), flashColor(j));
     return;
   }
   /* The marker goes where the press was SEEN (songBeats); the judgement is
@@ -1718,7 +1721,7 @@ function padDown(pad, vel) {
    * a note the scroll has not reached is only as near as it looks. */
   const j = SC.judgeHit(run, { voice, hand, velocity: vel }, tp.scoreBeats, tp.songBeats);
   SC.addMarker(run, voice, tp.songBeats, hand);
-  setFlash(PAD.padsForVoice(voice, settings.layout, hand), flashColor(j));
+  setFlash(PAD.padsForVoice(voice, layoutNow(), hand), flashColor(j));
 }
 
 function padUp(pad) {
@@ -1727,7 +1730,7 @@ function padUp(pad) {
 
 function padsOfVoices(voices) {
   const out = [];
-  for (const v of voices) out.push(...PAD.padsForVoice(v, settings.layout));
+  for (const v of voices) out.push(...PAD.padsForVoice(v, layoutNow()));
   return out;
 }
 
@@ -2097,7 +2100,33 @@ function quizItemOf(q) {
  * sticking layout every pad is the snare, and eight of nine prompts could not
  * be answered at all. */
 function layoutNow() {
-  return screen === QUIZ ? 'kit' : settings.layout;
+  return screen === QUIZ ? quizLayout : padLayout;
+}
+
+/*
+ * The pads in force, resolved once (padmap.resolveLayout): the chosen layout,
+ * flipped or not, Custom from pads.json. A drum quiz asks about drums, so it
+ * plays on the chosen layout — or MPC Classic when that is Sticking, where
+ * every pad is the snare and eight of nine prompts could not be answered.
+ */
+let customPads = null;
+let padLayout = PAD.resolveLayout(PAD.DEFAULT_LAYOUT);
+let quizLayout = padLayout;
+function refreshLayout() {
+  padLayout = PAD.resolveLayout(settings.layout, { flip: settings.flip, custom: customPads });
+  quizLayout = settings.layout === 'sticking'
+    ? PAD.resolveLayout(PAD.DEFAULT_LAYOUT, { flip: settings.flip }) : padLayout;
+  if (chart) chartWarning = warningFor(chart);
+}
+
+function loadPads() {
+  const r = PIO.readPads(readFile(PADS_PATH));
+  customPads = r.custom;
+  if (!r.ok) {
+    menuNote = 'BAD PADS.JSON';
+    menuNoteUntil = now() + 8000;
+    announce('pads.json would not read: Custom is MPC Classic until it is saved again.');
+  }
 }
 
 /*
@@ -2584,6 +2613,8 @@ function initInner() {
   const loaded = SET.loadSettings(readFile(SETTINGS_PATH));
   settings = loaded.settings;
   if (loaded.changed) saveSettings();
+  loadPads();
+  refreshLayout();
   stats = loadStats();
   manifestError = '';
   loadExercises();
@@ -2952,8 +2983,8 @@ function editSetting(key, delta) {
   if (key === 'study' && settings.study && !wasStudying && run && screen === RUNNING) {
     SC.resyncWait(run, tp.songBeats);
   }
-  /* Kit does not rebuild the drill, but it decides whether L0 can be played. */
-  if (key === 'layout' && chart) chartWarning = warningFor(chart);
+  /* The pads do not rebuild the drill, but they decide what it can reach. */
+  if (key === 'layout' || key === 'flip') refreshLayout();
   /* Re-armed from the chart it was built from, so a level, a random drill or a
    * drill wrapped by the Ladder or Clock is rebuilt too — and the Settings
    * screen you are editing in stays up. */

@@ -226,7 +226,7 @@ test('the first beat leads the list, and is playable on the default layout', () 
   assert.deepEqual(manifest.entries.slice(0, 3).map((e) => e.id),
     ['first-beat', 'eighth-beat', 'rock-backbeat']);
   const c = IO.parseExercise(read('first-beat.json'), 'first-beat').chart;
-  assert.equal(layoutForChart(c), 'kit');
+  assert.equal(layoutForChart(c), 'mpc');
   assert.ok(c.bpm <= 70, `${c.bpm} is too fast to lead with`);
   for (const e of c.events) assert.ok(e.voices.includes('HH'), 'a drum without its hat is not unison');
 });

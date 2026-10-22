@@ -3,7 +3,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { VOICES, VOICE_IDS, voiceById, voiceIndex, sortVoices, voicesInChart, stackLabel, isVoice }
+import { VOICES, VOICE_IDS, CORE_VOICES, voiceById, voiceIndex, sortVoices, voicesInChart, stackLabel, isVoice }
   from '../src/kit.mjs';
 import { diatonicToY, ledgerYs } from '../src/notation.mjs';
 import * as L from '../src/layout.mjs';
@@ -12,7 +12,7 @@ test('every voice is distinct and complete', () => {
   assert.equal(new Set(VOICE_IDS).size, VOICES.length);
   for (const v of VOICES) {
     assert.ok(v.label && v.short, `${v.id} needs a label`);
-    assert.ok(['note', 'x', 'circled-x'].includes(v.head), `${v.id} head`);
+    assert.ok(['note', 'x', 'circled-x', 'triangle', 'diamond', 'slash'].includes(v.head), `${v.id} head`);
     assert.ok(['up', 'down'].includes(v.stem), `${v.id} stem`);
     assert.equal(v.limb, v.stem === 'down' ? 'foot' : 'hand');
   }
@@ -30,9 +30,30 @@ test('the legend sits where a drum chart engraves it', () => {
   assert.ok(y('HF') > L.STAFF_BOTTOM_Y, 'hat pedal below the staff');
 });
 
-test('the crash is the only voice needing a ledger', () => {
+test('only the voices on the crash\'s line need a ledger', () => {
   const needing = VOICES.filter((v) => ledgerYs(diatonicToY(v.diatonic)).length > 0);
-  assert.deepEqual(needing.map((v) => v.id), ['CR']);
+  assert.deepEqual(needing.map((v) => v.id), ['CR', 'FX', 'P1']);
+});
+
+test('twenty-one voices, each its own sound and its own mark', () => {
+  assert.equal(VOICES.length, 21);
+  const gms = VOICES.map((v) => v.gm);
+  assert.equal(new Set(gms).size, 21, 'two voices send the same note');
+  for (let n = 36; n <= 51; n++) assert.ok(gms.includes(n), `no voice for GM ${n}`);
+  const marks = new Map();
+  for (const v of VOICES) {
+    const key = `${v.pitch}:${v.head}:${v.stem}`;
+    assert.ok(!marks.has(key), `${v.id} is engraved exactly like ${marks.get(key)}`);
+    marks.set(key, v.id);
+  }
+});
+
+test('the nine voices every drill was written in keep their place on the staff', () => {
+  const was = { CR: 81, HH: 79, HO: 79, RD: 77, HT: 76, SN: 72, LT: 69, KK: 65, HF: 62 };
+  for (const [id, pitch] of Object.entries(was)) assert.equal(voiceById(id).pitch, pitch, id);
+  assert.deepEqual(CORE_VOICES, Object.keys(was));
+  /* Staff order, top to bottom, is the list order. */
+  for (let i = 1; i < VOICES.length; i++) assert.ok(VOICES[i - 1].pitch >= VOICES[i].pitch, VOICES[i].id);
 });
 
 test('the whole legend fits the drawable band', () => {

@@ -3,9 +3,10 @@
 # the Move by nisp-build (Piano Practice's tools/nisp-build; see
 # scripts/build-samples.sh). Credits: THIRD-PARTY-NOTICES.md.
 #
-# Each piece lands on its General MIDI note, the same table src/ui.js sends
-# down a MIDI route (GM_NOTES), and dsp/drums maps the kit's nine voices onto
-# it. All five velocity layers, four of the ten round robins.
+# Each piece lands on its General MIDI note — the voice's `gm` in src/kit.mjs,
+# which the UI sends and dsp/drums strikes by. All five velocity layers, four
+# of the ten round robins. The hand percussion Naked Drums has none of (clap,
+# tambourine, cowbell, shaker) is samples/perc.manifest.toml.
 #
 # trim_db rebalances the pieces against the snare. The CR mix is a mix for a
 # record, where hats and cymbals sit well back; a practice kit, heard on the
@@ -50,24 +51,71 @@ to = 51
 seconds = 3.0
 
 [[piece]]
-name = "HT"
-trim_db = 6
-from = 47            # tom 2, 12"
-to = 48
-seconds = 1.8
-
-[[piece]]
 name = "SN"
 from = 38            # snare, centre
 to = 38
 seconds = 1.2
 
 [[piece]]
+name = "RM"
+trim_db = 9
+from = 37            # side stick (cross-stick)
+to = 37
+seconds = 0.6
+
+[[piece]]
+name = "S2"
+from = 40            # snare 2
+to = 40
+seconds = 1.2
+
+# Five recorded toms for six General MIDI tom slots: the smallest serves the
+# hi-mid tom as it is and the high tom three semitones up (nisp-build's
+# piece `tune`), so every tom slot is a drum of the same kit. The toms and
+# the China are cut a little shorter than the cymbals of the old nine, so the
+# full kit stays inside the budget; a tom's tail past 1.8 s is room.
+[[piece]]
+name = "HT"
+trim_db = 9
+from = 48            # tom 1, 10", three semitones up
+to = 50
+tune = 300
+seconds = 1.4
+
+[[piece]]
+name = "HM"
+trim_db = 8
+from = 48            # tom 1, 10"
+to = 48
+seconds = 1.6
+
+[[piece]]
+name = "MT"
+trim_db = 6
+from = 47            # tom 2, 12"
+to = 47
+seconds = 1.6
+
+[[piece]]
 name = "LT"
+trim_db = 8
+from = 45            # tom 3
+to = 45
+seconds = 1.8
+
+[[piece]]
+name = "F1"
+trim_db = 10
+from = 43            # tom 4, floor
+to = 43
+seconds = 1.8
+
+[[piece]]
+name = "F2"
 trim_db = 10
 from = 41            # tom 5, 16" floor
-to = 45
-seconds = 2.2
+to = 41
+seconds = 1.8
 
 [[piece]]
 name = "KK"
@@ -75,6 +123,21 @@ trim_db = 9
 from = 36            # kick, 22"
 to = 36
 seconds = 1.2
+
+[[piece]]
+name = "K2"
+trim_db = 9
+from = 36            # the same kick, a whole tone down: a deeper second kick
+to = 35
+tune = -200
+seconds = 1.2
+
+[[piece]]
+name = "FX"
+trim_db = 16
+from = 50            # China 1
+to = 52
+seconds = 2.0
 
 [[piece]]
 name = "HF"

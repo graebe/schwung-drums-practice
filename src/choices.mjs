@@ -11,7 +11,7 @@
  * the subdivision either side of it, a groove with the same backbeat.
  */
 
-import { VOICE_IDS, voiceIndex, voiceById } from './kit.mjs';
+import { CORE_VOICES, voiceIndex, voiceById } from './kit.mjs';
 
 const SUBDIV_ORDER = ['quarters', 'eighths', 'triplets', 'sixteenths', 'sextuplets'];
 
@@ -29,7 +29,7 @@ function nearest(pool, at, n) {
  * against a high tom is the confusion worth drilling; a snare against a crash
  * is not, and an option nobody would pick is a wasted option.
  */
-export function voiceChoices(answer, pool = VOICE_IDS, n = 2) {
+export function voiceChoices(answer, pool = CORE_VOICES, n = 2) {
   const list = pool.filter((v) => v !== 'HO' || answer === 'HH' || answer === 'HO');
   const at = list.indexOf(answer);
   if (at < 0) return [answer];

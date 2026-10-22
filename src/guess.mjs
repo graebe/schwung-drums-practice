@@ -21,7 +21,7 @@
  */
 
 import { rng } from './rng.mjs';
-import { VOICE_IDS } from './kit.mjs';
+import { CORE_VOICES } from './kit.mjs';
 import { voiceChoices, subdivChoices, grooveChoices, shuffle,
          voiceLabel, subdivLabel, SUBDIV_ORDER } from './choices.mjs';
 
@@ -46,7 +46,9 @@ export function createQuiz(opts = {}) {
   const quiz = {
     kind: opts.kind || 'voice',
     mode: opts.mode || 'guess',
-    pool: opts.pool || VOICE_IDS.filter((v) => v !== 'HF'),
+    /* The kit a beat is made of, not all twenty-one sounds: the drums a
+     * beginner meets first, and the ones every drill is written in. */
+    pool: opts.pool || CORE_VOICES.filter((v) => v !== 'HF'),
     /* The subdivisions asked about: all of them, or the ones a stage of the
      * Learning Path has taught so far. */
     subdivs: opts.subdivs || SUBDIV_ORDER,

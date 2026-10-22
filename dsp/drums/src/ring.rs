@@ -23,8 +23,10 @@ pub enum Event {
     /// Strike a drum. There is no note-off: a drum is a one-shot and its
     /// envelope decides when it stops. Carrying a release the player can
     /// never use would be a state machine kept alive for nothing.
+    /// `key` is the drum's General MIDI note — what the UI sends and the packs
+    /// are cut by.
     Strike {
-        drum: u8,
+        key: u8,
         vel: u8,
     },
     /// The metronome. Reserved slots, never stolen by the kit.

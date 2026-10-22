@@ -70,13 +70,26 @@ test('the percussion clef is two bars, not a smudge', () => {
 
 /* ---- Heads -------------------------------------------------------------- */
 
+test('the percussion heads are outlines, each its own shape', () => {
+  const draw = (head) => {
+    const ctx = createScreen();
+    SR.drawNote(ctx, 60, 30, head, 'pending', 'normal', 16);
+    const px = [];
+    for (let y = 26; y < 35; y++) for (let x = 55; x < 66; x++) px.push(isOn(ctx, x, y) ? 1 : 0);
+    return px.join('');
+  };
+  const shapes = ['note', 'x', 'triangle', 'diamond', 'slash'].map(draw);
+  assert.equal(new Set(shapes).size, shapes.length, 'two heads draw the same shape');
+  for (const s of shapes) assert.ok(s.includes('1'), 'a head drew nothing');
+});
+
 test('every voice draws at its own height, and no two share one', () => {
   const seen = new Map();
   for (const v of VOICES) {
     const ctx = createScreen();
     SR.drawNote(ctx, 60, yOf(v.id), v.head, 'pending', 'normal', 16);
     assert.ok(countOn(ctx, 55, yOf(v.id) - 3, 11, 7) > 0, `${v.id} drew nothing`);
-    const key = `${yOf(v.id)}:${v.head}`;
+    const key = `${yOf(v.id)}:${v.head}:${v.stem}`;
     assert.ok(!seen.has(key), `${v.id} is indistinguishable from ${seen.get(key)}`);
     seen.set(key, v.id);
   }
@@ -230,12 +243,12 @@ test('sixteenths get two beams, eighths one, quarters none', () => {
   assert.equal(beamRows(subdivisionDrill('quarters', { bpm: 90 }), 1), 0);
 });
 
-test('the crash gets a ledger line and nothing else does', () => {
+test('the voices on the crash\'s line get a ledger, and nothing else does', () => {
   for (const v of VOICES) {
     const ctx = createScreen();
     SR.drawLedgers(ctx, 60, yOf(v.id));
     const lit = countOn(ctx, 54, L.STAFF_AREA_TOP_Y, 13, 36);
-    if (v.id === 'CR') assert.ok(lit > 0, 'the crash needs its ledger');
+    if (['CR', 'FX', 'P1'].includes(v.id)) assert.ok(lit > 0, `${v.id} needs its ledger`);
     else assert.equal(lit, 0, `${v.id} drew a ledger it does not need`);
   }
 });
