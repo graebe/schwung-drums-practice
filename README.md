@@ -808,23 +808,44 @@ teaching is.
 | **Hear: subdivision** | a figure plays; is it eighths, triplets or sixteenths? Ear training for *time* |
 | **Pick: groove** | a groove plays; name it |
 
-**The naming drills answer on the pads**, as Piano Practice does. In *Pick: drum*, *Hear:
-subdivision* and *Pick: groove* the bottom row of pads becomes the answers, one pad each.
+**The naming drills answer on the pads**, as Piano Practice does: each answer has a colour and a
+place, and pressing it answers. Where the answers sit depends on what they name.
+
+**Pick: drum answers on the kit's own pads.** Every drum it offers lights all of its pads in the
+layout you play on — MPC Classic, Chromatic, your Custom; Sticking quizzes on MPC Classic — in that
+answer's colour, and every other pad is dark. Picking the drum is finding it. The screen draws the
+pads as they sit under your hands, each drum's short name in its cells, the jog's choice inverted in
+all of them and named in the header with its colour:
+
+```
+ Snare  cyan              3/20
+  CR RD        | CR RD
+  LT    HT     | LT    HT
+               |
+  KK[SN]HH HO  | KK[SN]HH HO      ← the kit's own pads, the snare chosen
+      PAD answer  REC help
+```
+
+A drum your Custom layout has no pad for is still offered on the jog, and the hint line says so in
+a turn of its own: `NO RD ON PADS`.
+
+*Hear: subdivision* and *Pick: groove* have no pads of their own, so their answers sit on the
+bottom row of pads, one pad each.
 
 **The answers never move.** A drill puts the same answers on the same pads for every question, in
 the same order, so once you know where *triplets* sits you can answer without looking. When the
-drill's whole set fits the bottom row (eight pads), every question offers all of it: the five
-subdivisions, the drums of the drill. Only a set bigger than the row (a long list of grooves)
-offers three near misses instead, and even those keep the set's order.
+drill's whole set fits (eight answers), every question offers all of it: the five subdivisions, the
+drums of the drill. Only a set bigger than that (a long list of grooves) offers three near misses
+instead, and even those keep the set's order.
 
-Three answers or fewer sit on every other pad, so a near miss lands on nothing, each in its own
-colour, and the screen names the colour beside each answer:
+On the bottom row, three answers or fewer sit on every other pad, so a near miss lands on nothing,
+each in its own colour, and the screen names the colour beside each answer:
 
 ```
- PICK: DRUM               3/20
-  Kick                  blue      ← the pad second from the left
-  Snare                 cyan      ← the middle one
-  Hi-hat                white     ← the one after
+ PICK: GROOVE             3/20
+  Motown                blue      ← the pad second from the left
+  Samba                 cyan      ← the middle one
+  Two-beat              white     ← the one after
       PAD answer  REC help
 ```
 
@@ -838,11 +859,11 @@ a short name each and the jog's choice spelled out underneath:
       PAD answer  REC help
 ```
 
-Press the pad to answer, or turn the jog and click; the answer the jog is on pulses on its pad, and
-one a hint has struck out goes dark. The answer pads sound nothing — a press there is a choice, not
-a drum — and the rows above them are still the kit. *Guess: drum* and *Hear: drum* keep the whole
-kit, because their answer **is** a drum and the bottom row holds drums. The colours are piano's,
-less its orange, which on these pads already means *right drum, wrong hand*.
+Press a pad to answer, or turn the jog and click; the answer the jog is on pulses on its pads, and
+one a hint has struck out goes dark. Answer pads sound nothing — a press there is a choice, not a
+drum — and a dark pad does nothing; above the bottom row's answers the pads are still the kit.
+*Guess: drum* and *Hear: drum* keep the whole kit, because their answer **is** a drum, played. The
+colours are piano's, less its orange, which on these pads already means *right drum, wrong hand*.
 
 When a set is too big for the row, the wrong options are near misses — the drum either side of it
 on the staff, the subdivision either side of it, a groove with the same density — because three

@@ -555,20 +555,44 @@ function stuckTargets() {
  * literal on every repaint, fifty times a second. */
 const paintState = {
   layout: null, held: null, flash: null, targets: null, sounding: null,
-  stuck: null, phase: 0, prompt: null, answerPads: null, answerColours: null, dark: false,
+  stuck: null, phase: 0, prompt: null, answerGrid: null, answerColours: null, dark: false,
 };
 const promptBuf = [null];
 const answerColourBuf = [];
 const answerStruck = (i) => Q.isEliminated(quiz, i);
 
 /*
- * The answer bar: a multiple-choice drill's answers as coloured pads along the
- * bottom row (answer_pads.mjs), as Piano Practice does it. Only for the Pick
- * drills, which ask for a NAME — in Guess: drum and Hear: drum the answer is a
- * drum, and the bottom row holds drums.
+ * A Pick drill's answers as coloured pads (answer_pads.mjs), as Piano Practice
+ * does it: Pick: drum on the kit's own pads in the layout in force, the other
+ * Picks on a bar along the bottom row. In Guess: drum and Hear: drum the
+ * answer is played, so the pads stay drums.
  */
-function answerBarActive() {
+function answersOnPads() {
   return screen === QUIZ && Boolean(quiz) && quiz.mode === 'pick' && quiz.options.length > 0;
+}
+
+/* The answers by pad index (answer_pads.mjs). Pick: drum's is made again only
+ * when the question's options or the layout change: the repaint asks on every
+ * frame, and must not allocate. */
+const kitAnswers = { options: null, layout: null, grid: [], padless: [] };
+function answerGrid() {
+  if (quiz.kind !== 'voice') return AP.barGrid(quiz.options.length);
+  const layout = layoutNow();
+  if (kitAnswers.options !== quiz.options || kitAnswers.layout !== layout) {
+    kitAnswers.options = quiz.options;
+    kitAnswers.layout = layout;
+    AP.kitGrid(quiz.options, layout, kitAnswers.grid);
+    kitAnswers.padless = AP.padless(quiz.options, layout);
+  }
+  return kitAnswers.grid;
+}
+
+/* What the quiz says on its hint line when an offered drum has no pad in a
+ * Custom layout: offered on the jog all the same, never dropped in silence. */
+function quizWarning() {
+  if (!answersOnPads() || quiz.kind !== 'voice') return '';
+  answerGrid();
+  return kitAnswers.padless.length ? `NO ${kitAnswers.padless[0]} ON PADS` : '';
 }
 
 function paintLeds(t) {
@@ -606,13 +630,13 @@ function paintLeds(t) {
   } else {
     st.prompt = null;
   }
-  if (answerBarActive()) {
+  if (answersOnPads()) {
     const n = quiz.options.length;
-    st.answerPads = AP.answerPads(n);
+    st.answerGrid = answerGrid();
     st.answerColours = AP.answerLeds(n, quiz.revealed ? -1 : quiz.choice, answerStruck,
       st.phase, answerColourBuf);
   } else {
-    st.answerPads = null;
+    st.answerGrid = null;
   }
   st.dark = false;
   paint(ledBuf, st);
@@ -1812,12 +1836,17 @@ function serviceQuiz() {
 
 /* ---- input -------------------------------------------------------------- */
 function padDown(pad, vel) {
-  /* In a multiple-choice drill the bottom row is answer buttons. They sound
-   * nothing: a press there is a choice, not a drum. */
-  if (answerBarActive() && AP.inAnswerBar(quiz.options.length, pad)) {
-    const r = Q.pickAt(quiz, AP.answerAt(quiz.options.length, pad), now());
+  /* In a Pick drill the answers' pads are answer buttons — the kit's own in
+   * Pick: drum, the bottom row's bar in the others. They sound nothing: a
+   * press there is a choice, not a drum, and a dark one does nothing. */
+  const grid = answersOnPads() ? answerGrid() : null;
+  if (grid && pad >= PAD.PAD_FIRST && pad < PAD.PAD_FIRST + grid.length) {
+    const at = grid[pad - PAD.PAD_FIRST];
+    const r = Q.pickAt(quiz, at, now());
     if (r === 'ignored') return;
-    setFlash([pad], r === 'right' ? PAD.LED_HIT : PAD.LED_MISS);
+    /* On the kit the answer is a drum: all of its pads say how it went. */
+    const pads = quiz.kind === 'voice' ? PAD.padsForVoice(quiz.options[at], layoutNow()) : [pad];
+    setFlash(pads, r === 'right' ? PAD.LED_HIT : PAD.LED_MISS);
     if (r === 'right') quizSolvedAt = now();
     return;
   }
@@ -3034,6 +3063,7 @@ function hintState(shift = shiftHeld) {
     st.pick = quiz.mode === 'pick';
     st.audible = promptIsAudible();
     st.hintsLeft = Q.hintsLeft(quiz);
+    st.warning = quizWarning();
   } else if (screen === RESULT) {
     st.path = Boolean(pathStep) || fromContinue;
   } else if (screen === CARD && card) {
@@ -3079,7 +3109,7 @@ function hintLine() {
   const st = hintState();
   const key = `${screen}|${st.shift}|${st.depth > 1}|${st.mode}|${st.paused}|${st.untimed}|${st.clock}|`
     + `${st.pick}|${st.audible}|${st.hintsLeft > 0}|${st.path}|${st.guided}|${st.more}|${st.pages > 1}|`
-    + `${st.asks}|${st.scrolls}|${st.editing}|${st.done}|${st.sounding}|${st.levels}`;
+    + `${st.asks}|${st.scrolls}|${st.editing}|${st.done}|${st.sounding}|${st.levels}|${st.warning}`;
   const view = viewNow();
   if (view + key !== hintKey) {
     hintKey = view + key;
@@ -3396,7 +3426,8 @@ function draw() {
   if (screen === QUIZ && quiz) {
     V.drawQuiz(ctx, {
       quiz, title: quizTitle, progress: Q.roundProgress(quiz),
-      colours: answerBarActive() ? AP.COLOUR_NAMES : null,
+      colours: answersOnPads() ? AP.COLOUR_NAMES : null,
+      padGrid: answersOnPads() && quiz.kind === 'voice' ? answerGrid() : null,
       labelFor: (id) => Q.labelFor(quiz, id),
       shortFor: (id) => Q.shortFor(quiz, id),
       columnOf: (i) => AP.answerPads(quiz.options.length)[i] - PAD.PAD_FIRST,
@@ -4056,7 +4087,9 @@ globalThis.drumsPracticeScreen = function drumsPracticeScreen() {
   const m = onMap() ? mapNow() : null;
   return { screen, sheet: sheet ? sheet.items.map((a) => a.label) : null, help: help ? help.lines.slice() : null,
     map: m ? { at: m.walk.target, places: m.places.map((p) => `${p.label}:${p.state}`) } : null,
-    home: onHome() ? { selected: CAT.navTop(nav).cursor, grow: homeGrow ? { ...homeGrow } : null } : null };
+    home: onHome() ? { selected: CAT.navTop(nav).cursor, grow: homeGrow ? { ...homeGrow } : null } : null,
+    quiz: quiz ? { kind: quiz.kind, mode: quiz.mode, prompt: quiz.prompt, options: quiz.options.slice(),
+      choice: quiz.choice, eliminated: quiz.eliminated.slice(), correct: quiz.correct, wrong: quiz.wrong } : null };
 };
 
 globalThis.onUnload = function onUnload() {

@@ -383,16 +383,55 @@ function drawPickMap(ctx, s) {
   ctx.text((L.SCREEN_W - ctx.textWidth(name)) >> 1, PICK_NAME_Y, name, 1);
 }
 
+/*
+ * Pick: drum, its answers on the kit's own pads: the grid as it sits under
+ * the hands (drawPadMap's, top row first, the hands' rule down the middle).
+ * Each offered drum's short name is in every one of its cells, the jog's
+ * choice inverted in all of them, a struck one crossed; the rest is empty.
+ */
+function drawPickPads(ctx, s) {
+  const q = s.quiz;
+  const g = PADMAP;
+  for (let row = 0; row < 4; row++) {
+    const y = g.y + (3 - row) * g.cellH;
+    for (let col = 0; col < 8; col++) {
+      const at = s.padGrid[row * 8 + col];
+      if (at < 0) continue;
+      const x = g.x + col * g.cellW;
+      const on = at === q.choice;
+      if (on) ctx.fillRect(x, y, g.cellW, g.cellH - 1, 1);
+      const short = s.shortFor(q.options[at]);
+      ctx.text(x + ((g.cellW - ctx.textWidth(short)) >> 1), y + 2, short, on ? 0 : 1);
+      if (s.isEliminated(at)) ctx.line(x + 1, y + g.cellH - 3, x + g.cellW - 2, y + 1, on ? 0 : 1);
+    }
+  }
+  ctx.fillRect(g.x + 4 * g.cellW - 1, g.y, 1, 4 * g.cellH - 1, 1);
+}
+
+/* Pick: drum's header names the jog's choice, since the cells only carry
+ * short names: "Snare  blue" where it fits beside the round's progress, the
+ * name alone where not. The colour only when the choice is on pads. */
+function pickTitle(ctx, s, room) {
+  const q = s.quiz;
+  const name = s.labelFor(q.options[q.choice]) || '';
+  const lit = s.colours && s.padGrid.indexOf(q.choice) >= 0;
+  const both = lit ? `${name}  ${s.colours[q.choice % s.colours.length]}` : name;
+  return ctx.textWidth(both) <= room ? both : fit(ctx, name, room);
+}
+
 export function drawQuiz(ctx, s) {
   ctx.clear();
   const q = s.quiz;
-  ctx.text(1, 0, s.title || 'QUIZ', 1);
   const prog = s.progress || '';
-  ctx.text(L.SCREEN_W - ctx.textWidth(prog) - 1, 0, prog, 1);
+  const pads = q.mode === 'pick' && s.padGrid;
+  const pw = ctx.textWidth(prog);
+  ctx.text(1, 0, pads ? pickTitle(ctx, s, L.SCREEN_W - pw - 8) : s.title || 'QUIZ', 1);
+  ctx.text(L.SCREEN_W - pw - 1, 0, prog, 1);
   ctx.fillRect(0, L.HEADER_RULE_Y, L.SCREEN_W, 1, 1);
 
   if (q.mode === 'pick') {
-    if (q.options.length <= PICK_LIST_MAX) drawPickList(ctx, s);
+    if (pads) drawPickPads(ctx, s);
+    else if (q.options.length <= PICK_LIST_MAX) drawPickList(ctx, s);
     else drawPickMap(ctx, s);
     drawHint(ctx, s.footer || (s.hintsLeft > 0 ? 'PAD answer  REC help' : 'PAD answer  CLICK ok'));
     return;

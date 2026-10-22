@@ -160,14 +160,18 @@ export function pack(pairs, prefix = '', width = HINT_CHARS) {
   return parts;
 }
 
-/* The hint line of a screen, as its parts. Shift held shows the Shift layer. */
+/* The hint line of a screen, as its parts. Shift held shows the Shift layer.
+ * A `warning` the screen gives ("NO HF ON PADS") takes a turn of its own. */
 export function hintFor(screen, st = {}) {
   const k = keysFor(screen, st);
   if (!k) return [];
   /* `width` leaves room on the line for what the screen shows beside the
    * keys: the ready screen's level. */
   const width = st.width || HINT_CHARS;
-  return st.shift ? pack(k.shift, 'SHIFT: ') : pack(k.keys, '', width);
+  if (st.shift) return pack(k.shift, 'SHIFT: ');
+  const parts = pack(k.keys, '', width);
+  if (st.warning) parts.push(st.warning);
+  return parts;
 }
 
 /*

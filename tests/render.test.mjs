@@ -793,10 +793,10 @@ test('the first Hear hint names the drum and still hides the staff', () => {
   assert.ok(after.includes('?'), 'and the staff is still withheld');
 });
 
-test('a pick drill with more answers than rows draws them as the pads they sit on', async () => {
+test('a bar pick drill with more answers than rows draws them as the pads they sit on', async () => {
   const AP = await import('../src/answer_pads.mjs');
   const Q = await import('../src/guess.mjs');
-  for (const [kind, n] of [['subdiv', 5], ['voice', 8]]) {
+  for (const [kind, n] of [['subdiv', 5]]) {
     const quiz = createQuiz({ kind, mode: 'pick', seed: 3 });
     assert.equal(quiz.options.length, n);
     const { c, seen } = capture();
@@ -811,6 +811,71 @@ test('a pick drill with more answers than rows draws them as the pads they sit o
     for (const id of quiz.options) assert.ok(seen.includes(Q.shortFor(quiz, id)), `${kind}: ${id}`);
     assert.ok(seen.includes(Q.labelFor(quiz, quiz.options[quiz.choice])), 'the jog\'s choice in full');
   }
+});
+
+/*
+ * Pick: drum on the kit: the pads as they sit under the hands (drawPadMap's
+ * grid, top row first), each offered drum's short name in every one of its
+ * cells, the jog's choice inverted in all of them, a struck one crossed, and
+ * the choice named with its colour in the header.
+ */
+test('Pick: drum draws the kit grid: short names in their cells, the choice inverted, struck crossed', async () => {
+  const AP = await import('../src/answer_pads.mjs');
+  const Q = await import('../src/guess.mjs');
+  const { PADMAP: G } = await import('../src/screens.mjs');
+  const { resolveLayout: resolve } = await import('../src/padmap.mjs');
+  for (const id of ['mpc', 'gm']) {
+    const quiz = createQuiz({ kind: 'voice', mode: 'pick', seed: 3 });
+    const grid = AP.kitGrid(quiz.options, resolve(id));
+    Q.moveChoice(quiz, quiz.options.indexOf('SN'));
+    const struck = quiz.options.indexOf('HO');
+    quiz.eliminated.push(struck);
+    const texts = [];
+    const fills = [];
+    const lines = [];
+    const c = createScreen();
+    const text = c.text.bind(c);
+    const fillRect = c.fillRect.bind(c);
+    const line = c.line.bind(c);
+    c.text = (x, y, str, v) => { texts.push({ x, y, str, v }); return text(x, y, str, v); };
+    c.fillRect = (x, y, w, h, v) => { fills.push({ x, y, w, h }); return fillRect(x, y, w, h, v); };
+    c.line = (x0, y0, x1, y1, v) => { lines.push({ x0, y0 }); return line(x0, y0, x1, y1, v); };
+    drawQuiz(c, { quiz, progress: '3/20', colours: AP.COLOUR_NAMES, padGrid: grid,
+      labelFor: (v) => Q.labelFor(quiz, v), shortFor: (v) => Q.shortFor(quiz, v),
+      isEliminated: (i) => Q.isEliminated(quiz, i), hintsLeft: 2 });
+    const cellOf = (i) => ({ x: G.x + (i % 8) * G.cellW, y: G.y + (3 - Math.floor(i / 8)) * G.cellH });
+    for (let i = 0; i < 32; i++) {
+      const { x, y } = cellOf(i);
+      const inCell = texts.filter((t) => t.y === y + 2 && t.x >= x && t.x < x + G.cellW);
+      if (grid[i] < 0) {
+        assert.equal(inCell.length, 0, `${id}: pad ${i} should be empty`);
+        continue;
+      }
+      const v = quiz.options[grid[i]];
+      assert.deepEqual(inCell.map((t) => t.str), [Q.shortFor(quiz, v)], `${id}: pad ${i}`);
+      const chosen = grid[i] === quiz.choice;
+      assert.equal(inCell[0].v, chosen ? 0 : 1, `${id}: pad ${i} inverted only when chosen`);
+      assert.equal(fills.some((f) => f.x === x && f.y === y && f.w === G.cellW), chosen, `${id}: pad ${i} fill`);
+      assert.equal(lines.some((l) => l.x0 === x + 1 && l.y0 > y && l.y0 < y + G.cellH), grid[i] === struck,
+        `${id}: pad ${i} crossed only when struck`);
+    }
+    const head = texts.find((t) => t.y === 0 && t.x === 1);
+    assert.equal(head.str, `Snare  ${AP.COLOUR_NAMES[quiz.choice % AP.COLOUR_NAMES.length]}`, id);
+  }
+});
+
+test('Pick: drum names the choice alone when the colour will not fit, and without one off the pads', async () => {
+  const AP = await import('../src/answer_pads.mjs');
+  const Q = await import('../src/guess.mjs');
+  const quiz = createQuiz({ kind: 'voice', mode: 'pick', seed: 3 });
+  const { c, seen } = capture();
+  const s = { quiz, progress: '3/20', colours: AP.COLOUR_NAMES, padGrid: AP.kitGrid(quiz.options, 'mpc'),
+    labelFor: () => 'Hi-mid tom two', shortFor: (v) => Q.shortFor(quiz, v), isEliminated: () => false };
+  drawQuiz(c, s);
+  assert.ok(seen.includes('Hi-mid tom two'), `the name, the colour left out: ${seen.join('|')}`);
+  const off = capture();
+  drawQuiz(off.c, { ...s, labelFor: () => 'Ride', padGrid: new Array(32).fill(-1) });
+  assert.ok(off.seen.includes('Ride'), off.seen.join('|'));
 });
 
 /* ---- The result screen, worst case ------------------------------------------- */

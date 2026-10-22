@@ -6,10 +6,11 @@ import assert from 'node:assert/strict';
 
 import {
   ANSWER_COLOURS, COLOUR_NAMES, LIST_MAX, MAX_ANSWERS,
-  answerPads, answerAt, inAnswerBar, answerColour, answerLeds,
+  answerPads, barGrid, kitGrid, padless, answerColour, answerLeds,
 } from '../src/answer_pads.mjs';
 import {
-  PAD_FIRST, LED_OFF, LED_VOICE, LED_TARGET_FAR, LED_TARGET_NEAR, LED_PROMPT,
+  PAD_FIRST, PAD_COUNT, PRESETS, padsForVoice, resolveLayout,
+  LED_OFF, LED_VOICE, LED_TARGET_FAR, LED_TARGET_NEAR, LED_PROMPT,
   LED_PRESSED, LED_HIT, LED_STICK, LED_MISS,
 } from '../src/padmap.mjs';
 import { paint } from '../src/led_paint.mjs';
@@ -27,16 +28,38 @@ test('up to four answers sit on every other pad of the bottom row, centred', () 
   assert.equal(cols(99).length, MAX_ANSWERS, 'capped, never off the row');
 });
 
-test('a pad says which answer it is, and the bar includes its gaps', () => {
-  assert.equal(answerAt(3, PAD_FIRST + 3), 1);
-  assert.equal(answerAt(3, PAD_FIRST + 2), -1, 'a gap is no answer');
-  assert.ok(inAnswerBar(3, PAD_FIRST + 2), 'but it is part of the bar: silent, not a drum');
-  assert.ok(!inAnswerBar(3, PAD_FIRST + 8), 'the row above is drums');
-  assert.ok(!inAnswerBar(0, PAD_FIRST), 'no answers, no bar');
+test('the bar is the bottom row: each pad its answer, a gap -1, the rows above not its own', () => {
+  assert.deepEqual(barGrid(3), [-1, 0, -1, 1, -1, 2, -1, -1]);
+  assert.deepEqual(barGrid(8), [0, 1, 2, 3, 4, 5, 6, 7]);
+  assert.deepEqual(barGrid(0), [], 'no answers, no bar');
 });
 
 test('the layouts are shared, so the LED repaint does not allocate', () => {
   assert.equal(answerPads(3), answerPads(3));
+  assert.equal(barGrid(3), barGrid(3));
+});
+
+test('Pick: drum\'s answers are every pad of each offered drum in the layout, the rest dark', () => {
+  const options = ['KK', 'SN', 'HH', 'CR'];
+  for (const id of ['mpc', 'gm', 'mirror']) {
+    const layout = resolveLayout(id);
+    const out = kitGrid(options, layout, []);
+    assert.equal(out.length, PAD_COUNT, id);
+    options.forEach((v, i) => {
+      for (const p of padsForVoice(v, layout)) assert.equal(out[p - PAD_FIRST], i, `${id} ${v}`);
+    });
+    const lit = options.reduce((n, v) => n + padsForVoice(v, layout).length, 0);
+    assert.equal(out.filter((a) => a < 0).length, PAD_COUNT - lit, `${id}: every other pad dark`);
+  }
+  const buf = [];
+  assert.equal(kitGrid(options, 'mpc', buf), buf, 'written in place');
+});
+
+test('a drum the layout has no pad for is named, to be offered on the jog alone', () => {
+  const noRide = resolveLayout('custom', { custom: { rows: PRESETS.mpc.rows.map((r) => r.replace('RD', '.')), pair: 'twin' } });
+  assert.deepEqual(padless(['KK', 'RD', 'SN'], noRide), ['RD']);
+  assert.deepEqual(padless(['KK', 'RD', 'SN'], 'mpc'), []);
+  assert.equal(kitGrid(['RD'], noRide).filter((a) => a >= 0).length, 0);
 });
 
 test('answer colours never borrow a colour that already means something on the drums', () => {
@@ -65,16 +88,23 @@ test('struck answers go dark, and the jog answer pulses in its own hue', () => {
 
 test('the bar owns the bottom row and nothing else; a judgement still shows over it', () => {
   const out = new Array(32);
-  const pads = answerPads(3);
   const state = { layout: 'mpc', held: new Set([PAD_FIRST + 1, PAD_FIRST + 9]), flash: null,
-    answerPads: pads, answerColours: [16, 14, 120] };
+    answerGrid: barGrid(3), answerColours: [16, 14, 120] };
   paint(out, state);
   assert.deepEqual(out.slice(0, 8), [0, 16, 0, 14, 0, 120, 0, 0]);
   assert.equal(out[9], LED_PRESSED, 'above the bar the pads are drums');
   paint(out, { ...state, flash: { pads: [PAD_FIRST + 3], color: LED_HIT } });
   assert.equal(out[3], LED_HIT);
-  paint(out, { ...state, answerPads: null });
+  paint(out, { ...state, answerGrid: null });
   assert.equal(out[1], LED_PRESSED, 'no bar, no answers');
+});
+
+test('on the kit the answers own every pad: a drum in its answer\'s colour, the rest dark', () => {
+  const out = new Array(32);
+  const grid = kitGrid(['KK', 'SN'], 'mpc');
+  paint(out, { layout: 'mpc', held: new Set([PAD_FIRST + 30]), flash: null, answerGrid: grid,
+    answerColours: [16, 0] });
+  for (let i = 0; i < 32; i++) assert.equal(out[i], grid[i] === 0 ? 16 : 0, `pad ${i}`);
 });
 
 test('a pad answers exactly as the jog and Click would', () => {

@@ -2412,11 +2412,11 @@ function padNow(log) {
   return now;
 }
 
-test('a Pick drill puts its answers on the bottom row, every question in the same place', async () => {
+test('Hear: subdivision and Pick: groove put their answers on the bottom row, every question in the same place', async () => {
   const AP = await import('../src/answer_pads.mjs');
-  /* Pick: drum and Hear: subdivision fit the bar whole (8 drums, 5
+  /* They have no pads of their own. Hear: subdivision fits the bar whole (5
    * subdivisions); the groove pool does not, so it offers three near misses. */
-  for (const [index, count] of [[2, 8], [3, 5], [4, 3]]) {
+  for (const [index, count] of [[3, 5], [4, 3]]) {
     const { log } = await loadUi();
     globalThis.init();
     ticks(2);
@@ -2463,6 +2463,79 @@ test('an answer pad answers and sounds nothing; one of them is right', async () 
     'an answer pad sounded a drum');
   ticks(30);
   assert.ok(drawnText(1).some((t) => /^1\//.test(t)), 'the round did not count the answer');
+});
+
+/*
+ * Pick: drum answers on the kit's own pads: every pad of an offered drum in
+ * the layout in force, in that answer's colour (the jog's choice pulsing),
+ * every other pad dark. Sticking quizzes on MPC Classic, as the drum quiz does.
+ */
+test('Pick: drum lights each offered drum on all its pads; any of them answers, silently', async () => {
+  const AP = await import('../src/answer_pads.mjs');
+  for (const [setting, layout] of [['mpc', 'mpc'], ['gm', 'gm'], ['sticking', 'mpc']]) {
+    const { log } = await loadUi({ settings: { layout: setting } });
+    globalThis.init();
+    ticks(2);
+    openQuiz(2);                             /* Pick: drum */
+    ticks(120);                              /* the prompt sounds first: let it finish */
+    let q = globalThis.drumsPracticeScreen().quiz;
+    assert.equal(q.mode + q.kind, 'pickvoice', setting);
+    const lights = () => {
+      const leds = padNow(log);
+      q = globalThis.drumsPracticeScreen().quiz;
+      for (let p = 68; p < 100; p++) {
+        const at = q.options.indexOf(PADMAP.padVoice(p, layout));
+        const c = AP.answerColour(at);
+        const want = at < 0 || q.eliminated.includes(at) ? [0] : [c.bright, c.dim];
+        assert.ok(want.includes(leds[p]), `${setting}: pad ${p} (${PADMAP.padVoice(p, layout)}) is ${leds[p]}`);
+      }
+    };
+    lights();
+    const lit = Object.entries(padNow(log)).filter(([n, c]) => n >= 68 && n < 100 && c).map(([n]) => +n);
+    const want = q.options.flatMap((v) => PADMAP.padsForVoice(v, layout)).sort((a, b) => a - b);
+    assert.deepEqual(lit.sort((a, b) => a - b), want, `${setting}: the lit pads are the offered drums'`);
+
+    const before = log.params.length;
+    /* A dark pad does nothing. */
+    const dark = [...Array(32).keys()].map((i) => 68 + i).find((p) => !want.includes(p));
+    pad(dark, 100); pad(dark, 0);
+    ticks(1);
+    assert.equal(globalThis.drumsPracticeScreen().quiz.wrong, 0, `${setting}: a dark pad answered`);
+    /* A wrong drum's last pad strikes it, and all its pads go dark. */
+    const wrong = q.options.findIndex((v) => v !== q.prompt);
+    const wrongPads = PADMAP.padsForVoice(q.options[wrong], layout);
+    pad(wrongPads[wrongPads.length - 1], 100); pad(wrongPads[wrongPads.length - 1], 0);
+    ticks(10);                               /* past the red flash */
+    assert.ok(globalThis.drumsPracticeScreen().quiz.eliminated.includes(wrong), setting);
+    for (const p of wrongPads) assert.equal(padNow(log)[p], 0, `${setting}: struck, pad ${p} still lit`);
+    lights();
+    /* The right drum's first pad answers it. */
+    const right = PADMAP.padsForVoice(q.prompt, layout)[0];
+    pad(right, 100); pad(right, 0);
+    ticks(1);
+    assert.equal(globalThis.drumsPracticeScreen().quiz.correct, 1, `${setting}: the right drum's pad`);
+    assert.equal(log.params.slice(before).filter(isHit).length, 0, `${setting}: an answer pad sounded a drum`);
+  }
+});
+
+test('Pick: drum names the jog\'s choice and its colour, and a drum without a pad is said', async () => {
+  /* Custom without the ride: the ride is offered on the jog all the same. */
+  const rows = PADMAP.rowsOf(PADMAP.gridOf(PADMAP.PRESETS.mpc.rows).map((v) => (v === 'RD' ? null : v)));
+  await loadUi({ settings: { layout: 'custom' },
+    dataFiles: { 'pads.json': JSON.stringify({ version: 1, pair: 'twin', rows }) } });
+  globalThis.init();
+  ticks(2);
+  openQuiz(2);
+  const q = globalThis.drumsPracticeScreen().quiz;
+  assert.ok(q.options.includes('RD'), 'the ride was dropped');
+  let shown = drawnText(1);
+  assert.ok(shown.includes('Crash  blue'), shown.join('|'));
+  const seen = new Set();
+  for (let i = 0; i < 300; i++) for (const t of drawnText(1)) seen.add(t);
+  assert.ok(seen.has('NO RD ON PADS') && seen.has('PAD answer  REC help'), [...seen].join('|'));
+  cc(CC.jogTurn, q.options.indexOf('RD'));
+  shown = drawnText(1);
+  assert.ok(shown.includes('Ride'), `the padless drum, on the jog: ${shown.join('|')}`);
 });
 
 test('Guess: drum keeps the whole kit — its answer is a drum, so there is no bar', async () => {

@@ -5,23 +5,30 @@
  * answer_pads.mjs — multiple-choice answers as pads. Pure.
  *
  * Piano Practice's picking pattern, so the two modules answer alike: every
- * drill that asks you to choose a name — Pick: drum, Hear: subdivision, Pick:
- * groove — puts its answers on the bottom of the grid, one coloured pad each,
- * and the screen says which colour means what. Pressing the pad answers; the
- * jog and Click still do too.
+ * drill that asks you to choose a name gives each answer a colour and puts
+ * it on pads, and the screen says which colour means what. Pressing a pad
+ * answers; the jog and Click still do too. Where the answers sit:
  *
- * Only there. Guess: drum and Hear: drum are answered by playing the drum,
- * and the bottom row holds drums, so a bar across it would cover the answer.
+ *   Pick: drum      on the kit itself: every pad of each offered drum in the
+ *                   layout in force, the rest dark. The answer is where the
+ *                   drum is, so picking it is finding it.
+ *   Hear: subdivision, Pick: groove
+ *                   have no pads of their own: a bar along the bottom row
  *
- *   up to 4    every other pad of the bottom row, centred:  · 1 · 2 · 3 · 4
- *   5 to 8     the whole bottom row
+ *     up to 4    every other pad of the bottom row, centred:  · 1 · 2 · 3 · 4
+ *     5 to 8     the whole bottom row
  *
- * The gaps are there for your fingers: with four answers or fewer there is
- * room to leave a dark pad between two, and a near miss lands on nothing
+ * The bar's gaps are there for your fingers: with four answers or fewer there
+ * is room to leave a dark pad between two, and a near miss lands on nothing
  * rather than on the neighbouring answer.
+ *
+ * Either way the answers are a grid by pad index (0 bottom left): the answer
+ * a pad is, or -1 for a dark one. The grid's length is how many pads the
+ * answers own — the bottom row for the bar, so the drums above stay drums;
+ * all of them on the kit.
  */
 
-import { PAD_FIRST } from './padmap.mjs';
+import { PAD_FIRST, PAD_COUNT, padVoice, padsForVoice } from './padmap.mjs';
 
 export const MAX_ANSWERS = 8;
 const ROW = 8;
@@ -66,14 +73,31 @@ export function answerPads(count) {
   return layouts[n];
 }
 
-/* Which answer a pad is, or -1. */
-export function answerAt(count, pad) {
-  return answerPads(count).indexOf(pad);
+/* The bar as a grid: the bottom row, an answer index or -1 a gap (none at
+ * all without answers). Made once per count and shared, like the layouts. */
+const bars = [];
+export function barGrid(count) {
+  const n = Math.max(0, Math.min(MAX_ANSWERS, count | 0));
+  if (!bars[n]) {
+    const pads = answerPads(n);
+    bars[n] = [];
+    if (n) for (let i = 0; i < ROW; i++) bars[n].push(pads.indexOf(PAD_FIRST + i));
+  }
+  return bars[n];
 }
 
-/* A pad belongs to the answer bar — the bottom row, gaps and all. */
-export function inAnswerBar(count, pad) {
-  return count > 0 && pad >= PAD_FIRST && pad < PAD_FIRST + ROW;
+/* Pick: drum's grid, written into `out`: every pad of an offered voice in
+ * `layout` is that answer, every other pad dark. */
+export function kitGrid(options, layout, out = []) {
+  out.length = PAD_COUNT;
+  for (let i = 0; i < PAD_COUNT; i++) out[i] = options.indexOf(padVoice(PAD_FIRST + i, layout));
+  return out;
+}
+
+/* The offered voices `layout` has no pad for (a Custom layout without them):
+ * still offered on the jog, and the screen says so. */
+export function padless(options, layout) {
+  return options.filter((v) => !padsForVoice(v, layout).length);
 }
 
 export function answerColour(index) {

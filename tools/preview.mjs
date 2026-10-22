@@ -34,6 +34,9 @@
  *                       (stage 0 from the start: Meet the pads not walked, or walked)
  *   npm run preview -- --screen tour --stop 0      (Meet the pads; --stop 99 is the end page,
  *                                                   --struck SN a wrong pad named)
+ *   npm run preview -- --screen pick --layout mpc|gm|custom [--choice N] [--struck N]
+ *                       (Pick: drum on the kit's pads; custom is MPC Classic without the
+ *                        ride, so one answer is on the jog only)
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { createScreen, toAscii } from './screen_buffer.mjs';
@@ -48,7 +51,9 @@ import * as L from '../src/layout.mjs';
 import * as UT from '../src/untimed.mjs';
 import { projectLevel } from '../src/levels.mjs';
 import { VOICES } from '../src/kit.mjs';
-import { resolveLayout } from '../src/padmap.mjs';
+import { resolveLayout, PRESETS } from '../src/padmap.mjs';
+import * as Q from '../src/guess.mjs';
+import * as AP from '../src/answer_pads.mjs';
 import * as H from '../src/hints.mjs';
 import * as HP from '../src/help.mjs';
 import * as TIPS from '../src/tips.mjs';
@@ -292,6 +297,21 @@ if (screen) {
     ctx.fillRect(0, L.HEADER_RULE_Y, L.SCREEN_W, 1, 1);
     HOME.drawHome(ctx, { items, selected: to, grow, now: Number(arg('t', 1000)) });
     V.drawHint(ctx, H.hintFor(H.SCREENS.HOME)[0]);
+  } else if (screen === 'pick') {
+    /* Pick: drum, the eight core drums, on the kit's own pads. */
+    const quiz = Q.createQuiz({ kind: 'voice', mode: 'pick', seed: 3 });
+    Q.moveChoice(quiz, Number(arg('choice', 0)));
+    if (arg('struck', null) !== null) quiz.eliminated.push(Number(arg('struck', 0)));
+    const id = String(arg('layout', 'mpc'));
+    const layout = id === 'custom'
+      ? resolveLayout('custom', { custom: { rows: PRESETS.mpc.rows.map((r) => r.replace(/RD/g, '.')), pair: 'twin' } })
+      : resolveLayout(id);
+    const footer = H.hintFor(H.SCREENS.QUIZ, { pick: true, hintsLeft: 2, audible: true,
+      warning: AP.padless(quiz.options, layout).map((v) => `NO ${v} ON PADS`)[0] || '' });
+    V.drawQuiz(ctx, { quiz, title: 'PICK: DRUM', progress: '3/20', colours: AP.COLOUR_NAMES,
+      padGrid: AP.kitGrid(quiz.options, layout), labelFor: (v) => Q.labelFor(quiz, v),
+      shortFor: (v) => Q.shortFor(quiz, v), isEliminated: (i) => Q.isEliminated(quiz, i), hintsLeft: 2,
+      footer: footer[Number(arg('part', 0)) % footer.length] });
   } else if (screen === 'map' || screen === 'map-sheet') {
     const { program, progress, folder } = samplePath({ fresh: Boolean(arg('fresh', false)),
       walked: Boolean(arg('walked', false)) });

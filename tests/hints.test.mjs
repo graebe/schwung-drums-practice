@@ -86,3 +86,11 @@ test('ui.js takes its screen names from the table, so none can be left without a
     'a screen declared outside hints.mjs');
   assert.match(src, /= H\.SCREENS;/);
 });
+
+test('a warning the screen gives takes a turn of its own, and not on the Shift layer', () => {
+  const st = { pick: true, hintsLeft: 2, audible: true, warning: 'NO RD ON PADS' };
+  const parts = H.hintFor(H.SCREENS.QUIZ, st);
+  assert.equal(parts[parts.length - 1], 'NO RD ON PADS');
+  assert.deepEqual(parts.slice(0, -1), H.hintFor(H.SCREENS.QUIZ, { ...st, warning: '' }));
+  assert.ok(!H.hintFor(H.SCREENS.QUIZ, { ...st, shift: true }).includes('NO RD ON PADS'));
+});
