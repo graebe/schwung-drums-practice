@@ -251,7 +251,7 @@ if (screen) {
     V.drawTour(ctx, { ...stop, footer: H.hintFor(H.SCREENS.TOUR, stop)[0] });
   } else if (screen === 'menu') {
     /* Continue on a step too long for the row: its rung, the whole step on top. */
-    const items = [{ label: 'Continue', value: 'L0' }, { label: 'Path', value: '>' },
+    const items = [{ label: 'Continue', value: 'L0' }, { label: 'Learning Path', value: '>' },
       { label: 'Practice', value: '>' }, { label: 'Quiz', value: '>' }, { label: 'Progress', value: '' },
       { label: 'Settings', value: '>' }];
     const shift = Boolean(arg('shift', false));
@@ -262,7 +262,7 @@ if (screen) {
     V.drawList(ctx, { title: '1 EIGHTH NOTES', items, selected: 0, footer: H.hintFor(H.SCREENS.SHEET)[0] });
   } else if (screen === 'help') {
     const topics = HP.parseHelp(readFileSync(new URL('../src/help.json', import.meta.url), 'utf8'));
-    const page = HP.helpPage(H.SCREENS.MENU, { st: { depth: 2, section: 'Path' }, topics });
+    const page = HP.helpPage(H.SCREENS.MENU, { st: { depth: 2, section: 'Learning Path' }, topics });
     V.drawPage(ctx, { title: page.title, lines: HP.fitPage(page.lines, (t) => ctx.textWidth(t)),
       top: Number(arg('top', 0)), footer: H.hintFor(H.SCREENS.HELP)[0] });
   } else if (screen === 'welcome') {
@@ -282,8 +282,8 @@ if (screen) {
       footer: H.hintFor(H.SCREENS.TIP, { scrolls: lines.length > L.PAGE_ROWS })[0] });
   } else if (screen === 'home') {
     /* The top as ui.js draws it: the title, the circles, the hint line. */
-    const items = [['Path', 'path'], ['Practice', PRACTICE_DRUMS], ['Quiz', 'quiz'], ['Progress', 'progress'],
-      ['Settings', 'settings']].map(([label, icon]) => ({ key: label, label, icon }));
+    const items = [['Learning Path', 'path'], ['Practice', PRACTICE_DRUMS], ['Quiz', 'quiz'],
+      ['Progress', 'progress'], ['Settings', 'settings']].map(([label, icon]) => ({ key: label, label, icon }));
     const to = Number(arg('selected', 0));
     const grow = HOME.createGrow(Number(arg('from', to)));
     if (arg('from', null) !== null) HOME.startGrow(grow, to, 0);

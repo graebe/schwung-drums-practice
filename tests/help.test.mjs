@@ -25,10 +25,10 @@ test('every line of help.json fits beside the scrollbar as written, so none is w
   }
 });
 
-test('help speaks the shared words: Path, stage, Review — never the old names', () => {
+test('help speaks the shared words: Learning Path, stage, Review — never the old names', () => {
   for (const [title, lines] of topics) {
     const all = [title].concat(lines).join(' ');
-    for (const old of [/Learning Path/, /\bphase/i, /Repetition/, /Training/, /Your path/, /Skip all here/,
+    for (const old of [/\bphase/i, /Repetition/, /Training/, /Your path/, /Skip all here/,
       /Skip next/, /Basics/]) {
       assert.ok(!old.test(all), `${title} still says ${old}`);
     }
@@ -37,7 +37,7 @@ test('help speaks the shared words: Path, stage, Review — never the old names'
 
 test('every screen has a page: what it is, its keys, and topics help.json holds', () => {
   for (const screen of Object.values(H.SCREENS)) {
-    for (const st of [{}, { section: 'Path' }, { section: 'Practice' }, { group: 'pads' }, { untimed: true,
+    for (const st of [{}, { section: 'Learning Path' }, { section: 'Practice' }, { group: 'pads' }, { untimed: true,
       ladder: true, clock: true }]) {
       for (const t of HP.topicsFor(screen, st)) assert.ok(topics.has(t), `${screen}: no topic "${t}"`);
       const page = HP.helpPage(screen, { st, topics });
@@ -64,13 +64,13 @@ test('a lesson card joins the page as prose, under its title', () => {
 
 test('the page opens on this screen: what it is, its keys, Shift\'s, the card — then More help', () => {
   const card = HP.cardLines([{ title: 'Pulse', text: 'Feel the beat.' }]);
-  const page = HP.helpPage(H.SCREENS.MENU, { st: { depth: 2, section: 'Path' }, topics, extra: card });
+  const page = HP.helpPage(H.SCREENS.MENU, { st: { depth: 2, section: 'Learning Path' }, topics, extra: card });
   const at = (l) => page.lines.indexOf(l);
   assert.equal(at('The list: CLICK a'), 0, 'what the screen is comes first');
   assert.ok(at('CLICK  open') < at('SHIFT+CLICK  options'));
   assert.ok(at('SHIFT+BACK  quit') < at('PULSE'), 'the card follows the keys');
   assert.ok(at('PULSE') < at(HP.MORE_HELP), 'the card is this screen\'s, above the divider');
-  assert.ok(at(HP.MORE_HELP) < at('PATH'), 'the manual is under the divider');
+  assert.ok(at(HP.MORE_HELP) < at('LEARNING PATH'), 'the manual is under the divider');
   assert.equal(page.lines.filter((l) => l === HP.MORE_HELP).length, 1);
 });
 
@@ -82,7 +82,7 @@ function assertFits(what, lines) {
 
 test('no line of help, a tip or the welcome runs past its page, measured as drawn', () => {
   for (const screen of Object.values(H.SCREENS)) {
-    for (const st of [{}, { depth: 2 }, { section: 'Path' }, { section: 'Practice' }, { group: 'pads' },
+    for (const st of [{}, { depth: 2 }, { section: 'Learning Path' }, { section: 'Practice' }, { group: 'pads' },
       { untimed: true, ladder: true, clock: true }, { editing: true }, { pick: true, audible: true, hintsLeft: 1 }]) {
       const card = HP.cardLines([{ title: 'A card', text: 'Words that run on well past the width of one line of the panel.' }]);
       const page = HP.helpPage(screen, { st, topics, extra: card });

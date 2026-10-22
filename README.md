@@ -65,10 +65,10 @@ fingers, in the same way its sister module is a reading trainer rather than a pi
   over time.
 - **Knows how far you have got.** Every drill shows your best **clean speed** — 80% means you can
   play it clean at 80% of its written tempo — and a tick once you can play it clean at tempo. The
-  **Path** walks you through seven stages, time, hands, grooves and ear side by side, and
+  **Learning Path** walks you through seven stages, time, hands, grooves and ear side by side, and
   **Review** brings back what you learned on a schedule, so it stays learned. **Continue** — Play
-  on the Path's map — always knows the one thing to do next.
-- **Starts at home.** Five circles with pictures — Path, Practice, Quiz, Progress, Settings — chosen
+  on the Learning Path's map — always knows the one thing to do next.
+- **Starts at home.** Five circles with pictures — Learning Path, Practice, Quiz, Progress, Settings — chosen
   with the jog (the chosen one grows) or by the five lit pads under them.
 - **Always says what to press.** The bottom line of every screen names its keys — `CLICK open  BACK
   up` — and **Menu** opens help for the screen you are on. Hold **Shift** and the line shows what
@@ -132,7 +132,7 @@ played before 2026-10-22 had those on the snare and the ride.
 
 The pads are the finger drummer's. **Settings › Pads** chooses the layout, **Flip** mirrors it left to
 right for a left-hander, and **Settings › Pad map** shows every pad's drum on screen. New to the
-layout? The Path starts with **Meet the pads** (Path › 0 Hello, kit › Ear, and Continue's first
+layout? The Learning Path starts with **Meet the pads** (Learning Path › 0 Hello, kit › Ear, and Continue's first
 offer): each drum in turn, its pads pulsing, its sound once — strike it to meet the next.
 
 ```
@@ -261,7 +261,7 @@ The ready screen **is the chart**, with the controls laid over it — and, for a
 to its ready screen, on the first rung you have not learned yet, and the jog walks L0 to L4 from
 there — the arrows say where it can still go, a tick beside LEVEL says this rung is learned. Each
 turn arms the new rung from the top, its pads lit; turning to L0 swaps in the own-pace screen
-(`hear bar`, `own pace`) and back. On the Path the jog walks only the rungs that stage asks for, so
+(`hear bar`, `own pace`) and back. On the Learning Path the jog walks only the rungs that stage asks for, so
 its targets stay the stage's; a review arms the rung that is due. The bottom line names the rung —
 `L2  + kick` — beside the keys, taking turns with them when both will not fit.
 
@@ -297,7 +297,7 @@ and only one of them wants something from you.
 | **Record** | **practice** — you play it, it scores you |
 | **Jog turn** | moves the highlight in the list, an action sheet and settings, scrolls help, and does nothing anywhere else — a knock cannot change what you are playing |
 | **Jog click** | open the highlighted folder, or arm the drill; in settings, edit the selected row |
-| **Menu** | **help for the screen you are on**: what it is, its keys, and what explains it — on a row of the Path, its lesson card. A run pauses first. Menu or Back closes it |
+| **Menu** | **help for the screen you are on**: what it is, its keys, and what explains it — on a row of the Learning Path, its lesson card. A run pauses first. Menu or Back closes it |
 | **Shift + jog click** | on a row of the list, its **options** (the action sheet, below); anywhere else, settings over whatever is on screen: a run pauses, and leaving settings returns to it |
 | **Back** | from a run or a result, back to the start of the drill; from the ready screen, up one folder; closes help, a sheet or a tip; out of the module from the top |
 | **Shift + Back** | close immediately from anywhere |
@@ -393,7 +393,7 @@ the loosest limb — that is the one to practise.
 | **Record** | another take, straight away |
 | **Play** | listen to it |
 | **Back** | back to the start of the drill |
-| **Click** | on to the next rung of a groove, else the next drill in the folder — the next rudiment — or, on the Path, the next step of its track; after a review Continue opened, whatever Continue offers next |
+| **Click** | on to the next rung of a groove, else the next drill in the folder — the next rudiment — or, on the Learning Path, the next step of its track; after a review Continue opened, whatever Continue offers next |
 
 Only a whole take is kept: practised from the top and never scrubbed. A take started from a scrubbed
 bar, or scrubbed while paused, is practice on a passage, and its result says **not kept**.
@@ -456,7 +456,7 @@ Every row in the list shows where you are:
 | `85%` | your best clean speed so far |
 | `○` | played, but never clean yet |
 | `»` | skipped on purpose |
-| `▸` | the next step on the Path |
+| `▸` | the next step on the Learning Path |
 | `12/40` | a folder: learned out of all |
 
 Your best never drops. Practising slowly is how a drummer gets faster, and a slow take must never
@@ -508,7 +508,7 @@ A quiz has no tempo either. Its number is your best round: answers right first t
 your answers — an answer you needed a hint for is right but not yet known, so it does not count as
 right here. **90%** is learned.
 
-### The Path
+### The Learning Path
 
 The first circle at home: a course from your first beat to pro rhythms, in **seven
 stages**. It does not hold drills of its own — every step is a row from elsewhere in the tree, so
@@ -532,7 +532,7 @@ the Clock), **Hands** (hand patterns, rudiments, dynamics), **Grooves** (beats r
 phrases) and **Ear**. Continue only recommends the stage you are in, so the tracks stay in step:
 what the hands are asked, the ears and eyes have been given.
 
-**The Path is a map.** It opens on the sea, an island per stage above its pad; a lit pad is a place
+**The Learning Path is a map.** It opens on the sea, an island per stage above its pad; a lit pad is a place
 you can walk to — green done, pulsing white where Continue goes, dim yellow started, blue skipped,
 bright white where you stand. Press a pad and the avatar walks there, press it again to go in; the
 jog walks too and Click goes in, Back goes up, Play is Continue, and the pads make no sound there.
@@ -563,7 +563,7 @@ thing each), **Electives** (never required) and its **Checkpoint**. Pass the che
 stage is through, whatever else is open — take it at any time to test out. Closing every core step
 does it too. The current stage is marked `▸`, a finished one ✓.
 
-**Continue** — **Play** on the Path's map, and the first row of the Path as a list — opens the next
+**Continue** — **Play** on the Learning Path's map, and the first row of the Learning Path as a list — opens the next
 step of the current stage, from the track you have left longest, and names it: `Continue   Quarters`. A name too long for the row shows only its
 rung (`Continue   L0`), and the title bar names the whole step while the cursor is on it. When something you learned is due again it
 offers that instead — `Review   Flam tap` — one review, then one new step, in turn.
@@ -579,10 +579,10 @@ offers that instead — `Review   Flam tap` — one review, then one new step, i
 | **Test out: checkpoint** | a stage: plays its checkpoint. Pass it and the path moves on |
 | **Lessons** | a stage: its lesson cards |
 | **Practise: Ladder**, **Practise: Clock** | any drill with a tempo — see the Ladder and the Clock below |
-| **Show as list**, **Show as map** | the Path and a stage: the folder as a list for the session, and the map again |
+| **Show as list**, **Show as map** | the Learning Path and a stage: the folder as a list for the session, and the map again |
 | **Settings...** | always: the Settings folder, on top of where you are, so Back comes back |
 
-**Settings › Path** decides what Continue offers: **Tracks** and **Styles** on or off, **Rungs**
+**Settings › Learning Path** decides what Continue offers: **Tracks** and **Styles** on or off, **Rungs**
 `full` or `short` (L0 and the top rung only), **Start at** a stage, **Intros** `new`/`always`/`off`.
 A switched-off style leaves the core of every stage (its checkpoint swaps to an alternative), and
 never empties one.
@@ -611,7 +611,7 @@ moves a drill on to its next interval; one that falls apart brings it back tomor
 the top of the list. Only a take at full speed counts here: working on a learned rudiment slowly is
 practice, not a slip. And it never lowers your best. **L0 never comes back** here: repetition asks
 whether something is still clean at tempo, which a take with no clock cannot answer, and the timed
-rungs carry the groove there. **Path › Review** lists what is due today, and is only there while
+rungs carry the groove there. **Learning Path › Review** lists what is due today, and is only there while
 something is; Continue offers the reviews in turn with new steps.
 
 ### Progress
@@ -620,7 +620,7 @@ Fifth in the list, laid out as Piano Practice's is:
 
 | Row | Opens |
 | --- | --- |
-| **Overall** | every drill on the Path you have learned, as a line along real time that steps up at each tick — flat stretches are weeks off, steep ones are where it clicked |
+| **Overall** | every drill on the Learning Path you have learned, as a line along real time that steps up at each tick — flat stretches are weeks off, steep ones are where it clicked |
 | **Time**, **Hands**, **Grooves**, **Ear** | the same for one track |
 | a drill | its takes: the chart the result draws, with your best and at what tempo, and how many takes |
 
@@ -639,11 +639,11 @@ the sheet shows them as rows. Below home the list is a tree: **Click** opens a f
 up one, and Back at home leaves. Four rows show at a time, with the keys under them.
 
 ```
-Path        a map: 0 Hello, kit … 6 Pro; as a list Continue first, Review (while something is due) last
-Practice    Subdivisions · Grooves › Rock & Pop … Techno · Rudiments › Rolls … Drags · Random
-Quiz        Guess / Hear / Pick
+Learning Path  a map: 0 Hello, kit … 6 Pro; as a list Continue first, Review (while something is due) last
+Practice       Subdivisions · Grooves › Rock & Pop … Techno · Rudiments › Rolls … Drags · Random
+Quiz           Guess / Hear / Pick
 Progress
-Settings    Path · Practice · Sound · Pads · MIDI · Help
+Settings       Learning Path · Practice · Sound · Pads · MIDI · Help
 ```
 
 The Ladder and the Clock are not rows: they wrap a drill, so they are on the drill's action sheet.
@@ -879,8 +879,8 @@ down. This is the drill that tells you whether you can.
 
 ## Settings
 
-**Settings** is the last row of the list, a folder of groups: **Path** (what Continue offers, see
-the Path above), **Practice**, **Sound**, **Pads**, **MIDI** and **Help** — *Show tips again* and
+**Settings** is the last row of the list, a folder of groups: **Learning Path** (what Continue offers, see
+the Learning Path above), **Practice**, **Sound**, **Pads**, **MIDI** and **Help** — *Show tips again* and
 *Welcome again*. Open a group and its settings show; **Shift + click** in a drill shows every
 setting at once. Click a row to edit it, turn the jog to change the value, click again when done.
 
@@ -1038,14 +1038,14 @@ Everything except `ui.js` is pure and runs under plain `node`.
 | `src/notation.mjs` | staff placement and ledger lines |
 | `src/catalog.mjs` | the drill tree and how the list walks it |
 | `src/progress.mjs` | clean takes, clean speed, what is learned, repetition, folder sums |
-| `src/program.mjs` | the Path: its stages, tracks and what to practise next |
-| `src/path_rows.mjs` | what the Path's rows and Continue say, and what Continue opens |
+| `src/program.mjs` | the Learning Path: its stages, tracks and what to practise next |
+| `src/path_rows.mjs` | what the Learning Path's rows and Continue say, and what Continue opens |
 | `src/row_sheet.mjs` | the action sheet: what can be done to a row besides opening it |
 | `src/hints.mjs` | every screen's keys, for its hint line and its help |
 | `src/help.mjs` | Menu's help page, from the hints and `help.json` |
 | `src/tips.mjs` | the welcome, the placement question and the first-visit tips |
-| `src/map_places.mjs` | the Path as places on the map: islands, places, their states |
-| `src/pathmap/` | the Path map engine — layout, walk, render, pad colours — vendored from Piano Practice (`scripts/check-vendored.sh`) |
+| `src/map_places.mjs` | the Learning Path as places on the map: islands, places, their states |
+| `src/pathmap/` | the Learning Path map engine — layout, walk, render, pad colours — vendored from Piano Practice (`scripts/check-vendored.sh`) |
 | `src/stats.mjs` | the raw history of every take, capped per drill |
 | `src/beam.mjs` | beat-grouped stems and beams |
 | `src/staff_render.mjs` | the percussion staff: heads, stems, beams, accents, bar lines |

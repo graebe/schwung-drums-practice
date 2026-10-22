@@ -2982,7 +2982,7 @@ function welcomeClick() {
   if (answer === 'start') {
     PROG.setPath(progress, 'start', 0);
     saveProgress();
-    announce('Path. Play continues.');
+    announce('Learning Path. Play continues.');
     return;
   }
   showTip('placement', MENU);

@@ -70,8 +70,8 @@ const ABOUT = {
 
 /* The list's topics by where you are in it: the top-level folder's label. */
 const SECTION_TOPICS = {
-  Continue: ['Path', 'Review', 'The sheet'],
-  Path: ['Path', 'Review', 'The sheet'],
+  Continue: ['Learning Path', 'Review', 'The sheet'],
+  'Learning Path': ['Learning Path', 'Review', 'The sheet'],
   Practice: ['The list', 'Own pace (L0)', 'The Ladder', 'The Clock', 'The sheet'],
   Quiz: ['Quiz'],
   Progress: ['Progress'],
@@ -90,11 +90,11 @@ export function topicsFor(screen, st = {}) {
   switch (screen) {
     case S.MENU: return SECTION_TOPICS[st.section] || ['The list', 'The sheet'];
     case S.SHEET: return ['The sheet'];
-    case S.MAP: return ['The map', 'Path', 'Review', 'The sheet'];
+    case S.MAP: return ['The map', 'Learning Path', 'Review', 'The sheet'];
     case S.HOME: return ['The list', 'The sheet'];
     case S.TOUR: return ['The pads', 'Colours'];
     case S.WELCOME: case S.TIP: return ['The list'];
-    case S.CARD: return ['Path'];
+    case S.CARD: return ['Learning Path'];
     case S.READY: case S.RUNNING: {
       const out = ['Playing'];
       if (st.untimed) out.push('Own pace (L0)');

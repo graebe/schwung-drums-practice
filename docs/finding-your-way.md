@@ -27,9 +27,9 @@ go on.
    ```
 
 3. **New to drums?** — turn the jog to pick, click to go on:
-   - **From the start** puts the path at its first stage and opens the **Path**'s map, your
+   - **From the start** puts the path at its first stage and opens the **Learning Path**'s map, your
      avatar on the first island. Press **PLAY** and your first lesson begins.
-   - **I already play** opens the **Path** — the map — with a tip: *Know a stage already? SHIFT+CLICK a stage,
+   - **I already play** opens the **Learning Path** — the map — with a tip: *Know a stage already? SHIFT+CLICK a stage,
      then Test out: checkpoint. Pass it and the path moves on.* See
      [Skipping what you already know](#skipping-what-you-already-know) below.
 
@@ -44,7 +44,7 @@ Everything starts from home: five circles, one per section, each with its pictur
 ```
  DRUMS
   (flag) (drum) ( ? ) (bars) (gear)    <- the chosen one filled and bigger
-                Path                   <- its name
+             Learning Path             <- its name
              JOG choose                <- the hint line
 ```
 
@@ -56,11 +56,11 @@ Back out of it.
 
 | Circle | What is in it |
 | --- | --- |
-| **Path** | the course, as a map: seven stages from *0 Hello, kit* to *6 Pro* (see [The map](#the-map)); PLAY there is Continue |
+| **Learning Path** | the course, as a map: seven stages from *0 Hello, kit* to *6 Pro* (see [The map](#the-map)); PLAY there is Continue |
 | **Practice** | the free library: **Subdivisions**, **Grooves** by style, **Rudiments** by family, **Random** |
 | **Quiz** | five ear and reading drills |
 | **Progress** | how far you have got: overall, per track, and every drill you played |
-| **Settings** | **Path**, **Practice**, **Sound**, **Pads**, **MIDI**, **Help** |
+| **Settings** | **Learning Path**, **Practice**, **Sound**, **Pads**, **MIDI**, **Help** |
 
 Inside a section everything is a list, four rows at a time with the keys under them: **Click**
 opens a row, **Back** goes up one level. The hint line says so: `CLICK open  BACK up`.
@@ -88,7 +88,7 @@ back.
 
 ## Continue: your one button
 
-**Continue** lives in the Path: on its map it is **PLAY**, and in the Path as a list it is the
+**Continue** lives in the Learning Path: on its map it is **PLAY**, and in the Learning Path as a list it is the
 first row, which says what it will open: `Continue   Quarters`. A long name that does not fit shows
 only its rung — `Continue   L0` for *First beat L0* — and the title bar names the whole step while
 the cursor is on the row: `FIRST BEAT L0`. Press it and
@@ -97,11 +97,11 @@ asks for. When you are done, **Click** on the result goes on to the next step.
 
 What you have learned comes back now and then to keep it fresh. When something is due, the row says
 so — `Review   Flam tap` — and Continue alternates: one review, then one new step, then a review
-again. Everything due today is also in **Path › Review**.
+again. Everything due today is also in **Learning Path › Review**.
 
 Example: a first session.
 
-1. Open **Path** and press **PLAY** (Continue) — `0 Hello, kit` introduces itself on a card. Click.
+1. Open **Learning Path** and press **PLAY** (Continue) — `0 Hello, kit` introduces itself on a card. Click.
 2. **Meet the pads**: each drum of your layout in turn, its name on screen, its pads pulsing on both
    halves, its sound once. Strike a pulsing pad to meet the next; another pad is only named, the jog
    skips, **PLAY** sounds it again, **Back** leaves without counting it. At the end, **Click** goes on.
@@ -109,9 +109,9 @@ Example: a first session.
 4. **REC** plays the drill and scores you; **PLAY** lets you listen first.
 5. On the result, **Click** goes on to the next step. **Back** goes back to the list.
 
-## The Path
+## The Learning Path
 
-Open **Path** and you see the seven stages. The one you are in is marked `▸`, a finished one ✓, and
+Open **Learning Path** and you see the seven stages. The one you are in is marked `▸`, a finished one ✓, and
 a stage you have played in shows `3/12` — steps learned out of all.
 
 Open a stage and its places are listed in the order a lesson takes them:
@@ -132,7 +132,7 @@ tap from Practice › Rudiments and the step that asks for it is done.
 
 ## The map
 
-**Path** opens as a map: the sea, with an island for each stage and a dotted route between them.
+**Learning Path** opens as a map: the sea, with an island for each stage and a dotted route between them.
 The screen is the pad grid — each island sits right above its pad — and the pads of the places are
 lit, so *lit means you can go there*:
 
@@ -172,7 +172,7 @@ a list again until you leave it, and BACK returns to the map. That is also where
 row after the stages while something is due — it is no island. **MENU** on the map explains it, with
 the lesson card of the place you stand on.
 
-Example: to go straight to the Grooves of stage 2 — open **Path**, press the pad lit under island 2,
+Example: to go straight to the Grooves of stage 2 — open **Learning Path**, press the pad lit under island 2,
 press it again, then press the Grooves place's pad twice.
 
 ## The action sheet: options for a row
@@ -190,7 +190,7 @@ shown, and **Settings...** is always last:
 | **Lessons** | a stage with cards | its lesson cards |
 | **Practise: Ladder** | a drill with a tempo | climbs from 70% of its tempo, a rung at a time |
 | **Practise: Clock** | a drill with a tempo | the click drops out and you keep the time |
-| **Show as list** / **Show as map** | the Path and its stages | the map's folder as a list, and back |
+| **Show as list** / **Show as map** | the Learning Path and its stages | the map's folder as a list, and back |
 | **Settings...** | every row | the Settings folder; Back comes back here |
 
 Turn the jog to choose, **CLICK** to do it, **BACK** to close the sheet without doing anything.
@@ -199,11 +199,11 @@ Turn the jog to choose, **CLICK** to do it, **BACK** to close the sheet without 
 
 You can play already? Test out instead of working through what you know:
 
-1. Open **Path**, turn to the stage you think you know, and **SHIFT+CLICK** it.
+1. Open **Learning Path**, turn to the stage you think you know, and **SHIFT+CLICK** it.
 2. Choose **Test out: checkpoint**. The stage's checkpoint opens — a piece of music, not a list.
 3. Play it clean. The stage is through, and Continue moves on to the next one.
 
-Just one step in your way? Show the Path as a list, **SHIFT+CLICK Continue** and choose **I know
+Just one step in your way? Show the Learning Path as a list, **SHIFT+CLICK Continue** and choose **I know
 this: skip**.
 
 ### The Ladder and the Clock
@@ -218,14 +218,14 @@ A groove — Rock backbeat, First beat — is one row. Open it and you are on it
 the controls on the left of the box and its **LEVEL** on the right: **L0** at your own pace, then
 **L1** cymbals only, **L2** + kick, **L3** + snare, **L4** everything. **Turn the jog** to change
 it; the arrows show where you can still go, and a tick that the level is learned. A groove opens on
-the first level you have not learned. On the Path the jog walks only the levels the stage asks for.
+the first level you have not learned. On the Learning Path the jog walks only the levels the stage asks for.
 **Click** on a result goes on to the next level.
 
 ## MENU: help, anywhere
 
 Press **MENU** on any screen and it explains that screen first: what it is, its keys — the same
 ones as its hint line, and Shift's. Under a *More help* line follows the manual's help that belongs
-to it; the count in the corner (`1/40`) says how far there is to scroll. On a row of the Path it adds that
+to it; the count in the corner (`1/40`) says how far there is to scroll. On a row of the Learning Path it adds that
 stage's or step's lesson card, so the *why* of a step is one press away. Turn the jog to scroll,
 **BACK** or **MENU** to close. In a drill, the take pauses while you read.
 
@@ -248,7 +248,7 @@ Click or Back and it is gone. *Settings › Help › Show tips again* brings the
 
 | Group | Holds |
 | --- | --- |
-| **Path** | what Continue offers: Tracks and Styles on or off, Rungs `full` or `short`, Start at, Intros |
+| **Learning Path** | what Continue offers: Tracks and Styles on or off, Rungs `full` or `short`, Start at, Intros |
 | **Practice** | tempo, speed, reading, how strictly you are judged, Study, Guide pads, the Ladder and the Clock |
 | **Sound** | the click, and latency |
 | **Pads** | the pad layout, Flip, and the Pad map |
@@ -261,5 +261,5 @@ CLICK** opens every setting at once over the drill, and the same again takes you
 ## Lost?
 
 Press **MENU**. It always tells you where you are and which keys work. **BACK** always goes one
-level up — press it a few times and you are home; open **Path** and **PLAY** knows what to do
+level up — press it a few times and you are home; open **Learning Path** and **PLAY** knows what to do
 next.

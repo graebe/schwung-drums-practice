@@ -27,15 +27,17 @@
         "JOG chooses, CLICK",
         "or its pad opens.",
         "",
-        "Path      the stages",
+        "Learning Path",
+        "          the stages",
         "Practice  all drills",
         "Quiz      ear drills",
         "Progress  how far",
         "Settings  your setup",
         "",
-        "PLAY on the Path map",
-        "is Continue: the",
-        "next step.",
+        "PLAY on the Learning",
+        "Path's map is",
+        "Continue: the next",
+        "step.",
         "",
         "CLICK opens, BACK",
         "goes up. MENU is",
@@ -168,7 +170,8 @@
         "both halves, BACK",
         "saves.",
         "",
-        "New to them? Path >",
+        "New to them?",
+        "Learning Path >",
         "0 Hello, kit > Ear >",
         "Meet the pads shows",
         "each one."
@@ -264,13 +267,14 @@
     {
       "title": "The map",
       "lines": [
-        "Path shows a map: an",
-        "island per stage. On",
-        "an island, a place",
-        "per part: the hut is",
-        "its lessons, a cove",
-        "its electives, the",
-        "fort its checkpoint.",
+        "The Learning Path is",
+        "a map: an island per",
+        "stage. On an island,",
+        "a place per part:",
+        "the hut is its",
+        "lessons, a cove its",
+        "electives, the fort",
+        "its checkpoint.",
         "",
         "PAD    walk there,",
         "       again: go in",
@@ -289,7 +293,7 @@
       ]
     },
     {
-      "title": "Path",
+      "title": "Learning Path",
       "lines": [
         "Seven stages, first",
         "beat to pro. In",
@@ -312,10 +316,10 @@
         "skip it, start the",
         "path there, or Test",
         "out: checkpoint.",
-        "Settings > Path:",
-        "tracks, styles,",
-        "rungs, start,",
-        "intros."
+        "Settings > Learning",
+        "Path: tracks,",
+        "styles, rungs,",
+        "start, intros."
       ]
     },
     {
@@ -438,7 +442,8 @@
     {
       "title": "Settings",
       "lines": [
-        "Path      what",
+        "Learning Path",
+        "          what",
         "          Continue",
         "          offers",
         "Practice  tempo,",

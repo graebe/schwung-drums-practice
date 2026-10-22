@@ -2,7 +2,7 @@
 # Drums Practice — the curriculum
 
 From your first beat to pro rhythms, on Move's pads with two hands. This page is the plan of the
-Path: how it is built, what every step asks and why, and what is still to come. The README says
+Learning Path: how it is built, what every step asks and why, and what is still to come. The README says
 how to use the module, and [Finding your way](finding-your-way.md) how to get about it; this says
 how the course is meant to teach.
 
@@ -28,9 +28,9 @@ hands, dynamics, time and the ear.
 - Each **stage** ends on a **checkpoint**, a piece of music. Pass it and the next stage opens —
   you can take it at any time, which is how someone who can already play tests out of a stage.
 - Before a new idea comes a **lesson card**: a screen or two on what it is and where you hear it.
-  Click starts the practice, read or not; *Settings › Path › Intros* turns them to `always` or
+  Click starts the practice, read or not; *Settings › Learning Path › Intros* turns them to `always` or
   `off`, and every stage's **Lessons** row shows them again — as does **Menu** on a row of the path.
-- **Settings › Path** decides what Continue offers: tracks and styles on or off, the full ladder of
+- **Settings › Learning Path** decides what Continue offers: tracks and styles on or off, the full ladder of
   a groove or only L0 and its top rung, and the stage to start at.
 - Stuck? After three takes that did not count the result suggests an easier way in (Speed down,
   or L0); after six the step is parked for a day and Continue offers something else.
@@ -413,7 +413,7 @@ opened outside the path show none — the library is free play.
 
 **Skipping is one press.** On a card: **Click** = start (to the Ready screen, card marked seen);
 **Jog** = next/previous page; **Play** = hear the drill (goes to Ready and listens — the same
-"Play listens" as everywhere); **Back** = out to the list. *Settings › Path › Intros*: `new`
+"Play listens" as everywhere); **Back** = out to the list. *Settings › Learning Path › Intros*: `new`
 (default, each card once) / `always` / `off`. Each stage folder opens on a **Lessons** row listing
 its cards to re-read at any time, and a stage's action sheet offers them too.
 
@@ -498,7 +498,7 @@ Skip next exists; a higher rung ticks the lower ones; Click goes on even after a
 - Switching track from a result meant Menu → Learning Path → the track.
 
 **Now:**
-1. **Settings › Path** (a group of the Settings folder, the last row of the list):
+1. **Settings › Learning Path** (a group of the Settings folder, the last row of the list):
    - **Tracks** — Time / Hands / Grooves / Ear on/off (at least one stays on).
    - **Styles** — Rock & Pop / Funk / Latin / Jazz / Electronic / Techno on/off; decides which
      electives Continue offers and the Pick: groove pool. Core steps stay (a stage's idea is

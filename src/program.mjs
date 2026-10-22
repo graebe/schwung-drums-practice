@@ -800,7 +800,7 @@ const pref = (label, group, key) => ({ label, value: '', prefRow: true, group, k
  */
 export function pathSettingsFolder(styles = []) {
   return {
-    label: 'Path',
+    label: 'Learning Path',
     value: '>',
     untracked: true,
     children: [
@@ -835,7 +835,7 @@ export function programFolder(program, reviewRows = () => []) {
     },
   };
   return {
-    label: 'Path',
+    label: 'Learning Path',
     value: '>',
     /* Its rows point back into the tree rather than holding drills. */
     pointers: true,
