@@ -62,7 +62,7 @@ fingers, in the same way its sister module is a reading trainer rather than a pi
   over time.
 - **Knows how far you have got.** Every drill shows your best **clean speed** — 80% means you can
   play it clean at 80% of its written tempo — and a tick once you can play it clean at tempo. A
-  **Learning Path** walks you through time, rudiments, grooves and ear training side by side, and
+  **Learning Path** walks you through seven stages, time, hands, grooves and ear side by side, and
   **Repetition** brings back what you learned on a schedule, so it stays learned.
 - **Sounds like a kit, with no setup** — the module renders its own drums and its own click and
   mixes them into Move's audio. No track, no instrument, no MIDI channel to match.
@@ -443,30 +443,60 @@ right here. **90%** is learned.
 
 ### The Learning Path
 
-Second in the list, after Basics. It does not hold drills of its own: every step is a row from
-elsewhere in the tree, so **a take anywhere counts** — learn the flam tap from Rudiments › Flams and
-its step on the path is learned too. Nothing is locked; the path only recommends.
+Second in the list, after Basics: a course from your first beat to pro rhythms, in **seven stages**.
+It does not hold drills of its own — every step is a row from elsewhere in the tree, so **a take
+anywhere counts**: play the flam tap from Rudiments › Flams at the tempo a step asks and the step is
+done. Nothing is locked; the path only recommends. The whole plan, step by step and why, is in
+[docs/curriculum.md](docs/curriculum.md).
 
-Four tracks run side by side, because time, hands, grooves and ears are different skills and a
-session that mixes them beats one that grinds a single list:
-
-| Track | Steps |
+| Stage | The world it opens |
 | --- | --- |
-| **Time** | quarters and eighths; triplets, sixteenths, sextuplets and switching between them; reading 8ths and 16ths and random sticking; then the **Clock** on quarters — keep time with the click gone |
-| **Rudiments** | all forty, in the order a teacher brings them in rather than by family: singles and doubles, the short rolls, flams, drags, the paradiddles, the long rolls, then the compound flams and drags |
-| **Grooves** | every groove, family by family from rock to techno, the plainest of each first, and every groove rung by rung, L0 to L4 |
-| **Ear** | name the drum — reading it, hearing it, picking it — then the subdivision, then the groove |
+| **0 Hello, kit** | the three drums of a beat, the pulse, rests — and your first beat, in session one |
+| **1 Eighth notes** | 1 & 2 &, off-beats, kicks on the "&", the open hat, a phrase and keeping time alone |
+| **2 Sixteenths** | 1 e & a, accents and ghost notes on purpose, the first rudiments, house and funk |
+| **3 Ghosts & flams** | ghost-note grooves, reading a kick line under steady hands, flams and drags |
+| **4 Triplets/swing** | triplets, the shuffle, swing, 6/8 and 12/8, the jazz ride with the click on 2 and 4 |
+| **5 Clave & world** | the clave, 3 over 2, bossa, samba, songo, mozambique, the long rolls |
+| **6 Pro** | odd meters, groupings, displacement, feel on purpose, pro tempos |
+
+Inside a stage four **tracks** run side by side, because time, hands, grooves and ears are different
+skills and a session that mixes them beats one that grinds a single list: **Time** (pulse, reading,
+the Clock), **Hands** (hand patterns, rudiments, dynamics), **Grooves** (beats rung by rung, fills,
+phrases) and **Ear**. Continue only recommends the stage you are in, so the tracks stay in step:
+what the hands are asked, the ears and eyes have been given.
+
+A step asks for its drill at a **target** — a share of its written tempo — and opening it sets
+**Speed** to that, so 100% of what the step asks is what you are armed at. A drill new to you
+arrives slow, 60–85%, and comes back faster in a later stage; the row reads `45/60`, your best
+against the target, until it is done. A stage has a **core** (the steps that teach its idea, one new
+thing each), **Electives** (more of the same idea in other styles, never required) and a
+**Checkpoint**: a piece of music that proves the stage. Pass the checkpoint and the stage is
+through, whatever else is open — take it at any time to test out. Closing every core step does it
+too.
 
 | Row | Does |
 | --- | --- |
-| **Continue** | opens the next step of the track you have left longest, so a session walks Time, Rudiments, Grooves and Ear in turn |
-| **Skip next** | passes that step by; it stays playable and still gets its tick if you play it later |
-| a track | its units and steps, with the next one marked `▸` |
+| **Continue** | opens the next step of the current stage, from the track you have left longest |
+| **Skip next** | passes that step by; it stays playable and still counts if you play it later |
+| **Your path** | what Continue offers: **Tracks** and **Styles** on or off, **Rungs** `full` or `short` (L0 and the top rung only), **Start at** a stage, **Intros** `new`/`always`/`off` |
+| a stage | its Checkpoint, its **Lessons**, its tracks and Electives — the current stage marked `▸`, a finished one ✓ |
 | **Repetition** | what is due today |
 
-Opening a generated drill from the path sets **Tempo** to its target, so Speed 100% is exactly what
-the step asks for. Click on a result goes on to the next step of the same track — even when the take
-was not good enough yet, so you are never stuck on one drill; Record plays it again.
+Every folder of the path starts with its own **Skip next** and **Skip all here**; once everything in
+it is skipped the row reads **Unskip all here** and takes the skips back. A switched-off style
+leaves the core of every stage (its checkpoint swaps to an alternative), and never empties one.
+
+**Lesson cards.** Before a new idea comes a card — a screen or two on what it is, where you hear it
+and what to listen for: what a ghost note is, why the clave leans. **Click** starts the practice,
+read or not; the **jog** turns a card's pages; **Play** skips the reading and plays the practice to
+you; **Back** returns to the list. Each card shows once (Intros `new`), and a stage's **Lessons** row
+shows them all again.
+
+**Stuck?** After three takes of a step in a row that did not count, the result suggests the easier
+way in — `stuck? knob 8 slower`, or `stuck? try L0` on a groove. After six the step is **parked** for
+a day (`~` in its row) and Continue offers something else; a plateau is met by coming back tomorrow.
+Click on a result goes on to the next step even when the take did not count, so you are never stuck
+on one drill; Record plays it again.
 
 A groove learned at a higher level ticks the levels below it: if you can play everything, you can
 play the cymbals alone — and you know its notes, which is all L0 asks. Someone who can already play
@@ -489,7 +519,7 @@ The last row of the list, laid out as Piano Practice's is:
 | Row | Opens |
 | --- | --- |
 | **Overall** | every drill on the Learning Path you have learned, as a line along real time that steps up at each tick — flat stretches are weeks off, steep ones are where it clicked |
-| **Time**, **Rudiments**, **Grooves**, **Ear** | the same for one track |
+| **Time**, **Hands**, **Grooves**, **Ear** | the same for one track |
 | a drill | its takes: the chart the result draws, with your best and at what tempo, and how many takes |
 
 Drills come most recent first, with their mark and best clean speed. Once a chart is open the jog
@@ -505,7 +535,7 @@ The list is a tree. **Click** opens a folder, **Back** goes up one, and Back at 
 
 ```
 Basics      Subdivisions · Random (reading 8ths/16ths, sticking, groove variation — fresh each time)
-Learning    Continue · Skip next · Time · Rudiments · Grooves · Ear · Repetition
+Learning    Continue · Skip next · Your path · 0 Hello, kit … 6 Pro · Repetition
  Path
 Grooves     Rock & Pop · Funk & Soul · Latin & World · Jazz & Swing · Electronic · Techno
 Rudiments   Rolls · Diddles · Flams · Drags          (the PAS forty)
