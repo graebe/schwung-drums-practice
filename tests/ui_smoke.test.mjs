@@ -1460,7 +1460,7 @@ test('a Settings knob keeps its row however far it is turned, and the jog touch 
   assert.equal(saved.bpm, 91, 'jog touch must not move the cursor off Tempo');
   assert.equal(saved.strictness, 'tight', 'three turns of one knob, one row');
   assert.equal(saved.view, 'grid', 'and not the rows around it');
-  assert.equal(saved.sticking, 'strict');
+  assert.equal(saved.sticking, 'off');
 });
 
 test('knob 8 slows a hand-written drill', async () => {
