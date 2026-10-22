@@ -62,6 +62,9 @@ const MODULE_DIR = '/data/UserData/schwung/modules/tools/drums-practice';
 const SETTINGS_PATH = `${MODULE_DIR}/settings.json`;
 /* The Custom pad layout (pads_io.mjs). */
 const PADS_PATH = `${MODULE_DIR}/pads.json`;
+/* Its second copy, as for stats and progress below: the host's write empties
+ * the file before it fills it, so a save cut short leaves the other whole. */
+const PADS_BAK_PATH = `${MODULE_DIR}/pads.bak.json`;
 const STATS_PATH = `${MODULE_DIR}/stats.json`;
 /* A second copy, written after the first: the host has no rename, so a save
  * cut short by the power going leaves one of the two whole. */
@@ -2176,17 +2179,23 @@ function padMapClick() {
 
 function savePads() {
   if (!pm.edited || !customPads) return;
-  if (writeFile(PADS_PATH, PIO.serialisePads(customPads))) pm.edited = false;
+  const text = PIO.serialisePads(customPads);
+  if (!writeFile(PADS_PATH, text)) return;
+  pm.edited = false;
+  writeFile(PADS_BAK_PATH, text);
 }
 
 function padMapSelected() {
   return screen === PADMAP ? PMS.selectedPads(pm, padMapView()) : null;
 }
 
+/* The Custom layout from pads.json or, when that is empty or will not read —
+ * a save cut short — from its backup. */
 function loadPads() {
-  const r = PIO.readPads(readFile(PADS_PATH));
-  customPads = r.custom;
-  if (!r.ok) {
+  const main = PIO.readPads(readFile(PADS_PATH));
+  const r = main.custom ? main : PIO.readPads(readFile(PADS_BAK_PATH));
+  customPads = r.custom || main.custom;
+  if (!r.custom && !(main.ok && r.ok)) {
     menuNote = 'BAD PADS.JSON';
     menuNoteUntil = now() + 8000;
     announce('pads.json would not read: Custom is MPC Classic until it is saved again.');

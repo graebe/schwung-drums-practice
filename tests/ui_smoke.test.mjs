@@ -1850,6 +1850,8 @@ test('Click on a preset makes Custom a copy of it; an edit lands on both halves;
   assert.deepEqual(saved.rows[3].split(' ').slice(0, 1), ['K2']);
   assert.equal(saved.rows[3].split(' ')[4], 'K2', 'and its twin under the right hand');
   assert.equal(JSON.parse(log.writes[SETTINGS_FILE]).layout, 'custom');
+  assert.equal(log.writes['/data/UserData/schwung/modules/tools/drums-practice/pads.bak.json'],
+    log.writes['/data/UserData/schwung/modules/tools/drums-practice/pads.json'], 'and its backup');
 });
 
 test('a Custom edit survives closing straight from the Pad map', async () => {
@@ -1903,6 +1905,19 @@ test('a Custom from pads.json is what the pads play; a broken one is said and fa
   pad(68, 100); pad(68, 0);
   globalThis.tick();
   assert.equal(loaded.log.params.slice(before).filter(isHit)[0][1], '36:100', 'MPC Classic until it is saved');
+});
+
+test('a pads.json emptied by a save cut short is read from its backup, unannounced', async () => {
+  const rows = ['CR CR CR CR CR CR CR CR', 'HH HH HH HH HH HH HH HH', 'SN SN SN SN SN SN SN SN', 'SH KK KK KK KK KK KK KK'];
+  const loaded = await loadUi({ settings: { layout: 'custom' },
+    dataFiles: { 'pads.json': '', 'pads.bak.json': JSON.stringify({ version: 1, pair: 'twin', rows }) } });
+  globalThis.init();
+  ticks(2);
+  assert.ok(!drawnText(1).includes('BAD PADS.JSON'), drawnText(1).join('|'));
+  const before = loaded.log.params.length;
+  pad(68, 100); pad(68, 0);
+  globalThis.tick();
+  assert.equal(loaded.log.params.slice(before).filter(isHit)[0][1], '70:100', 'the backup\'s shaker');
 });
 
 test('Flip puts the kick under the left hand\'s right finger', async () => {
