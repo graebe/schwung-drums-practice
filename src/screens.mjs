@@ -185,6 +185,26 @@ export function drawNote(ctx, x, y, note) {
   ctx.text(tx, y, fit(ctx, note.text || '', L.SCREEN_W - tx - 1), 1);
 }
 
+/* ---- Lesson card -------------------------------------------------------- */
+/*
+ * A short explanation before a practice (lessons.mjs): its title over a rule,
+ * a page of text, and how to go on. `n/m` says there is more to read; the
+ * footer says Click starts, so reading is never the price of playing.
+ *
+ * s = { title, lines, page, pages, footer }
+ */
+export const CARD_TEXT_Y = 10;
+
+export function drawCard(ctx, s) {
+  ctx.clear();
+  const pages = s.pages || 1;
+  drawTitle(ctx, s.title || '', pages > 1 ? `${(s.page || 0) + 1}/${pages}` : '', null);
+  const lines = s.lines || [];
+  for (let i = 0; i < lines.length; i++) ctx.text(1, CARD_TEXT_Y + i * L.TEXT_H, lines[i], 1);
+  const foot = fit(ctx, s.footer || 'CLICK start', L.SCREEN_W - 2);
+  ctx.text((L.SCREEN_W - ctx.textWidth(foot)) >> 1, L.SCREEN_H - L.TEXT_H, foot, 1);
+}
+
 /* ---- Ladder ------------------------------------------------------------- */
 export function drawLadder(ctx, s) {
   ctx.clear();

@@ -47,6 +47,7 @@ import * as Q from './guess.mjs';
 import * as AP from './answer_pads.mjs';
 import * as PROG from './progress.mjs';
 import * as PLAN from './program.mjs';
+import * as LES from './lessons.mjs';
 import * as UT from './untimed.mjs';
 import { availableLevels, LEVEL_ID_RE, isUntimedId } from './levels.mjs';
 import { paint, flashColor, guideTargets, FLASH_MS } from './led_paint.mjs';
@@ -88,6 +89,7 @@ const PROGRESS = 'progress';
 const PROGRESS_ITEM = 'progressItem';
 const SETTINGS = 'settings';
 const ERROR = 'error';
+const CARD = 'card';
 
 /* MIDI out routes. */
 const OUT_TRACK = 1;
@@ -216,15 +218,23 @@ let progress = PROG.emptyProgress();
 let progressDirty = false;
 /* Folder sums over the tree, cached by folder against progress.rev. */
 const agg = PROG.createAggregator();
-/* The Learning Path's tracks, every leaf by item id, and what each item is
+/* The Learning Path's stages, every leaf by item id, and what each item is
  * called on its own — all made with the tree, once. */
-let tracks = [];
+let program = { stages: [], tracks: [] };
 let pathNode = null;
 let leafIdx = new Map();
 let itemNames = new Map();
-/* The track the armed drill was opened from on the Learning Path, so Click on
- * its result goes on along that track; null when it came from anywhere else. */
-let pathTrack = null;
+/* The step of the Learning Path the armed drill was opened as, so Click on
+ * its result goes on along the path; null when it came from anywhere else. */
+let pathStep = null;
+/* The lesson cards (lessons.json), and the ones on screen:
+ * { ids, at, page, pages, then } — `then` is what Click goes on to once the
+ * last is read, null when they were opened from Lessons to read again. */
+let lessons = new Map();
+let card = null;
+/* How stuck the learner is on that step, for the result's footer (program.mjs
+ * stuckLevel): 0, 1 suggest an easier way in, 2 parked for a day. */
+let stuckNow = 0;
 /* What the take just did to the drill's progress, for the result screens. */
 let progressNote = null;
 let settingsDirty = false;
@@ -641,7 +651,7 @@ function rebuildProgress(always = false) {
 function itemOfRecord(rec) {
   const parts = String(rec.d).split(':');
   const kind = parts[0];
-  if (kind === 'guess' || kind === 'hear' || kind === 'pick') return `quiz:${parts[0]}:${parts[1]}`;
+  if (kind === 'guess' || kind === 'hear' || kind === 'pick') return `quiz:${parts.slice(0, 3).join(':')}`;
   if (kind === 'clock') return CAT.CLOCK_ID;
   if (kind !== 'drill' && kind !== 'ladder' && kind !== 'untimed') return null;
   let end = parts.length;
@@ -742,8 +752,21 @@ function loadManifest(path) {
  * anyway, and doing it now keeps that work out of the frames that follow.
  */
 function rebuildMenu() {
-  tracks = PLAN.buildProgram({ entries: fileEntries, categories: fileCategories });
-  pathNode = PLAN.programFolder(tracks, repetitionRows);
+  itemNames = namesOfItems();
+  program = PLAN.buildProgram({
+    entries: fileEntries,
+    categories: fileCategories,
+    has: (id) => itemNames.has(id) && id.indexOf('quiz:') !== 0,
+    label: itemTitle,
+  });
+  /* A pooled quiz is an item of its own, named by its step. */
+  for (const stage of program.stages) {
+    for (const st of PLAN.coreSteps(stage).concat(PLAN.electiveSteps(stage))) {
+      if (st.quiz) itemNames.set(st.id, st.label);
+    }
+  }
+  pathNode = PLAN.programFolder(program, repetitionRows,
+    fileCategories.filter((c) => c.folder === 'Grooves'));
   catalog = CAT.drumsTree({
     entries: fileEntries,
     categories: fileCategories,
@@ -754,7 +777,6 @@ function rebuildMenu() {
   });
   nav = CAT.navStart(catalog);
   leafIdx = CAT.leafIndex(catalog);
-  itemNames = namesOfItems();
   PROG.resetShape(agg);
   rowsNode = null;
 }
@@ -1306,7 +1328,7 @@ function resultOf(whole, { t, st, verdict, eased, dyn }) {
     dyn: dyn.score,
     dynAdvice: dyn.score >= 0 && dyn.score < PROG.DYN_GOOD ? PROG.dynamicsAdvice(st) : '',
     series: PROG.percentSeries(it ? it.h : [], box.w - 2, box.h - 2),
-    footer: clockMode && !pathTrack ? 'REC again  BACK start' : 'REC again  CLICK next',
+    footer: stuckFooter() || (clockMode && !pathStep ? 'REC again  BACK start' : 'REC again  CLICK next'),
   };
 }
 
@@ -1363,6 +1385,29 @@ function recordProgress(take) {
   saveProgress();
   takeLearned = r.learned;
   progressNote = noteFor(r, take.clean ? speed : null, take.reason, take.eased);
+  noteStuck();
+}
+
+/*
+ * Stuck on a step of the path: after a few takes that did not count the
+ * result suggests the easier way in, and after more the path parks the step
+ * for a day and Continue offers something else — a plateau is met by coming
+ * back tomorrow, not by a seventh take tonight.
+ */
+function noteStuck() {
+  stuckNow = 0;
+  if (!pathStep || pathStep.id !== armedItemId()) return;
+  stuckNow = PLAN.stuckLevel(PROG.failStreak(progress, pathStep.id));
+  if (stuckNow === 2 && !PROG.isParked(progress, pathStep.id, Date.now())) {
+    PROG.parkItem(progress, pathStep.id, Date.now());
+    saveProgress();
+  }
+}
+
+function stuckFooter() {
+  if (stuckNow === 2) return 'parked: CLICK other';
+  if (stuckNow === 1) return pathStep && pathStep.rung > 0 ? 'stuck? try L0' : 'stuck? knob 8 slower';
+  return '';
 }
 
 function noteFor(r, value, reason, eased) {
@@ -1698,7 +1743,7 @@ function finishQuiz() {
     sd: 0, mean: 0, n: quiz.correct,
     err: quiz.wrong, at: Date.now() / 1000,
   });
-  const round = PROG.recordRound(progress, `quiz:${quiz.mode}:${quiz.kind}`, {
+  const round = PROG.recordRound(progress, quizItemOf(quiz), {
     correct: quiz.correct, wrong: quiz.wrong, hinted: quiz.hinted, at: Date.now(),
   });
   saveProgress();
@@ -1719,7 +1764,7 @@ function finishQuiz() {
     series,
     isBest,
     note: round.learned ? { mark: PROG.MARK_DONE, text: `learned ${score}%` }
-      : { mark: PROG.isDone(progress, `quiz:${quiz.mode}:${quiz.kind}`) ? PROG.MARK_DONE : null,
+      : { mark: PROG.isDone(progress, quizItemOf(quiz)) ? PROG.MARK_DONE : null,
         text: `score ${score}%` },
   };
   screen = RESULT;
@@ -1735,31 +1780,90 @@ function openRow() {
     return;
   }
   if (item.continueRow) {
-    const next = PLAN.continueStep(progress, tracks);
-    if (next) openStep(next.step, next.track);
+    const next = PLAN.continueStep(progress, program);
+    if (next) openPathStep(next.step);
     else announce('Everything on the path is learned.');
     return;
   }
+  if (item.lessonsRow) {
+    const st = item.stage;
+    const ids = LES.stageCards(lessons, st, PLAN.coreSteps(st).concat(PLAN.checkpointSteps(st)));
+    if (ids.length) showCards(ids, null);
+    return;
+  }
   if (item.skipRow) {
-    const next = PLAN.continueStep(progress, tracks);
+    const next = skipTarget(item);
     if (!next) return;
-    PROG.skipItem(progress, next.step.id, Date.now());
+    PROG.skipItem(progress, next.id, Date.now());
     saveProgress();
-    announce(`Skipped ${PLAN.stepTitle(next.step)}`);
+    announce(`Skipped ${PLAN.stepTitle(next)}`);
+    return;
+  }
+  if (item.skipAllRow) {
+    skipAll(item.scope);
+    return;
+  }
+  if (item.prefRow) {
+    turnPref(item);
     return;
   }
   if (item.step) {
-    openStep(item.step, openTrack() || PLAN.trackOf(tracks, item.step.id));
+    openPathStep(item.step);
     return;
   }
-  pathTrack = null;
+  pathStep = null;
   if (item.repId) {
-    const step = PLAN.findStep(tracks, item.repId);
-    if (step) openStep(step, null);
-    else if (leafIdx.get(item.repId)) openLeaf(leafIdx.get(item.repId));
+    if (leafIdx.get(item.repId)) openLeaf(leafIdx.get(item.repId));
     return;
   }
   openLeaf(item);
+}
+
+/* What a "Skip" row skips: the next open step of its folder, or, at the top
+ * of the path, the step Continue would open. */
+function skipTarget(row) {
+  if (row.scope) return PLAN.nextOpen(progress, row.scope);
+  const next = PLAN.continueStep(progress, program);
+  return next ? next.step : null;
+}
+
+/* Skip every open step of a folder — or, when nothing in it is left to skip,
+ * take the skips back. One row, so it is never more than a click to undo. */
+function skipAll(scope) {
+  const open = scope.filter((st) => !PLAN.stepDone(progress, st) && !PLAN.stepSkipped(progress, st));
+  if (open.length) {
+    for (const st of open) PROG.skipItem(progress, st.id, Date.now());
+    announce(`Skipped ${open.length}`);
+  } else {
+    for (const st of scope) PROG.unskipItem(progress, st.id);
+    announce('Skips taken back');
+  }
+  saveProgress();
+}
+
+/* A row of Your path, turned on by a click: a track or style on or off, the
+ * next value of a choice. */
+function turnPref(row) {
+  const path = progress.path;
+  if (row.group === 'tracks' || row.group === 'styles') {
+    if (!PROG.togglePath(progress, row.group, row.key)) announce('One track stays on');
+  } else if (row.group === 'rungs') {
+    PROG.setPath(progress, 'rungs', path.rungs === 'full' ? 'short' : 'full');
+  } else if (row.group === 'intros') {
+    const i = PROG.INTROS.indexOf(path.intros);
+    PROG.setPath(progress, 'intros', PROG.INTROS[(i + 1) % PROG.INTROS.length]);
+  } else if (row.group === 'start') {
+    PROG.setPath(progress, 'start', ((path.start || 0) + 1) % program.stages.length);
+  }
+  saveProgress();
+}
+
+/* What a Your path row shows as its value. */
+function prefValue(row) {
+  const path = progress.path;
+  if (row.group === 'tracks' || row.group === 'styles') return path[row.group][row.key] ? 'on' : 'off';
+  if (row.group === 'start') return `Stage ${path.start || 0}`;
+  return path[row.group] || '';
 }
 
 /*
@@ -1767,10 +1871,11 @@ function openRow() {
  * picked there — with a generated drill's Tempo set to its target, so 100%
  * Speed is what the step asks for, and the Clock wrapped round its drill.
  */
-function openStep(step, track) {
+function openStep(step) {
+  stuckNow = 0;
   if (step.quiz) {
-    openQuiz(step.quiz);
-    pathTrack = track;
+    openQuiz(step.quiz, step);
+    pathStep = step;
     return;
   }
   const id = step.wrap || step.id;
@@ -1780,8 +1885,12 @@ function openStep(step, track) {
     return;
   }
   const target = PLAN.targetBpm(id);
-  if (target && settings.bpm !== target) {
-    settings.bpm = target;
+  /* The step's target is the Speed it is played at, so 100% of what it asks
+   * is what the take is armed at. L0 has no clock to set. */
+  const speed = isUntimedId(step.id) ? settings.speed : speedFor(step.target);
+  if ((target && settings.bpm !== target) || settings.speed !== speed) {
+    if (target) settings.bpm = target;
+    settings.speed = speed;
     settingsRowsCache = SET.settingsRows(settings);
     saveSettings();
   }
@@ -1791,18 +1900,78 @@ function openStep(step, track) {
     enterReady();
     announce(`Clock: ${chart.name}`);
   }
-  pathTrack = track;
+  pathStep = step;
+}
+
+/*
+ * A step of the path, with the lesson cards it is due first: its stage's
+ * card the first time the stage is entered, then its own. Click on the last
+ * one opens the step, so the cards cost one press, read or not.
+ */
+function openPathStep(step) {
+  const stage = program.stages.find((s) => s.key === step.stage);
+  const due = LES.dueCards(lessons, progress.path, step, stage);
+  if (due.length) showCards(due, () => openStep(step));
+  else openStep(step);
+}
+
+function showCards(ids, then) {
+  card = { ids, at: 0, page: 0, pages: [[]], then };
+  layCard();
+  screen = CARD;
+}
+
+/* The card at `at`, wrapped to the screen in the font it is drawn in. */
+function layCard() {
+  const c = lessons.get(card.ids[card.at]);
+  card.title = c ? c.title : '';
+  card.pages = LES.paginate(LES.wrapText(c ? c.text : '', L.SCREEN_W - 2, (t) => ctx.textWidth(t)));
+  card.page = 0;
+}
+
+/* Click: this card is read; on to the next, or to what the cards stood before. */
+function nextCard() {
+  PROG.markSeen(progress, card.ids[card.at]);
+  saveProgress();
+  if (card.at + 1 < card.ids.length) {
+    card.at++;
+    layCard();
+    return;
+  }
+  const then = card.then;
+  card = null;
+  screen = MENU;
+  if (then) then();
+}
+
+/* Play: the cards are taken as read and the practice is heard at once. */
+function hearFromCard() {
+  if (!card.then) return;
+  for (let i = card.at; i < card.ids.length; i++) PROG.markSeen(progress, card.ids[i]);
+  card.at = card.ids.length - 1;
+  nextCard();
+  if (screen === READY) start(false);
+}
+
+function cardFooter() {
+  if (!card.then) return card.at + 1 < card.ids.length ? 'CLICK next  BACK list' : 'CLICK done';
+  return card.at + 1 < card.ids.length ? 'CLICK next  PLAY hear' : 'CLICK start PLAY hear';
+}
+
+/* A step's target as a Speed the setting offers: its nearest step of five,
+ * inside the setting's range. */
+function speedFor(target) {
+  const v = Math.round((target || 100) / 5) * 5;
+  return Math.max(50, Math.min(120, v));
 }
 
 /* On from a result along the path: the next open step after this one. */
 function goNext() {
-  const at = screen === RESULT && quiz ? `quiz:${quiz.mode}:${quiz.kind}`
-    : clockMode ? CAT.CLOCK_ID : recordIdOf(chart);
-  const next = PLAN.stepAfter(progress, pathTrack, at);
+  const next = PLAN.stepAfter(progress, program, pathStep);
   quiz = null;
   resultCache = null;
   if (next) {
-    openStep(next, pathTrack);
+    openPathStep(next);
     return;
   }
   ladder = null;
@@ -1810,14 +1979,20 @@ function goNext() {
   screen = MENU;
 }
 
-function openQuiz(drill) {
+function openQuiz(drill, step = null) {
   /* Nothing a quiz could be wrapped in: a Clock step before it on the path
    * must not still be armed when the round is over. */
   ladder = null;
   clockMode = false;
+  /* A step of the path asks about what its stage has taught: three drums,
+   * two subdivisions, the grooves you have played. From the Quiz folder, all. */
+  const pool = step && step.pool;
   quiz = Q.createQuiz({
     kind: drill.kind, mode: drill.mode,
-    roundSize: settings.roundSize, charts: grooveCharts(),
+    roundSize: settings.roundSize, charts: step ? pathGrooves() : grooveCharts(),
+    pool: pool && pool.voices ? pool.voices : undefined,
+    subdivs: pool && pool.subdivs ? pool.subdivs : undefined,
+    variant: step ? step.variant || '' : '',
     seed: (Date.now() & 0xffff) || 1,
   });
   quizTitle = (drill.name || '').toUpperCase();
@@ -1896,6 +2071,28 @@ function grooveCharts() {
   return out;
 }
 
+/*
+ * Pick: groove on the Learning Path asks only about grooves you have played,
+ * in the styles you have on: naming a groove you have never heard is a guess,
+ * not ear training. With fewer than three of those there is no fair question,
+ * so it falls back to the styles you have on.
+ */
+const MIN_GROOVE_POOL = 3;
+function pathGrooves() {
+  const styles = progress.path.styles;
+  const all = new Set(grooveCharts());
+  const on = fileEntries.filter((e) => all.has(e.chart) && styles[e.category] !== false);
+  const ids = Object.keys(progress.items).filter((id) => progress.items[id].plays > 0);
+  const played = on.filter((e) => ids.some((id) => id === e.chart.id || id.indexOf(`${e.chart.id}:`) === 0));
+  const use = played.length >= MIN_GROOVE_POOL ? played : on;
+  return use.length >= MIN_GROOVE_POOL ? use.map((e) => e.chart) : grooveCharts();
+}
+
+/* The item a quiz round is filed under: its pooled variant's, when it has one. */
+function quizItemOf(q) {
+  return PLAN.quizItemId({ mode: q.mode, kind: q.kind }, q.variant);
+}
+
 /* The pad layout a press is read in. A drum quiz always uses the kit: in the
  * sticking layout every pad is the snare, and eight of nine prompts could not
  * be answered at all. */
@@ -1912,7 +2109,7 @@ function layoutNow() {
 function openProgress() {
   const all = PROG.summariseIds(progress, overviewIds(null));
   const rows = [{ label: 'Overall', value: `${all.done}/${all.count}`, overview: true, track: null }];
-  for (const t of tracks) {
+  for (const t of program.tracks) {
     const sum = PROG.summariseIds(progress, overviewIds(t));
     rows.push({ label: t.name, value: `${sum.done}/${sum.count}`, overview: true, track: t });
   }
@@ -1928,7 +2125,7 @@ function openProgress() {
 
 /* The steps an overview counts: one track's, or the whole path's. */
 function overviewIds(track) {
-  return track ? PLAN.trackSteps(track).map((st) => st.id) : PROG.leafIds(agg, pathNode);
+  return track ? PLAN.trackIds(program, track.key) : PROG.leafIds(agg, pathNode);
 }
 
 function openProgressRow() {
@@ -2000,6 +2197,7 @@ function leaveToMenu() {
     T.home(tp);
   }
   untimed = null;
+  card = null;
   screen = MENU;
   settingsEditing = false;
   quiz = null;
@@ -2021,6 +2219,7 @@ function back() {
   if ((screen === SUMMARY || screen === LADDER) && chart) { restart(); return true; }
   /* Up one folder; only the top of the tree is left by Back. */
   if (screen === MENU) return CAT.navPop(nav);
+  if (screen === CARD) { card = null; screen = MENU; return true; }
   if (screen === PROGRESS_ITEM) { screen = PROGRESS; return true; }
   /* Back from a run RESTARTS it. Back again lands on READY, whose own Back
    * goes to the list — so leaving needs no gesture of its own. */
@@ -2132,36 +2331,52 @@ function menuRows(node) {
 }
 
 function decoratedRows(node) {
-  const track = openTrack();
-  const next = track ? PLAN.nextStep(progress, track) : null;
+  /* Inside the Learning Path, the step Continue would open is marked ▸. */
+  const inPath = nav.some((n) => n.node === pathNode);
+  const next = inPath ? PLAN.continueStep(progress, program) : null;
+  const stage = inPath ? PLAN.currentStage(progress, program) : null;
   const kids = node.children;
   const out = new Array(kids.length);
-  for (let i = 0; i < kids.length; i++) out[i] = decorateRow(kids[i], next ? next.id : '');
+  for (let i = 0; i < kids.length; i++) {
+    out[i] = decorateRow(kids[i], next ? next.step.key : '', stage);
+  }
   return out;
-}
-
-/* The Learning Path track the list is inside, if it is inside one. */
-function openTrack() {
-  for (let i = nav.length - 1; i >= 0; i--) if (nav[i].node.track) return nav[i].node.track;
-  return null;
 }
 
 /*
  * What a row says about your progress, decided here rather than in the tree:
  * the tree holds what the drills ARE, not how far you have got with them.
  */
-function decorateRow(row, nextId) {
+function decorateRow(row, nextKey, current) {
   const plain = { label: row.label, value: row.value || '', mark: row.mark || null };
   if (row.continueRow) {
-    const next = PLAN.continueStep(progress, tracks);
+    const next = PLAN.continueStep(progress, program);
     return next
       ? { label: `Next: ${PLAN.stepTitle(next.step)}`, value: '', mark: PROG.MARK_NEXT }
       : { label: 'All learned', value: '', mark: PROG.MARK_DONE };
   }
   if (row.skipRow) {
-    const next = PLAN.continueStep(progress, tracks);
-    return { label: next ? `Skip: ${PLAN.stepTitle(next.step)}` : 'Skip: nothing left', value: '' };
+    const next = skipTarget(row);
+    return { label: next ? `Skip: ${PLAN.stepTitle(next)}` : 'Skip: nothing left', value: '' };
   }
+  if (row.skipAllRow) {
+    const open = row.scope.some((st) => !PLAN.stepDone(progress, st) && !PLAN.stepSkipped(progress, st));
+    const skipped = row.scope.some((st) => PLAN.stepSkipped(progress, st));
+    return { label: !open && skipped ? 'Unskip all here' : 'Skip all here', value: '' };
+  }
+  if (row.prefRow) return { label: row.label, value: prefValue(row) };
+  if (row.lessonsRow) return plain;
+  if (row.stage) {
+    const sum = PLAN.stepsSummary(progress, row.steps);
+    const mark = PLAN.stageComplete(progress, row.stage) ? PROG.MARK_DONE
+      : row.stage === current ? PROG.MARK_NEXT : null;
+    return { label: row.label, value: sum.played ? `${sum.done}/${sum.count}` : '>', mark };
+  }
+  if (row.steps && CAT.isFolder(row)) {
+    const sum = PLAN.stepsSummary(progress, row.steps);
+    return { label: row.label, value: sum.played ? `${sum.done}/${sum.count}` : '>' };
+  }
+  if (row.step) return stepRowOf(row, nextKey);
   if (row.repetition) {
     const due = PROG.dueCount(PROG.repetitionSession(progress, Date.now()));
     return { label: row.label, value: due ? `${due} due` : '>' };
@@ -2177,9 +2392,26 @@ function decorateRow(row, nextId) {
     return { label: row.label, value: `${sum.done}/${sum.count}` };
   }
   if (!row.id) return plain;
-  let mark = PROG.itemMark(progress, row.id);
-  if (!mark && row.id === nextId) mark = PROG.MARK_NEXT;
-  return { label: row.label, value: PROG.itemValue(progress, row.id) || plain.value, mark };
+  return { label: row.label, value: PROG.itemValue(progress, row.id) || plain.value,
+    mark: PROG.itemMark(progress, row.id) };
+}
+
+/* A step of the path: done at ITS target, which may be short of a ✓ — the
+ * spiral brings the drill back faster later — or parked for the day, `~`. */
+function stepRowOf(row, nextKey) {
+  const st = row.step;
+  let mark = null;
+  if (PLAN.stepDone(progress, st)) mark = PROG.MARK_DONE;
+  else if (PLAN.stepSkipped(progress, st)) mark = PROG.MARK_SKIP;
+  else if (st.key === nextKey) mark = PROG.MARK_NEXT;
+  else mark = PROG.itemMark(progress, st.id) === PROG.MARK_TRIED ? PROG.MARK_TRIED : null;
+  if (!mark && PROG.isParked(progress, st.id, Date.now())) return { label: row.label, value: '~', mark };
+  /* Short of 100%, the best is read against the step's own target: 45/60. */
+  const it = PROG.item(progress, st.id);
+  const timed = !st.quiz && !isUntimedId(st.id);
+  let value = PROG.itemValue(progress, st.id);
+  if (value && timed && st.target < 100) value = `${it.best}/${st.target}`;
+  return { label: row.label, value, mark };
 }
 
 function draw() {
@@ -2190,6 +2422,11 @@ function draw() {
       count: errCount,
       safeMode,
     });
+    return;
+  }
+  if (screen === CARD && card) {
+    V.drawCard(ctx, { title: card.title, lines: card.pages[card.page], page: card.page,
+      pages: card.pages.length, footer: cardFooter() });
     return;
   }
   if (screen === MENU) {
@@ -2350,10 +2587,11 @@ function initInner() {
   stats = loadStats();
   manifestError = '';
   loadExercises();
+  lessons = LES.parseLessons(readFile(`${MODULE_DIR}/lessons.json`)).cards;
   rebuildMenu();
   /* After the tree: reading takes in from stats.json needs its item ids. */
   progress = loadProgress();
-  pathTrack = null;
+  pathStep = null;
   progressNote = null;
   if (manifestError) {
     menuNote = 'BAD USER.JSON';
@@ -2557,6 +2795,7 @@ function midiInner(data) {
       /* In a hearing drill Play repeats the question — without it a prompt
        * you did not catch is a prompt you cannot answer. */
       if (screen === QUIZ && promptIsAudible()) { schedulePrompt(); return; }
+      if (screen === CARD && card) { hearFromCard(); return; }
       if (screen === READY || ((screen === SUMMARY || screen === LADDER) && chart)) {
         if (screen !== READY) enterReady();
         start(false);
@@ -2646,6 +2885,8 @@ function jog(delta) {
     settingsSel = Math.max(0, Math.min(SET.ROWS.length - 1, settingsSel + delta));
   } else if (target === 'value') {
     editSetting(SET.ROWS[settingsSel].key, delta);
+  } else if (target === 'page' && card) {
+    card.page = Math.max(0, Math.min(card.pages.length - 1, card.page + delta));
   } else if (target === 'choice' && quiz) {
     Q.moveChoice(quiz, delta);
   } else if ((screen === SUMMARY || screen === LADDER) && review) {
@@ -2665,6 +2906,7 @@ function jog(delta) {
 
 function click() {
   if (screen === MENU) { openRow(); return; }
+  if (screen === CARD && card) { nextCard(); return; }
   if (screen === SETTINGS) { settingsEditing = !settingsEditing; return; }
   if (screen === QUIZ && quiz && quiz.mode === 'pick') {
     const r = Q.pickChoice(quiz, now());
@@ -2673,7 +2915,7 @@ function click() {
   }
   if (screen === PROGRESS) { openProgressRow(); return; }
   /* On along the Learning Path, when that is where the drill came from. */
-  if ((screen === RESULT || screen === SUMMARY || screen === LADDER) && pathTrack) {
+  if ((screen === RESULT || screen === SUMMARY || screen === LADDER) && pathStep) {
     goNext();
     return;
   }

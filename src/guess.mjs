@@ -47,6 +47,11 @@ export function createQuiz(opts = {}) {
     kind: opts.kind || 'voice',
     mode: opts.mode || 'guess',
     pool: opts.pool || VOICE_IDS.filter((v) => v !== 'HF'),
+    /* The subdivisions asked about: all of them, or the ones a stage of the
+     * Learning Path has taught so far. */
+    subdivs: opts.subdivs || SUBDIV_ORDER,
+    /* A pooled quiz is its own exercise, filed under its own id. */
+    variant: opts.variant || '',
     charts: opts.charts || [],
     roundSize: opts.roundSize === undefined ? 20 : opts.roundSize,
     rand: rng(opts.seed || 1),
@@ -71,7 +76,7 @@ export function createQuiz(opts = {}) {
 }
 
 function poolFor(quiz) {
-  if (quiz.kind === 'subdiv') return SUBDIV_ORDER;
+  if (quiz.kind === 'subdiv') return quiz.subdivs;
   if (quiz.kind === 'groove') return quiz.charts.map((c) => c.id);
   return quiz.pool;
 }
@@ -87,7 +92,7 @@ export function nextPrompt(quiz) {
   quiz.choice = 0;
   if (quiz.mode === 'pick') {
     let opts;
-    if (quiz.kind === 'subdiv') opts = subdivChoices(answer);
+    if (quiz.kind === 'subdiv') opts = subdivChoices(answer, 2, quiz.subdivs);
     else if (quiz.kind === 'groove') opts = grooveChoices(answer, quiz.charts);
     else opts = voiceChoices(answer, quiz.pool);
     quiz.options = shuffle(opts, quiz.rand);
@@ -253,5 +258,5 @@ export function isEliminated(quiz, i) {
 
 /* The drill id a round is recorded against. */
 export function quizDrillId(quiz) {
-  return `${quiz.mode}:${quiz.kind}`;
+  return `${quiz.mode}:${quiz.kind}${quiz.variant ? `:${quiz.variant}` : ''}`;
 }

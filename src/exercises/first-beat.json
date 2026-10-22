@@ -1,0 +1,42 @@
+{
+  "id": "first-beat",
+  "name": "First beat",
+  "bpm": 70,
+  "timeSig": [
+    4,
+    4
+  ],
+  "loopBars": 1,
+  "repeats": 8,
+  "sticking": "off",
+  "events": [
+    {
+      "beat": 0.0,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 1.0,
+      "voices": [
+        "HH",
+        "SN"
+      ]
+    },
+    {
+      "beat": 2.0,
+      "voices": [
+        "HH",
+        "KK"
+      ]
+    },
+    {
+      "beat": 3.0,
+      "voices": [
+        "HH",
+        "SN"
+      ]
+    }
+  ]
+}

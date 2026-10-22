@@ -1,0 +1,249 @@
+{
+  "cards": [
+    {
+      "id": "stage-0",
+      "title": "0 Hello, kit",
+      "text": "Three drums make a beat: the kick (a low thump), the snare (a crack) and the hi-hat (a tick). Find them, then play your first beat today."
+    },
+    {
+      "id": "kit-on-paper",
+      "title": "The kit on paper",
+      "text": "Each row is one drum. Kick at the bottom, snare in the middle, cymbals on top, as on any drum chart. Stuck for a pad? Record twice is a hint that lights it."
+    },
+    {
+      "id": "pulse",
+      "title": "The pulse",
+      "text": "Music has a steady beat you could clap to: the pulse. Count it out loud, 1 2 3 4. Steady matters more than fast."
+    },
+    {
+      "id": "result",
+      "title": "Your result",
+      "text": "% right: the right pad at the right time. s12: your spread in ms, smaller is steadier. +3ms: a little late on average; minus is early. dyn: how your accents and ghosts sounded."
+    },
+    {
+      "id": "rests",
+      "title": "Rests",
+      "text": "A rest is a beat you count but do not play. Keep counting through it: the next note depends on it."
+    },
+    {
+      "id": "backbeat",
+      "title": "The backbeat",
+      "text": "The hat keeps time on every beat. Kick on 1 and 3, snare on 2 and 4: the backbeat, the heart of almost all pop. Start at L0, no clock, and find the notes."
+    },
+    {
+      "id": "checkpoints",
+      "title": "Checkpoints",
+      "text": "A checkpoint is a short exam of the stage. Pass it and the next stage opens. Can you already play it? Take it now and test out."
+    },
+    {
+      "id": "stage-1",
+      "title": "1 Eighth notes",
+      "text": "Two notes per beat: 1 & 2 &. Most rock and pop lives here. By the end: a beat with a kick on any eighth."
+    },
+    {
+      "id": "eighths",
+      "title": "Eighth notes",
+      "text": "Split each beat in two: 1 & 2 & 3 & 4 &. The & falls exactly halfway. The accent stays on the number."
+    },
+    {
+      "id": "offbeats",
+      "title": "Off-beats",
+      "text": "The & between beats is the off-beat. Disco and house hats live there: the kick on the beat, the hat answers."
+    },
+    {
+      "id": "hands",
+      "title": "Hands",
+      "text": "R and L name the hand: left pads left hand, right pads right hand. Doubles, RRLL, wake up the weaker hand."
+    },
+    {
+      "id": "syncopation",
+      "title": "Syncopation",
+      "text": "A note on the & instead of the beat is syncopated: it pushes the groove forward. Count the & out loud."
+    },
+    {
+      "id": "kick-patterns",
+      "title": "Kick patterns",
+      "text": "Most rock beats share the hat and the snare and differ in the kick. Learn every kick spot and you can play them all."
+    },
+    {
+      "id": "open-hat",
+      "title": "Open hi-hat",
+      "text": "An open hat rings longer. On 4& it lifts the bar into the next one."
+    },
+    {
+      "id": "fills",
+      "title": "Fills and phrases",
+      "text": "Music comes in 4-bar phrases. A fill ends one; the crash on the next 1 starts the next. Land the 1."
+    },
+    {
+      "id": "keep-time",
+      "title": "Keep time alone",
+      "text": "The click drops out. Keep going: the header shows your drift. Bands play without a click."
+    },
+    {
+      "id": "stage-2",
+      "title": "2 Sixteenths",
+      "text": "Four notes per beat, and the difference between loud and soft. By the end: a funk groove."
+    },
+    {
+      "id": "sixteenths",
+      "title": "Sixteenths",
+      "text": "Four per beat: 1 e & a. The e and the a sit between the eighths."
+    },
+    {
+      "id": "four-spots",
+      "title": "The four spots",
+      "text": "Every 16th groove uses four spots. & is halfway, a just before the next beat, e just after the beat: the hardest to feel."
+    },
+    {
+      "id": "cells",
+      "title": "16th figures",
+      "text": "Three or two sixteenths in a beat: 1-e-&, 1-&-a, 1-e-a. Funk is built from these."
+    },
+    {
+      "id": "rudiments",
+      "title": "Rudiments",
+      "text": "The drummer's scales: hand patterns behind every fill and groove. Singles, doubles, and the paradiddle, RLRR LRLL."
+    },
+    {
+      "id": "accents",
+      "title": "Accents",
+      "text": "An accent (>) is louder than the notes around it. The skill is coming straight back down. It is judged against your own normal strokes."
+    },
+    {
+      "id": "ghost-notes",
+      "title": "Ghost notes",
+      "text": "A ghost note is a very soft stroke, felt more than heard. Funk, hip-hop and house put them between the backbeats so the groove breathes."
+    },
+    {
+      "id": "dyn-score",
+      "title": "Your dyn score",
+      "text": "Notes and time decide whether a take counts. dyn % is how your accents and ghosts sounded: improve it at your own pace. A soft accent is never a wrong note."
+    },
+    {
+      "id": "between-hats",
+      "title": "Between the hats",
+      "text": "A 16th kick lands where no hat plays. Feel it against the & before it."
+    },
+    {
+      "id": "stage-3",
+      "title": "3 Ghosts & flams",
+      "text": "Grooves with real dynamics, a kick line read under steady hands, flams and drags, and 8-bar form."
+    },
+    {
+      "id": "changing-grids",
+      "title": "Changing grids",
+      "text": "Music changes subdivision in the middle of a phrase. The seam between eighths and sixteenths is where time wobbles."
+    },
+    {
+      "id": "independence",
+      "title": "Independence",
+      "text": "The hat and the snare stay, the kick reads something new. Your hands keep time while your eyes read."
+    },
+    {
+      "id": "linear",
+      "title": "Linear grooves",
+      "text": "No two drums ever sound together. The groove becomes a melody passed between your hands."
+    },
+    {
+      "id": "flams",
+      "title": "Flams and drags",
+      "text": "A flam is a soft grace note from the other hand just before the stroke; a drag is two. Written apart here: close them up as you speed up."
+    },
+    {
+      "id": "form",
+      "title": "8-bar form",
+      "text": "Two 4-bar phrases: a small fill in bar 4, a bigger one in bar 8. Count the bars."
+    },
+    {
+      "id": "stage-4",
+      "title": "4 Triplets/swing",
+      "text": "Three notes per beat, the shuffle, swing and jazz."
+    },
+    {
+      "id": "triplets",
+      "title": "Triplets",
+      "text": "Three per beat: 1-trip-let. Round where eighths are square. Hold the beat; only the inside changes."
+    },
+    {
+      "id": "swing",
+      "title": "Swing",
+      "text": "Swing delays every &. 50% is straight, 66% is triplet swing: the swing knob on a drum machine does exactly this."
+    },
+    {
+      "id": "shuffle",
+      "title": "Shuffle",
+      "text": "Play the first and last of each triplet: 1 _ let. Blues, old rock and half-time grooves live on it."
+    },
+    {
+      "id": "compound",
+      "title": "6/8 and 12/8",
+      "text": "Count in groups of three: 6/8 is two groups, 12/8 four. 12/8 is a shuffle written exactly."
+    },
+    {
+      "id": "jazz-ride",
+      "title": "The jazz ride",
+      "text": "Ride: 1, 2-a, 3, 4-a. The hat foot on 2 and 4. The ride carries the band; the drums answer."
+    },
+    {
+      "id": "click-24",
+      "title": "Click on 2 and 4",
+      "text": "Jazz players hear the click as the backbeat. Hear it as 1 and 3 and you have flipped: reset on the count-in."
+    },
+    {
+      "id": "stage-5",
+      "title": "5 Clave & world",
+      "text": "One two-bar rhythm organises Latin music. Learn it, then the grooves built on it."
+    },
+    {
+      "id": "clave",
+      "title": "Clave",
+      "text": "A two-bar key: three notes then two (3-2), or the other way round (2-3). Every part fits around it; never play against it."
+    },
+    {
+      "id": "polyrhythm",
+      "title": "Polyrhythm",
+      "text": "Two pulses at once: 3 over 2 is three even notes in the time of two. Accent every second triplet and it appears."
+    },
+    {
+      "id": "latin",
+      "title": "Latin grooves",
+      "text": "Dense and two bars long. Start at L0, and keep the clave in your head while you play."
+    },
+    {
+      "id": "round-the-kit",
+      "title": "Round the kit",
+      "text": "A rudiment spread over the toms and the snare becomes a fill. Same hands, new sound."
+    },
+    {
+      "id": "stage-6",
+      "title": "6 Pro",
+      "text": "Odd bars, shifted beats, feel on purpose, and pro tempos on Strict tight."
+    },
+    {
+      "id": "odd-meters",
+      "title": "Odd meters",
+      "text": "5/4 and 7/8: count in twos and threes, 1-2 1-2 1-2-3, never up to 7."
+    },
+    {
+      "id": "groupings",
+      "title": "Groupings",
+      "text": "Accent every 3rd or 5th sixteenth: the accents slide over the bar line and come home after 3 or 5 bars."
+    },
+    {
+      "id": "displacement",
+      "title": "Displacement",
+      "text": "The same beat moved by a sixteenth. You know a beat when you know where every note is, not just its shape."
+    },
+    {
+      "id": "offbeat-click",
+      "title": "Off-beat click",
+      "text": "The click only on the &s, or once every two bars. The hardest test of your own time."
+    },
+    {
+      "id": "feel",
+      "title": "Feel",
+      "text": "Behind the beat is relaxed (hip-hop, neo-soul), ahead is urgent (punk). Your mean in ms shows where you sit: now choose it."
+    }
+  ]
+}

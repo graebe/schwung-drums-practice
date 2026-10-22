@@ -12,31 +12,21 @@
     {
       "beat": 0.0,
       "voices": [
-        "RD"
-      ]
-    },
-    {
-      "beat": 0.0,
-      "voices": [
+        "RD",
         "KK"
       ]
     },
     {
-      "beat": 1.0,
+      "beat": 1.5,
       "voices": [
-        "RD"
+        "RD",
+        "HF"
       ]
     },
     {
-      "beat": 1.5,
+      "beat": 2.5,
       "voices": [
         "RD"
-      ]
-    },
-    {
-      "beat": 1.5,
-      "voices": [
-        "HH"
       ]
     },
     {
@@ -46,21 +36,16 @@
       ]
     },
     {
-      "beat": 4.0,
+      "beat": 4.5,
       "voices": [
-        "RD"
+        "RD",
+        "HF"
       ]
     },
     {
-      "beat": 4.5,
+      "beat": 5.5,
       "voices": [
         "RD"
-      ]
-    },
-    {
-      "beat": 4.5,
-      "voices": [
-        "HH"
       ]
     }
   ],

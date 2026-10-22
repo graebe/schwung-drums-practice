@@ -220,12 +220,24 @@ test('a backbeat accents the snare and NOT the hi-hat above it', () => {
   assert.equal(tabOf(chart, 'HH')[4], 'o', 'the hi-hat was accented along with the snare');
 });
 
-test('the rock beat leads the list, and is playable on the default layout', () => {
-  /* Somebody who has just installed a drum trainer wants a drum beat. */
-  assert.equal(manifest.entries[0].id, 'rock-backbeat');
-  const c = IO.parseExercise(read('rock-backbeat.json'), 'rock-backbeat').chart;
+test('the first beat leads the list, and is playable on the default layout', () => {
+  /* Somebody who has just installed a drum trainer wants a drum beat — the
+   * simplest there is: every drum lands with a quarter-note hat. */
+  assert.deepEqual(manifest.entries.slice(0, 3).map((e) => e.id),
+    ['first-beat', 'eighth-beat', 'rock-backbeat']);
+  const c = IO.parseExercise(read('first-beat.json'), 'first-beat').chart;
   assert.equal(layoutForChart(c), 'kit');
-  assert.ok(c.bpm <= 100, `${c.bpm} is too fast to lead with`);
+  assert.ok(c.bpm <= 70, `${c.bpm} is too fast to lead with`);
+  for (const e of c.events) assert.ok(e.voices.includes('HH'), 'a drum without its hat is not unison');
+});
+
+test('the jazz ride is 1, 2, 2-a, 3, 4, 4-a, with the hat foot on 2 and 4', () => {
+  const c = IO.parseExercise(read('jazz-ride.json'), 'jazz-ride').chart;
+  const on = (v) => c.events.filter((e) => e.voices.includes(v)).map((e) => e.beat);
+  /* 12/8: a beat is a dotted quarter, 1.5 quarter notes; its "a" one more. */
+  assert.deepEqual(on('RD'), [0, 1.5, 2.5, 3, 4.5, 5.5]);
+  assert.deepEqual(on('HF'), [1.5, 4.5]);
+  assert.deepEqual(on('KK'), [0]);
 });
 
 /* ---- a practice has a length -------------------------------------------- */

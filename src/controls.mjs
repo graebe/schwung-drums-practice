@@ -59,6 +59,7 @@ export function jogTarget(screen, editing) {
   if (screen === 'menu') return 'menu';
   if (screen === 'quiz') return 'choice';
   if (screen === 'progress') return 'drill';
+  if (screen === 'card') return 'page';
   return 'none';
 }
 
