@@ -227,14 +227,15 @@ if (screen) {
   } else if (screen === 'untimed-ready') {
     const st = untimedState(untimedAt(0));
     const lv = readyLevel(0);
-    V.drawUntimedReady(ctx, { ...st, rightLabel: '16 stacks', footerRight: '', ...lv });
+    V.drawUntimedReady(ctx, { ...st, rightLabel: '16 stacks', footerRight: '', ready: true, ...lv });
   } else if (screen === 'ladder') {
     V.drawLadder(ctx, { ladder: Object.assign(createLadder({ bpm: 112 }), { rungs: 6 }), barsDone: 2 });
   } else if (screen === 'ready') {
     V.drawReady(ctx, {
       run: runAt(0), chart, bpm: chart.bpm, title: chart.name,
       songBeats: Number(arg('beats', 0)), pxPerBeat: px, view,
-      dynamics: true, rightLabel: '8 bars', ...readyLevel(Number(arg('level', 2))),
+      dynamics: true, ready: true, ...readyLevel(Number(arg('level', 2))),
+      rightLabel: Number(arg('beats', 0)) > 0 ? `${Math.floor(Number(arg('beats', 0)) / 4) + 1}/8` : '8 bars  0:21',
     });
   } else if (screen === 'padmap') {
     const lay = resolveLayout(String(arg('layout', 'mpc')), { flip: Boolean(arg('flip', false)) });

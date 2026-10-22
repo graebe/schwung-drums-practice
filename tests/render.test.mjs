@@ -611,7 +611,7 @@ test('a groove\'s box splits: the controls left, LEVEL right with its digit and 
   assert.ok(top.text.includes('<') && !top.text.includes('>'));
   /* The words keep to their half. */
   for (const t of ['listen', 'practise', 'scrub']) {
-    assert.ok(b.x + 14 + t.length * 6 - 1 < b.x + READY_SPLIT - 1, `${t} runs into the level`);
+    assert.ok(b.x + 15 + t.length * 6 - 1 < b.x + READY_SPLIT - 1, `${t} runs into the level`);
   }
   /* The music still shows above and below the box. */
   assert.ok(countOn(mid.ctx, 0, 10, L.SCREEN_W, b.y - 10) + countOn(mid.ctx, 0, b.y + b.h + 1, L.SCREEN_W, 6) > 0);
@@ -1241,4 +1241,32 @@ test('Sticking off still shows the written hands: on the scroll, on the page, in
     sticking: 'strict', events: [{ beat: 0, voices: ['SN'], hand: 'R' }] }, { sticking: 'off' });
   expireMissed(study, 0.5, true);
   assert.equal(stuckLabel(study), 'Snare R', 'Study names the hand as a guide');
+});
+
+test('no glyph of the ready box touches its word: one glyph column, the words 3px after it', async () => {
+  const { drawReadyBox } = await import('../src/chrome.mjs');
+  const ctx = createScreen();
+  const xs = [];
+  const text = ctx.text.bind(ctx);
+  ctx.text = (x, y, s, v) => { xs.push(x); text(x, y, s, v); };
+  drawReadyBox(ctx, { rows: [['play', 'hear bar'], ['rec', 'own pace'], ['scrub', 'scrub']] });
+  const b = READY_BOX;
+  assert.equal(new Set(xs).size, 1, 'the words share one column');
+  for (let i = 0; i < 3; i++) {
+    const y = b.y + 4 + i * 9;
+    assert.equal(countOn(ctx, xs[0] - 3, y, 3, 8), 0, `row ${i}: its glyph runs into the gap before the word`);
+  }
+});
+
+test('the ready header gives the name the middle: no 1/n, the name cut at a word', () => {
+  const chart = { ...subdivisionDrill('eighths', { bpm: 90 }), name: 'Rock backbeat with ghosts' };
+  const run = createRun(chart, { repeats: 8 });
+  ensureEntries(run, 32);
+  const ctx = createScreen();
+  const seen = [];
+  const text = ctx.text.bind(ctx);
+  ctx.text = (x, y, s, v) => { if (y === 0) seen.push(s); text(x, y, s, v); };
+  drawReady(ctx, { run, chart, songBeats: 0, pxPerBeat: 32, view: 'grid', title: chart.name, bpm: 90,
+    rightLabel: '8 bars', ready: true });
+  assert.deepEqual(seen, ['Rock backbeat', '8 bars'], 'one length, the name to whole words');
 });

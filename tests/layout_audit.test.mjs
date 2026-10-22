@@ -232,7 +232,8 @@ test('the split ready box: the words keep left of the line, LEVEL and its digit 
   const b = L.READY_BOX;
   const w = (s) => s.length * 6 - 1;
   for (const word of ['listen', 'practise', 'scrub', 'hear bar', 'own pace']) {
-    assert.ok(b.x + 3 + 11 + w(word) + 2 < b.x + READY_SPLIT, `"${word}" crosses into the level`);
+    /* The glyph column 9 wide, the words 3px after it. */
+    assert.ok(b.x + 3 + 9 + 3 + w(word) + 1 < b.x + READY_SPLIT, `"${word}" crosses into the level`);
   }
   const right = b.w - READY_SPLIT - 1;
   assert.ok(3 + w('LEVEL') + 5 + 2 <= right, 'LEVEL and the done mark do not fit their half');

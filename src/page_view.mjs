@@ -74,7 +74,7 @@ export function drawUntimedView(ctx, s) {
     beat: nextEntry.beat, x: L.PAGE_PEEK_X } : null;
 
   drawHeader(ctx, { chart: s.chart, songBeats: cur ? cur.beat : from, title: s.title,
-    rightLabel: s.rightLabel });
+    rightLabel: s.rightLabel, ready: s.ready });
 
   if (s.view === 'grid') drawGridPage(ctx, s, page, peek, left, px);
   else drawStaffPage(ctx, s, page, peek, left, px);

@@ -3425,7 +3425,7 @@ function draw() {
       listening: heard >= 0,
       rightLabel: at > 0 ? `${CH.barBeatOf(chart, at).bar}/${CH.barBeatOf(chart, at).bars}` : chartLength,
       footerRight: '', progress: 0, warning: chartWarning, scrubbed: at > 0,
-      ...readyFooter(), level: readyLevel(),
+      ...readyFooter(), level: readyLevel(), ready: true,
     });
     return;
   }
@@ -3455,7 +3455,7 @@ function draw() {
         ? `${CH.barBeatOf(chart, tp.songBeats).bar}/${CH.barBeatOf(chart, tp.songBeats).bars || '?'}`
         : chartLength,
       /* The bottom line: the level, or what the pads cannot reach, and the keys. */
-      ...readyFooter(), level: readyLevel(),
+      ...readyFooter(), level: readyLevel(), ready: true,
     });
     return;
   }

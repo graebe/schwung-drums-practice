@@ -16,7 +16,7 @@ import * as L from './layout.mjs';
 import { barBeatOf } from './chart.mjs';
 import { recentStats } from './timing.mjs';
 import * as SR from './staff_render.mjs';
-import { drawMark, MARK_W, drawPlayGlyph, drawRecordGlyph, drawScrubGlyph } from './glyphs.mjs';
+import { drawMark, MARK_W, drawPlayGlyph, drawRecordGlyph, drawScrubGlyph, SCRUB_W } from './glyphs.mjs';
 
 /* ---- Header ------------------------------------------------------------- */
 /*
@@ -31,7 +31,9 @@ export function drawHeader(ctx, s) {
   const left = s.title || '';
   /* "3/8" is bars through the whole practice. An endless drill has no total,
    * so it falls back to the absolute bar and beat. */
-  const mid = bar.bars > 0 ? `${bar.bar}/${bar.bars}` : `${bar.bar}.${bar.beat}`;
+  /* The ready screen has no middle: its right slot already says the length,
+   * or once scrubbed the position, and saying either twice cost the title. */
+  const mid = s.ready ? '' : bar.bars > 0 ? `${bar.bar}/${bar.bars}` : `${bar.bar}.${bar.beat}`;
   /*
    * The right slot holds ONE thing, and which one depends on what you are
    * doing. While playing it is your timing, which is the whole point of the
@@ -52,11 +54,17 @@ export function drawHeader(ctx, s) {
    * under them — past TEXT_MAX_PX the host stops plotting and a number goes
    * missing in silence. */
   let title = left;
-  const budget = L.SCREEN_W - rw - mw - 10;
+  const budget = L.SCREEN_W - rw - (mid ? mw + 10 : 6);
+  if (s.ready) {
+    /* Before a take the name is read, not glanced at: cut at a word. */
+    const words = left.split(' ');
+    while (words.length > 1 && ctx.textWidth(words.join(' ')) > budget) words.pop();
+    title = words.join(' ');
+  }
   while (title.length && ctx.textWidth(title) > budget) title = title.slice(0, -1);
 
   ctx.text(1, 0, title, 1);
-  ctx.text(L.SCREEN_W - rw - mw - 5, 0, mid, 1);
+  if (mid) ctx.text(L.SCREEN_W - rw - mw - 5, 0, mid, 1);
   ctx.text(L.SCREEN_W - rw - 1, 0, right, 1);
   ctx.fillRect(0, L.HEADER_RULE_Y, L.SCREEN_W, 1, 1);
 }
@@ -168,8 +176,10 @@ export function drawReadyBox(ctx, { rows = [], level = null } = {}) {
   const b = L.READY_BOX;
   ctx.fillRect(b.x, b.y, b.w, b.h, 0);
   ctx.drawRect(b.x, b.y, b.w, b.h, 1);
+  /* One glyph column, the words 3px after the widest glyph (the scrub's 9),
+   * so none touches its word. */
   const gx = b.x + 3;
-  const tx = gx + 11;
+  const tx = gx + SCRUB_W + 3;
   for (let i = 0; i < rows.length; i++) {
     const y = b.y + 4 + i * 9;
     const [glyph, word] = rows[i];
