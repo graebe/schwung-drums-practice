@@ -50,6 +50,7 @@ import * as AP from './answer_pads.mjs';
 import * as PROG from './progress.mjs';
 import * as PLAN from './program.mjs';
 import * as LES from './lessons.mjs';
+import * as ROWS from './path_rows.mjs';
 import * as UT from './untimed.mjs';
 import { availableLevels } from './levels.mjs';
 import * as IDS from './ids.mjs';
@@ -1825,51 +1826,29 @@ function openRow() {
   openLeaf(item);
 }
 
-/* What a "Skip" row skips: the next open step of its folder, or, at the top
- * of the path, the step Continue would open. */
 function skipTarget(row) {
-  if (row.scope) return PLAN.nextOpen(progress, row.scope);
-  const next = PLAN.continueStep(progress, program);
-  return next ? next.step : null;
+  return ROWS.skipTarget(row, progress, program, Date.now());
 }
 
-/* Skip every open step of a folder — or, when nothing in it is left to skip,
- * take the skips back. One row, so it is never more than a click to undo. */
+/* Skip every open step of a folder, or take its skips back (path_rows.mjs). */
 function skipAll(scope) {
-  const open = scope.filter((st) => !PLAN.stepDone(progress, st) && !PLAN.stepSkipped(progress, st));
-  if (open.length) {
-    for (const st of open) PROG.skipItem(progress, st.id, Date.now());
-    announce(`Skipped ${open.length}`);
+  const change = ROWS.skipAllChange(scope, progress);
+  if (change.skip) {
+    for (const id of change.skip) PROG.skipItem(progress, id, Date.now());
+    announce(`Skipped ${change.skip.length}`);
   } else {
-    for (const st of scope) PROG.unskipItem(progress, st.id);
+    for (const id of change.unskip) PROG.unskipItem(progress, id);
     announce('Skips taken back');
   }
   saveProgress();
 }
 
-/* A row of Your path, turned on by a click: a track or style on or off, the
- * next value of a choice. */
+/* A row of Your path, turned on by a click. */
 function turnPref(row) {
-  const path = progress.path;
-  if (row.group === 'tracks' || row.group === 'styles') {
-    if (!PROG.togglePath(progress, row.group, row.key)) announce('One track stays on');
-  } else if (row.group === 'rungs') {
-    PROG.setPath(progress, 'rungs', path.rungs === 'full' ? 'short' : 'full');
-  } else if (row.group === 'intros') {
-    const i = PROG.INTROS.indexOf(path.intros);
-    PROG.setPath(progress, 'intros', PROG.INTROS[(i + 1) % PROG.INTROS.length]);
-  } else if (row.group === 'start') {
-    PROG.setPath(progress, 'start', ((path.start || 0) + 1) % program.stages.length);
-  }
+  const change = ROWS.prefChange(row, progress.path, program.stages.length);
+  if (change.toggle && !PROG.togglePath(progress, ...change.toggle)) announce('One track stays on');
+  if (change.set) PROG.setPath(progress, ...change.set);
   saveProgress();
-}
-
-/* What a Your path row shows as its value. */
-function prefValue(row) {
-  const path = progress.path;
-  if (row.group === 'tracks' || row.group === 'styles') return path[row.group][row.key] ? 'on' : 'off';
-  if (row.group === 'start') return `Stage ${path.start || 0}`;
-  return path[row.group] || '';
 }
 
 /*
@@ -2432,52 +2411,22 @@ function menuRows(node) {
 }
 
 function decoratedRows(node) {
-  /* Inside the Learning Path, the step Continue would open is marked ▸. */
+  /* Inside the Learning Path its rows speak for themselves (path_rows.mjs). */
   const inPath = nav.some((n) => n.node === pathNode);
-  const next = inPath ? PLAN.continueStep(progress, program) : null;
-  const stage = inPath ? PLAN.currentStage(progress, program) : null;
+  const pc = inPath ? ROWS.pathContext(progress, program, Date.now()) : null;
   const kids = node.children;
   const out = new Array(kids.length);
-  for (let i = 0; i < kids.length; i++) {
-    out[i] = decorateRow(kids[i], next ? next.step.key : '', stage);
-  }
+  for (let i = 0; i < kids.length; i++) out[i] = (pc && ROWS.pathRow(kids[i], pc)) || decorateRow(kids[i]);
   return out;
 }
 
 /*
- * What a row says about your progress, decided here rather than in the tree:
- * the tree holds what the drills ARE, not how far you have got with them.
+ * What a row of the library says about your progress, decided here rather
+ * than in the tree: the tree holds what the drills ARE, not how far you have
+ * got with them.
  */
-function decorateRow(row, nextKey, current) {
+function decorateRow(row) {
   const plain = { label: row.label, value: row.value || '', mark: row.mark || null };
-  if (row.continueRow) {
-    const next = PLAN.continueStep(progress, program);
-    return next
-      ? { label: `Next: ${PLAN.stepTitle(next.step)}`, value: '', mark: PROG.MARK_NEXT }
-      : { label: 'All learned', value: '', mark: PROG.MARK_DONE };
-  }
-  if (row.skipRow) {
-    const next = skipTarget(row);
-    return { label: next ? `Skip: ${PLAN.stepTitle(next)}` : 'Skip: nothing left', value: '' };
-  }
-  if (row.skipAllRow) {
-    const open = row.scope.some((st) => !PLAN.stepDone(progress, st) && !PLAN.stepSkipped(progress, st));
-    const skipped = row.scope.some((st) => PLAN.stepSkipped(progress, st));
-    return { label: !open && skipped ? 'Unskip all here' : 'Skip all here', value: '' };
-  }
-  if (row.prefRow) return { label: row.label, value: prefValue(row) };
-  if (row.lessonsRow) return plain;
-  if (row.stage) {
-    const sum = PLAN.stepsSummary(progress, row.steps);
-    const mark = PLAN.stageComplete(progress, row.stage) ? PROG.MARK_DONE
-      : row.stage === current ? PROG.MARK_NEXT : null;
-    return { label: row.label, value: sum.played ? `${sum.done}/${sum.count}` : '>', mark };
-  }
-  if (row.steps && CAT.isFolder(row)) {
-    const sum = PLAN.stepsSummary(progress, row.steps);
-    return { label: row.label, value: sum.played ? `${sum.done}/${sum.count}` : '>' };
-  }
-  if (row.step) return stepRowOf(row, nextKey);
   if (row.repetition) {
     const due = PROG.dueCount(PROG.repetitionSession(progress, Date.now()));
     return { label: row.label, value: due ? `${due} due` : '>' };
@@ -2495,24 +2444,6 @@ function decorateRow(row, nextKey, current) {
   if (!row.id) return plain;
   return { label: row.label, value: PROG.itemValue(progress, row.id) || plain.value,
     mark: PROG.itemMark(progress, row.id) };
-}
-
-/* A step of the path: done at ITS target, which may be short of a ✓ — the
- * spiral brings the drill back faster later — or parked for the day, `~`. */
-function stepRowOf(row, nextKey) {
-  const st = row.step;
-  let mark = null;
-  if (PLAN.stepDone(progress, st)) mark = PROG.MARK_DONE;
-  else if (PLAN.stepSkipped(progress, st)) mark = PROG.MARK_SKIP;
-  else if (st.key === nextKey) mark = PROG.MARK_NEXT;
-  else mark = PROG.itemMark(progress, st.id) === PROG.MARK_TRIED ? PROG.MARK_TRIED : null;
-  if (!mark && PROG.isParked(progress, st.id, Date.now())) return { label: row.label, value: '~', mark };
-  /* Short of 100%, the best is read against the step's own target: 45/60. */
-  const it = PROG.item(progress, st.id);
-  const timed = !st.quiz && !isUntimedId(st.id);
-  let value = PROG.itemValue(progress, st.id);
-  if (value && timed && st.target < 100) value = `${it.best}/${st.target}`;
-  return { label: row.label, value, mark };
 }
 
 function draw() {
