@@ -32,6 +32,35 @@ export function drillId(kind, id, opts = {}) {
 }
 
 /*
+ * A record's drill id read back: { kind, id, strictness, sticking }. The id
+ * itself may hold colons (`rock-backbeat:l3`, `subdiv:quarters`), so it is
+ * everything between the kind and the first strictness; a quiz round's id
+ * (`pick:subdiv:qe`) has no strictness and is the kind and the rest. The
+ * one reader of what drillId writes — it used to be parsed in two places,
+ * each scanning for a strictness of its own.
+ */
+export const STRICTNESS = ['loose', 'normal', 'tight'];
+export const QUIZ_KINDS = ['guess', 'hear', 'pick'];
+
+export function parseDrillId(d) {
+  const parts = String(d).split(':');
+  const kind = parts[0];
+  if (QUIZ_KINDS.indexOf(kind) >= 0) {
+    return { kind, id: parts.slice(1).join(':'), strictness: '', sticking: '' };
+  }
+  let end = parts.length;
+  for (let i = 1; i < parts.length; i++) {
+    if (STRICTNESS.indexOf(parts[i]) >= 0) { end = i; break; }
+  }
+  return {
+    kind,
+    id: parts.slice(1, end).join(':'),
+    strictness: parts[end] || '',
+    sticking: parts[end + 1] || '',
+  };
+}
+
+/*
  * One finished attempt.
  *   t     unix seconds
  *   d     drill id

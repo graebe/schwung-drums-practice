@@ -655,16 +655,10 @@ function rebuildProgress(always = false) {
  * the item "rock-backbeat:l2". A quiz round is filed as "pick:groove".
  */
 function itemOfRecord(rec) {
-  const parts = String(rec.d).split(':');
-  const kind = parts[0];
-  if (kind === 'guess' || kind === 'hear' || kind === 'pick') return `quiz:${parts.slice(0, 3).join(':')}`;
+  const { kind, id } = ST.parseDrillId(rec.d);
+  if (ST.QUIZ_KINDS.indexOf(kind) >= 0) return `quiz:${kind}:${id}`;
   if (kind === 'clock') return CAT.CLOCK_ID;
   if (kind !== 'drill' && kind !== 'ladder' && kind !== 'untimed') return null;
-  let end = parts.length;
-  for (let i = 1; i < parts.length; i++) {
-    if (SC.WINDOWS[parts[i]]) { end = i; break; }
-  }
-  const id = parts.slice(1, end).join(':');
   return itemNames.has(id) ? id : null;
 }
 

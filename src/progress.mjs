@@ -32,6 +32,7 @@
  */
 
 import { LEVEL_ID_RE } from './levels.mjs';
+import { parseDrillId } from './stats.mjs';
 
 /* 2: dynamics apart from clean, a take's dynamics in its history entry. A
  * version 1 file is set aside and progress rebuilt from the stats log. */
@@ -847,21 +848,18 @@ export function learnedTimeline(progress, ids, w, h, atMs) {
  */
 export const IMPORT_GOOD_MS = 60;
 export const IMPORT_MIN_HITS = 8;
-const STRICTNESS = ['loose', 'normal', 'tight'];
 
 export function importStats(progress, records, itemOf, writtenOf) {
   for (let i = 0; i < records.length; i++) {
     const r = records[i];
     const id = itemOf(r);
     if (!id) continue;
-    const parts = String(r.d).split(':');
-    const kind = parts[0];
+    const { kind, strictness } = parseDrillId(r.d);
     if (kind === 'guess' || kind === 'hear' || kind === 'pick') {
       recordRound(progress, id, { correct: r.n, wrong: r.err, at: r.t * 1000 });
       continue;
     }
     if (r.s) continue;  /* a Study take never counted */
-    const strictness = parts.find((p) => STRICTNESS.indexOf(p) >= 0);
     const eased = easedBy({ strictness, guide: r.g === 1, study: false });
     const dyn = typeof r.dp === 'number' ? r.dp : -1;
     const speed = speedOf(r.bpm, writtenOf(id, r));
