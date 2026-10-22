@@ -1104,15 +1104,35 @@ function hearBar() {
   const from = V.pageBar(run, cursor, perBar) * perBar;
   const beatMs = 60000 / (chart.bpm || 90);
   const t = now();
-  for (const e of run.entries) {
+  const stops = [];
+  for (let i = 0; i < run.entries.length; i++) {
+    const e = run.entries[i];
     if (e.beat < from - 1e-9) continue;
     if (e.beat >= from + perBar - 1e-9) break;
+    stops.push({ index: i, atMs: t + (e.beat - from) * beatMs });
     for (const n of e.notes) {
       promptQueue.push({ atMs: t + (e.beat - from) * beatMs, voice: n.voice,
         vel: n.wantDyn === 'accent' ? 115 : n.wantDyn === 'ghost' ? 45 : 90, lit: true });
     }
   }
+  if (stops.length) hearing = { stops, endMs: t + perBar * beatMs };
   announce('listen');
+}
+
+/*
+ * The stack L0's Play is sounding right now, or -1 when it is not playing:
+ * the cursor walks the bar with the sound, so you see which note is which.
+ */
+function hearingIndex() {
+  if (!hearing) return -1;
+  const t = now();
+  if (t >= hearing.endMs) {
+    hearing = null;
+    return -1;
+  }
+  let at = hearing.stops[0].index;
+  for (const stop of hearing.stops) if (stop.atMs <= t) at = stop.index;
+  return at;
 }
 
 /* Hold the playhead. The clock stops; the panel does not. */
@@ -1660,10 +1680,14 @@ function clockEnd() {
 const QUIZ_ADVANCE_MS = 500;
 const PROMPT_BPM = 96;
 let promptQueue = [];       /* { atMs, voice, vel }, soonest first */
+/* L0's Play sounding its bar: { stops: [{ index, atMs }], endMs }, so the
+ * page can follow it with the cursor instead of hiding under the ready box. */
+let hearing = null;
 let quizSolvedAt = 0;
 
 function clearPrompt() {
   promptQueue.length = 0;
+  hearing = null;
 }
 
 /* Lay out the prompt on the wall clock. The quiz has no musical clock of its
@@ -3196,9 +3220,13 @@ function draw() {
   }
   if (screen === READY && chart && chart.untimed) {
     const at = Math.max(0, tp.songBeats);
+    const heard = hearingIndex();
     V.drawUntimedReady(ctx, {
       run, chart, view: settings.view, lanes: chartLanes, dynamics: settings.dynamics,
-      cursor: Math.max(0, SC.nextEntryIndex(run, at)), title: chart.name,
+      cursor: heard >= 0 ? heard : Math.max(0, SC.nextEntryIndex(run, at)), title: chart.name,
+      /* Play takes the box away while the bar sounds: the notes and the
+       * cursor walking them are what there is to see. */
+      listening: heard >= 0,
       rightLabel: at > 0 ? `${CH.barBeatOf(chart, at).bar}/${CH.barBeatOf(chart, at).bars}` : chartLength,
       footerRight: '', progress: 0, warning: chartWarning, scrubbed: at > 0,
       hint: at > 0 && !shiftHeld ? '' : hint,
@@ -3206,9 +3234,10 @@ function draw() {
     return;
   }
   if (screen === RUNNING && run && chart && untimed) {
+    const heard = hearingIndex();
     V.drawUntimedView(ctx, {
       run, chart, view: settings.view, lanes: chartLanes, dynamics: settings.dynamics,
-      cursor: untimed.index, done: untimed.finished, title: chart.name,
+      cursor: heard >= 0 ? heard : untimed.index, done: heard < 0 && untimed.finished, title: chart.name,
       rightLabel: untimed.livePace > 0 ? `${Math.round(untimed.livePace)}bpm` : '--',
       footerRight: `${untimed.firstTry}/${untimed.stacks - untimed.firstTry}`,
       progress: UT.progress(untimed), paused: tp.paused,

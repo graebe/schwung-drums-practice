@@ -172,11 +172,12 @@ function drawArrow(ctx, x) {
  * The ready screen: the page, with the controls over it — the same box the
  * timed rungs show, saying what they do here. Play sounds the bar at its
  * written tempo, so the groove can be heard before it is stepped; Record
- * begins, with no count-in, because there is nothing to count in to.
+ * begins, with no count-in, because there is nothing to count in to. While
+ * Play sounds the bar (s.listening) the box steps aside for the page.
  */
 export function drawUntimedReady(ctx, s) {
   drawUntimedView(ctx, s);
-  if (s.scrubbed) return;
+  if (s.scrubbed || s.listening) return;
   const b = L.READY_BOX;
   ctx.fillRect(b.x, b.y, b.w, b.h, 0);
   ctx.drawRect(b.x, b.y, b.w, b.h, 1);

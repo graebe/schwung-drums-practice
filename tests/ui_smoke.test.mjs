@@ -2648,6 +2648,29 @@ test('Play on L0 sounds the bar, spread over time, and starts nothing', async ()
   assert.ok(drawnText(2).includes('REC   own pace'), 'still on the ready screen');
 });
 
+test('Play on L0 takes the ready box away, and the cursor walks the bar as it sounds', async () => {
+  const L = await import('../src/layout.mjs');
+  const { screen } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  armL0();
+  assert.ok(drawnText(2).includes('REC   own pace'), 'the box, before Play');
+  /* The cursor's arrow: its wide top row sits alone under the header rule. */
+  const arrowX = () => {
+    for (let x = 0; x < 128; x++) if (screen.pixels[L.CURSOR_TOP_Y * 128 + x]) return x;
+    return -1;
+  };
+  cc(CC.play, 127);
+  ticks(2);
+  assert.ok(!drawnText(1).includes('REC   own pace'), 'the box still covers the page');
+  const first = arrowX();
+  ticks(40);                                    /* a second into the bar */
+  const later = arrowX();
+  assert.ok(first >= 0 && later > first, `the cursor did not walk: ${first} -> ${later}`);
+  ticks(120);                                   /* past the bar */
+  assert.ok(drawnText(2).includes('REC   own pace'), 'the box comes back when the bar is through');
+});
+
 test('Record pauses an L0 take, and a press while paused is not a stroke', async () => {
   await loadUi();
   globalThis.init();
