@@ -81,7 +81,8 @@ export const MAX_TARGET = 120;
 /*
  * Step specs. `t` is the target in percent of the written tempo; `alt` the
  * drills that stand in when the first is not installed or its style is
- * switched off; `card` the lesson card that introduces it (lessons.mjs).
+ * switched off; `card` the lesson card, or cards, that introduce it
+ * (lessons.mjs).
  */
 const time = (id, t = 100, o = {}) => ({ track: 'time', id, t, ...o });
 const hands = (id, t = 100, o = {}) => ({ track: 'hands', id, t, ...o });
@@ -105,7 +106,7 @@ export const STAGES = [
     core: [
       quiz('guess', 'voice', 'kit3', { card: 'kit-on-paper' }),
       quiz('hear', 'voice', 'kit3'),
-      time('subdiv:quarters', 60, { card: 'pulse' }),
+      time('subdiv:quarters', 60, { card: ['pulse', 'result'] }),
       time('read:1', 100, { card: 'rests' }),
       groove('first-beat', 100, { card: 'backbeat' }),
     ],
@@ -369,7 +370,7 @@ function makeSteps(spec, option, stage, part) {
     target,
     dyn: spec.dyn || 0,
     style: option.style,
-    card: spec.card || '',
+    cards: [].concat(spec.card || []),
     stage: stage.key,
     part,
     title: st.title || st.label,
@@ -489,10 +490,12 @@ function open(progress, step, atMs) {
 }
 
 /* What a step needs to be counted as part of its stage under the prefs: a
- * track that is on, and with the short ladder only a groove's first and last
- * rungs. */
+ * track that is on, a style that is on (after its alternatives were tried),
+ * and with the short ladder only a groove's first and last rungs. A stage's
+ * idea is in several of its grooves, so dropping a style never empties it. */
 function required(prefs, step) {
   if (!trackOn(prefs, step.track)) return false;
+  if (!styleOn(prefs, step.style)) return false;
   if (prefs.rungs === 'short' && step.rung > 0 && !step.top) return false;
   return true;
 }
@@ -716,6 +719,7 @@ function stageFolder(stage) {
   const children = [...scopedRows(core)];
   const cp = checkpointSteps(stage, {});
   if (cp.length) children.push({ ...stepRow(cp[0]), label: `Checkpoint: ${stepTitle(cp[0])}`, checkpoint: true });
+  children.push({ label: 'Lessons', value: '', lessonsRow: true, stage });
   for (const t of TRACKS) {
     const steps = core.filter((st) => st.track === t.key);
     if (!steps.length) continue;

@@ -15,6 +15,7 @@ for entry in \
   drums-practice/ui.js \
   drums-practice/dsp.so \
   drums-practice/help.json \
+  drums-practice/lessons.json \
   drums-practice/exercises/index.json \
   drums-practice/LICENSE \
   drums-practice/THIRD-PARTY-NOTICES.md \

@@ -28,7 +28,7 @@ const SHARED = '/data/UserData/schwung/shared/';
 const STAGED_UI = join(mkdtempSync(join(tmpdir(), 'drums-ui-')), 'ui.js');
 let uiLoads = 0;
 
-async function loadUi({ extraFiles = {}, settings = null, dataFiles = {} } = {}) {
+async function loadUi({ extraFiles = {}, settings = null, dataFiles = {}, withLessons = false } = {}) {
   const src = readFileSync(new URL('../src/ui.js', import.meta.url), 'utf8');
   const log = { leds: [], buttons: [], params: [], midi: [], writes: {}, announces: [], exited: 0 };
   const screen = createScreen();
@@ -58,6 +58,12 @@ async function loadUi({ extraFiles = {}, settings = null, dataFiles = {} } = {})
   }
   for (const [name, text] of Object.entries(extraFiles)) {
     files[`/data/UserData/schwung/modules/tools/drums-practice/exercises/${name}`] = text;
+  }
+  /* The lesson cards stand before the steps they introduce, so only the tests
+   * about them ship the file; the rest walk the path without them. */
+  if (withLessons) {
+    files['/data/UserData/schwung/modules/tools/drums-practice/lessons.json'] =
+      readFileSync(new URL('../src/lessons.json', import.meta.url), 'utf8');
   }
   if (settings) {
     files['/data/UserData/schwung/modules/tools/drums-practice/settings.json'] =
@@ -1564,7 +1570,7 @@ test('a take short of the step\'s target reads as its speed; the row shows it ag
   /* Learning Path › 0 Hello, kit › Time: Quarters reads 50 of its 60. */
   cc(CC.jogTurn, 3);
   cc(CC.jogClick, 127);
-  cc(CC.jogTurn, 3);
+  cc(CC.jogTurn, 4);
   cc(CC.jogClick, 127);
   ticks(2);
   assert.ok(drawnText(2).includes('50/60'), `the row does not show the speed: ${drawnText(2).join('|')}`);
@@ -1661,7 +1667,7 @@ test('a folder skips everything in it with one row, and takes it back with the s
   cc(CC.jogClick, 127);           /* Learning Path */
   cc(CC.jogTurn, 3);
   cc(CC.jogClick, 127);           /* 0 Hello, kit */
-  cc(CC.jogTurn, 5);
+  cc(CC.jogTurn, 6);
   cc(CC.jogClick, 127);           /* Ear */
   cc(CC.jogTurn, 1);
   ticks(1);
@@ -1694,6 +1700,147 @@ test('Your path: a track switched off, and Continue no longer offers it', async 
   for (let i = 0; i < 5; i++) cc(CC.jogTurn, 127);
   ticks(1);
   assert.ok(drawnText(1).some((t) => /Next: First beat L0/.test(t)), drawnText(1).join('|'));
+});
+
+test('Your path: the short ladder, and starting at a later stage', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);           /* Learning Path */
+  cc(CC.jogTurn, 2);
+  cc(CC.jogClick, 127);           /* Your path */
+  cc(CC.jogTurn, 2);
+  cc(CC.jogClick, 127);           /* Rungs: full -> short */
+  cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);           /* Start at: Stage 0 -> Stage 1 */
+  ticks(1);
+  const shown = drawnText(1);
+  assert.ok(shown.includes('short') && shown.includes('Stage 1'), shown.join('|'));
+  cc(CC.back, 127);
+  for (let i = 0; i < 5; i++) cc(CC.jogTurn, 127);
+  ticks(1);
+  assert.ok(drawnText(1).some((t) => /Next: Eighths/.test(t)), drawnText(1).join('|'));
+});
+
+/* Practise quarters at `bpm`, hitting only every other beat: a take that
+ * does not count. From the ready screen or a result, Record starts it. */
+function playHalf(snarePadNo, bpm, beats = 40) {
+  cc(CC.record, 127);
+  const beatMs = 60000 / bpm;
+  let t = 0;
+  let next = 0;
+  let k = 0;
+  for (let i = 0; i < (beats * beatMs) / 25 + 40; i++) {
+    if (t >= next) { if (k % 2 === 0) { pad(snarePadNo, 100); pad(snarePadNo, 0); } k++; next += beatMs; }
+    globalThis.__advance(25);
+    t += 25;
+    globalThis.tick();
+  }
+}
+
+test('stuck on a step: a hint after three failed takes, parked after six', async () => {
+  const { log } = await loadUi({ settings: PLAIN });
+  const sn = await snare();
+  globalThis.init();
+  ticks(2);
+  continuePath();
+  for (let n = 1; n <= 6; n++) {
+    playHalf(sn, 60);
+    const shown = drawnText(2);
+    assert.ok(shown.includes('NOT CLEAN'), shown.join('|'));
+    if (n < 3) assert.ok(shown.includes('REC again  CLICK next'), `take ${n}: ${shown.join('|')}`);
+    else if (n < 6) assert.ok(shown.includes('stuck? knob 8 slower'), `take ${n}: ${shown.join('|')}`);
+    else assert.ok(shown.includes('parked: CLICK other'), `take ${n}: ${shown.join('|')}`);
+  }
+  cc(CC.menu, 127);
+  ticks(1);
+  assert.ok(drawnText(1).some((t) => /Next: First beat L0/.test(t)), 'Continue still offers the parked step');
+  globalThis.onUnload();
+  assert.ok(JSON.parse(log.writes[`${DATA}progress.json`]).items['subdiv:quarters'].park > 0);
+});
+
+/* ---- lesson cards ---------------------------------------------------------- */
+
+test('a lesson card stands before a new concept, and Click is all it costs', async () => {
+  const { log } = await loadUi({ settings: PLAIN, withLessons: true });
+  globalThis.init();
+  ticks(2);
+  continuePath();
+  /* Entering the first stage: its card, then the step's two. */
+  let shown = drawnText(1);
+  assert.ok(shown.includes('0 Hello, kit'), `no stage card: ${shown.join('|')}`);
+  assert.ok(shown.includes('CLICK next  PLAY hear'), shown.join('|'));
+  cc(CC.jogClick, 127); ticks(1);
+  assert.ok(drawnText(1).includes('The pulse'), drawnText(1).join('|'));
+  cc(CC.jogClick, 127); ticks(1);
+  shown = drawnText(1);
+  assert.ok(shown.includes('Your result') && shown.includes('CLICK start PLAY hear'), shown.join('|'));
+  cc(CC.jogClick, 127); ticks(2);
+  assert.ok(drawnText(2).some((t) => /Quart/.test(t)), 'Click on the last card did not open the step');
+  /* Read once, never again: Continue goes straight to the step. */
+  cc(CC.menu, 127); ticks(1);
+  cc(CC.jogClick, 127); ticks(2);
+  assert.ok(drawnText(2).some((t) => /Quart/.test(t)), 'a card read came back');
+  globalThis.onUnload();
+  const seen = JSON.parse(log.writes[`${DATA}progress.json`]).path.seen;
+  assert.deepEqual(seen, ['stage-0', 'pulse', 'result']);
+});
+
+test('Back from a card returns to the list and marks nothing read; Intros off shows none', async () => {
+  await loadUi({ settings: PLAIN, withLessons: true });
+  globalThis.init();
+  ticks(2);
+  continuePath();
+  cc(CC.back, 127); ticks(1);
+  assert.ok(drawnText(1).some((t) => /Next: Quarters/.test(t)), 'Back did not return to the list');
+  cc(CC.jogClick, 127); ticks(1);
+  assert.ok(drawnText(1).includes('0 Hello, kit'), 'the card was marked read by Back');
+  cc(CC.back, 127);
+  /* Your path › Intros: new -> always -> off. */
+  cc(CC.jogTurn, 2);
+  cc(CC.jogClick, 127);
+  cc(CC.jogTurn, 4);
+  cc(CC.jogClick, 127);
+  cc(CC.jogClick, 127);
+  ticks(1);
+  assert.ok(drawnText(1).includes('off'), drawnText(1).join('|'));
+  cc(CC.back, 127);
+  for (let i = 0; i < 5; i++) cc(CC.jogTurn, 127);
+  cc(CC.jogClick, 127); ticks(2);
+  assert.ok(drawnText(2).some((t) => /Quart/.test(t)), 'Intros off still showed a card');
+});
+
+test('Play on a card skips the reading and hears the practice', async () => {
+  const { log } = await loadUi({ settings: PLAIN, withLessons: true });
+  globalThis.init();
+  ticks(2);
+  continuePath();
+  cc(CC.play, 127);
+  ticks(2);
+  assert.ok(log.buttons.some(([cc, c]) => cc === CC.play && c === 126), 'not listening');
+  globalThis.onUnload();
+  assert.equal(JSON.parse(log.writes[`${DATA}progress.json`]).path.seen.length, 3);
+});
+
+test('a stage\'s Lessons row reads its cards again, the jog turning their pages', async () => {
+  await loadUi({ settings: PLAIN, withLessons: true });
+  globalThis.init();
+  ticks(2);
+  cc(CC.jogTurn, 1);
+  cc(CC.jogClick, 127);           /* Learning Path */
+  cc(CC.jogTurn, 3);
+  cc(CC.jogClick, 127);           /* 0 Hello, kit */
+  cc(CC.jogTurn, 3);
+  cc(CC.jogClick, 127);           /* Lessons */
+  ticks(1);
+  assert.ok(drawnText(1).includes('CLICK next  BACK list'), drawnText(1).join('|'));
+  cc(CC.jogTurn, 1);              /* a one-page card stays on its page */
+  ticks(1);
+  for (let i = 0; i < 10 && !drawnText(1).includes('CLICK done'); i++) { cc(CC.jogClick, 127); ticks(1); }
+  assert.ok(drawnText(1).includes('CLICK done'));
+  cc(CC.jogClick, 127); ticks(1);
+  assert.ok(drawnText(1).includes('Lessons'), `not back in the stage folder: ${drawnText(1).join('|')}`);
 });
 
 test('Repetition lists what is due, and opens it', async () => {
@@ -1835,7 +1982,7 @@ test('an Ear step records its round, and Click goes on to the next quiz', async 
   cc(CC.jogClick, 127);
   cc(CC.jogTurn, 3);
   cc(CC.jogClick, 127);
-  cc(CC.jogTurn, 5);
+  cc(CC.jogTurn, 6);
   cc(CC.jogClick, 127);
   cc(CC.jogTurn, 2);
   cc(CC.jogClick, 127);
@@ -1869,7 +2016,7 @@ test('the Clock step arms the Clock round its drill, at the drill\'s target', as
   cc(CC.jogClick, 127);
   cc(CC.jogTurn, 4);
   cc(CC.jogClick, 127);
-  cc(CC.jogTurn, 3);
+  cc(CC.jogTurn, 4);
   cc(CC.jogClick, 127);
   cc(CC.jogTurn, 4);
   cc(CC.jogClick, 127);

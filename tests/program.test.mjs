@@ -185,6 +185,20 @@ test('Your path: a style switched off swaps a checkpoint for its alternative', (
   assert.equal(PLAN.checkpointSteps(prog.stages[4], p.path)[0].id, 'half-time-shuffle:l3');
 });
 
+test('Your path: a style switched off leaves the core, but never empties a stage', () => {
+  const prog = build();
+  const p = P.emptyProgress();
+  P.togglePath(p, 'styles', 'jazz');
+  const s4 = PLAN.coreSteps(prog.stages[4], p.path).map((st) => st.id);
+  assert.ok(!s4.some((id) => id.startsWith('jazz-ride') || id.startsWith('two-beat')), 'jazz is still asked');
+  assert.ok(s4.some((id) => id.startsWith('half-time-shuffle')), 'the shuffle (funk) stays');
+  assert.ok(s4.includes('subdiv:triplets'), 'the time track is no style');
+  for (const k of P.PATH_STYLES) if (p.path.styles[k]) P.togglePath(p, 'styles', k);
+  for (const stage of prog.stages) {
+    assert.ok(PLAN.coreSteps(stage, p.path).length > 0, `stage ${stage.index} is empty with no style on`);
+  }
+});
+
 test('Your path: start at a later stage; earlier stages stay open, nothing is ticked', () => {
   const prog = build();
   const p = P.emptyProgress();

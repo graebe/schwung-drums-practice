@@ -47,6 +47,7 @@ import * as Q from './guess.mjs';
 import * as AP from './answer_pads.mjs';
 import * as PROG from './progress.mjs';
 import * as PLAN from './program.mjs';
+import * as LES from './lessons.mjs';
 import * as UT from './untimed.mjs';
 import { availableLevels, LEVEL_ID_RE, isUntimedId } from './levels.mjs';
 import { paint, flashColor, guideTargets, FLASH_MS } from './led_paint.mjs';
@@ -88,6 +89,7 @@ const PROGRESS = 'progress';
 const PROGRESS_ITEM = 'progressItem';
 const SETTINGS = 'settings';
 const ERROR = 'error';
+const CARD = 'card';
 
 /* MIDI out routes. */
 const OUT_TRACK = 1;
@@ -225,6 +227,11 @@ let itemNames = new Map();
 /* The step of the Learning Path the armed drill was opened as, so Click on
  * its result goes on along the path; null when it came from anywhere else. */
 let pathStep = null;
+/* The lesson cards (lessons.json), and the ones on screen:
+ * { ids, at, page, pages, then } — `then` is what Click goes on to once the
+ * last is read, null when they were opened from Lessons to read again. */
+let lessons = new Map();
+let card = null;
 /* How stuck the learner is on that step, for the result's footer (program.mjs
  * stuckLevel): 0, 1 suggest an easier way in, 2 parked for a day. */
 let stuckNow = 0;
@@ -1774,8 +1781,14 @@ function openRow() {
   }
   if (item.continueRow) {
     const next = PLAN.continueStep(progress, program);
-    if (next) openStep(next.step);
+    if (next) openPathStep(next.step);
     else announce('Everything on the path is learned.');
+    return;
+  }
+  if (item.lessonsRow) {
+    const st = item.stage;
+    const ids = LES.stageCards(lessons, st, PLAN.coreSteps(st).concat(PLAN.checkpointSteps(st)));
+    if (ids.length) showCards(ids, null);
     return;
   }
   if (item.skipRow) {
@@ -1795,7 +1808,7 @@ function openRow() {
     return;
   }
   if (item.step) {
-    openStep(item.step);
+    openPathStep(item.step);
     return;
   }
   pathStep = null;
@@ -1890,6 +1903,61 @@ function openStep(step) {
   pathStep = step;
 }
 
+/*
+ * A step of the path, with the lesson cards it is due first: its stage's
+ * card the first time the stage is entered, then its own. Click on the last
+ * one opens the step, so the cards cost one press, read or not.
+ */
+function openPathStep(step) {
+  const stage = program.stages.find((s) => s.key === step.stage);
+  const due = LES.dueCards(lessons, progress.path, step, stage);
+  if (due.length) showCards(due, () => openStep(step));
+  else openStep(step);
+}
+
+function showCards(ids, then) {
+  card = { ids, at: 0, page: 0, pages: [[]], then };
+  layCard();
+  screen = CARD;
+}
+
+/* The card at `at`, wrapped to the screen in the font it is drawn in. */
+function layCard() {
+  const c = lessons.get(card.ids[card.at]);
+  card.title = c ? c.title : '';
+  card.pages = LES.paginate(LES.wrapText(c ? c.text : '', L.SCREEN_W - 2, (t) => ctx.textWidth(t)));
+  card.page = 0;
+}
+
+/* Click: this card is read; on to the next, or to what the cards stood before. */
+function nextCard() {
+  PROG.markSeen(progress, card.ids[card.at]);
+  saveProgress();
+  if (card.at + 1 < card.ids.length) {
+    card.at++;
+    layCard();
+    return;
+  }
+  const then = card.then;
+  card = null;
+  screen = MENU;
+  if (then) then();
+}
+
+/* Play: the cards are taken as read and the practice is heard at once. */
+function hearFromCard() {
+  if (!card.then) return;
+  for (let i = card.at; i < card.ids.length; i++) PROG.markSeen(progress, card.ids[i]);
+  card.at = card.ids.length - 1;
+  nextCard();
+  if (screen === READY) start(false);
+}
+
+function cardFooter() {
+  if (!card.then) return card.at + 1 < card.ids.length ? 'CLICK next  BACK list' : 'CLICK done';
+  return card.at + 1 < card.ids.length ? 'CLICK next  PLAY hear' : 'CLICK start PLAY hear';
+}
+
 /* A step's target as a Speed the setting offers: its nearest step of five,
  * inside the setting's range. */
 function speedFor(target) {
@@ -1903,7 +1971,7 @@ function goNext() {
   quiz = null;
   resultCache = null;
   if (next) {
-    openStep(next);
+    openPathStep(next);
     return;
   }
   ladder = null;
@@ -2129,6 +2197,7 @@ function leaveToMenu() {
     T.home(tp);
   }
   untimed = null;
+  card = null;
   screen = MENU;
   settingsEditing = false;
   quiz = null;
@@ -2150,6 +2219,7 @@ function back() {
   if ((screen === SUMMARY || screen === LADDER) && chart) { restart(); return true; }
   /* Up one folder; only the top of the tree is left by Back. */
   if (screen === MENU) return CAT.navPop(nav);
+  if (screen === CARD) { card = null; screen = MENU; return true; }
   if (screen === PROGRESS_ITEM) { screen = PROGRESS; return true; }
   /* Back from a run RESTARTS it. Back again lands on READY, whose own Back
    * goes to the list — so leaving needs no gesture of its own. */
@@ -2295,6 +2365,7 @@ function decorateRow(row, nextKey, current) {
     return { label: !open && skipped ? 'Unskip all here' : 'Skip all here', value: '' };
   }
   if (row.prefRow) return { label: row.label, value: prefValue(row) };
+  if (row.lessonsRow) return plain;
   if (row.stage) {
     const sum = PLAN.stepsSummary(progress, row.steps);
     const mark = PLAN.stageComplete(progress, row.stage) ? PROG.MARK_DONE
@@ -2351,6 +2422,11 @@ function draw() {
       count: errCount,
       safeMode,
     });
+    return;
+  }
+  if (screen === CARD && card) {
+    V.drawCard(ctx, { title: card.title, lines: card.pages[card.page], page: card.page,
+      pages: card.pages.length, footer: cardFooter() });
     return;
   }
   if (screen === MENU) {
@@ -2511,6 +2587,7 @@ function initInner() {
   stats = loadStats();
   manifestError = '';
   loadExercises();
+  lessons = LES.parseLessons(readFile(`${MODULE_DIR}/lessons.json`)).cards;
   rebuildMenu();
   /* After the tree: reading takes in from stats.json needs its item ids. */
   progress = loadProgress();
@@ -2718,6 +2795,7 @@ function midiInner(data) {
       /* In a hearing drill Play repeats the question — without it a prompt
        * you did not catch is a prompt you cannot answer. */
       if (screen === QUIZ && promptIsAudible()) { schedulePrompt(); return; }
+      if (screen === CARD && card) { hearFromCard(); return; }
       if (screen === READY || ((screen === SUMMARY || screen === LADDER) && chart)) {
         if (screen !== READY) enterReady();
         start(false);
@@ -2807,6 +2885,8 @@ function jog(delta) {
     settingsSel = Math.max(0, Math.min(SET.ROWS.length - 1, settingsSel + delta));
   } else if (target === 'value') {
     editSetting(SET.ROWS[settingsSel].key, delta);
+  } else if (target === 'page' && card) {
+    card.page = Math.max(0, Math.min(card.pages.length - 1, card.page + delta));
   } else if (target === 'choice' && quiz) {
     Q.moveChoice(quiz, delta);
   } else if ((screen === SUMMARY || screen === LADDER) && review) {
@@ -2826,6 +2906,7 @@ function jog(delta) {
 
 function click() {
   if (screen === MENU) { openRow(); return; }
+  if (screen === CARD && card) { nextCard(); return; }
   if (screen === SETTINGS) { settingsEditing = !settingsEditing; return; }
   if (screen === QUIZ && quiz && quiz.mode === 'pick') {
     const r = Q.pickChoice(quiz, now());
