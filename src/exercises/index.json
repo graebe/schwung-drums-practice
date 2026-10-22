@@ -12,6 +12,8 @@
     {"id": "drags", "name": "Drags", "folder": "Rudiments"}
   ],
   "exercises": [
+    {"id": "first-beat", "name": "First beat", "category": "rock", "file": "first-beat.json"},
+    {"id": "eighth-beat", "name": "Eighth-note beat", "category": "rock", "file": "eighth-beat.json"},
     {"id": "rock-backbeat", "name": "Rock backbeat", "category": "rock", "file": "rock-backbeat.json"},
     {"id": "straight-eights", "name": "Straight eights", "category": "rock", "file": "straight-eights.json"},
     {"id": "pop-four-floor", "name": "Pop four-floor", "category": "rock", "file": "pop-four-floor.json"},
