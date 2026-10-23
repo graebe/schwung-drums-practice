@@ -67,12 +67,40 @@ export function resultBig(s) {
   return `${Math.round(s.rate)}`;
 }
 
-/* Where a result's big number sits, as the star round it needs it (anim.mjs
- * starBurst): its middle, and a radius that clears it. */
-export function bigScoreRing(big) {
-  const w = SR.bigTextWidth(big, L.RESULT_BIG_SCALE);
+/*
+ * The star's frame (scene_view.mjs): a level learned for the first time,
+ * its result's big number alone and centred in the map area (y 10..54) at
+ * the result's scale with its unit, LEVEL LEARNED under it — or LEARNED,
+ * where that does not fit — the result's title bar and the scene's hint
+ * line. When the star ends the result screen is drawn as it always is.
+ *
+ *   y 10..45  the number, centred on (STAR_X, STAR_Y)
+ *   y 46..52  the caption
+ */
+export const STAR_X = L.SCREEN_W >> 1;
+export const STAR_Y = 27;
+const STAR_CAPTION_Y = 46;
+const STAR_CAPTIONS = ['LEVEL LEARNED', 'LEARNED'];
+
+/* The number's box on the star's frame: the digits at the result's scale and
+ * the unit beside them, centred on the star. */
+export function learnedBox(ctx, { big, unit }) {
+  const digits = SR.bigTextWidth(big, L.RESULT_BIG_SCALE);
   const h = SR.BIG_H * L.RESULT_BIG_SCALE;
-  return { x: L.RESULT_LEFT_X + (w >> 1), y: L.RESULT_BIG_Y + (h >> 1), r: Math.ceil(Math.max(w, h) / 2) };
+  const w = digits + (unit ? ctx.textWidth(unit) + 3 : 0);
+  return { x: STAR_X - (w >> 1), y: STAR_Y - (h >> 1), w, h, digits };
+}
+
+/* s = { title, right, mark, big, unit, footer } */
+export function drawLearned(ctx, s) {
+  ctx.clear();
+  drawTitle(ctx, s.title || '', s.right || '', s.mark || null);
+  const b = learnedBox(ctx, s);
+  SR.drawBigText(ctx, b.x, b.y, s.big, L.RESULT_BIG_SCALE);
+  if (s.unit) ctx.text(b.x + b.digits + 3, b.y + 8, s.unit, 1);
+  const caption = STAR_CAPTIONS.find((c) => ctx.textWidth(c) <= L.SCREEN_W - 2) || STAR_CAPTIONS[1];
+  ctx.text((L.SCREEN_W - ctx.textWidth(caption)) >> 1, STAR_CAPTION_Y, caption, 1);
+  drawHint(ctx, s.footer || '');
 }
 
 export function drawSummary(ctx, s) {

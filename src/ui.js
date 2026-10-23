@@ -2298,8 +2298,9 @@ function nextScene() {
   anim.scene = sc;
   anim.since = now();
   anim.walk = SV.sceneWalk(sc, anim.since);
-  const big = sc.kind !== 'star' ? '' : sc.under === RESULT ? V.resultBig(resultCache) : V.summaryBig(summaryInfo);
-  anim.args = SV.sceneArgs(sc, { seed: anim.at + 1, big });
+  anim.args = SV.sceneArgs(sc, { seed: anim.at + 1 });
+  anim.learned = sc.kind !== 'star' ? null
+    : SV.learnedOf(sc.under === RESULT ? { result: resultCache } : { summary: summaryInfo });
   if (sc.say) announce(sc.say);
 }
 
@@ -2330,10 +2331,8 @@ function sceneInput(type, d1, d2) {
 
 function drawScene(hint) {
   const t = now();
-  const under = anim.scene.kind !== 'star' ? null : anim.scene.under === RESULT
-    ? { result: { ...resultCache, footer: hint } } : { summary: { ...summaryInfo, footer: hint } };
   SV.drawScene(ctx, { scene: anim.scene, args: anim.args, walk: anim.walk, now: t, ms: t - anim.since, footer: hint,
-    under });
+    learned: anim.learned });
 }
 
 function sceneLeds(t) {

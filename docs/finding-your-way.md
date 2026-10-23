@@ -178,8 +178,9 @@ up, then the avatar walks to the place of the next step. Finish a stage and fire
 it, a banner says **STAGE COMPLETE** (or **CHECKPOINT PASSED**), the map zooms out, the avatar sails
 to the next island, the map zooms in and the avatar walks to the next step. The whole path through
 ends with **LEARNING PATH COMPLETE** and fireworks over every island. A level learned for the first
-time gets a burst of rays round the result's number. Each is said aloud, and **any key or pad
-skips it** to where it was going; nothing sounds and nothing is recorded meanwhile.
+time shows its result's number on its own with **LEVEL LEARNED** under it, then the result. Each is
+said aloud, and **any key or pad skips it** to where it was going; nothing sounds and nothing is
+recorded meanwhile.
 
 **The list is one option away.** SHIFT+CLICK on the map and choose **Show as list**: the folder is
 a list again until you leave it, and BACK returns to the map. That is also where **Review** is, the

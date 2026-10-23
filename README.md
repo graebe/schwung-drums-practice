@@ -552,7 +552,7 @@ when Click on a result goes on along the path, what you finished is shown before
 | a place (a track's last step), and the next step is in another | its flag going up, then the avatar walking to the next place |
 | a stage — its core, or its checkpoint passed | the flag and fireworks, **STAGE COMPLETE** or **CHECKPOINT PASSED**, the map zooming out, the avatar sailing to the next island, zooming in, and walking to the next step |
 | the whole path | the fireworks and banner, **LEARNING PATH COMPLETE**, and the finale: every flag waving, fireworks over every island |
-| a level, learned for the first time | a burst of rays round the result's big number |
+| a level, learned for the first time | its result's big number on its own, **LEVEL LEARNED** under it, then the result |
 
 Each one is said aloud, the pads sweep and sparkle along, and **any key or pad skips** it straight
 to where it was going. Nothing sounds and nothing is recorded while one plays. When the next step

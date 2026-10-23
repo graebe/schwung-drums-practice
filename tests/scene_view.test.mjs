@@ -64,7 +64,7 @@ test('every scene draws, from its first frame to its last, with the hint line ke
         const f = c[k].bind(c);
         c[k] = (...a) => { calls++; return f(...a); };
       }
-      SV.drawScene(c, { scene: sc, args, walk, now: ms, ms, footer: 'ANY KEY skip', under: { summary } });
+      SV.drawScene(c, { scene: sc, args, walk, now: ms, ms, footer: 'ANY KEY skip', learned: SV.learnedOf({ summary }) });
       assert.ok(countOn(c, 0, 10, 128, 44) > 0, `${sc.kind} at ${ms} drew nothing`);
       assert.ok(countOn(c, 0, 56, 128, 8) > 0, `${sc.kind} at ${ms} lost its hint line`);
       assert.ok(calls < 400, `${sc.kind} at ${ms}: ${calls} calls`);
@@ -92,4 +92,30 @@ test('the pads follow the scene: a sweep as the flag rises, sparkles after, the 
   assert.ok(out.includes(SCENE_PALETTE.sparkle));
   SV.sceneLeds(out, { scene: out1, walk: SV.sceneWalk(out1, 0), now: 0, ms: 100 });
   assert.ok(out.includes(MAP_PALETTE.done), 'the world\'s finished islands');
+});
+
+/*
+ * The star's own frame: the big number alone and centred in the map area at
+ * the result's scale, the caption under it, the result's title bar and the
+ * scene's hint line kept.
+ */
+test('the star frame: the score centred in the map area, LEVEL LEARNED under it', async () => {
+  const V = await import('../src/view.mjs');
+  const sc = { kind: 'star', under: 'summary' };
+  for (const learned of [SV.learnedOf({ summary }), SV.learnedOf({ result: { rate: 24.4, isBest: true } })]) {
+    const texts = [];
+    const c = createScreen();
+    const text = c.text.bind(c);
+    c.text = (x, y, str, v) => { texts.push({ x, y, str }); return text(x, y, str, v); };
+    SV.drawScene(c, { scene: sc, args: SV.sceneArgs(sc), now: 0, ms: 0, footer: 'ANY KEY skip', learned });
+    const box = V.learnedBox(c, learned);
+    assert.ok(box.y >= 10 && box.y + box.h <= 45, `inside the map area: ${JSON.stringify(box)}`);
+    assert.ok(Math.abs(box.x + box.w / 2 - 64) <= 1, 'centred');
+    assert.ok(countOn(c, box.x, box.y, box.digits, box.h) > 0, 'the number');
+    const caption = texts.find((t) => t.str === 'LEVEL LEARNED');
+    assert.ok(caption && caption.y > box.y + box.h && caption.y + 7 < 56, `the caption under it: ${JSON.stringify(caption)}`);
+    assert.ok(texts.some((t) => t.str === 'ANY KEY skip' && t.y === 56), 'the hint line');
+    assert.ok(texts.some((t) => t.y === 0 && t.str === learned.title), 'the title bar');
+    assert.ok(texts.some((t) => t.str === learned.unit), 'its unit');
+  }
 });

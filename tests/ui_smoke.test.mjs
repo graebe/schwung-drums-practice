@@ -1823,6 +1823,8 @@ test('a level learned for the first time: the star round the result, then the re
   stepThrough();
   assert.equal(screenNow(), 'anim', 'no star for a level learned');
   assert.ok(log.announces.includes('learned'));
+  const frame = drawnText(1);
+  assert.ok(frame.includes('LEVEL LEARNED') && frame.includes('ANY KEY skip'), `the star's frame: ${frame.join('|')}`);
   ticks(30);                                  /* its 600 ms */
   assert.equal(screenNow(), 'summary');
   assert.ok(drawnText(1).includes('LEARNED'), drawnText(1).join('|'));
@@ -2807,6 +2809,7 @@ test('stepping L0 through, clean, ends on a result that learns it', async () => 
   cc(CC.record, 127);
   ticks(2);
   stepThrough();
+  skipScene();                                  /* learned: past the star */
   const shown = drawnText(3);
   assert.ok(shown.some((t) => /100% 1st try/.test(t)), shown.join('|'));
   assert.ok(shown.some((t) => /of 92bpm/.test(t)), 'the pace against the written tempo');
@@ -2834,6 +2837,7 @@ test('a stack struck apart is asked for again and costs its first try', async ()
   pad(PAD_OF.KK, 80); pad(PAD_OF.KK, 0);
   ticks(4);
   stepThrough();
+  skipScene();                                  /* learned: past the star */
   const shown = drawnText(3);
   const n = ROCK_STACKS.length * 2;
   const pct = Math.floor(((n - 1) * 100) / n);
@@ -2918,6 +2922,7 @@ test('Record pauses an L0 take, and a press while paused is not a stroke', async
   cc(CC.record, 127);                           /* resume */
   ticks(2);
   stepThrough();
+  skipScene();                                  /* learned: past the star */
   assert.ok(drawnText(3).some((t) => /100% 1st try/.test(t)));
 });
 
@@ -2971,6 +2976,7 @@ test('Speed during an L0 take changes only what Play sounds like; the take stays
   ticks(2);
   cc(CC.knob1 + 7, 127);                        /* knob 8, a step slower */
   stepThrough();
+  skipScene();                                  /* learned: past the star */
   const shown = drawnText(3);
   assert.ok(shown.includes('LEARNED'), `still a whole take: ${shown.join('|')}`);
   assert.ok(shown.some((t) => /of 92bpm/.test(t)), 'measured against the written tempo, not the Speed');
@@ -3058,6 +3064,7 @@ test('switching Pads back in Settings clears the L0 warning', async () => {
   cc(CC.record, 127);
   ticks(2);
   stepThrough();
+  skipScene();                                  /* learned: past the star */
   assert.ok(drawnText(3).some((t) => /1st try/.test(t)), 'and the take runs');
 });
 

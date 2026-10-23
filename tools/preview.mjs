@@ -35,6 +35,7 @@
  *   npm run preview -- --screen tour --stop 0      (Meet the pads; --stop 99 is the end page,
  *                                                   --struck SN a wrong pad named)
  *   npm run preview -- --screen scene --case place|stage|checkpoint [--scene N] [--t ms]
+ *   npm run preview -- --screen star [--quiz] [--t ms]   (a level learned: its star frame)
  *                       (a scene of the Learning Path: scene N of the plan, --t ms into it)
  *   npm run preview -- --screen pick --layout mpc|gm|custom [--choice N] [--struck N]
  *                       (Pick: drum on the kit's pads; custom is MPC Classic without the
@@ -315,6 +316,13 @@ if (screen) {
       padGrid: AP.kitGrid(quiz.options, layout), labelFor: (v) => Q.labelFor(quiz, v),
       shortFor: (v) => Q.shortFor(quiz, v), isEliminated: (i) => Q.isEliminated(quiz, i), hintsLeft: 2,
       footer: footer[Number(arg('part', 0)) % footer.length] });
+  } else if (screen === 'star') {
+    const sc = { kind: 'star', under: arg('quiz', false) ? 'result' : 'summary' };
+    const learned = arg('quiz', false) ? SV.learnedOf({ result: { rate: 24.4, isBest: true } })
+      : SV.learnedOf({ summary: { name: 'Rock backbeat L2', status: 'LEARNED', clean: true, speed: 100 } });
+    const ms = Number(arg('t', 300));
+    SV.drawScene(ctx, { scene: sc, args: SV.sceneArgs(sc, { seed: 1 }), ms, now: ms, learned,
+      footer: H.hintFor(H.SCREENS.ANIM)[0] });
   } else if (screen === 'scene') {
     /* A scene of the Learning Path, from a real step and its plan. */
     const { program, folder } = samplePath({ fresh: true });

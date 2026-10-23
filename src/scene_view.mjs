@@ -14,7 +14,9 @@
  *   walk       the avatar at the story's pace (STORY_MS_PER_CELL)
  *   zoom       the world's title, the island growing from its cell or back
  *   finale     every flag waving, fireworks over every island
- *   star       the result, rays round its big number (starBurst)
+ *   star       its own frame: the result's big number in the map area,
+ *              LEVEL LEARNED under it (drawLearned); the rays round it wait
+ *              for the engine's elliptical starBurst
  * The pads: a green sweep as a flag rises and round the star, sparkles under
  * fireworks, a banner and the finale; a walk and a zoom show their map's.
  */
@@ -46,10 +48,9 @@ export function sceneWalk(sc, t) {
 /*
  * What a scene's frames are drawn with, worked out once as it starts: the
  * repaint is fifty times a second and must not allocate. `seed` varies the
- * fireworks from scene to scene; `big` is the star's result's big number.
+ * fireworks from scene to scene.
  */
-export function sceneArgs(sc, { seed = 1, big = '' } = {}) {
-  if (sc.kind === 'star') return { ...V.bigScoreRing(big), seed };
+export function sceneArgs(sc, { seed = 1 } = {}) {
   const m = sceneMap(sc);
   if (sc.kind === 'zoom') return { cell: m.layout.cells[sc.at], place: m.places[sc.at] };
   if (sc.kind === 'finale') return { layout: m.layout, places: m.places, seed };
@@ -70,18 +71,23 @@ export function drawPlaces(ctx, { map, walk, now, footer, places = map.places, r
     route });
 }
 
+/* The star's frame, for the result it celebrates: a take's (summary) or a
+ * quiz round's (result), its title bar and its big number. */
+export function learnedOf({ summary = null, result = null }) {
+  if (result) return { title: result.isBest ? 'BEST YET' : 'ROUND', big: V.resultBig(result), unit: '/min' };
+  return { title: summary.name || 'RESULT', right: summary.status, mark: summary.mark, big: V.summaryBig(summary),
+    unit: '%' };
+}
+
 /*
  * One frame, `ms` into the scene: s = { scene, args, walk, now, ms, footer,
- * under } — `under` the result the star is drawn over, as the screen draws
- * it ({ result } or { summary }).
+ * learned } — `learned` the star's frame (learnedOf).
  */
 export function drawScene(ctx, s) {
   const sc = s.scene;
   const a = s.args;
   if (sc.kind === 'star') {
-    if (s.under.result) V.drawResult(ctx, s.under.result);
-    else V.drawSummary(ctx, s.under.summary);
-    A.starBurst(ctx, a, s.ms);
+    V.drawLearned(ctx, { ...s.learned, footer: s.footer });
     return;
   }
   const map = sceneMap(sc);
