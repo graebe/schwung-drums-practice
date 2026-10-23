@@ -41,7 +41,7 @@ jobs:
           version=$(sed -n 's/.*"version": "\([^"]*\)".*/\1/p' src/module.json)
           tag=${GITHUB_REF#refs/tags/v}
           test "$version" = "$tag" || { echo "module.json $version != tag $tag" >&2; exit 1; }
-      - run: sh scripts/build.sh
+      - run: bash scripts/build.sh
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/drums-practice-module.tar.gz
