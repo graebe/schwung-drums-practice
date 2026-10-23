@@ -86,17 +86,17 @@ test('a folder skip names the open steps; Undo skip names the skipped ones', () 
   assert.deepEqual(R.skipAllChange(ear.steps, p), { skip: [], unskip: first.skip });
 });
 
-test('Settings › Path rows show their value and say what a click changes', () => {
+test('Learning Path rows show their value and say what a click changes', () => {
   const path = P.defaultPath();
   const yours = prefs;
   assert.equal(byLabel(yours, 'Styles').children.length, 6, 'one row a style');
   const time = byLabel(byLabel(yours, 'Tracks'), 'Time');
   assert.equal(R.prefValue(time, path), 'on');
-  assert.deepEqual(R.prefChange(time, path, 7), { toggle: ['tracks', 'time'] });
-  assert.deepEqual(R.prefChange(byLabel(yours, 'Rungs'), path, 7), { set: ['rungs', 'short'] });
-  assert.deepEqual(R.prefChange(byLabel(yours, 'Intros'), path, 7), { set: ['intros', 'always'] });
-  assert.deepEqual(R.prefChange(byLabel(yours, 'Start at'), { ...path, start: 6 }, 7), { set: ['start', 0] });
-  assert.equal(R.prefValue(byLabel(yours, 'Start at'), { ...path, start: 3 }), 'Stage 3');
+  assert.deepEqual(R.prefChange(time, path), { toggle: ['tracks', 'time'] });
+  assert.deepEqual(R.prefChange(byLabel(yours, 'Rungs'), path), { set: ['rungs', 'short'] });
+  assert.deepEqual(R.prefChange(byLabel(yours, 'Intros'), path), { set: ['intros', 'always'] });
+  assert.equal(byLabel(yours, 'Start at'), undefined, 'Start at is on Settings itself');
+  assert.equal(R.prefValue({ group: 'start' }, { ...path, start: 3 }), 'Stage 3', 'its value there');
   assert.equal(R.pathRow({ label: 'X', id: 'flam' }, R.pathContext(P.emptyProgress(), program, T0)), null,
     'a library row is not the path\'s to decorate');
 });

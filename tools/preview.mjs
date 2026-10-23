@@ -17,6 +17,8 @@
  *   npm run preview -- --exercise rock-backbeat --untimed --cursor 0,3,8 --view grid
  *   npm run preview -- --exercise rock-backbeat --screen untimed-summary
  *   npm run preview -- --exercise kit --px 14 --film 2,8,14,20   (all 21 voices engraved)
+ *   npm run preview -- --screen settings [--group main|practice|sound|midi] [--selected N] [--editing]
+ *   npm run preview -- --screen advanced [--selected N]     (Settings › Advanced)
  *   npm run preview -- --screen padmap --layout mirror --flip
  *   npm run preview -- --screen ready --level 0..4 [--done] [--beats N] [--part K]
  *                       (the split box: LEVEL at the right, the level's name on the bottom line)
@@ -50,6 +52,7 @@ import { createRun, ensureEntries, judgeHit, expireMissed } from '../src/scoring
 import { builtins } from '../src/generator.mjs';
 import { parseExercise, parseManifest } from '../src/exercise_io.mjs';
 import { createLadder } from '../src/ladder.mjs';
+import * as SETDEF from '../src/settings_def.mjs';
 import { DEFAULTS } from '../src/settings_def.mjs';
 import * as PROG from '../src/progress.mjs';
 import * as L from '../src/layout.mjs';
@@ -250,6 +253,22 @@ if (screen) {
       dynamics: true, ready: true, ...readyLevel(Number(arg('level', 2))),
       rightLabel: Number(arg('beats', 0)) > 0 ? `${Math.floor(Number(arg('beats', 0)) / 4) + 1}/8` : '8 bars  0:21',
     });
+  } else if (screen === 'settings') {
+    /* A settings page as ui.js draws it: Settings itself (main) or a group
+     * of Advanced; --selected N puts the cursor on row N, --editing edits it. */
+    const group = String(arg('group', 'main'));
+    const rows = SETDEF.rowsIn(group);
+    const sel = Number(arg('selected', 0));
+    const editing = Boolean(arg('editing', false));
+    const items = SETDEF.settingsRows({ ...DEFAULTS }, rows, { start: `Stage ${Number(arg('start', 1))}` });
+    V.drawList(ctx, { title: editing ? 'SET *' : SETDEF.groupByKey(group).label.toUpperCase(), items, selected: sel,
+      top: V.pageTop(items.length, sel),
+      footer: H.hintFor(H.SCREENS.SETTINGS, { editing, open: rows[sel].type === 'action' })[0] });
+  } else if (screen === 'advanced') {
+    /* Settings › Advanced: the list of the rest. */
+    const adv = CAT.settingsFolder(PLAN.pathSettingsFolder([])).children[0];
+    V.drawList(ctx, { title: 'ADVANCED', items: adv.children.map((c) => ({ label: c.label, value: c.value })),
+      selected: Number(arg('selected', 0)), footer: H.hintFor(H.SCREENS.MENU, { depth: 3 })[0] });
   } else if (screen === 'padmap') {
     const lay = resolveLayout(String(arg('layout', 'mpc')), { flip: Boolean(arg('flip', false)) });
     V.drawPadMap(ctx, { title: lay.name, right: lay.flip ? 'flip' : '', grid: lay.grid, selected: [],

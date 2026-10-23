@@ -192,7 +192,10 @@ function toList() {
 /* Up to the top of the list, the cursor on Continue. */
 function toTop() {
   toList();
-  for (let i = 0; i < 8 && globalThis.drumsPracticeMenu().title !== 'Drums'; i++) {
+  /* Back walks up; out of Settings › Advanced it passes Settings' page. */
+  for (let i = 0; i < 10; i++) {
+    const m = globalThis.drumsPracticeMenu();
+    if (m && m.title === 'Drums') break;
     cc(CC.back, 127);
     skipScene();
   }
@@ -208,6 +211,36 @@ function sheetPick(label) {
   assert.ok(at >= 0, `no "${label}" in the sheet: ${s.sheet.join(' | ')}`);
   if (at) cc(CC.jogTurn, at);
   cc(CC.jogClick, 127);
+}
+/* Settings itself, its own page: home's Settings circle. */
+function toSettings() {
+  toTop();
+  goTo('Settings');
+  assert.equal(screenNow(), 'settings', 'Settings did not open its page');
+}
+/* The cursor onto a row of the settings page on screen, by its label. */
+function settingsTo(label) {
+  const s = globalThis.drumsPracticeScreen().settings;
+  const at = s.labels.indexOf(label);
+  assert.ok(at >= 0, `no "${label}" on ${s.group}: ${s.labels.join(' | ')}`);
+  const d = at - s.cursor;
+  if (d) cc(CC.jogTurn, d > 0 ? d : 128 + d);
+}
+/* Settings › Advanced, the list of the rest; with a label, that row opened. */
+function toAdvanced(...path) {
+  toSettings();
+  settingsTo('Advanced');
+  cc(CC.jogClick, 127);
+  assert.equal(globalThis.drumsPracticeMenu().title, 'Advanced');
+  if (path.length) goTo(...path);
+}
+/* The Pad map, from Settings. */
+function toPadMap() {
+  toSettings();
+  settingsTo('Pad map');
+  cc(CC.jogClick, 127);
+  assert.equal(screenNow(), 'padmap');
+  ticks(1);
 }
 /* Into a list, where the pads are the kit: at home they are the circles. */
 function toKit() {
@@ -230,11 +263,11 @@ function toPathList() {
   const at = globalThis.drumsPracticeMenu().cursor;
   if (at) cc(CC.jogTurn, 128 - at);
 }
-/* Settings › a group: the editor with that group's rows. */
-function toSettings(group = 'Practice') {
-  toTop();
-  goTo('Settings', group);
+/* Settings › Advanced › a group: the editor with that group's rows. */
+function toGroup(group = 'Practice') {
+  toAdvanced(group);
   assert.equal(screenNow(), 'settings');
+  assert.equal(globalThis.drumsPracticeScreen().settings.group, group.toLowerCase());
 }
 const pad = (n, v) => globalThis.onMidiMessageInternal([v > 0 ? 0x90 : 0x80, n, v]);
 /* A write that strikes a drum. The `n` list also carries the tick's click
@@ -437,7 +470,7 @@ test('settings persist, and are written lazily rather than every frame', async (
   ticks(3);
   /* Knobs change settings only on the Settings screen: open Settings ›
    * Practice, then knob 1 is its first row, Tempo. */
-  toSettings('Practice');
+  toGroup('Practice');
   cc(CC.knob1, 1);
   cc(CC.knob1, 1);
   ticks(3);
@@ -791,7 +824,7 @@ test('in Settings the knobs follow the rows ON SCREEN, not fixed numbers', async
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  toSettings('Practice');
+  toGroup('Practice');
   ticks(2);
 
   /* At the top of the list, knob 1 is the first row — the tempo. */
@@ -806,7 +839,7 @@ test('scrolling Settings moves what the knobs address', async () => {
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  toSettings('Practice');
+  toGroup('Practice');
   ticks(2);
 
   /* Scroll well down the list, then turn knob 1: it must edit a row that is
@@ -828,7 +861,7 @@ test('touching a knob moves the cursor to the row it edits', async () => {
   const { screen } = await loadUi();
   globalThis.init();
   ticks(2);
-  toSettings('Practice');
+  toGroup('Practice');
   ticks(2);
   const before = screen.pixels.slice();
 
@@ -1006,12 +1039,12 @@ test('the module closes from EVERY screen, and silences everything on the way', 
     ready: () => { toFirstRung(); ticks(2); cc(CC.jogClick, 127); ticks(2); },
     running: () => { startFirstDrill(); ticks(10); },
     paused: () => { startFirstDrill(); ticks(10); cc(CC.play, 127); ticks(2); },
-    settings: () => { toSettings('Sound'); ticks(2); },
+    settings: () => { toGroup('Sound'); ticks(2); },
     progress: () => { goTo('Progress'); ticks(2); },
     quiz: () => { toQuizzes(); cc(CC.jogClick, 127); ticks(2); },
     sheet: () => { shiftClick(); ticks(2); },
     help: () => { startFirstDrill(); ticks(10); cc(CC.menu, 127); ticks(2); },
-    welcome: () => { goTo('Settings', 'Help', 'Welcome again'); ticks(2); },
+    welcome: () => { toAdvanced('Help', 'Welcome again'); ticks(2); },
   };
   for (const [name, go] of Object.entries(routes)) {
     const { log } = await loadUi();
@@ -1543,7 +1576,7 @@ test('a Settings knob keeps its row however far it is turned, and the jog touch 
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  toSettings('Practice');
+  toGroup('Practice');
   globalThis.onMidiMessageInternal([0x90, 9, 127]);   /* jog touch */
   knob(0, 1);                                         /* row 0 is Tempo, if the cursor stayed */
   for (let i = 0; i < 5; i++) cc(CC.jogTurn, 1);      /* row 5, Strict: the second page */
@@ -1977,7 +2010,7 @@ test('a stage\'s sheet starts the path there, and its Settings... opens Settings
   assert.ok(drawnText(1).includes('Sixteenths'), 'Continue is not in stage 2');
   goTo('2 Sixteenths', { open: false });
   sheetPick('Settings...');
-  assert.equal(globalThis.drumsPracticeMenu().title, 'Settings');
+  assert.equal(globalThis.drumsPracticeScreen().settings.group, 'main', 'Settings... opens Settings itself');
   cc(CC.back, 127);
   assert.equal(globalThis.drumsPracticeMenu().title, 'Learning Path', 'Back from Settings is where it came from');
 });
@@ -1993,11 +2026,11 @@ test('Test out: checkpoint plays the stage\'s checkpoint', async () => {
   assert.match(log.announces.join('|'), /First beat.* ready/);
 });
 
-test('Settings › Path: a track switched off, and Continue no longer offers it', async () => {
+test('Settings › Advanced › Learning Path: a track switched off, and Continue no longer offers it', async () => {
   await loadUi({ walked: true });
   globalThis.init();
   ticks(2);
-  goTo('Settings', 'Learning Path', 'Tracks');
+  toAdvanced('Learning Path', 'Tracks');
   ticks(1);
   assert.ok(drawnText(1).includes('on'));
   goTo('Time');                   /* Time: off */
@@ -2008,15 +2041,22 @@ test('Settings › Path: a track switched off, and Continue no longer offers it'
   assert.ok(drawnText(1).includes('FIRST BEAT L0'), drawnText(1).join('|'));
 });
 
-test('Settings › Path: the short ladder, and starting at a later stage', async () => {
+test('Settings: the short ladder under Advanced, and Start at a later stage on Settings itself', async () => {
   await loadUi();
   globalThis.init();
   ticks(2);
-  goTo('Settings', 'Learning Path', 'Rungs');   /* full -> short */
-  goTo('Start at');                    /* Stage 0 -> Stage 1 */
+  toAdvanced('Learning Path', 'Rungs');   /* full -> short */
   ticks(1);
-  const shown = drawnText(1);
-  assert.ok(shown.includes('short') && shown.includes('Stage 1'), shown.join('|'));
+  assert.ok(drawnText(1).includes('short'), drawnText(1).join('|'));
+  cc(CC.back, 127);                       /* Learning Path -> Advanced */
+  cc(CC.back, 127);                       /* Advanced -> Settings, on Advanced */
+  assert.equal(globalThis.drumsPracticeScreen().settings.group, 'main');
+  settingsTo('Start at');
+  cc(CC.jogClick, 127);                   /* edit */
+  cc(CC.jogTurn, 1);                      /* Stage 0 -> Stage 1 */
+  cc(CC.jogClick, 127);
+  ticks(1);
+  assert.ok(drawnText(1).includes('Stage 1'), drawnText(1).join('|'));
   toPathList();
   ticks(1);
   assert.ok(drawnText(1).includes('Eighths'), drawnText(1).join('|'));
@@ -2061,21 +2101,11 @@ test('stuck on a step: a hint after three failed takes, parked after six', async
 
 /* ---- pad layouts and the Pad map ------------------------------------------- */
 
-/* Settings › Pads, then its Pad map row. */
-async function toPadMap() {
-  const SET = await import('../src/settings_def.mjs');
-  toSettings('Pads');
-  const row = SET.rowsIn('pads').findIndex((r) => r.key === 'padMap');
-  for (let i = 0; i < row; i++) cc(CC.jogTurn, 1);
-  cc(CC.jogClick, 127);
-  ticks(1);
-}
-
 test('the Pad map names every pad, sounds it, and steps through the layouts', async () => {
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  await toPadMap();
+  toPadMap();
   let shown = drawnText(1);
   assert.ok(shown.includes('MPC Classic') && shown.includes('PAD hear CLICK edit'), shown.join('|'));
   assert.equal(shown.filter((t) => /^[A-Z0-9]{2}$/.test(t)).length, 32);
@@ -2089,7 +2119,9 @@ test('the Pad map names every pad, sounds it, and steps through the layouts', as
   assert.ok(drawnText(1).includes('MPC Family Rows'), drawnText(1).join('|'));
   cc(CC.back, 127);
   ticks(1);
-  assert.ok(drawnText(1).includes('PADS'), 'Back returns to Settings › Pads');
+  assert.equal(globalThis.drumsPracticeScreen().settings.group, 'main', 'Back returns to Settings');
+  assert.equal(globalThis.drumsPracticeScreen().settings.labels[globalThis.drumsPracticeScreen().settings.cursor],
+    'Pad map', 'on the Pad map row');
   globalThis.onUnload();
   assert.equal(JSON.parse(log.writes[SETTINGS_FILE]).layout, 'family');
 });
@@ -2098,7 +2130,7 @@ test('Click on a preset makes Custom a copy of it; an edit lands on both halves;
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  await toPadMap();
+  toPadMap();
   cc(CC.jogClick, 127);           /* edit a copy of MPC Classic */
   ticks(1);
   assert.ok(drawnText(1).includes('Custom'), drawnText(1).join('|'));
@@ -2124,7 +2156,7 @@ test('a Custom edit survives closing straight from the Pad map', async () => {
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  await toPadMap();
+  toPadMap();
   cc(CC.jogClick, 127);
   pad(68, 100); pad(68, 0);
   cc(CC.jogTurn, 1);
@@ -2140,7 +2172,7 @@ test('knob 1 on Custom edits one half only', async () => {
   const { log } = await loadUi();
   globalThis.init();
   ticks(2);
-  await toPadMap();
+  toPadMap();
   cc(CC.jogClick, 127);
   pad(68, 100); pad(68, 0);
   knob(0, 1);                     /* both -> one */
@@ -2271,8 +2303,8 @@ test('Back from a card returns to the list and marks nothing read; Intros off sh
   assert.ok(drawnText(1).includes('0 Hello, kit'), 'the card was marked read by Back');
   cc(CC.back, 127);
   toTop();
-  /* Settings › Path › Intros: new -> always -> off. */
-  goTo('Settings', 'Learning Path', 'Intros');
+  /* Settings › Advanced › Learning Path › Intros: new -> always -> off. */
+  toAdvanced('Learning Path', 'Intros');
   goTo('Intros');
   ticks(1);
   assert.ok(drawnText(1).includes('off'), drawnText(1).join('|'));
@@ -3054,11 +3086,8 @@ test('switching Pads back in Settings clears the L0 warning', async () => {
   ticks(2);
   armL0();
   assert.ok(drawnText(2).includes('NO HH ON PADS'));
-  const SET = await import('../src/settings_def.mjs');
-  const row = SET.ROWS.findIndex((r) => r.key === 'layout');
-  shiftClick();
-  for (let i = 0; i < 40; i++) cc(CC.jogTurn, 127);
-  for (let i = 0; i < row; i++) cc(CC.jogTurn, 1);
+  shiftClick();                                  /* Settings, over the drill */
+  settingsTo('Pads');
   cc(CC.jogClick, 127);                          /* edit Pads */
   cc(CC.jogTurn, 1);                             /* sticking is the last value */
   for (let i = 0; i < 10; i++) cc(CC.jogTurn, 127); /* clamp at the first: MPC Classic */
@@ -3193,11 +3222,9 @@ test('each first visit shows its tip once, and Show tips again brings them back'
   ticks(2);
   assert.equal(screenNow(), 'quiz');
   assert.ok(globalThis.__log.params.slice(before).some(isHit), 'the question is asked once the tip is read');
-  toTop();
-  goTo('Settings', 'Help', 'Show tips again');
-  cc(CC.back, 127);
-  cc(CC.back, 127);
-  shiftClick();
+  toAdvanced('Help', 'Show tips again');
+  cc(CC.back, 127);                              /* Help -> Advanced */
+  shiftClick();                                  /* a row's sheet: its tip first */
   ticks(1);
   assert.equal(screenNow(), 'tip', 'the tips were not cleared');
 });
@@ -3279,25 +3306,89 @@ test('the map, home and ready screens open on their first hint part, each part a
   }
 });
 
-test('Settings is a folder of groups; Shift+click over a drill still shows every setting', async () => {
+test('Settings is one short page; Advanced holds the rest, a group at a time', async () => {
   await loadUi();
   globalThis.init();
   ticks(2);
-  goTo('Settings');
-  assert.deepEqual(globalThis.drumsPracticeMenu().labels, ['Learning Path', 'Practice', 'Sound', 'Pads', 'MIDI', 'Help']);
-  goTo('Sound');
+  toSettings();
+  const page = globalThis.drumsPracticeScreen().settings;
+  assert.deepEqual([page.group, page.labels], ['main', ['Pads', 'Pad map', 'Flip', 'Click', 'Start at', 'Advanced']]);
   let shown = drawnText(1);
-  assert.ok(shown.includes('SOUND') && shown.includes('Click') && shown.includes('Latency'), shown.join('|'));
+  assert.ok(shown.includes('SETTINGS') && shown.includes('MPC') && shown.includes('Click'), shown.join('|'));
+  settingsTo('Advanced');
+  assert.ok(drawnText(1).includes('Stage 0'), 'Start at, on the second page');
+  assert.ok(drawnText(1).includes('CLICK open  BACK up'), 'Advanced opens');
+  cc(CC.jogClick, 127);
+  assert.deepEqual(globalThis.drumsPracticeMenu().labels, ['Learning Path', 'Practice', 'Sound', 'MIDI', 'Help']);
+  goTo('Sound');
+  shown = drawnText(1);
+  assert.ok(shown.includes('SOUND') && shown.includes('Click sub') && shown.includes('Latency'), shown.join('|'));
   assert.ok(!shown.includes('Tempo'), 'another group\'s row in Sound');
   cc(CC.back, 127);
-  assert.equal(globalThis.drumsPracticeMenu().title, 'Settings', 'Back from a group is the folder');
+  assert.equal(globalThis.drumsPracticeMenu().title, 'Advanced', 'Back from a group is Advanced');
+  cc(CC.back, 127);
+  assert.deepEqual([screenNow(), globalThis.drumsPracticeScreen().settings.labels[globalThis.drumsPracticeScreen()
+    .settings.cursor]], ['settings', 'Advanced'], 'Back from Advanced is Settings, on Advanced');
+  cc(CC.back, 127);
+  assert.equal(homeNow().selected, 4, 'Back from Settings is home, on Settings');
+});
+
+test('Shift+click over a drill: Settings; Advanced › Practice; Back three times to the paused run', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  startFirstDrill();
+  ticks(10);
+  shiftClick();
+  assert.equal(globalThis.drumsPracticeScreen().settings.group, 'main', 'Settings itself over a drill');
+  settingsTo('Advanced');
+  cc(CC.jogClick, 127);
+  goTo('Practice');
+  assert.ok(drawnText(1).includes('Tempo'));
+  cc(CC.back, 127);                              /* Practice -> Advanced */
+  cc(CC.back, 127);                              /* Advanced -> Settings */
+  cc(CC.back, 127);                              /* Settings -> the run */
+  assert.equal(screenNow(), 'running');
+  assert.ok(drawnText(1).some((t) => /go on/.test(t)), 'the run is paused');
+  /* Shift+click on any of its pages closes all of it at once. */
+  shiftClick();
+  settingsTo('Advanced');
+  cc(CC.jogClick, 127);
+  goTo('MIDI');
+  shiftClick();
+  assert.equal(screenNow(), 'running', 'Shift+click from a group goes back to the drill');
+  cc(CC.back, 127);
+  cc(CC.back, 127);
   toTop();
-  armFirstRung();
-  shiftClick();
-  shown = drawnText(1);
-  assert.ok(shown.includes('SETTINGS') && shown.includes('Tempo'), shown.join('|'));
-  shiftClick();
-  assert.equal(screenNow(), 'ready', 'Shift+click again leaves Settings');
+  assert.equal(globalThis.drumsPracticeMenu().title, 'Drums', 'the list is as it was');
+});
+
+test('Settings... inside Advanced goes back up to Settings; the knobs edit Start at too', async () => {
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  toAdvanced('Learning Path', { open: false });
+  sheetPick('Settings...');
+  assert.deepEqual([screenNow(), globalThis.drumsPracticeScreen().settings.group], ['settings', 'main']);
+  const page = globalThis.drumsPracticeScreen().settings;
+  assert.equal(page.labels[page.cursor], 'Advanced');
+  /* A knob edits the row it sits beside: the page on Advanced is Start at
+   * and Advanced, so knob 1 is Start at — and knob 2, Advanced, does nothing. */
+  cc(CC.knob1, 1);
+  ticks(1);
+  assert.ok(drawnText(1).includes('Stage 1'), drawnText(1).join('|'));
+  assert.match(log.announces.join('|'), /The path starts at stage 1/);
+  cc(CC.knob1, 127);
+  cc(CC.knob1, 127);                             /* clamped at stage 0 */
+  ticks(1);
+  assert.ok(drawnText(1).includes('Stage 0'));
+  const settingsWrites = log.writes[SETTINGS_FILE];
+  cc(CC.knob1 + 1, 1);
+  assert.equal(screenNow(), 'settings', 'a knob on Advanced opens nothing');
+  globalThis.onUnload();
+  assert.equal(JSON.parse(log.writes[`${DATA}progress.json`]).path.start, 0);
+  assert.deepEqual(JSON.parse(log.writes[SETTINGS_FILE] || settingsWrites || '{}').start, undefined,
+    'Start at is progress, not a setting');
 });
 
 test('a stage with lesson cards offers them in its sheet, and its help reads the stage\'s card', async () => {
@@ -3711,7 +3802,9 @@ test('home: click opens a section, Back comes home with its circle chosen; the p
     cc(CC.jogTurn, 20); cc(CC.jogTurn, 108);
     if (i) cc(CC.jogTurn, i);
     cc(CC.jogClick, 127);
-    assert.equal(globalThis.drumsPracticeMenu().title, title);
+    skipScene();
+    if (title === 'Settings') assert.equal(globalThis.drumsPracticeScreen().settings.group, 'main');
+    else assert.equal(globalThis.drumsPracticeMenu().title, title);
     cc(CC.back, 127);
     assert.equal(homeNow().selected, i, `${title}: Back did not come home on its circle`);
   }

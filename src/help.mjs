@@ -82,7 +82,7 @@ const SECTION_TOPICS = {
 const GROUP_TOPICS = {
   practice: ['Study', 'Accents', 'Clean at tempo', 'Knobs'],
   sound: ['Sound', 'Latency'],
-  pads: ['The pads'],
+  main: ['Settings', 'The pads'],
   midi: ['Sound'],
 };
 

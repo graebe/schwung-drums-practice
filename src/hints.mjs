@@ -134,9 +134,10 @@ export function keysFor(screen, st = {}) {
       return { keys: [['CLICK', 'chart'], ['BACK', 'up']], shift: [SETTINGS, QUIT] };
     case S.PROGRESS_ITEM:
       return { keys: [['JOG', 'next'], ['BACK', 'list']], shift: [SETTINGS, QUIT] };
+    /* A row that opens something (Pad map, Advanced) opens; the rest edit. */
     case S.SETTINGS:
-      return { keys: st.editing ? [['JOG', 'change'], ['CLICK', 'done']] : [['CLICK', 'edit'], ['BACK', 'up']],
-        shift: [['CLICK', 'close'], QUIT] };
+      return { keys: st.editing ? [['JOG', 'change'], ['CLICK', 'done']]
+        : [['CLICK', st.open ? 'open' : 'edit'], ['BACK', 'up']], shift: [['CLICK', 'close'], QUIT] };
     case S.PADMAP:
       return { keys: [['PAD', 'hear'], ['JOG', 'layout'], ['BACK', 'save']], shift: [SETTINGS, QUIT] };
     case S.ERROR:

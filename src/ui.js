@@ -279,12 +279,16 @@ let menuNote = '';
 let menuNoteUntil = 0;
 let settingsSel = 0;
 let settingsEditing = false;
-/* The rows the settings editor shows: one group's, opened from the
- * Settings folder, or every row, over a drill (settings_def.mjs). */
-let settingsGroup = null;
-let settingsDefs = SET.ROWS;
-/* The Settings folder of the tree, for the sheet's Settings... */
+/* The page the settings editor shows (settings_def.mjs): Settings itself,
+ * 'main', or a group of Settings › Advanced. */
+let settingsGroup = SET.MAIN_GROUP.key;
+let settingsDefs = SET.rowsIn(SET.MAIN_GROUP.key);
+/* The Settings node of the tree, and its Advanced folder. */
 let settingsNode = null;
+let advancedNode = null;
+/* The list as it stood when Advanced was opened from Settings: leaving
+ * Advanced, or closing Settings from inside it, puts it back. */
+let settingsBack = null;
 /* The action sheet on screen (row_sheet.mjs): { title, items, sel, row }. */
 let sheet = null;
 /* MENU's help page on screen (help.mjs): { title, lines, top, back }. */
@@ -339,7 +343,7 @@ let ladderBarsDone = 0;
 /* The armed drill's tempo — its own, scaled by Speed — kept apart from
  * `chart.bpm`, which the Ladder changes as it climbs. */
 let armedBpm = 0;
-/* The screen Settings was opened from, which leaving Settings returns to. */
+/* The screen Settings itself was opened from, which closing it returns to. */
 let settingsFrom = MENU;
 /* Whether the take on the summary beat every one before it. */
 let summaryIsBest = false;
@@ -906,6 +910,8 @@ function rebuildMenu() {
     pathPrefs: PLAN.pathSettingsFolder(fileCategories.filter((c) => c.folder === 'Grooves')),
   });
   settingsNode = catalog.children.find((c) => c.label === 'Settings') || null;
+  advancedNode = settingsNode ? settingsNode.children.find((c) => c.advanced) || null : null;
+  settingsBack = null;
   nav = CAT.navStart(catalog);
   leafIdx = CAT.leafIndex(catalog);
   PROG.resetShape(agg);
@@ -1966,6 +1972,12 @@ function openRow() {
   const item = CAT.navCurrent(nav);
   if (!item) return;
   fromContinue = false;
+  /* Settings is a page, not a folder; so is a group of Advanced. */
+  if (item.settingsGroup) {
+    if (item.settingsGroup === SET.MAIN_GROUP.key) openSettings();
+    else openSettingsGroup(item);
+    return;
+  }
   const world = onMap() && CAT.navTop(nav).node === pathNode ? mapNow() : null;
   if (CAT.navPush(nav)) {
     enterRing();
@@ -1986,10 +1998,6 @@ function openRow() {
   }
   if (item.prefRow) {
     turnPref(item);
-    return;
-  }
-  if (item.settingsGroup) {
-    openSettingsGroup(item);
     return;
   }
   if (item.helpAction) {
@@ -2050,15 +2058,15 @@ function stageHasCards(st) {
   return LES.stageCards(lessons, st, PLAN.coreSteps(st).concat(PLAN.checkpointSteps(st))).length > 0;
 }
 
-/* A row of Settings › Path, turned on by a click. */
+/* A row of Settings › Advanced › Learning Path, turned on by a click. */
 function turnPref(row) {
-  const change = ROWS.prefChange(row, progress.path, program.stages.length);
+  const change = ROWS.prefChange(row, progress.path);
   if (change.toggle && !PROG.togglePath(progress, ...change.toggle)) announce('One track stays on');
   if (change.set) PROG.setPath(progress, ...change.set);
   saveProgress();
 }
 
-/* Settings › Help: the tips shown again, or the welcome. */
+/* Settings › Advanced › Help: the tips shown again, or the welcome. */
 function helpAction(what) {
   if (what === 'tips') {
     PROG.clearTips(progress);
@@ -2463,18 +2471,15 @@ function sheetDo() {
       showFolderAs(a.act);
       return;
     default:
-      openSettingsFolder();
+      openSettingsPage();
   }
 }
 
-/* The sheet's Settings...: the Settings folder, on top of where you are, so
- * Back comes back here. */
-function openSettingsFolder() {
-  if (!settingsNode) return;
-  const at = nav.findIndex((n) => n.node === settingsNode);
-  if (at >= 0) nav.length = at + 1;
-  else nav.push({ node: settingsNode, cursor: 0 });
-  announce('Settings.');
+/* The sheet's Settings...: Settings itself, on top of the list you are on,
+ * so Back comes back here — or, inside Advanced, back up to it. */
+function openSettingsPage() {
+  if (inAdvanced()) leaveAdvanced();
+  else openSettings();
 }
 
 /*
@@ -3035,19 +3040,57 @@ function progressDetail(index) {
   };
 }
 
-/* Settings opens over whatever is on screen, pausing a run, and goes back to
- * it — every row of it, as it always has. */
+/*
+ * Settings itself — one short page (settings_def.mjs MAIN) — over whatever is
+ * on screen: the list, home, or a drill, whose run it pauses. Back and
+ * Shift+click go back to it; its Advanced row opens the rest.
+ *
+ *   Settings ── Advanced ── a group (Practice, Sound, MIDI)
+ *                        └─ Learning Path ›, Help ›
+ * Back walks a group to Advanced, Advanced to Settings, Settings to where it
+ * was opened; Shift+click on any of its pages closes all of it at once.
+ */
 function openSettings() {
   settingsFrom = screen;
+  settingsBack = null;
   if (screen === RUNNING && !tp.paused) pause();
-  useSettingsRows(null);
+  useSettingsRows(SET.MAIN_GROUP.key);
+  settingsSel = 0;
   screen = SETTINGS;
   settingsEditing = false;
+  announce('Settings.');
 }
 
-/* A group of the Settings folder: the editor with that group's rows. */
+/* Settings › Advanced: the folder of the rest, as a list on top of the
+ * Settings node, the way you came kept for the way back. */
+function openAdvanced() {
+  if (!advancedNode) return;
+  settingsBack = nav.map((e) => ({ node: e.node, cursor: e.cursor }));
+  nav = CAT.navStart(catalog);
+  nav[0].cursor = Math.max(0, catalog.children.indexOf(settingsNode));
+  nav.push({ node: settingsNode, cursor: 0 }, { node: advancedNode, cursor: 0 });
+  settingsEditing = false;
+  screen = MENU;
+  announce('Advanced.');
+}
+
+function inAdvanced() {
+  return Boolean(settingsBack) && nav.some((e) => e.node === advancedNode);
+}
+
+/* Back up from Advanced: Settings, on its Advanced row. */
+function leaveAdvanced() {
+  nav = settingsBack || CAT.navStart(catalog);
+  settingsBack = null;
+  useSettingsRows(SET.MAIN_GROUP.key);
+  settingsSel = Math.max(0, SET.MAIN.indexOf('advanced'));
+  screen = SETTINGS;
+  settingsEditing = false;
+  announce('Settings.');
+}
+
+/* A group of Advanced: the editor with that group's rows; Back is Advanced. */
 function openSettingsGroup(row) {
-  settingsFrom = MENU;
   useSettingsRows(row.settingsGroup);
   settingsSel = 0;
   screen = SETTINGS;
@@ -3062,17 +3105,47 @@ function useSettingsRows(group) {
   settingsSel = Math.max(0, Math.min(settingsSel, settingsDefs.length - 1));
 }
 
-/* The editor's rows as the list shows them, made when a value changes. */
+/* The editor's rows as the list shows them, made when a value changes:
+ * Start at's from the path. */
 function refreshSettingsRows() {
-  settingsRowsCache = SET.settingsRows(settings, settingsDefs);
+  settingsRowsCache = SET.settingsRows(settings, settingsDefs,
+    { start: ROWS.prefValue({ group: 'start' }, progress.path) });
 }
 
+/* Back on a settings page: a group goes back to Advanced, Settings itself
+ * to where it was opened. */
 function leaveSettings() {
   settingsEditing = false;
+  if (settingsGroup !== SET.MAIN_GROUP.key) {
+    screen = MENU;
+    return;
+  }
+  closeSettings();
+}
+
+/* All of Settings closed at once, back to where it was opened. */
+function closeSettings() {
+  settingsEditing = false;
+  if (settingsBack) {
+    nav = settingsBack;
+    settingsBack = null;
+  }
   let to = settingsFrom;
   if ((to === READY || to === RUNNING) && !chart) to = MENU;
   if (to === SETTINGS || to === ERROR) to = MENU;
   screen = to;
+}
+
+/* Start at, on Settings itself: the stage the path starts at, a step a
+ * detent, kept in range — progress, not a setting. */
+function stepPathStart(delta) {
+  const n = program.stages.length;
+  const to = Math.max(0, Math.min(n - 1, (progress.path.start || 0) + delta));
+  if (to === (progress.path.start || 0)) return;
+  PROG.setPath(progress, 'start', to);
+  saveProgress();
+  refreshSettingsRows();
+  announce(`The path starts at stage ${to}`);
 }
 
 /* ---- MENU: help for this screen ----------------------------------------- */
@@ -3222,6 +3295,8 @@ function hintState(shift = shiftHeld) {
     st.scrolls = tipCard.lines.length > L.PAGE_ROWS;
   } else if (screen === SETTINGS) {
     st.editing = settingsEditing;
+    const row = settingsDefs[settingsSel];
+    st.open = Boolean(row && row.type === 'action');
   } else if (screen === TOUR && tour) {
     st.done = tour.tour.done;
     st.sounding = Boolean(tour.tour.solvedAt);
@@ -3255,7 +3330,7 @@ function hintLine() {
   const st = hintState();
   const key = `${screen}|${st.shift}|${st.depth > 1}|${st.mode}|${st.paused}|${st.untimed}|${st.clock}|`
     + `${st.pick}|${st.audible}|${st.hintsLeft > 0}|${st.path}|${st.guided}|${st.more}|${st.pages > 1}|`
-    + `${st.asks}|${st.scrolls}|${st.editing}|${st.done}|${st.sounding}|${st.levels}|${st.warning}`;
+    + `${st.asks}|${st.scrolls}|${st.editing}|${st.done}|${st.sounding}|${st.levels}|${st.warning}|${st.open}`;
   const view = viewNow();
   if (view + key !== hintKey) {
     hintKey = view + key;
@@ -3308,6 +3383,10 @@ function back() {
     const top = CAT.navTop(nav);
     if (listViews.has(top.node)) {
       showFolderAs('map');
+      return true;
+    }
+    if (top.node === advancedNode && inAdvanced()) {
+      leaveAdvanced();
       return true;
     }
     const island = onMap() && top.node !== pathNode ? mapNow() : null;
@@ -3438,7 +3517,7 @@ function menuRows(node) {
 }
 
 function decoratedRows(node) {
-  /* The Path's rows, Continue and Settings › Path speak for themselves
+  /* The Path's rows, Continue and the Learning Path's choices speak for themselves
    * (path_rows.mjs); the rest are decorated as the library is. */
   const pc = ROWS.pathContext(progress, program, Date.now(), { turn: continueTurn, titleOf: itemTitle });
   const kids = node.children;
@@ -3558,7 +3637,7 @@ function draw() {
     return;
   }
   if (screen === SETTINGS) {
-    const group = settingsGroup ? SET.GROUPS.find((g) => g.key === settingsGroup) : null;
+    const group = SET.groupByKey(settingsGroup);
     V.drawList(ctx, {
       title: settingsEditing ? 'SET *' : group ? group.label.toUpperCase() : 'SETTINGS',
       items: settingsRowsCache, selected: settingsSel,
@@ -4111,7 +4190,7 @@ function jog(delta) {
 function shiftClick() {
   if (screen === MENU) openSheet();
   else if (screen === SHEET) sheetDo();
-  else if (screen === SETTINGS) leaveSettings();
+  else if (screen === SETTINGS) closeSettings();
   else if (screen !== HELP && screen !== TIP && screen !== WELCOME && screen !== ERROR) openSettings();
 }
 
@@ -4129,6 +4208,7 @@ function click() {
     const row = settingsDefs[settingsSel];
     if (row && row.type === 'action') {
       if (row.action === 'padmap') openPadMap();
+      else if (row.action === 'advanced') openAdvanced();
       return;
     }
     settingsEditing = !settingsEditing;
@@ -4183,6 +4263,12 @@ function click() {
  * to re-run at another speed.
  */
 function editSetting(key, delta) {
+  if (key === 'start') {
+    stepPathStart(delta);
+    return;
+  }
+  const def = SET.rowFor(key);
+  if (!def || def.type === 'action') return;
   const wasStudying = settings.study;
   SET.applySetting(settings, key, delta);
   refreshSettingsRows();
@@ -4248,6 +4334,8 @@ globalThis.drumsPracticeScreen = function drumsPracticeScreen() {
   return { screen, sheet: sheet ? sheet.items.map((a) => a.label) : null, help: help ? help.lines.slice() : null,
     map: m ? { at: m.walk.target, places: m.places.map((p) => `${p.label}:${p.state}`) } : null,
     home: onHome() ? { selected: CAT.navTop(nav).cursor, grow: homeGrow ? { ...homeGrow } : null } : null,
+    settings: screen === SETTINGS ? { group: settingsGroup, cursor: settingsSel,
+      labels: settingsDefs.map((r) => r.label) } : null,
     quiz: quiz ? { kind: quiz.kind, mode: quiz.mode, prompt: quiz.prompt, options: quiz.options.slice(),
       choice: quiz.choice, eliminated: quiz.eliminated.slice(), correct: quiz.correct, wrong: quiz.wrong } : null };
 };

@@ -12,7 +12,8 @@
  * shape after a numeric switch, a parallel array of labels and a separate
  * list of chart-affecting keys drifted apart.
  *
- * Row order is load-bearing at the top: knobs 1-4 are wired to rows 0-3.
+ * The knobs edit the rows on screen, a page of five at a time (ui.js
+ * settingsRowForKnob), so a page's order is what the knobs reach.
  *
  * type:
  *   int   clamped to [min, max]
@@ -22,12 +23,12 @@
  *   action  a row that opens something rather than holding a value — Click
  *           on it does what `action` names; it is never saved
  *
- * group: which Settings folder the row is filed in (GROUPS). The menu's
- * Settings opens one group at a time; Settings over a drill shows them all.
+ * group: the page the row is on. `main` is Settings itself (MAIN): what is
+ * personal — the pads, the click, where the path starts. The rest have good
+ * defaults and are filed under Settings › Advanced, a page per GROUPS.
  */
 
 export const ROWS = [
-  /* ---- knobs 1-4 ---- */
   { key: 'bpm',        group: 'practice', label: 'Tempo',     type: 'int',  min: 40, max: 240, rebuild: true,
     format: (v) => `${v}` },
   /*
@@ -51,16 +52,14 @@ export const ROWS = [
    * finger drummers learnt on. Chromatic is Move's own drum mode, note for
    * note; Sticking puts the snare on every pad, for rudiments.
    */
-  { key: 'layout',     group: 'pads',     label: 'Pads',      type: 'list',
+  { key: 'layout',     group: 'main',     label: 'Pads',      type: 'list',
     values: ['mpc', 'family', 'centre', 'gm', 'mirror', 'custom', 'sticking'],
     format: (v) => ({ mpc: 'MPC', family: 'Family', centre: 'Centre', gm: 'GM', mirror: 'Mirror',
       custom: 'Custom', sticking: 'Sticking' })[v] || `${v}` },
   /* Mirror the layout left to right, for a left-hander. The hands stay the
    * physical halves. */
-  { key: 'flip',       group: 'pads',     label: 'Flip',      type: 'bool' },
-  { key: 'padMap',     group: 'pads',     label: 'Pad map',   type: 'action', action: 'padmap', format: () => '>' },
-
-  /* ---- the rest ---- */
+  { key: 'flip',       group: 'main',     label: 'Flip',      type: 'bool' },
+  { key: 'padMap',     group: 'main',     label: 'Pad map',   type: 'action', action: 'padmap', format: () => '>' },
   { key: 'view',       group: 'practice', label: 'View',      type: 'list', values: ['staff', 'grid'] },
   { key: 'strictness', group: 'practice', label: 'Strict',    type: 'list', values: ['loose', 'normal', 'tight'] },
   { key: 'sticking',   group: 'practice', label: 'Sticking',  type: 'list', values: ['strict', 'loose', 'off'] },
@@ -71,7 +70,7 @@ export const ROWS = [
   { key: 'ghostDrop',  group: 'practice', label: 'Ghost -',   type: 'int',  min: 5,  max: 60 },
   { key: 'guide',      group: 'practice', label: 'Guide pads', type: 'bool' },
   { key: 'study',      group: 'practice', label: 'Study',     type: 'bool' },
-  { key: 'click',      group: 'sound',    label: 'Click',     type: 'bool' },
+  { key: 'click',      group: 'main',     label: 'Click',     type: 'bool' },
   { key: 'clickSubdiv',group: 'sound',    label: 'Click sub', type: 'list', values: [0, 1, 2, 4],
     /* Clicks per beat: 2 is eighths, 4 sixteenths. It read `v * 2` and so
      * printed 4ths and 8ths for the eighths and sixteenths it plays. */
@@ -100,21 +99,42 @@ export const ROWS = [
 ];
 
 /*
- * The groups of the Settings folder, in its order, as the editor shows them.
- * Path and Help are folders of the menu, not rows of this table — the path's
- * choices are the learner's progress (progress.mjs) and Help's rows are
- * actions — so only these four open the editor.
+ * Settings itself, one short page in this order: the pads, how they map and
+ * which way round, the click, where the Learning Path starts, and Advanced.
+ * Start at and Advanced are rows of the page, not settings: Start at is the
+ * learner's progress (progress.mjs path.start), shown from `extra.start`,
+ * and Advanced opens the folder of the rest. So they stay out of ROWS, and
+ * DEFAULTS and coerceInto never see them.
+ */
+export const MAIN = ['layout', 'padMap', 'flip', 'click', 'start', 'advanced'];
+export const MAIN_GROUP = { key: 'main', label: 'Settings' };
+const PAGE_ROWS = {
+  start: { key: 'start', group: 'main', label: 'Start at', type: 'path' },
+  advanced: { key: 'advanced', group: 'main', label: 'Advanced', type: 'action', action: 'advanced',
+    format: () => '>' },
+};
+
+/*
+ * The pages under Settings › Advanced, in its order, as the editor shows
+ * them. The Learning Path's choices and Help are folders of the menu, not
+ * rows of this table — the path's choices are the learner's progress and
+ * Help's rows are actions — so only these open the editor.
  */
 export const GROUPS = [
   { key: 'practice', label: 'Practice' },
   { key: 'sound', label: 'Sound' },
-  { key: 'pads', label: 'Pads' },
   { key: 'midi', label: 'MIDI' },
 ];
 
-/* The rows of one group, in table order; every row with no group given. */
+/* A page by its key: Settings itself or a group of Advanced. */
+export function groupByKey(key) {
+  return key === MAIN_GROUP.key ? MAIN_GROUP : GROUPS.find((g) => g.key === key) || null;
+}
+
+/* The rows of one page: Settings itself in MAIN's order, a group in table order. */
 export function rowsIn(group) {
-  return group ? ROWS.filter((r) => r.group === group) : ROWS;
+  if (group === MAIN_GROUP.key) return MAIN.map((k) => byKey[k] || PAGE_ROWS[k]);
+  return ROWS.filter((r) => r.group === group);
 }
 
 export const DEFAULTS = {
@@ -168,8 +188,11 @@ export function formatValue(row, value) {
   return String(value);
 }
 
-export function settingsRows(settings, rows = ROWS) {
-  return rows.map((r) => ({ key: r.key, label: r.label, value: formatValue(r, settings[r.key]),
+/* The rows as the list shows them; a page row of type `path` shows
+ * `extra[key]` (Start at: "Stage 1"). */
+export function settingsRows(settings, rows = ROWS, extra = {}) {
+  return rows.map((r) => ({ key: r.key, label: r.label,
+    value: r.type === 'path' ? String(extra[r.key] ?? '') : formatValue(r, settings[r.key]),
     action: r.action || null }));
 }
 

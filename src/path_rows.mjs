@@ -3,7 +3,7 @@
 
 /*
  * path_rows.mjs — what the Path's rows say, what Continue offers, and what
- * a click on a Settings › Path row changes. Pure.
+ * a click on a Learning Path choice (Settings › Advanced) changes. Pure.
  *
  * The path folder (program.mjs programFolder) holds what the path IS:
  * stages, tracks, steps. What each row SAYS depends on how far you have got,
@@ -54,16 +54,15 @@ export function skipAllChange(scope, progress) {
     unskip: scope.filter((st) => PLAN.stepSkipped(progress, st)).map((st) => st.id) };
 }
 
-/* A row of Settings › Path, clicked: a track or style toggled, or a choice
- * moved on to its next value. */
-export function prefChange(row, path, stageCount) {
+/* A row of Settings › Advanced › Learning Path, clicked: a track or style
+ * toggled, or a choice moved on to its next value. */
+export function prefChange(row, path) {
   if (row.group === 'tracks' || row.group === 'styles') return { toggle: [row.group, row.key] };
   if (row.group === 'rungs') return { set: ['rungs', path.rungs === 'full' ? 'short' : 'full'] };
   if (row.group === 'intros') {
     const i = INTROS.indexOf(path.intros);
     return { set: ['intros', INTROS[(i + 1) % INTROS.length]] };
   }
-  if (row.group === 'start') return { set: ['start', ((path.start || 0) + 1) % Math.max(1, stageCount)] };
   return {};
 }
 
@@ -91,7 +90,8 @@ export function titleWords(text, chars) {
 
 const ROW_CHARS = 21;
 
-/* What a Settings › Path row shows as its value. */
+/* What a Learning Path choice shows as its value — Start at, on Settings
+ * itself, included. */
 export function prefValue(row, path) {
   if (row.group === 'tracks' || row.group === 'styles') return path[row.group][row.key] ? 'on' : 'off';
   if (row.group === 'start') return `Stage ${path.start || 0}`;

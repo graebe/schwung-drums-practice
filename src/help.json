@@ -199,8 +199,9 @@
     {
       "title": "Study",
       "lines": [
-        "Settings > Practice",
-        "> Study stops the",
+        "Settings > Advanced",
+        "> Practice > Study",
+        "stops the",
         "scroll ON a note you",
         "missed. The lane",
         "names it; Guide pads",
@@ -336,10 +337,12 @@
         "skip it, start the",
         "path there, or Test",
         "out: checkpoint.",
-        "Settings > Learning",
-        "Path: tracks,",
-        "styles, rungs,",
-        "start, intros."
+        "Settings > Start at:",
+        "where it starts.",
+        "Settings > Advanced",
+        "> Learning Path:",
+        "tracks, styles,",
+        "rungs, intros."
       ]
     },
     {
@@ -466,6 +469,19 @@
     {
       "title": "Settings",
       "lines": [
+        "One short page:",
+        "Pads      the layout",
+        "Pad map   see it,",
+        "          edit it",
+        "Flip      for the",
+        "          left hand",
+        "Click     on or off",
+        "Start at  the stage",
+        "          the path",
+        "          starts at",
+        "Advanced  the rest",
+        "",
+        "Advanced:",
         "Learning Path",
         "          what",
         "          Continue",
@@ -473,16 +489,19 @@
         "Practice  tempo,",
         "          reading,",
         "          judging",
-        "Sound     the click",
-        "Pads      the layout",
+        "Sound     click sub,",
+        "          latency",
         "MIDI      where hits",
         "          go",
         "Help      tips and",
         "          welcome",
         "",
-        "SHIFT+CLICK in a",
-        "drill: every",
-        "setting."
+        "BACK walks up a",
+        "page. SHIFT+CLICK",
+        "in a drill opens",
+        "Settings; again, or",
+        "on any of its pages,",
+        "closes it."
       ]
     },
     {
@@ -493,8 +512,9 @@
         "amount, that is your",
         "rig, not you.",
         "",
-        "Settings > Sound >",
-        "Latency takes it off",
+        "Settings > Advanced",
+        "> Sound > Latency",
+        "takes it off",
         "every reading."
       ]
     },
@@ -505,8 +525,9 @@
         "own kit and click.",
         "Nothing to set up.",
         "",
-        "Settings > MIDI:",
-        "MIDI out can send to",
+        "Settings > Advanced",
+        "> MIDI: MIDI out can",
+        "send to",
         "a track or USB",
         "instead."
       ]

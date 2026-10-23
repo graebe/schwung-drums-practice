@@ -12,8 +12,9 @@
  * after the update only notes the welcome as seen.
  *
  * Each tip is one card, shown the first time its screen comes up and never
- * again, until Settings › Help › Show tips again clears the list. The keys of
- * the tips shown are kept in progress.tips (progress.mjs) and saved with it.
+ * again, until Settings › Advanced › Help › Show tips again clears the list.
+ * The keys of the tips shown are kept in progress.tips (progress.mjs) and
+ * saved with it.
  *
  * The words are shared with Piano Practice. They are written as sentences and
  * wrapped to the panel by the caller's measure (help.mjs fitPage), because a

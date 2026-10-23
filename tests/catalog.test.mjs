@@ -113,14 +113,18 @@ test('Quiz holds the five drills; the Ladder and the Clock are no rows of their 
   assert.equal(CLOCK_ID, 'clock', 'the Clock keeps the id its takes are filed under');
 });
 
-test('Settings is a folder of groups: the path, the editor\'s groups, and Help', () => {
-  const prefs = folder('Path', []);
+test('Settings is a page of its own; Advanced holds the path, the editor\'s groups and Help', () => {
+  const prefs = folder('Learning Path', []);
   const s = settingsFolder(prefs);
-  assert.deepEqual(labels(s), ['Path', 'Practice', 'Sound', 'Pads', 'MIDI', 'Help']);
-  assert.deepEqual(s.children.slice(1, 5).map((c) => c.settingsGroup), ['practice', 'sound', 'pads', 'midi']);
-  assert.deepEqual(child(s, 'Help').children.map((c) => [c.label, c.helpAction]),
+  assert.equal(s.settingsGroup, 'main', 'opening Settings shows its page');
+  assert.deepEqual(labels(s), ['Advanced']);
+  const adv = child(s, 'Advanced');
+  assert.equal(adv.advanced, true);
+  assert.deepEqual(labels(adv), ['Learning Path', 'Practice', 'Sound', 'MIDI', 'Help']);
+  assert.deepEqual(adv.children.slice(1, 4).map((c) => c.settingsGroup), ['practice', 'sound', 'midi']);
+  assert.deepEqual(child(adv, 'Help').children.map((c) => [c.label, c.helpAction]),
     [['Show tips again', 'tips'], ['Welcome again', 'welcome']]);
-  assert.deepEqual(labels(settingsFolder()).slice(0, 1), ['Practice'], 'no path, no Path group');
+  assert.deepEqual(labels(child(settingsFolder(), 'Advanced')).slice(0, 1), ['Practice'], 'no path, no path group');
 });
 
 test('every leaf can be acted on, and every chart leaf builds a valid chart', () => {

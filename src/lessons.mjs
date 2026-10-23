@@ -12,7 +12,7 @@
  * course; each stage has a card of its own, what that world is.
  *
  * A card is never in the way. Click starts the practice — one press, read or
- * not — and Settings › Path › Intros says whether cards show once (new), every
+ * not — and Settings › Advanced › Learning Path › Intros says whether cards show once (new), every
  * time (always) or never (off). Each stage folder lists its cards under
  * Lessons, to read again at any time.
  *

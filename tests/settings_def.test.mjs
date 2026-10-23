@@ -25,19 +25,38 @@ test('every row is complete and every default is in range', () => {
   }
 });
 
-test('every row is filed in exactly one group, and every group holds rows', () => {
-  const keys = S.GROUPS.map((g) => g.key);
-  for (const row of S.ROWS) assert.ok(keys.includes(row.group), `${row.key} is in no group`);
-  let total = 0;
-  for (const g of S.GROUPS) {
-    const rows = S.rowsIn(g.key);
-    assert.ok(rows.length > 0, `${g.label} is empty`);
-    total += rows.length;
+test('every setting is on exactly one page: Settings itself or a group of Advanced', () => {
+  const pages = [S.MAIN_GROUP.key, ...S.GROUPS.map((g) => g.key)];
+  for (const row of S.ROWS) assert.ok(pages.includes(row.group), `${row.key} is on no page`);
+  const seen = [];
+  for (const key of pages) {
+    const rows = S.rowsIn(key);
+    assert.ok(rows.length > 0, `${key} is empty`);
+    seen.push(...rows.map((r) => r.key).filter((k) => S.rowFor(k)));
   }
-  assert.equal(total, S.ROWS.length);
-  assert.equal(S.rowsIn(null), S.ROWS, 'no group is every row, for Settings over a drill');
-  assert.deepEqual(S.rowsIn('pads').map((r) => r.key), ['layout', 'flip', 'padMap']);
+  assert.deepEqual(seen.slice().sort(), S.ROWS.map((r) => r.key).sort(), 'each setting exactly once');
+  assert.deepEqual(S.rowsIn('main').map((r) => r.key), S.MAIN);
+  assert.deepEqual(S.MAIN, ['layout', 'padMap', 'flip', 'click', 'start', 'advanced']);
+  assert.deepEqual(S.rowsIn('main').map((r) => r.label), ['Pads', 'Pad map', 'Flip', 'Click', 'Start at', 'Advanced']);
+  assert.deepEqual(S.GROUPS.map((g) => g.key), ['practice', 'sound', 'midi']);
   assert.deepEqual(S.settingsRows(S.DEFAULTS, S.rowsIn('midi')).map((r) => r.label), ['MIDI out', 'MIDI ch']);
+  assert.equal(S.groupByKey('main').label, 'Settings');
+  assert.equal(S.groupByKey('sound').label, 'Sound');
+  assert.equal(S.groupByKey('pads'), null, 'Pads is on Settings itself now');
+});
+
+test('Start at and Advanced are rows of the page, never settings', () => {
+  assert.equal(S.rowFor('start'), null);
+  assert.equal(S.rowFor('advanced'), null);
+  assert.ok(!('start' in S.DEFAULTS) && !('advanced' in S.DEFAULTS));
+  const rows = S.settingsRows(S.DEFAULTS, S.rowsIn('main'), { start: 'Stage 2' });
+  assert.deepEqual(rows.slice(-2).map((r) => [r.label, r.value, r.action]),
+    [['Start at', 'Stage 2', null], ['Advanced', '>', 'advanced']]);
+  assert.deepEqual(rows[0], { key: 'layout', label: 'Pads', value: 'MPC', action: null });
+  const before = { ...S.DEFAULTS };
+  S.applySetting(before, 'advanced', 1);
+  S.applySetting(before, 'start', 1);
+  assert.deepEqual(before, S.DEFAULTS, 'a page row changes no setting');
 });
 
 test('the label fits the screen', () => {

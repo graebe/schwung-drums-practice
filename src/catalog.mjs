@@ -141,23 +141,32 @@ export function libraryFolders({ charts = [], categories = [] } = {}) {
 }
 
 /*
- * Settings, as a folder of groups: the path's choices (program.mjs
- * pathSettingsFolder), a row per group of the settings editor — opening one
- * shows the editor with that group's rows — and Help.
+ * Settings: opening it shows its own short page (settings_def.mjs MAIN,
+ * settingsGroup 'main'), not a folder. Its one child is Advanced, the folder
+ * of the rest, which the page's Advanced row opens: the Learning Path's
+ * choices (program.mjs pathSettingsFolder), a row per group of the settings
+ * editor — opening one shows the editor with that group's rows — and Help.
  */
 export function settingsFolder(pathPrefs = null) {
   return {
     label: 'Settings',
     value: FOLDER,
     untracked: true,
-    children: [
-      ...(pathPrefs ? [pathPrefs] : []),
-      ...GROUPS.map((g) => ({ label: g.label, value: FOLDER, settingsGroup: g.key })),
-      { label: 'Help', value: FOLDER, untracked: true, children: [
-        { label: 'Show tips again', value: '', helpAction: 'tips' },
-        { label: 'Welcome again', value: '', helpAction: 'welcome' },
-      ] },
-    ],
+    settingsGroup: 'main',
+    children: [{
+      label: 'Advanced',
+      value: FOLDER,
+      untracked: true,
+      advanced: true,
+      children: [
+        ...(pathPrefs ? [pathPrefs] : []),
+        ...GROUPS.map((g) => ({ label: g.label, value: FOLDER, settingsGroup: g.key })),
+        { label: 'Help', value: FOLDER, untracked: true, children: [
+          { label: 'Show tips again', value: '', helpAction: 'tips' },
+          { label: 'Welcome again', value: '', helpAction: 'welcome' },
+        ] },
+      ],
+    }],
   };
 }
 
@@ -177,7 +186,7 @@ export const QUIZ_ICONS = Object.freeze({
  *   newSeed    a source of fresh seeds; without one every build uses seed 1,
  *              which keeps the tests deterministic
  *   path       the Path folder (program.mjs programFolder), when there is one
- *   pathPrefs  Settings › Path (program.mjs pathSettingsFolder)
+ *   pathPrefs  Settings › Advanced › Learning Path (program.mjs pathSettingsFolder)
  *
  * The Ladder and the Clock are no rows of their own: they wrap a drill, so
  * they are offered on the drill's row, in its action sheet. The Clock still

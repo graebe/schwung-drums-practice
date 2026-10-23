@@ -794,9 +794,10 @@ function stageFolder(stage) {
 const pref = (label, group, key) => ({ label, value: '', prefRow: true, group, key });
 
 /*
- * Settings › Path: what Continue offers — the tracks and styles on or off,
- * the full ladder of a groove or its first and last rung, the stage to start
- * at, and how the lesson cards show. `styles` are the groove families.
+ * Settings › Advanced › Learning Path: what Continue offers — the tracks and
+ * styles on or off, the full ladder of a groove or its first and last rung,
+ * and how the lesson cards show. `styles` are the groove families. The stage
+ * to start at is on Settings itself (settings_def.mjs MAIN).
  */
 export function pathSettingsFolder(styles = []) {
   return {
@@ -809,7 +810,6 @@ export function pathSettingsFolder(styles = []) {
       { label: 'Styles', value: '>', untracked: true, styleRows: true,
         children: styles.map((c) => pref(c.name, 'styles', c.id)) },
       pref('Rungs', 'rungs', ''),
-      pref('Start at', 'start', ''),
       pref('Intros', 'intros', ''),
     ],
   };

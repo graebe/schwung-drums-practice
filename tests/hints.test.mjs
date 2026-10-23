@@ -94,3 +94,9 @@ test('a warning the screen gives takes a turn of its own, and not on the Shift l
   assert.deepEqual(parts.slice(0, -1), H.hintFor(H.SCREENS.QUIZ, { ...st, warning: '' }));
   assert.ok(!H.hintFor(H.SCREENS.QUIZ, { ...st, shift: true }).includes('NO RD ON PADS'));
 });
+
+test('on Settings a row that opens something says so; the others edit', () => {
+  assert.deepEqual(H.hintFor(H.SCREENS.SETTINGS, { open: true }), ['CLICK open  BACK up']);
+  assert.deepEqual(H.hintFor(H.SCREENS.SETTINGS, {}), ['CLICK edit  BACK up']);
+  assert.deepEqual(H.hintFor(H.SCREENS.SETTINGS, { editing: true, open: false }), ['JOG change', 'CLICK done']);
+});

@@ -296,10 +296,11 @@ test('a stage lists its places in teaching order, the checkpoint last, and no ro
   walk(f);
 });
 
-test('Settings › Path: tracks, styles, rungs, the start and the intros', () => {
+test('Settings › Advanced › Learning Path: tracks, styles, rungs and the intros', () => {
   const styles = manifest.categories.filter((c) => c.folder === 'Grooves');
   const f = PLAN.pathSettingsFolder(styles);
-  assert.deepEqual(f.children.map((c) => c.label), ['Tracks', 'Styles', 'Rungs', 'Start at', 'Intros']);
+  assert.deepEqual(f.children.map((c) => c.label), ['Tracks', 'Styles', 'Rungs', 'Intros'],
+    'Start at is on Settings itself');
   assert.equal(f.children[1].children.length, 6, 'one row a style');
   assert.equal(f.untracked, true, 'nothing to count in it');
 });
