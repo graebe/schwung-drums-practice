@@ -11,16 +11,18 @@
 #   samples/LICENSES/CC0-1.0.txt
 #   src/pathmap             the Path map engine, and its tests/pathmap_*.test.mjs
 #   src/home                the home screen's circles, and tests/home_*.test.mjs
+#   tools/screen_buffer.mjs the preview and test screen, the Move's font in full,
+#                           and tests/screen_font.test.mjs
 #
 #   scripts/check-vendored.sh [<piano-practice checkout>] [<ref>]
 #
 # The checkout defaults to the sibling of this repository's main checkout
 # (schwung-pinao-practice beside schwung-drums-practice), the ref to main.
-# Name the ref to check against a branch that is not merged yet: the Path map
-# exists in Piano Practice only on feature/piano-map until it merges, and its
-# island path fix and the home engine's ring menus only on feature/piano-rings
-# until that merges into piano-map, so until then run
-#   scripts/check-vendored.sh <piano checkout> feature/piano-rings
+# Name the ref to check against a branch that is not merged yet: the shared
+# scene player (src/pathmap/scenes.mjs) and the beaded sticks icon exist in
+# Piano Practice only on feature/piano-followups until it merges, so until
+# then run
+#   scripts/check-vendored.sh <piano checkout> feature/piano-followups
 # Each file is compared by its git blob id, the Git LFS pointer for a pack, so
 # a pack is checked without its objects. A local, deliberate check: run it
 # whenever either side changes, and before a release.
@@ -38,6 +40,8 @@ FILES="$FILES
 $(cd "$ROOT" && find src/pathmap src/home -name '*.mjs' -type f | sort)
 $(cd "$ROOT" && find tests -name 'pathmap_*.test.mjs' -type f | sort)
 $(cd "$ROOT" && find tests -name 'home_*.test.mjs' -type f | sort)
+tools/screen_buffer.mjs
+tests/screen_font.test.mjs
 samples/click.nisp
 samples/click.manifest.toml
 samples/click.report.txt
