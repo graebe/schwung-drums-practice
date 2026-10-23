@@ -10,7 +10,7 @@
     "test:dsp": "bash scripts/test.sh dsp",
     "test:package": "bash scripts/test.sh package",
     "test:rust": "bash scripts/test.sh rust",
-    "build": "sh scripts/build.sh",
+    "build": "bash scripts/build.sh",
     "preview": "node tools/preview.mjs",
     "coverage:ui": "node tools/ui_coverage.mjs"
   }
