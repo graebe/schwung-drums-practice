@@ -56,7 +56,7 @@ const ABOUT = {
   [S.WELCOME]: ['WELCOME', ['Your first steps.']],
   [S.TIP]: ['TIP', ['A tip, shown once.']],
   [S.CARD]: ['LESSON', ['A lesson card: what', 'comes next, and why.']],
-  [S.READY]: ['READY', ['A drill, ready: REC', 'plays and scores it,', 'PLAY lets you hear', 'it first.']],
+  [S.READY]: ['READY', ['A drill, ready: REC', 'plays and scores it,', 'PLAY lets you hear', 'it first. Knob 8 is', 'its tempo: the box', 'shows it in bpm.']],
   [S.RUNNING]: ['PLAYING', ['A take, under way.']],
   [S.SUMMARY]: ['RESULT', ['How the take went.']],
   [S.LADDER]: ['LADDER', ['How the climb went.']],

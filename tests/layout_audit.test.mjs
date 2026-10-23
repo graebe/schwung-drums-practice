@@ -160,22 +160,58 @@ test('the per-voice table stops before it falls off the screen', () => {
   assert.ok(lastRow < L.SCREEN_H, 'the table is allowed more rows than fit');
 });
 
-test('the ready box fits, in both of its states', () => {
+test('the ready box fits: three rows, the rule, the tempo row, clear of the title and the hint line', async () => {
   /*
    * At an earlier geometry the third row landed on screen row 51 — outside a
    * box ending at 46, and across the sticking rule at 47. An overflow has to
    * fail here rather than ship.
    */
+  const { READY_ROW_Y, READY_RULE_Y, READY_TEMPO_Y, readyTempoText } = await import('../src/chrome.mjs');
   const b = READY_BOX;
   assert.ok(b.x >= 0 && b.x + b.w <= L.SCREEN_W, 'the box runs off the side');
-  assert.ok(b.y > L.HEADER_RULE_Y, 'the box covers the header');
-  assert.ok(b.y + b.h <= L.UNDER_RULE_Y, 'the box crosses the under-lane rule');
-  /* Three rows at +4 / +13 / +22, each a line of text tall. */
-  for (const dy of [4, 13, 22]) {
-    assert.ok(b.y + dy + L.TEXT_H <= b.y + b.h, `the row at +${dy} ends outside the box`);
+  assert.ok(b.y > L.HEADER_RULE_Y + 1, 'the box touches the title rule');
+  assert.ok(L.HINT_Y - (b.y + b.h) >= 2, 'fewer than 2 clear rows between the box and the hint line');
+  /* Three rows, each a line of text tall, a row clear of the rule. */
+  for (let i = 0; i < 3; i++) {
+    assert.ok(READY_ROW_Y + i * 9 + L.TEXT_H < READY_RULE_Y, `row ${i} runs into the rule`);
   }
-  /* And it leaves the timing bar alone. */
-  assert.ok(b.y + b.h < L.FOOTER_Y - 2);
+  assert.ok(READY_ROW_Y >= 2, 'the first row touches the top edge');
+  /* The LEVEL's digit (at +13, 15 tall) ends above the rule. */
+  assert.ok(13 + 15 < READY_RULE_Y, 'the digit runs into the rule');
+  /* The tempo row under the rule, inside the box, for 2 and 3 digits. */
+  assert.ok(READY_TEMPO_Y > READY_RULE_Y + 1, 'the tempo row touches the rule');
+  assert.ok(READY_TEMPO_Y + L.TEXT_H < b.h - 1, 'the tempo row runs into the bottom edge');
+  const w = (s) => s.length * 6 - 1;
+  for (const bpm of [92, 120, 240]) {
+    assert.ok(3 + w(readyTempoText(bpm)) <= b.w - 3, `"${readyTempoText(bpm)}" runs out of the box`);
+  }
+  assert.equal(readyTempoText(92).length, readyTempoText(120).length, 'the bpm keeps its place');
+});
+
+/*
+ * The ready box on one vertical rhythm, measured from its top edge (row 0)
+ * to its bottom edge (row h-1); every line in it is 7 tall.
+ */
+test('the ready box\'s rhythm: even padding round the controls, the tempo and the digit centred, no row to spare', async () => {
+  const C = await import('../src/chrome.mjs');
+  const b = READY_BOX;
+  const H7 = L.TEXT_H;
+  const topPad = C.READY_ROW_Y - 1;
+  const between = C.READY_ROW_PITCH - H7;
+  const lastEnd = C.READY_ROW_Y + 2 * C.READY_ROW_PITCH + H7;     /* the row after the third control */
+  const overRule = C.READY_RULE_Y - lastEnd;
+  assert.deepEqual([topPad, between, overRule], [C.READY_PAD, C.READY_PAD, C.READY_PAD],
+    'the same padding above the first control, between them and down to the rule');
+  const underRule = C.READY_TEMPO_Y - (C.READY_RULE_Y + 1);
+  const overEdge = (b.h - 1) - (C.READY_TEMPO_Y + H7);
+  assert.equal(underRule, overEdge, `the tempo is not centred between the rule and the edge: ${underRule}/${overEdge}`);
+  assert.equal(underRule, C.READY_PAD, 'and on the same rhythm');
+  /* LEVEL on the first control's row; its digit (15 tall) between the word and the rule. */
+  const underWord = C.READY_DIGIT_Y - (C.READY_ROW_Y + H7);
+  const overRuleDigit = C.READY_RULE_Y - (C.READY_DIGIT_Y + 15);
+  assert.ok(Math.abs(underWord - overRuleDigit) <= 1, `the digit is off centre: ${underWord}/${overRuleDigit}`);
+  /* As compact as the rhythm allows: a row less, and the tempo is off centre. */
+  assert.equal(b.h, C.READY_TEMPO_Y + H7 + C.READY_PAD + 1, 'a row to spare');
 });
 
 /* ---- L0's still page ---------------------------------------------------------- */

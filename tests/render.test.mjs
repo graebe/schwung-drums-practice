@@ -563,18 +563,19 @@ test('the grid is what you see first', async () => {
 import { drawReady, READY_BOX } from '../src/view.mjs';
 import { drawScrubGlyph, SCRUB_W, SCRUB_H } from '../src/glyphs.mjs';
 
-function readyFrame(opts = {}) {
+function readyFrameState() {
   const chart = subdivisionDrill('eighths', { bpm: 90 });
   const run = createRun(chart, { repeats: 8 });
   ensureEntries(run, 32);
+  return { run, chart, songBeats: 0, pxPerBeat: 32, view: 'grid', title: chart.name, bpm: chart.bpm, dynamics: true };
+}
+
+function readyFrame(opts = {}) {
   const ctx = createScreen();
   const text = [];
   const orig = ctx.text.bind(ctx);
   ctx.text = (x, y, s, v) => { text.push(s); orig(x, y, s, v); };
-  drawReady(ctx, {
-    run, chart, songBeats: opts.songBeats || 0, pxPerBeat: 32, view: 'grid',
-    title: chart.name, bpm: chart.bpm, dynamics: true, ...opts,
-  });
+  drawReady(ctx, { ...readyFrameState(), ...opts });
   return { ctx, text };
 }
 
@@ -597,11 +598,12 @@ test('the box is over the chart at home and gone once you scrub', () => {
 });
 
 test('a groove\'s box splits: the controls left, LEVEL right with its digit and the arrows it can take', async () => {
-  const { READY_SPLIT } = await import('../src/chrome.mjs');
+  const { READY_SPLIT, READY_RULE_Y } = await import('../src/chrome.mjs');
   const mid = readyFrame({ level: { digit: '2', down: true, up: true, done: false } });
   assert.ok(mid.text.includes('LEVEL') && mid.text.includes('<') && mid.text.includes('>'), mid.text.join('|'));
   const b = READY_BOX;
-  assert.equal(countOn(mid.ctx, b.x + READY_SPLIT, b.y, 1, b.h), b.h, 'no line between the halves');
+  assert.equal(countOn(mid.ctx, b.x + READY_SPLIT, b.y, 1, READY_RULE_Y), READY_RULE_Y,
+    'no line between the halves, down to the rule');
   /* The digit is big: drawn as blocks, not as text. */
   assert.ok(!mid.text.includes('2'));
   assert.ok(countOn(mid.ctx, b.x + READY_SPLIT + 15, b.y + 13, 12, 15) > 20, 'no digit');
@@ -615,6 +617,82 @@ test('a groove\'s box splits: the controls left, LEVEL right with its digit and 
   }
   /* The music still shows above and below the box. */
   assert.ok(countOn(mid.ctx, 0, 10, L.SCREEN_W, b.y - 10) + countOn(mid.ctx, 0, b.y + b.h + 1, L.SCREEN_W, 6) > 0);
+});
+
+test('under the controls, across a rule, the tempo and the knob that sets it', async () => {
+  const { READY_RULE_Y, READY_TEMPO_Y, READY_SPLIT } = await import('../src/chrome.mjs');
+  const b = READY_BOX;
+  for (const [bpm, row] of [[92, 'Knob 8:  92 bpm'], [120, 'Knob 8: 120 bpm']]) {
+    const f = readyFrame({ bpm, level: { digit: '4', down: true, up: false, done: false } });
+    assert.ok(f.text.includes(row), `${bpm}: ${f.text.join('|')}`);
+    assert.equal(countOn(f.ctx, b.x, b.y + READY_RULE_Y, b.w, 1), b.w, 'the rule runs the box\'s width');
+    assert.ok(countOn(f.ctx, b.x + 3, b.y + READY_TEMPO_Y, b.w - 6, 7) > 20, 'no tempo row');
+    /* The halves' line stops at the rule: the tempo row is one row, the width. */
+    assert.equal(countOn(f.ctx, b.x + READY_SPLIT, b.y + READY_RULE_Y + 1, 1, b.h - READY_RULE_Y - 2),
+      countOn(f.ctx, b.x + READY_SPLIT, b.y + READY_TEMPO_Y, 1, 7), 'the line crosses the tempo row');
+  }
+  const none = readyFrame({ bpm: 0 });
+  assert.ok(!none.text.some((t) => /Knob 8/.test(t)), 'no tempo, no row');
+});
+
+test('the tempo row is centred, and keeps its place as the knob turns', async () => {
+  const b = READY_BOX;
+  const xs = {};
+  for (const bpm of [92, 120]) {
+    const c = createScreen();
+    const text = c.text.bind(c);
+    c.text = (x, y, s, v) => { if (/^Knob 8/.test(s)) xs[bpm] = { x, w: s.length * 6 - 1 }; text(x, y, s, v); };
+    drawReady(c, { ...readyFrameState(), bpm });
+  }
+  assert.equal(xs[92].x, xs[120].x, 'the row moved as the tempo changed');
+  const left = xs[92].x - b.x;
+  const right = b.x + b.w - (xs[92].x + xs[92].w);
+  assert.ok(Math.abs(left - right) <= 1, `not centred: ${left} left, ${right} right`);
+});
+
+/*
+ * While the box is up nothing of the chart touches it: a clear pixel round
+ * it, the rows under it clear to the hint line, and no bar number anywhere —
+ * the numbers come back once you scrub. On real grooves at two tempos.
+ */
+test('nothing touches the ready box, and the bar numbers wait until you scrub', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { parseExercise, parseManifest } = await import('../src/exercise_io.mjs');
+  const dir = new URL('../src/exercises/', import.meta.url);
+  const man = parseManifest(readFileSync(new URL('index.json', dir), 'utf8'));
+  const load = (id) => parseExercise(readFileSync(new URL(man.entries.find((e) => e.id === id).file, dir), 'utf8'), id)
+    .chart;
+  const b = READY_BOX;
+  for (const [id, lv, digit] of [['halftime-ballad', 'l4', '4'], ['rock-backbeat', 'l1', '1']]) {
+    const chart = projectLevel(load(id), lv);
+    for (const bpm of [92, 120]) {
+      for (const view of ['grid', 'staff']) {
+        const run = createRun(chart, { repeats: 8 });
+        ensureEntries(run, 32);
+        const c = createScreen();
+        const ys = [];
+        const text = c.text.bind(c);
+        c.text = (x, y, s, v) => { ys.push(y); text(x, y, s, v); };
+        drawReady(c, { run, chart, bpm, title: chart.name, songBeats: 0, pxPerBeat: 32, view, dynamics: true,
+          level: { digit, down: true, up: true, done: false }, hintLeft: 'L4  Everything', hint: 'BACK up' });
+        const where = `${id} ${lv} ${bpm} bpm ${view}`;
+        assert.equal(countOn(c, b.x - 1, b.y - 1, b.w + 2, 1), 0, `${where}: something touches the top edge`);
+        assert.equal(countOn(c, b.x - 1, b.y, 1, b.h), 0, `${where}: something touches the left edge`);
+        assert.equal(countOn(c, b.x + b.w, b.y, 1, b.h), 0, `${where}: something touches the right edge`);
+        assert.equal(countOn(c, b.x - 1, b.y + b.h, b.w + 2, L.HINT_Y - (b.y + b.h)), 0,
+          `${where}: something between the box and the hint line`);
+        assert.ok(!ys.includes(L.UNDER_LANE_Y), `${where}: a bar number beside the box`);
+      }
+    }
+    const away = createScreen();
+    const ys = [];
+    const text = away.text.bind(away);
+    away.text = (x, y, s, v) => { ys.push(y); text(x, y, s, v); };
+    const run = createRun(chart, { repeats: 8 });
+    ensureEntries(run, 32);
+    drawReady(away, { run, chart, bpm: 92, title: chart.name, songBeats: 4, pxPerBeat: 32, view: 'grid', dynamics: true });
+    assert.ok(ys.includes(L.UNDER_LANE_Y), `${id}: the bar numbers did not come back on a scrub`);
+  }
 });
 
 test('the bottom line carries the level at the left and the keys at the right', () => {
@@ -1034,6 +1112,34 @@ function page(view, upTo, opts = {}) {
   return { ctx, run, u, c };
 }
 
+test('the L0 ready box: its tempo row, nothing touching it, no bar number or cursor marks till it steps aside', async () => {
+  const { drawUntimedReady } = await import('../src/view.mjs');
+  const c = projectLevel(ROCKISH, 'l0');
+  const b = READY_BOX;
+  const frame = (extra) => {
+    const run = createRun(c, { sticking: 'off' });
+    const ctx = createScreen();
+    const ys = [];
+    const seen = [];
+    const text = ctx.text.bind(ctx);
+    ctx.text = (x, y, s, v) => { ys.push(y); seen.push(s); text(x, y, s, v); };
+    drawUntimedReady(ctx, { run, chart: c, bpm: 92, view: 'grid', dynamics: true, cursor: 0, title: c.name,
+      rightLabel: '16 stacks', footerRight: '', ready: true, hintLeft: 'L0  Own pace', hint: '',
+      level: { digit: '0', down: false, up: true, done: false }, ...extra });
+    return { ctx, ys, seen };
+  };
+  const up = frame({});
+  assert.ok(up.seen.includes('Knob 8:  92 bpm'), up.seen.join('|'));
+  assert.ok(!up.ys.includes(L.UNDER_LANE_Y), 'a bar number beside the box');
+  assert.equal(countOn(up.ctx, 0, L.CURSOR_TOP_Y, L.SCREEN_W, b.y - 1 - L.CURSOR_TOP_Y), 0,
+    'the cursor\'s arrow over the box');
+  assert.equal(countOn(up.ctx, b.x - 1, b.y - 1, b.w + 2, 1) + countOn(up.ctx, b.x - 1, b.y, 1, b.h)
+    + countOn(up.ctx, b.x + b.w, b.y, 1, b.h), 0, 'something touches the box');
+  const aside = frame({ scrubbed: true });
+  assert.ok(aside.ys.includes(L.UNDER_LANE_Y), 'the bar number did not come back');
+  assert.ok(countOn(aside.ctx, 0, L.CURSOR_TOP_Y, L.SCREEN_W, L.CARET_H) > 0, 'nor the cursor\'s arrow');
+});
+
 test('the page holds the whole bar between its bar lines, at even spacing', () => {
   for (const view of ['grid', 'staff']) {
     const { left, px } = pageGeometry(view, ROCKISH);
@@ -1318,7 +1424,7 @@ test('Sticking off still shows the written hands: on the scroll, on the page, in
 });
 
 test('no glyph of the ready box touches its word: one glyph column, the words 3px after it', async () => {
-  const { drawReadyBox } = await import('../src/chrome.mjs');
+  const { drawReadyBox, READY_ROW_Y } = await import('../src/chrome.mjs');
   const ctx = createScreen();
   const xs = [];
   const text = ctx.text.bind(ctx);
@@ -1327,7 +1433,7 @@ test('no glyph of the ready box touches its word: one glyph column, the words 3p
   const b = READY_BOX;
   assert.equal(new Set(xs).size, 1, 'the words share one column');
   for (let i = 0; i < 3; i++) {
-    const y = b.y + 4 + i * 9;
+    const y = b.y + READY_ROW_Y + i * 9;
     assert.equal(countOn(ctx, xs[0] - 3, y, 3, 8), 0, `row ${i}: its glyph runs into the gap before the word`);
   }
 });

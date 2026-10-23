@@ -36,7 +36,9 @@ export * from './screens.mjs';
 export { drawUntimedView, drawUntimedReady, pageGeometry, pageBar } from './page_view.mjs';
 
 /* ---- The reading view --------------------------------------------------- */
-export function drawReadingView(ctx, s) {
+/* `boxUp`: the ready box is over the chart, and the under lane's bar
+ * numbers are left out — one beside it would only crowd its edge. */
+export function drawReadingView(ctx, s, boxUp = false) {
   ctx.clear();
   drawHeader(ctx, s);
 
@@ -55,7 +57,7 @@ export function drawReadingView(ctx, s) {
     drawStaffBody(ctx, s, visible, px, bars);
   }
 
-  drawUnderLane(ctx, s, visible, rulerBars(s.chart, s.songBeats, px, endBeat));
+  drawUnderLane(ctx, s, visible, rulerBars(s.chart, s.songBeats, px, endBeat), !boxUp);
   /* How far through, and hits/misses so far — as in the piano trainer. */
   /* `progress` is the caller's when the run is endless: the Ladder's rung, the
    * Clock's rounds. Otherwise it is the run's own. */
@@ -157,9 +159,9 @@ function drawGridBody(ctx, s, visible, px, bars) {
  * the downbeat's hand — which for a paradiddle is the one letter worth reading.
  * The ticks are drawn either way; they cost one row and hang off the rule.
  */
-function drawUnderLane(ctx, s, visible, bars) {
+function drawUnderLane(ctx, s, visible, bars, barNumbers) {
   const sticking = handsWritten(s.run);
-  drawBarRuler(ctx, bars, !sticking);
+  drawBarRuler(ctx, bars, !sticking && barNumbers);
   if (!sticking) return;
   for (let i = 0; i < visible.length; i++) {
     const { entry, x } = visible[i];
@@ -188,7 +190,8 @@ function drawUnderLane(ctx, s, visible, bars) {
 export const READY_BOX = L.READY_BOX;
 
 export function drawReady(ctx, s) {
-  drawReadingView(ctx, s);
+  const boxUp = (s.songBeats || 0) <= 0;
+  drawReadingView(ctx, s, boxUp);
 
   /*
    * The box (chrome.mjs drawReadyBox): the controls, a word each, and the
@@ -200,9 +203,10 @@ export function drawReady(ctx, s) {
    * scrubbing through; keeping it up would defeat the scrubbing. It comes
    * back when you scroll home, which is also the only way to find it again.
    */
-  if ((s.songBeats || 0) > 0) return;
+  if (!boxUp) return;
 
-  drawReadyBox(ctx, { rows: [['play', 'listen'], ['rec', 'practise'], ['scrub', 'scrub']], level: s.level });
+  drawReadyBox(ctx, { rows: [['play', 'listen'], ['rec', 'practise'], ['scrub', 'scrub']], level: s.level,
+    bpm: s.bpm });
 }
 
 /* ---- Clock -------------------------------------------------------------- */
