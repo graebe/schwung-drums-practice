@@ -28,10 +28,11 @@ hands, dynamics, time and the ear.
 - Each **stage** ends on a **checkpoint**, a piece of music. Pass it and the next stage opens —
   you can take it at any time, which is how someone who can already play tests out of a stage.
 - Before a new idea comes a **lesson card**: a screen or two on what it is and where you hear it.
-  Click starts the practice, read or not; *Settings › Learning Path › Intros* turns them to `always` or
-  `off`, and every stage's **Lessons** row shows them again — as does **Menu** on a row of the path.
-- **Settings › Learning Path** decides what Continue offers: tracks and styles on or off, the full ladder of
-  a groove or only L0 and its top rung, and the stage to start at.
+  Click starts the practice, read or not; *Settings › Advanced › Learning Path › Intros* turns them
+  to `always` or `off`, and every stage's **Lessons** row shows them again — as does **Menu** on a row of the path.
+- **Settings › Advanced › Learning Path** decides what Continue offers: tracks and styles on or off,
+  the full ladder of a groove or only L0 and its top rung; **Start at**, on Settings itself, the stage
+  to start at.
 - Stuck? After three takes that did not count the result suggests an easier way in (Speed down,
   or L0); after six the step is parked for a day and Continue offers something else.
 
@@ -413,8 +414,8 @@ opened outside the path show none — the library is free play.
 
 **Skipping is one press.** On a card: **Click** = start (to the Ready screen, card marked seen);
 **Jog** = next/previous page; **Play** = hear the drill (goes to Ready and listens — the same
-"Play listens" as everywhere); **Back** = out to the list. *Settings › Learning Path › Intros*: `new`
-(default, each card once) / `always` / `off`. Each stage folder opens on a **Lessons** row listing
+"Play listens" as everywhere); **Back** = out to the list. *Settings › Advanced › Learning Path ›
+Intros*: `new` (default, each card once) / `always` / `off`. Each stage folder opens on a **Lessons** row listing
 its cards to re-read at any time, and a stage's action sheet offers them too.
 
 **The cards**, as first drafted (the shipped wording, fitted to the screen, is in `src/lessons.json`):
@@ -498,14 +499,15 @@ Skip next exists; a higher rung ticks the lower ones; Click goes on even after a
 - Switching track from a result meant Menu → Learning Path → the track.
 
 **Now:**
-1. **Settings › Learning Path** (a group of the Settings folder, the last row of the list):
+1. **Settings › Advanced › Learning Path** (with **Start at** on Settings itself):
    - **Tracks** — Time / Hands / Grooves / Ear on/off (at least one stays on).
    - **Styles** — Rock & Pop / Funk / Latin / Jazz / Electronic / Techno on/off; decides which
      electives Continue offers and the Pick: groove pool. Core steps stay (a stage's idea is
      needed), but a core groove in a switched-off style is swapped for an elective of the same
      idea in a style that is on (each core groove step lists its alternatives).
    - **Rungs** — full ladder / short (L0 and L4; L1–L3 stay playable, not recommended).
-   - **Start at** — Stage 0…6: Continue starts there; earlier stages stay open, nothing ticked.
+   - **Start at** (on Settings) — Stage 0…6: Continue starts there; earlier stages stay open,
+     nothing ticked.
    - **Intros** — `new` / `always` / `off` (lesson cards).
 2. **Test out**: every stage's **Checkpoint**, its last row, plays its checkpoint at any time, and so
    does *Test out: checkpoint* on the stage's action sheet; pass it and the stage is through

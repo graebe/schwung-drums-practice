@@ -35,7 +35,7 @@ go on.
 
 **Back** on any page ends the welcome; it will not come back on its own. If you practised before
 this version, you are not greeted at all — you know your way already. To see it again: *Settings ›
-Help › Welcome again*.
+Advanced › Help › Welcome again*.
 
 ## Home
 
@@ -60,7 +60,7 @@ Back out of it.
 | **Practice** | the free library: **Subdivisions**, **Grooves** by style, **Rudiments** by family, **Random** |
 | **Quiz** | five ear and reading drills |
 | **Progress** | how far you have got: overall, per track, and every drill you played |
-| **Settings** | **Learning Path**, **Practice**, **Sound**, **Pads**, **MIDI**, **Help** |
+| **Settings** | one short page: **Pads**, **Pad map**, **Flip**, **Click**, **Start at**, and **Advanced** for the rest |
 
 **Practice** and **Quiz** open as rings of their own, the same way: a circle per entry with its
 picture, the jog growing the one you are on, Click or its pad opening it (silently), MENU their
@@ -217,7 +217,7 @@ shown, and **Settings...** is always last:
 | **Practise: Ladder** | a drill with a tempo | climbs from 70% of its tempo, a rung at a time |
 | **Practise: Clock** | a drill with a tempo | the click drops out and you keep the time |
 | **Show as list** / **Show as map** | the Learning Path and its stages | the map's folder as a list, and back |
-| **Settings...** | every row | the Settings folder; Back comes back here |
+| **Settings...** | every row | Settings, over the list; Back comes back here (inside Advanced: back up to Settings) |
 
 Turn the jog to choose, **CLICK** to do it, **BACK** to close the sheet without doing anything.
 
@@ -266,23 +266,39 @@ The first time you open a sheet, a drill, a quiz, the map and an island, a short
 - on the first island: *Each place is part of the stage. The fort is its checkpoint, the signpost
   its lessons.*
 
-Click or Back and it is gone. *Settings › Help › Show tips again* brings them all back.
+Click or Back and it is gone. *Settings › Advanced › Help › Show tips again* brings them all back.
 
 ## Settings
 
-**Settings** is the last row of the list, a folder of groups:
+**Settings** is one short page — only what is yours to decide:
 
-| Group | Holds |
+```
+SETTINGS
+  Pads          MPC        <- the pad layout
+  Pad map       >          <- every pad's drum; the Custom editor
+  Flip          off        <- mirrored, for a left-hander
+  Click         on         <- the metronome
+  Start at      Stage 0    <- where the Learning Path starts
+  Advanced      >          <- the rest
+```
+
+Click a row, turn the jog to change it, click again when done. **Pad map** and **Advanced** open on
+a click. Everything else has a good default and waits under **Advanced**:
+
+| In Advanced | Holds |
 | --- | --- |
-| **Learning Path** | what Continue offers: Tracks and Styles on or off, Rungs `full` or `short`, Start at, Intros |
+| **Learning Path** | what Continue offers: Tracks and Styles on or off, Rungs `full` or `short`, Intros |
 | **Practice** | tempo, speed, reading, how strictly you are judged, Study, Guide pads, the Ladder and the Clock |
-| **Sound** | the click, and latency |
-| **Pads** | the pad layout, Flip, and the Pad map |
+| **Sound** | the click's subdivision, and latency |
 | **MIDI** | where your hits go, and on which channel |
 | **Help** | Show tips again, Welcome again |
 
-Open a group, click a row, turn the jog to change it, click again when done. In a drill, **SHIFT +
-CLICK** opens every setting at once over the drill, and the same again takes you back to it.
+**BACK** walks up a page: from a group to Advanced, from Advanced to Settings, from Settings to
+where you opened it. In a drill, **SHIFT + CLICK** opens Settings over the drill (paused), and the
+same again — on Settings or any page under it — takes you straight back to it.
+
+Example: to have the click count sixteenths — open **Settings**, choose **Advanced**, then
+**Sound**, edit **Click sub** to `16ths`, and press **BACK** three times to be where you were.
 
 ## Lost?
 

@@ -131,8 +131,8 @@ played before 2026-10-22 had those on the snare and the ride.
 
 ## The pads
 
-The pads are the finger drummer's. **Settings › Pads** chooses the layout, **Flip** mirrors it left to
-right for a left-hander, and **Settings › Pad map** shows every pad's drum on screen. New to the
+The pads are the finger drummer's. **Pads** on Settings chooses the layout, **Flip** mirrors it left
+to right for a left-hander, and **Pad map** shows every pad's drum on screen. New to the
 layout? The Learning Path starts with **Meet the pads** (Learning Path › 0 Hello, kit › Ear, and Continue's first
 offer): each drum in turn, its pads pulsing, its sound once — strike it to meet the next.
 
@@ -598,10 +598,11 @@ offers that instead — `Review   Flam tap` — one review, then one new step, i
 | **Lessons** | a stage: its lesson cards |
 | **Practise: Ladder**, **Practise: Clock** | any drill with a tempo — see the Ladder and the Clock below |
 | **Show as list**, **Show as map** | the Learning Path and a stage: the folder as a list for the session, and the map again |
-| **Settings...** | always: the Settings folder, on top of where you are, so Back comes back |
+| **Settings...** | always: Settings, on top of where you are, so Back comes back (inside Settings › Advanced: back up to Settings) |
 
-**Settings › Learning Path** decides what Continue offers: **Tracks** and **Styles** on or off, **Rungs**
-`full` or `short` (L0 and the top rung only), **Start at** a stage, **Intros** `new`/`always`/`off`.
+**Start at**, on Settings itself, is the stage the path starts at. **Settings › Advanced › Learning
+Path** decides what Continue offers: **Tracks** and **Styles** on or off, **Rungs** `full` or `short`
+(L0 and the top rung only), **Intros** `new`/`always`/`off`.
 A switched-off style leaves the core of every stage (its checkpoint swaps to an alternative), and
 never empties one.
 
@@ -667,7 +668,7 @@ Learning Path  a map: 0 Hello, kit … 6 Pro; as a list Continue first, Review (
 Practice       Subdivisions · Grooves › Rock & Pop … Techno · Rudiments › Rolls … Drags · Random
 Quiz           Guess / Hear / Pick
 Progress
-Settings       Learning Path · Practice · Sound · Pads · MIDI · Help
+Settings       Pads · Pad map · Flip · Click · Start at · Advanced › Learning Path · Practice · Sound · MIDI · Help
 ```
 
 The Ladder and the Clock are not rows: they wrap a drill, so they are on the drill's action sheet.
@@ -924,21 +925,51 @@ down. This is the drill that tells you whether you can.
 
 ## Settings
 
-**Settings** is the last row of the list, a folder of groups: **Learning Path** (what Continue offers, see
-the Learning Path above), **Practice**, **Sound**, **Pads**, **MIDI** and **Help** — *Show tips again* and
-*Welcome again*. Open a group and its settings show; **Shift + click** in a drill shows every
-setting at once. Click a row to edit it, turn the jog to change the value, click again when done.
+**Settings is one short page**: what is yours to decide — the pads, the click, where the path
+starts. Everything else has a good default and waits under **Advanced**. Open it from home's
+Settings circle, from *Settings...* on any row's sheet, or with **Shift + click** in a drill (which
+pauses it). Click a row to edit it, turn the jog to change the value, click again when done; Pad map
+and Advanced open on a click.
+
+```
+SETTINGS
+  Pads          MPC
+  Pad map       >
+  Flip          off
+  Click         on
+  Start at      Stage 0
+  Advanced      >      Learning Path › · Practice › · Sound › · MIDI › · Help ›
+```
+
+**Back walks up a page at a time**: a group of Advanced back to Advanced, Advanced back to Settings
+(on its Advanced row), Settings back to where you opened it — the list, home, or the paused drill.
+**Shift + click** on any of its pages closes all of it at once.
 
 **In settings the knobs follow the rows on screen**: settings shows a page of four, and knobs 1–4
 are its rows. The page only turns when the cursor leaves it, so a knob keeps its row however far you
 turn it. **Touch a knob** and the cursor jumps to the row it edits, which is how you find the
 mapping rather than having to remember it.
 
+**Settings**
+
+| Setting | Default | |
+| --- | --- | --- |
+| Pads | **MPC** | the pad layout: `MPC` Classic, `Family`, `Centre`, `GM` chromatic, `Mirror`, `Custom`, `Sticking` (the snare on every pad) |
+| Pad map | › | every pad's drum on screen, and the Custom editor; Back comes back to Settings |
+| Flip | off | mirror the layout left to right, for a left-hander; the hands stay the physical halves |
+| Click | **on** | the built-in metronome |
+| Start at | Stage 0 | the stage the Learning Path starts at — earlier ones count as known. Saved with your progress, not your settings |
+| Advanced | › | everything below |
+
+**Advanced**
+
 | Setting | In | Default | |
 | --- | --- | --- | --- |
+| Tracks, Styles, Rungs, Intros | Learning Path | all on, `full`, `new` | what Continue offers — see the Learning Path above |
 | Tempo | Practice | 90 | the tempo of the generated drills in Practice › Subdivisions and Random |
 | Speed | Practice | **100%** | every drill at this share of its own tempo, 50–120%. Also knob 8 in a drill |
 | Read ahead | Practice | 32 | pixels per beat: how far ahead the chart shows |
+| Reps | Practice | **as written** | override how many times the drill repeats. The file is the default, and usually right |
 | View | Practice | **grid** | `grid` is drum tab — what a drummer reads; `staff` is real percussion notation, for reading practice |
 | Strict | Practice | **normal** | the timing windows, above |
 | Sticking | Practice | **off** | whether the written hand is judged. `off`: only the drum counts, either half of the grid will do — the R and L are still shown as a guide; `loose` shows a wrong hand amber but does not count it; `strict` counts it as its own error. A saved `strict` from an earlier version moves to `off` once |
@@ -946,21 +977,20 @@ mapping rather than having to remember it.
 | Accent + | Practice | 15 | how much louder than your own normal strokes an accent must be |
 | Ghost - | Practice | 20 | how much softer than your own normal strokes a ghost note must be |
 | Guide pads | Practice | **off** | light the voice you need next. This is a reading trainer first |
-| Reps | Practice | **as written** | override how many times the drill repeats. The file is the default, and usually right |
 | Study | Practice | off | stop the scroll **on** a note you missed until it is played: the lane under the chart names it, its pads pulse with Guide pads on, and one press carries on. For learning a rudiment, not for keeping time |
 | Count in | Practice | 4 | beats before the first note |
 | Ladder + | Practice | 5 | BPM added per rung |
 | Ladder bars | Practice | 4 | clean bars needed to climb |
 | Clock bars | Practice | 4 | bars of click, then that many without |
 | Round | Practice | 20 | prompts in a quiz round, or `endless` |
-| Click | Sound | **on** | the built-in metronome |
 | Click sub | Sound | beat | `off` / `beat` / `8ths` / `16ths` |
 | Latency | Sound | 0 ms | subtract a fixed offset from every hit, if your setup has one |
-| Pads | Pads | **MPC** | the pad layout: `MPC` Classic, `Family`, `Centre`, `GM` chromatic, `Mirror`, `Custom`, `Sticking` (the snare on every pad) |
-| Flip | Pads | off | mirror the layout left to right; the hands stay the physical halves |
-| Pad map | Pads | › | every pad's drum on screen, and the Custom editor |
 | MIDI out | MIDI | kit | `kit` is the built-in one. Also `track`, `USB`, `trk+USB` |
 | MIDI ch | MIDI | 10 GM | the channel drum hits are sent on: General MIDI's drum channel by default |
+| Show tips again, Welcome again | Help | | the first-visit tips again, or the welcome |
+
+Your settings are kept in `settings.json` as they always were: moving a setting to Advanced changed
+where it is shown, not what it is.
 
 ## Hearing it
 
