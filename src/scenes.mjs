@@ -2,10 +2,14 @@
 // Copyright (C) 2026 Torben Gräber
 
 /*
- * scenes.mjs — the Learning Path in motion: what a step changed on the path,
- * and the scenes that show it. Pure; ui.js plays them (its ANIM screen).
+ * scenes.mjs — this module's Learning Path in motion: the snapshot of its
+ * path to compare, and the scenes that show what a step finished, with what
+ * each says aloud. Pure. The player, the scenes' lengths and the comparison
+ * itself are the engine's (pathmap/scenes.mjs, shared with Piano Practice);
+ * ui.js plays the queue on its ANIM screen.
  *
- * The path is compared before and after a step's takes (pathState, changes):
+ * The path is compared before and after a step's takes (pathState here,
+ * changes in the engine):
  * a place newly finished, a stage newly through (its core, or its checkpoint
  * passed), the whole path through. On along the path (Click on a result)
  * then plays, on the maps the learner knows:
@@ -35,26 +39,6 @@
 
 import * as PLAN from './program.mjs';
 import * as MP from './map_places.mjs';
-import { FLAG_MS, FIREWORKS_MS, ZOOM_MS, STAR_MS, FINALE_MS, BANNER_MS } from './pathmap/anim.mjs';
-
-/*
- * How long a scene plays when it is not a walk (a walk lasts until the avatar
- * arrives): the engine's frames (pathmap/anim.mjs).
- */
-export const SCENE_MS = Object.freeze({
-  celebrate: FLAG_MS,          /* the flag rises                        */
-  fireworks: FIREWORKS_MS,     /* a big celebration's bursts, after it  */
-  zoom: ZOOM_MS,
-  star: STAR_MS,
-  finale: FINALE_MS,
-  banner: BANNER_MS,
-});
-
-export function sceneMs(scene) {
-  if (scene.kind === 'celebrate') return SCENE_MS.celebrate + (scene.big ? SCENE_MS.fireworks : 0);
-  return SCENE_MS[scene.kind] || 0;
-}
-
 /* A stage's folder, among the Path's children. */
 export function folderOf(folders, stageKey) {
   return folders.find((f) => f.stage && f.stage.key === stageKey) || null;
@@ -72,8 +56,9 @@ export function islandMap(progress, program, folder, env = {}) {
 }
 
 /*
- * What is finished on the path, to compare: per stage whether it is through
- * and which of its places are done, and whether every stage is.
+ * What is finished on the path, to compare (pathmap/scenes.mjs changes): per
+ * stage whether it is through and which of its places are done, and whether
+ * every stage is — { stages: { [key]: { done, places } }, all }.
  */
 export function pathState(progress, program, folders, env = {}) {
   const stages = {};
@@ -85,20 +70,6 @@ export function pathState(progress, program, folders, env = {}) {
     };
   }
   return { stages, all: !PLAN.currentStage(progress, program) };
-}
-
-/* What became finished between two states: { places, stages, all }. */
-export function changes(before, after) {
-  const out = { places: [], stages: [], all: false };
-  if (!before || !after) return out;
-  for (const key of Object.keys(after.stages)) {
-    const was = before.stages[key] || { done: false, places: [] };
-    const now = after.stages[key];
-    if (now.done && !was.done) out.stages.push(key);
-    for (const id of now.places) if (!was.places.includes(id)) out.places.push(id);
-  }
-  out.all = after.all && !before.all;
-  return out;
 }
 
 const celebrate = (map, at, big, say) => ({ kind: 'celebrate', map, at, big, say });

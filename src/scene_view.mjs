@@ -11,7 +11,8 @@
  *   celebrate  the place not yet done, its flag rising (flagRise); a big one
  *              then fireworks over it, the map without its route
  *   banner     a strip across the map: STAGE COMPLETE and the like
- *   walk       the avatar at the story's pace (STORY_MS_PER_CELL)
+ *   walk       the avatar at the story's pace, then a moment on the place it
+ *              reached (the player's, pathmap/scenes.mjs)
  *   zoom       the world's title, the island growing from its cell or back
  *   finale     every flag waving, fireworks over every island
  *   star       its own frame: the result's big number in the map area,
@@ -26,7 +27,7 @@ import * as V from './view.mjs';
 import * as MP from './map_places.mjs';
 import * as A from './pathmap/anim.mjs';
 import { cellCentre } from './pathmap/layout.mjs';
-import { createWalk, walkTo, posAt, STORY_MS_PER_CELL } from './pathmap/walk.mjs';
+import { createWalk, posAt } from './pathmap/walk.mjs';
 import { mapPadColors } from './pathmap/leds.mjs';
 import { MAP_PALETTE, SCENE_PALETTE } from './padmap.mjs';
 import { SCREEN_W } from './layout.mjs';
@@ -36,14 +37,13 @@ export function sceneMap(sc) {
   return sc.kind === 'zoom' ? sc.world : sc.map || null;
 }
 
-/* Its avatar: walking from place to place at the story's pace, or standing
- * where the scene is. Null for the star, which has no map. */
-export function sceneWalk(sc, t) {
+/* Its avatar: a walk's own, which the player (pathmap/scenes.mjs) set off
+ * as the scene began, or standing where the scene is. Null for the star,
+ * which has no map. */
+export function sceneWalk(sc) {
+  if (sc.kind === 'walk') return sc.walk;
   const m = sceneMap(sc);
-  if (!m) return null;
-  const pace = { msPerCell: STORY_MS_PER_CELL };
-  if (sc.kind === 'walk') return walkTo(createWalk(m.layout, sc.from, pace), sc.to, t, pace);
-  return createWalk(m.layout, sc.at, pace);
+  return m ? createWalk(m.layout, sc.at) : null;
 }
 
 /*

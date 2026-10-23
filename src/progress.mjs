@@ -31,7 +31,7 @@
  * Path, the Grooves folder or a repetition.
  */
 
-import { parseDrillId, higherLevelIds } from './ids.mjs';
+import { parseDrillId, higherLevelIds, isUntimedId } from './ids.mjs';
 
 /* 2: dynamics apart from clean, a take's dynamics in its history entry. A
  * version 1 file is set aside and progress rebuilt from the stats log. */
@@ -477,13 +477,16 @@ export function recordTake(progress, id, take) {
  *   pace   the pace as a share of the written tempo, in percent
  *
  * It is learned the first time it is clean on the standard settings, at ANY
- * pace — L0 asks whether you know the notes. Its best is the fastest pace of
- * such a take, so the list keeps reading as a speed against the written
- * tempo, like every other row: a share right first time would sit at 100 in
- * a week and could not show anyone getting faster. It never schedules a
- * repetition — repetition asks whether a drill is still clean AT TEMPO, which
- * a take with no clock cannot answer, and the timed rungs carry the groove
- * there.
+ * pace — L0 asks whether you know the notes. `best` keeps the fastest pace of
+ * such a take, as before, but no row shows it: a pace against the written
+ * tempo read like a grade — "114%" — when it was a speed. What a row shows
+ * for L0 is what L0 asks, the best share right first time (firstTryBest),
+ * read from the history at read time, so progress.json is as it was. The
+ * pace is shown where it explains itself: the result, and the Progress
+ * chart, which plots it (UNTIMED_SCALE) and names it "pace 91 bpm". It never
+ * schedules a repetition — repetition asks whether a drill is still clean AT
+ * TEMPO, which a take with no clock cannot answer, and the timed rungs carry
+ * the groove there.
  */
 export function recordUntimed(progress, id, take) {
   const standard = !take.eased;
@@ -641,6 +644,8 @@ export const MARK_NEXT = 'next';
  *   80%      the best clean speed so far
  *   ○        played, never clean
  *   »        skipped
+ * An L0 row's value is its best share right first time instead — never above
+ * 100% — since L0 has no tempo to be a share of (firstTryBest).
  */
 export function itemMark(progress, id) {
   const it = progress.items[id];
@@ -653,7 +658,20 @@ export function itemMark(progress, id) {
 
 export function itemValue(progress, id) {
   const it = progress.items[id];
-  return it && it.best ? `${it.best}%` : '';
+  if (!it || !it.best) return '';
+  return `${isUntimedId(id) ? firstTryBest(it) : it.best}%`;
+}
+
+/*
+ * An L0 item's best share right first time, 0..100: the most of its takes
+ * that counted — clean on the standard settings, as recordUntimed counts them
+ * (F_CLEAN) — out of the history it keeps (HISTORY_CAP takes), where an
+ * entry's third field is the share right first time in percent.
+ */
+export function firstTryBest(it) {
+  let best = 0;
+  for (const e of (it && it.h) || []) if (e[4] & F_CLEAN && e[2] > best) best = e[2];
+  return Math.min(100, best);
 }
 
 /* ---- Review (repetition) -------------------------------------------------- */

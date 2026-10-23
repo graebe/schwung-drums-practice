@@ -2850,10 +2850,16 @@ test('stepping L0 through, clean, ends on a result that learns it', async () => 
   assert.ok(shown.some((t) => /100% 1st try/.test(t)), shown.join('|'));
   assert.ok(shown.some((t) => /of 92bpm/.test(t)), 'the pace against the written tempo');
   assert.ok(shown.includes('LEARNED'));
+  /* Its row in the list: right first time, never the pace as a grade. */
+  toList();
+  ticks(1);
+  const rows = drawnText(1);
   globalThis.onUnload();
   const progress = JSON.parse(log.writes[`${DATA}progress.json`]);
   const it = progress.items['rock-backbeat:l0'];
   assert.ok(it && it.done, 'L0 was learned');
+  assert.ok(it.best > 100, `a pace past the written tempo: ${it.best}`);
+  assert.ok(rows.includes('L0 100%') && !rows.some((t) => t.includes(`${it.best}%`)), rows.join('|'));
   assert.equal(it.rep, null, 'and never comes back for repetition');
   const stats = JSON.parse(log.writes[`${DATA}stats.json`]);
   assert.ok(stats.records.some((r) => r.d.startsWith('untimed:rock-backbeat:l0:normal') && r.cl === 1),

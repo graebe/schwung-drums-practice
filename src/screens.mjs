@@ -544,7 +544,9 @@ export function drawResult(ctx, s) {
  * One drill's takes on the same chart the result draws, with its best in the
  * header and its last take spelled out under it.
  *
- * s = { title, best, bpm, plays, done, isQuiz, last, series, footer }
+ * s = { title, best, bpm, plays, done, isQuiz, untimed, last, series, footer }
+ * An L0 drill's best is its share right first time, and its line names the
+ * pace the chart plots: "pace 91 bpm".
  */
 export function drawProgress(ctx, s) {
   ctx.clear();
@@ -557,7 +559,8 @@ export function drawProgress(ctx, s) {
     ctx.text((L.SCREEN_W - ctx.textWidth(none)) >> 1, box.y + (box.h >> 1) - 3, none, 1);
   }
   const takes = `${s.plays} ${s.plays === 1 ? 'take' : 'takes'}`;
-  const bestLine = s.isQuiz ? `best ${s.best}%` : s.best ? `best ${s.best}% ${s.bpm}bpm` : 'never clean';
+  const bestLine = s.isQuiz ? `best ${s.best}%` : !s.best ? 'never clean'
+    : s.untimed ? `pace ${s.bpm} bpm` : `best ${s.best}% ${s.bpm}bpm`;
   ctx.text(1, L.PROGRESS_ROW_Y, bestLine, 1);
   ctx.text(L.SCREEN_W - ctx.textWidth(takes) - 1, L.PROGRESS_ROW_Y, takes, 1);
   drawHint(ctx, s.footer || '');

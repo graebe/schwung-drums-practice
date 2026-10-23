@@ -122,9 +122,11 @@
         "PLAY   hear the bar",
         "REC    begin, pause",
         "Learned: 90% right",
-        "first time. The % is",
-        "your pace, of the",
-        "tempo."
+        "first time. Its row",
+        "shows your best %",
+        "right first time;",
+        "Progress plots your",
+        "pace."
       ]
     },
     {

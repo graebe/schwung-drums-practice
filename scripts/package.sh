@@ -18,7 +18,7 @@ cp "$ROOT/src/ui.js" "$STAGE/ui.js"
 # (scripts/check-vendored.sh). It ships as a folder of its own, stamped like
 # the rest: its files import each other, and two of them share a name with a
 # module beside ui.js (layout), so it cannot be flattened into one folder.
-PATHMAP="model layout walk places render leds anim"
+PATHMAP="model layout walk places render leds anim scenes"
 # The home screen's circles, vendored the same way into src/home/.
 HOMESCREEN="icons render leds"
 
