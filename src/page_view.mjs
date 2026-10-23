@@ -60,7 +60,10 @@ export function pageBar(run, cursor, perBar) {
  *   cursor   the entry the take waits on; past the end once it is through
  *   done     the take is through: no cursor, and a double bar for the peek
  */
-export function drawUntimedView(ctx, s) {
+/* `boxUp`: the ready box is over the page, and what would only crowd its
+ * edges is left out — the bar number, and the cursor's arrow and caret,
+ * whose stack the box covers anyway. */
+export function drawUntimedView(ctx, s, boxUp = false) {
   ctx.clear();
   const { left, px, perBar } = pageGeometry(s.view, s.chart);
   const run = s.run;
@@ -78,9 +81,9 @@ export function drawUntimedView(ctx, s) {
 
   if (s.view === 'grid') drawGridPage(ctx, s, page, peek, left, px);
   else drawStaffPage(ctx, s, page, peek, left, px);
-  if (curItem) drawArrow(ctx, Math.round(curItem.x));
+  if (curItem && !boxUp) drawArrow(ctx, Math.round(curItem.x));
 
-  drawUnder(ctx, s, page, bar, curItem, left, px, perBar);
+  drawUnder(ctx, s, page, bar, boxUp ? null : curItem, left, px, perBar, !boxUp);
   /* The hint line takes the footer's band when there is one to show. */
   if (s.hint || s.hintLeft) drawHint(ctx, s.hint, s.hintLeft);
   else drawFooter(ctx, s.progress || 0, s.footerRight || '');
@@ -130,9 +133,9 @@ function closeBar(ctx, peek, line) {
  * drill with written hands gets its R and L there instead of the number, as
  * on the scroll; the header already says which bar it is.
  */
-function drawUnder(ctx, s, page, bar, curItem, left, px, perBar) {
+function drawUnder(ctx, s, page, bar, curItem, left, px, perBar, barNumbers) {
   const sticking = handsWritten(s.run);
-  drawBarRuler(ctx, [{ bar: bar + 1, x: -1 }], !sticking);
+  drawBarRuler(ctx, [{ bar: bar + 1, x: -1 }], !sticking && barNumbers);
   /* The beats, ticked on the rule: the lanes have no rule of their own here.
    * The downbeat is the longer tick, as on a ruler. */
   for (let b = 0; b < Math.ceil(perBar - 1e-9); b++) {
@@ -175,8 +178,9 @@ function drawArrow(ctx, x) {
  * Play sounds the bar (s.listening) the box steps aside for the page.
  */
 export function drawUntimedReady(ctx, s) {
-  drawUntimedView(ctx, s);
-  if (s.scrubbed || s.listening) return;
+  const boxUp = !s.scrubbed && !s.listening;
+  drawUntimedView(ctx, s, boxUp);
+  if (!boxUp) return;
   /* Knob 8 is the tempo here too: how fast Play sounds the bar. */
   drawReadyBox(ctx, { rows: [['play', 'hear bar'], ['rec', 'own pace'], ['scrub', 'scrub']], level: s.level,
     bpm: s.bpm });

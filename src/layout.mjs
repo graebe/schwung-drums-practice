@@ -183,11 +183,12 @@ export const CURSOR_TOP_Y = HEADER_RULE_Y + 1;
 
 /* The ready screen's box of controls, laid over the chart (view.mjs drawReady,
  * page_view.mjs drawUntimedReady): three rows of controls beside the LEVEL,
- * a rule, and the tempo knob 8 sets under them (chrome.mjs drawReadyBox).
- * From under the title rule to three rows clear of the hint line; while it is
- * up it covers the under lane and its bar numbers — they are the music you
- * scrub to, and the box steps aside the moment you do. */
-export const READY_BOX = { x: 12, y: 11, w: 104, h: 42 };
+ * a rule, and the tempo knob 8 sets under them (chrome.mjs drawReadyBox, its
+ * rows two clear pixels apart). From two rows under the title rule to two
+ * rows clear of the hint line; while it is up the under lane's bar numbers
+ * are left out — they are the music you scrub to, and the box steps aside
+ * the moment you do. */
+export const READY_BOX = { x: 12, y: 11, w: 104, h: 43 };
 
 /* ---- The under lane ----------------------------------------------------- */
 /*

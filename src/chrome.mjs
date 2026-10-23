@@ -179,10 +179,21 @@ export function drawHint(ctx, text, left = '') {
  * the knob's own announcement and in Settings.
  */
 export const READY_SPLIT = 64;
-/* The rows' tops in the box, the rule under them and the tempo's line. */
-export const READY_ROW_Y = 3;
-export const READY_RULE_Y = 30;
-export const READY_TEMPO_Y = 32;
+/*
+ * The box's rows, from its top edge, on one rhythm: every line of it is 7
+ * tall with READY_PAD (2) clear rows on either side.
+ *   +3, +12, +21   the controls: 2 under the top edge, 2 between, 2 over the rule
+ *   +30            the rule
+ *   +33            the tempo: 2 under the rule, 2 over the bottom edge (+42)
+ *   +3, +12        LEVEL, and its digit, 15 tall, 2 under the word and 3 over
+ *                  the rule: the 20 rows between hold 15 no more evenly
+ */
+export const READY_PAD = 2;
+export const READY_ROW_Y = 1 + READY_PAD;
+export const READY_ROW_PITCH = 7 + READY_PAD;
+export const READY_RULE_Y = READY_ROW_Y + 2 * READY_ROW_PITCH + 7 + READY_PAD;
+export const READY_TEMPO_Y = READY_RULE_Y + 1 + READY_PAD;
+export const READY_DIGIT_Y = READY_ROW_Y + 7 + Math.floor((READY_RULE_Y - (READY_ROW_Y + 7) - 15) / 2);
 
 /* The tempo row's words: the bpm in a field of three, so 92 and 120 line up. */
 export function readyTempoText(bpm) {
@@ -191,16 +202,17 @@ export function readyTempoText(bpm) {
 
 export function drawReadyBox(ctx, { rows = [], level = null, bpm = 0 } = {}) {
   const b = L.READY_BOX;
-  /* The box and a clear strip under it down to the hint line: the under
-   * lane's bar number would otherwise peek out under the box as a stub. */
-  ctx.fillRect(b.x, b.y, b.w, L.HINT_Y - b.y, 0);
+  /* The box, a clear pixel round it, and a clear strip under it down to the
+   * hint line: no fragment of the chart touches its edge or peeks out under
+   * it as a stub. */
+  ctx.fillRect(b.x - 1, b.y - 1, b.w + 2, L.HINT_Y - b.y + 1, 0);
   ctx.drawRect(b.x, b.y, b.w, b.h, 1);
   /* One glyph column, the words 3px after the widest glyph (the scrub's 9),
    * so none touches its word. */
   const gx = b.x + 3;
   const tx = gx + SCRUB_W + 3;
   for (let i = 0; i < rows.length; i++) {
-    const y = b.y + READY_ROW_Y + i * 9;
+    const y = b.y + READY_ROW_Y + i * READY_ROW_PITCH;
     const [glyph, word] = rows[i];
     if (glyph === 'play') drawPlayGlyph(ctx, gx + 1, y, 7);
     else if (glyph === 'rec') drawRecordGlyph(ctx, gx + 1, y, 7);
@@ -209,19 +221,22 @@ export function drawReadyBox(ctx, { rows = [], level = null, bpm = 0 } = {}) {
   }
   if (bpm > 0) {
     ctx.fillRect(b.x, b.y + READY_RULE_Y, b.w, 1, 1);
-    ctx.text(gx, b.y + READY_TEMPO_Y, fitText(ctx, readyTempoText(bpm), b.w - 6), 1);
+    /* Centred: its length is fixed, so turning the knob moves no letter. */
+    const t = fitText(ctx, readyTempoText(bpm), b.w - 6);
+    ctx.text(b.x + ((b.w - ctx.textWidth(t)) >> 1), b.y + READY_TEMPO_Y, t, 1);
   }
   if (!level) return;
   const sx = b.x + READY_SPLIT;
   ctx.fillRect(sx, b.y, 1, bpm > 0 ? READY_RULE_Y : b.h, 1);
   const rw = b.w - READY_SPLIT - 1;
   const cx = sx + 1 + (rw >> 1);
-  ctx.text(sx + 3, b.y + 3, 'LEVEL', 1);
-  if (level.done) drawMark(ctx, b.x + b.w - MARK_W - 2, b.y + 3, 'done', 1);
+  ctx.text(sx + 3, b.y + READY_ROW_Y, 'LEVEL', 1);
+  if (level.done) drawMark(ctx, b.x + b.w - MARK_W - 2, b.y + READY_ROW_Y, 'done', 1);
   const w = SR.bigTextWidth(level.digit, 3);
-  SR.drawBigText(ctx, cx - (w >> 1), b.y + 13, level.digit, 3);
-  if (level.down) ctx.text(cx - (w >> 1) - 10, b.y + 17, '<', 1);
-  if (level.up) ctx.text(cx + (w >> 1) + 5, b.y + 17, '>', 1);
+  SR.drawBigText(ctx, cx - (w >> 1), b.y + READY_DIGIT_Y, level.digit, 3);
+  /* The arrows on the digit's middle row. */
+  if (level.down) ctx.text(cx - (w >> 1) - 10, b.y + READY_DIGIT_Y + 4, '<', 1);
+  if (level.up) ctx.text(cx + (w >> 1) + 5, b.y + READY_DIGIT_Y + 4, '>', 1);
 }
 
 /* ---- Lists (the menu and the settings page) ----------------------------- */
