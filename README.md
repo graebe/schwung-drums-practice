@@ -415,7 +415,9 @@ An **L0** take ends on the same screen with its own words in it, because it has 
 The number is your pace as a share of the written tempo. When the take did not count it is how
 much was right first time instead, and the line under it names what cost the most: **wrong pads**,
 stacks **not together**, a drum **struck twice** or **wrong hands**. The dynamics are scored
-apart here too, `dyn` at the end of the row. Click goes on to L1.
+apart here too, `dyn` at the end of the row. Click goes on to L1. The rung's row in the list keeps
+the other number — your best share right first time — so a fast pace never reads as a grade over
+100%.
 
 ### Looking back over a take
 
@@ -455,6 +457,7 @@ Every row in the list shows where you are:
 | --- | --- |
 | `✓ 100%` | learned — clean at tempo — and your best clean speed |
 | `85%` | your best clean speed so far |
+| `L0 97%` | an L0 rung: your best share right first time, never above 100% — L0 has no tempo to be a share of |
 | `○` | played, but never clean yet |
 | `»` | skipped on purpose |
 | `▸` | the next step on the Learning Path |
@@ -739,9 +742,11 @@ Take as long as you like over any of it.
 The footer counts stacks right first time against the rest; the header shows your **pace**: how many
 beats of the groove you get through in a minute, with stops left out — a long look at the page is not
 held against you. L0 is learned at **90% right first time** on the standard settings, at **any**
-pace. Its number in the list, on the chart and on the result is your best pace as a share of the
-written tempo: **✓ 45%** says you know the notes and can step them at 45% of the tempo. When that
-number climbs, go on to L1.
+pace. **Its number in the list is your best share right first time** — never above 100%: **✓ 97%**
+says you know the notes and step 97 stacks in 100 right at the first try, whatever the pace. The
+pace shows where it explains itself: on the result (`150 of 92bpm`), and in Progress, whose chart
+plots it and whose line names it — `pace 91 bpm`. When the notes are right and the pace climbs, go
+on to L1.
 
 The Ladder and the Clock are about time, so they need a timed rung: armed on L0, they say
 **ARM A TIMED RUNG**.

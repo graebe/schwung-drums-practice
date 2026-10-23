@@ -968,6 +968,15 @@ test('the Progress chart dots the dynamics under the speed', async () => {
   assert.ok(seen.includes('dyn 100%  JOG 1/2'), seen.join('|'));
 });
 
+test('an L0 drill\'s Progress: right first time on top, its pace named in the line', async () => {
+  const { drawProgress } = await import('../src/view.mjs');
+  const { c, seen } = capture();
+  drawProgress(c, { title: 'Rock backbeat L0', best: 100, bpm: 91, plays: 3, untimed: true,
+    series: percentSeries([[0, 99, 100, 0, 9]], L.PROGRESS_PLOT.w - 2, L.PROGRESS_PLOT.h - 2), footer: '' });
+  assert.ok(seen.includes('100%') && seen.includes('pace 91 bpm'), seen.join('|'));
+  assert.ok(!seen.some((t) => /best/.test(t)), 'no "best 100% 91bpm" that reads like a speed');
+});
+
 test('the Pad map draws all 32 pads, the hand split and the selection, inside the screen', async () => {
   const { drawPadMap, PADMAP } = await import('../src/view.mjs');
   const { resolveLayout } = await import('../src/padmap.mjs');

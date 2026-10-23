@@ -529,6 +529,44 @@ test('a guided L0 take is practice: kept, but not learned', () => {
   assert.equal(P.item(p, 'rock:l0').plays, 1);
 });
 
+/*
+ * An L0 row shows what L0 asks — the best share right first time, never above
+ * 100% — not its pace against the written tempo, which read like a grade.
+ * The pace stays in the history, and the chart plots it.
+ */
+test('an L0 row shows its best share right first time, never its pace', () => {
+  const p = P.emptyProgress();
+  P.recordUntimed(p, 'rock:l0', { pace: 114, accuracy: 1, clean: true, eased: '', bpm: 103, at: T0 });
+  assert.equal(P.itemValue(p, 'rock:l0'), '100%', 'not 114%');
+  assert.equal(P.item(p, 'rock:l0').best, 114, 'the pace is kept as it was');
+  const q = P.emptyProgress();
+  P.recordUntimed(q, 'rock:l0', { pace: 80, accuracy: 0.94, clean: true, eased: '', bpm: 74, at: T0 });
+  P.recordUntimed(q, 'rock:l0', { pace: 90, accuracy: 0.97, clean: true, eased: '', bpm: 83, at: T0 + DAY });
+  P.recordUntimed(q, 'rock:l0', { pace: 70, accuracy: 0.95, clean: true, eased: '', bpm: 65, at: T0 + 2 * DAY });
+  assert.equal(P.itemValue(q, 'rock:l0'), '97%', 'the best of the takes, not the last');
+  assert.equal(P.itemValue(p, 'rock:l1'), '', 'nothing played, nothing shown');
+});
+
+test('an L0 take that does not count — eased, or not clean — is no first-try best', () => {
+  const p = P.emptyProgress();
+  P.recordUntimed(p, 'rock:l0', { pace: 60, accuracy: 0.92, clean: true, eased: '', bpm: 55, at: T0 });
+  P.recordUntimed(p, 'rock:l0', { pace: 70, accuracy: 1, clean: true, eased: 'Guide', bpm: 64, at: T0 + DAY });
+  P.recordUntimed(p, 'rock:l0', { pace: 70, accuracy: 0.99, clean: false, eased: '', bpm: 64, at: T0 + DAY });
+  assert.equal(P.itemValue(p, 'rock:l0'), '92%');
+  const eased = P.emptyProgress();
+  P.recordUntimed(eased, 'rock:l0', { pace: 70, accuracy: 1, clean: true, eased: 'Study', bpm: 64, at: T0 });
+  assert.equal(P.itemValue(eased, 'rock:l0'), '', 'an eased take alone shows nothing');
+  assert.equal(P.firstTryBest(P.item(eased, 'rock:l0')), 0);
+});
+
+test('the L0 chart still plots the pace, whatever the row shows', () => {
+  const p = P.emptyProgress();
+  P.recordUntimed(p, 'rock:l0', { pace: 40, accuracy: 1, clean: true, eased: '', bpm: 37, at: T0 });
+  P.recordUntimed(p, 'rock:l0', { pace: 110, accuracy: 1, clean: true, eased: '', bpm: 101, at: T0 + DAY });
+  const s = P.percentSeries(P.item(p, 'rock:l0').h, 50, 20, P.UNTIMED_SCALE);
+  assert.ok(s.points[1].y < s.points[0].y, 'the faster pace plots higher, though both were 100% first try');
+});
+
 test('a higher rung learned ticks L0; L0 learned ticks nothing above it', () => {
   const p = P.emptyProgress();
   assert.deepEqual(P.higherLevels('rock:l0'), ['rock:l1', 'rock:l2', 'rock:l3', 'rock:l4']);

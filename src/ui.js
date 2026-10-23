@@ -3025,15 +3025,18 @@ function progressDetail(index) {
   const id = row.id;
   const it = PROG.item(progress, id) || { h: [], best: 0, bpm: 0, plays: 0 };
   const isQuiz = IDS.isQuizItemId(id);
+  const untimed = isUntimedId(id);
   /* The best dynamics beside where the jog is: the chart's dotted line. */
   const dyn = it.dyn >= 0 ? `dyn ${it.dyn}%` : '';
   return {
     title: itemTitle(id),
-    best: it.best,
+    /* L0: the share right first time on top; the pace in the line and the chart. */
+    best: untimed && it.best ? PROG.firstTryBest(it) : it.best,
     bpm: it.bpm,
     plays: it.plays,
     done: PROG.isDone(progress, id),
     isQuiz,
+    untimed,
     series: PROG.percentSeries(it.h, box.w - 2, box.h - 2,
       isQuiz ? { lo: 0, hi: 100, line: PROG.QUIZ_PASS } : isUntimedId(id) ? PROG.UNTIMED_SCALE : {}),
     footer: [dyn, footer].filter(Boolean).join('  '),
