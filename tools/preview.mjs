@@ -69,6 +69,7 @@ import { LABELS } from '../src/row_sheet.mjs';
 import * as PLAN from '../src/program.mjs';
 import * as MP from '../src/map_places.mjs';
 import * as SCN from '../src/scenes.mjs';
+import * as SP from '../src/pathmap/scenes.mjs';
 import * as SV from '../src/scene_view.mjs';
 import { createWalk, walkTo, posAt } from '../src/pathmap/walk.mjs';
 import { RANDOM_DRILLS } from '../src/generator.mjs';
@@ -378,13 +379,14 @@ if (screen) {
     const env = { atMs: at };
     const before = SCN.pathState(progress, program, folders, env);
     finish(step);
-    const change = SCN.changes(before, SCN.pathState(progress, program, folders, env));
+    const change = SP.changes(before, SCN.pathState(progress, program, folders, env));
     const plan = SCN.pathScenes({ progress, program, folders, step, next: PLAN.stepAfter(progress, program, step, at),
       change, env });
     const n = Math.min(plan.length - 1, Number(arg('scene', 0)));
     const sc = plan[n];
     const ms = Number(arg('t', 0));
-    const walk = SV.sceneWalk(sc, 0);
+    SP.startScenes(SP.createPlayer(), [sc], null, 0);  /* sets a walk off, as it begins */
+    const walk = SV.sceneWalk(sc);
     SV.drawScene(ctx, { scene: sc, args: SV.sceneArgs(sc, { seed: n + 1 }), walk, now: ms, ms,
       footer: H.hintFor(H.SCREENS.ANIM)[0] });
     console.log(`scenes: ${plan.map((x) => x.kind).join(', ')}; showing ${n} (${sc.kind}) at ${ms} ms`);

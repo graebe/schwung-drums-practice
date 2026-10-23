@@ -9,6 +9,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as SCN from '../src/scenes.mjs';
+import * as SP from '../src/pathmap/scenes.mjs';
 import * as MP from '../src/map_places.mjs';
 import * as PLAN from '../src/program.mjs';
 import * as P from '../src/progress.mjs';
@@ -42,7 +43,7 @@ const step = (id) => core0.find((st) => st.id === id);
 function playOn(p, st) {
   const before = SCN.pathState(p, program, folders, env);
   finish(p, st);
-  const change = SCN.changes(before, SCN.pathState(p, program, folders, env));
+  const change = SP.changes(before, SCN.pathState(p, program, folders, env));
   const next = PLAN.stepAfter(p, program, st, T0);
   return { change, next, scenes: SCN.pathScenes({ progress: p, program, folders, step: st, next, change, env }) };
 }
@@ -56,7 +57,7 @@ test('a step tells what it finished: a place, a stage, the whole path', () => {
   assert.deepEqual(change.places, ['s0:time']);
   assert.deepEqual(change.stages, []);
   assert.equal(change.all, false);
-  assert.deepEqual(SCN.changes(null, null), { places: [], stages: [], all: false });
+  assert.deepEqual(SP.changes(null, null), { places: [], stages: [], all: false });
 });
 
 test('a place finished, the next step in another: celebrate it, then walk there', () => {
@@ -135,11 +136,29 @@ test('the whole path through: the stage\'s fireworks, zoom out, the finale', () 
   assert.equal(scenes[4].at, last.index, 'the avatar on the last island');
 });
 
-test('a scene lasts its engine frame; a big celebration adds its fireworks', () => {
-  assert.equal(SCN.sceneMs({ kind: 'celebrate' }), SCN.SCENE_MS.celebrate);
-  assert.equal(SCN.sceneMs({ kind: 'celebrate', big: true }), SCN.SCENE_MS.celebrate + SCN.SCENE_MS.fireworks);
-  for (const k of ['zoom', 'star', 'finale', 'banner']) assert.equal(SCN.sceneMs({ kind: k }), SCN.SCENE_MS[k]);
-  assert.equal(SCN.sceneMs({ kind: 'walk' }), 0, 'a walk lasts until it arrives');
+test('every scene the plan queues is one the shared player times, start to end', () => {
+  const p = P.emptyProgress();
+  for (const st of core0) if (!st.tour && st.id !== 'first-beat:l3') finish(p, st);
+  P.skipItem(p, 'first-beat:l3', T0);
+  const { scenes } = playOn(p, step('tour:pads'));
+  for (const sc of scenes) assert.ok(SP.KINDS.includes(sc.kind), sc.kind);
+  /* Played through: each starts as the one before ends, then `then` once. */
+  const player = SP.createPlayer();
+  let done = 0;
+  SP.startScenes(player, scenes, () => done++, 0);
+  let t = 0;
+  const starts = [];
+  for (let i = 0; i < 1000 && SP.playing(player); i++) {
+    const sc = SP.stepScenes(player, t);
+    if (sc && starts[starts.length - 1] !== sc) starts.push(sc);
+    t += 25;
+  }
+  assert.equal(done, 1);
+  assert.deepEqual(starts.map((s) => s.kind), scenes.map((s) => s.kind));
+  for (let i = 1; i < scenes.length; i++) {
+    assert.equal(scenes[i].t0, scenes[i - 1].t0 + SP.runMs(scenes[i - 1]), `${scenes[i].kind} starts as the last ends`);
+  }
+  assert.equal(scenes[0].big, true, 'the stage\'s celebration is the big one');
 });
 
 test('a step finds its place on the island: a track, the checkpoint, or none', () => {

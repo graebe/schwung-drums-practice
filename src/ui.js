@@ -57,6 +57,7 @@ import * as HP from './help.mjs';
 import * as TIPS from './tips.mjs';
 import * as MP from './map_places.mjs';
 import * as SCN from './scenes.mjs';
+import * as SP from './pathmap/scenes.mjs';
 import * as SV from './scene_view.mjs';
 import { placeOfPad } from './pathmap/layout.mjs';
 import { createWalk, walkTo, walkStep, posAt, arrived } from './pathmap/walk.mjs';
@@ -2289,37 +2290,37 @@ function showPathMap() {
 
 /* ---- scenes: the Learning Path in motion ---------------------------------- */
 /*
- * scenes.mjs works out what to show; this plays it on its own screen (ANIM):
- * a queue of scenes, each announced and drawn on the maps the learner knows,
- * with the pads its own while it plays. Any key or pad skips to the end and
- * goes on to what the scenes stood before (`then`). Nothing is recorded or
- * sounded: the screen takes no other input.
+ * scenes.mjs works out what to show for this module's path; the engine's
+ * player (pathmap/scenes.mjs, shared with Piano Practice) times the queue;
+ * this plays it on its own screen (ANIM): each scene announced and drawn on
+ * the maps the learner knows, with the pads its own while it plays. Any key
+ * or pad skips to the end and goes on to what the scenes stood before
+ * (`then`). Nothing is recorded or sounded: the screen takes no other input.
  *
  * The frames and pads are scene_view.mjs's, the engine's animations
  * (pathmap/anim.mjs) drawn with the ms into each scene.
  */
 let anim = null;
+const scenePlayer = SP.createPlayer();
 
+/* Play `queue` on the ANIM screen, then `then` (pathmap/scenes.mjs: each
+ * scene starts when the one before it ended, a walk holds a moment on the
+ * place it reached). */
 function playScenes(queue, then) {
   if (!queue.length) {
     then();
     return;
   }
-  anim = { queue, at: -1, scene: null, since: 0, walk: null, then };
+  anim = { scene: null, at: -1, walk: null, args: null, learned: null };
   screen = ANIM;
-  nextScene();
+  onScene(SP.startScenes(scenePlayer, queue, () => endScenes(then), now()));
 }
 
-function nextScene() {
-  anim.at++;
-  if (anim.at >= anim.queue.length) {
-    endScenes();
-    return;
-  }
-  const sc = anim.queue[anim.at];
+/* A scene on stage: what its frames are drawn with, and it said aloud. */
+function onScene(sc) {
   anim.scene = sc;
-  anim.since = now();
-  anim.walk = SV.sceneWalk(sc, anim.since);
+  anim.at++;
+  anim.walk = SV.sceneWalk(sc);
   anim.learned = sc.kind !== 'star' ? null
     : SV.learnedOf(sc.under === RESULT ? { result: resultCache } : { summary: summaryInfo });
   anim.args = SV.sceneArgs(sc, { seed: anim.at + 1, learned: anim.learned, ctx });
@@ -2327,13 +2328,12 @@ function nextScene() {
 }
 
 function serviceScenes(t) {
-  const sc = anim.scene;
-  if (sc.kind === 'walk' ? arrived(anim.walk, t) : t - anim.since >= SCN.sceneMs(sc)) nextScene();
+  const sc = SP.stepScenes(scenePlayer, t);
+  if (sc && sc !== anim.scene) onScene(sc);
 }
 
 /* The end, played through or skipped: on to what the scenes stood before. */
-function endScenes() {
-  const then = anim.then;
+function endScenes(then) {
   anim = null;
   screen = MENU;
   then();
@@ -2348,17 +2348,17 @@ function sceneInput(type, d1, d2) {
   }
   const key = type === 0xB0 && d2 > 0;
   const pad = type === 0x90 && d2 > 0 && PAD.isPad(d1);
-  if (key || pad) endScenes();
+  if (key || pad) SP.skipScenes(scenePlayer);
 }
 
 function drawScene(hint) {
   const t = now();
-  SV.drawScene(ctx, { scene: anim.scene, args: anim.args, walk: anim.walk, now: t, ms: t - anim.since, footer: hint,
-    learned: anim.learned });
+  SV.drawScene(ctx, { scene: anim.scene, args: anim.args, walk: anim.walk, now: t, ms: t - anim.scene.t0,
+    footer: hint, learned: anim.learned });
 }
 
 function sceneLeds(t) {
-  SV.sceneLeds(ledBuf, { scene: anim.scene, walk: anim.walk, now: t, ms: t - anim.since, seed: anim.at + 1 });
+  SV.sceneLeds(ledBuf, { scene: anim.scene, walk: anim.walk, now: t, ms: t - anim.scene.t0, seed: anim.at + 1 });
 }
 
 /*
@@ -2382,7 +2382,7 @@ function mapEnv() {
 /* The scenes from `step` on to `next`, for what the step finished. */
 function scenesOnto(step, next) {
   if (!pathBefore) return [];
-  const change = SCN.changes(pathBefore, pathStateNow());
+  const change = SP.changes(pathBefore, pathStateNow());
   return SCN.pathScenes({ progress, program, folders: stageFolders(), step, next, change, env: mapEnv() });
 }
 
