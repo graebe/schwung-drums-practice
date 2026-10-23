@@ -17,17 +17,24 @@
  * just a folder whose children are its rungs, where they used to be a second
  * screen with its own state and its own Back rules.
  *
- *   Basics      generated: subdivisions, and random material drawn fresh
- *   Grooves     one folder per groove family in index.json, in its order
- *   Rudiments   one folder per rudiment family
- *   Other       drills whose category is missing or unknown, if there are any
- *   ...tail     what the caller appends: Training, Quiz, Progress
+ * The top of the list is the same in Drums Practice and Piano Practice, so a
+ * student who knows one knows the other:
+ *
+ *   Continue    the one button: the next step, or a review that is due
+ *   Path        the seven stages, then Review (program.mjs)
+ *   Practice    the free library: Subdivisions, Grooves › styles,
+ *               Rudiments › families, Random, and Other when there is any
+ *   Quiz        the five drills
+ *   Progress
+ *   Settings    Path, Practice, Sound, Pads, MIDI, Help
  *
  * Other is where a drill listed in user.json lands unless it names one of the
  * shipped categories — it must be somewhere in the list.
  */
 
 import { CLOCK_ID, quizItemId } from './ids.mjs';
+import { GROUPS } from './settings_def.mjs';
+import { PRACTICE_DRUMS } from './home/icons.mjs';
 import { availableLevels, projectLevel } from './levels.mjs';
 import { subdivisionDrills, RANDOM_DRILLS } from './generator.mjs';
 
@@ -57,31 +64,41 @@ export function isFolder(node) {
 }
 
 /*
- * A drill opens its ladder of rungs; one with a single rung — a rudiment,
- * which is all snare — arms straight away.
+ * A drill is one row. A groove with a ladder of rungs — L0 to L4 — is one
+ * row too, its rungs chosen on the ready screen with the jog: the level page
+ * it used to open was a menu level nobody needed. Each rung keeps the item id
+ * its takes are filed under (`rock-backbeat:l2`); `levels` lists them, and
+ * `build(id)` makes the one asked for. A drill with a single rung — a
+ * rudiment, which is all snare — arms straight away as before.
  */
 export function chartNode(chart) {
   const levels = availableLevels(chart);
   if (levels.length > 1) {
-    return folder(chart.name, levels.map((lv) => ({
-      label: `${lv.step} ${lv.label}`,
+    const rungs = levels.map((lv) => ({ id: `${chart.id}:${lv.id}`, step: lv.step, label: lv.label,
+      untimed: Boolean(lv.untimed) }));
+    return {
+      label: chart.name,
       value: '',
       kind: 'chart',
-      id: `${chart.id}:${lv.id}`,
-      build: () => projectLevel(chart, lv.id),
-    })));
+      levels: rungs,
+      levelIds: rungs.map((r) => r.id),
+      build: (id) => {
+        const lv = levels[Math.max(0, rungs.findIndex((r) => r.id === id))];
+        return projectLevel(chart, lv.id);
+      },
+    };
   }
   return { label: chart.name, value: '', kind: 'chart', id: chart.id, build: () => chart };
 }
 
 /*
- * The whole tree.
+ * The library's folders, by category.
  *   charts      [{ chart, category }] — parsed files, in manifest order
  *   categories  [{ id, name, folder }] — display order; `folder` groups them
- *   basics      a node for Basics, or null
- *   tail        nodes appended at the end
+ * Returns { folders } in manifest order, and { other }: the folder of what
+ * lands nowhere else, or null.
  */
-export function buildCatalog({ charts = [], categories = [], basics = null, lead = [], tail = [] } = {}) {
+export function libraryFolders({ charts = [], categories = [] } = {}) {
   /*
    * Charts are only SORTED here; their nodes are made when their folder is
    * first opened. A groove's node projects all four of its levels to find
@@ -98,8 +115,8 @@ export function buildCatalog({ charts = [], categories = [], basics = null, lead
   const nodesOf = (list) => () => list.map(chartNode);
   /*
    * A category naming a `folder` nests under it (Grooves › Rock & Pop); one
-   * without is a top-level folder of its own. Groups keep the order of their
-   * first category, so the manifest decides the list.
+   * without is a folder of its own. Groups keep the order of their first
+   * category, so the manifest decides the list.
    */
   const groups = [];
   const byGroup = {};
@@ -117,53 +134,115 @@ export function buildCatalog({ charts = [], categories = [], basics = null, lead
     }
     byGroup[cat.folder].rows.push(lazyFolder(cat.name, nodesOf(list)));
   }
-  const children = (basics ? [basics] : []).concat(lead);
-  for (let i = 0; i < groups.length; i++) {
-    const g = groups[i];
-    children.push(g.lazy ? lazyFolder(g.label, g.lazy) : folder(g.label, g.rows));
-  }
-  if (other.length) children.push(lazyFolder('Other', nodesOf(other)));
-  return folder('Drums', children.concat(tail));
+  return {
+    folders: groups.map((g) => (g.lazy ? lazyFolder(g.label, g.lazy) : folder(g.label, g.rows))),
+    other: other.length ? lazyFolder('Other', nodesOf(other)) : null,
+  };
 }
 
 /*
- * The module's own tree: Basics, the categories, then Training, Quiz and
- * Progress. Kept here rather than in ui.js so the tests can walk the real one.
- *   drills    guess.mjs's DRILLS
- *   newSeed   a source of fresh seeds; without one every build uses seed 1,
- *             which keeps the tests deterministic
+ * Settings: opening it shows its own short page (settings_def.mjs MAIN,
+ * settingsGroup 'main'), not a folder. Its one child is Advanced, the folder
+ * of the rest, which the page's Advanced row opens: the Learning Path's
+ * choices (program.mjs pathSettingsFolder), a row per group of the settings
+ * editor — opening one shows the editor with that group's rows — and Help.
  */
-export function drumsTree({ entries = [], categories = [], bpm = 90, drills = [], newSeed = null, path = null } = {}) {
+export function settingsFolder(pathPrefs = null) {
+  return {
+    label: 'Settings',
+    value: FOLDER,
+    untracked: true,
+    settingsGroup: 'main',
+    children: [{
+      label: 'Advanced',
+      value: FOLDER,
+      untracked: true,
+      advanced: true,
+      children: [
+        ...(pathPrefs ? [pathPrefs] : []),
+        ...GROUPS.map((g) => ({ label: g.label, value: FOLDER, settingsGroup: g.key })),
+        { label: 'Help', value: FOLDER, untracked: true, children: [
+          { label: 'Show tips again', value: '', helpAction: 'tips' },
+          { label: 'Welcome again', value: '', helpAction: 'welcome' },
+        ] },
+      ],
+    }],
+  };
+}
+
+/* The rings' pictures (src/home/icons.mjs): Practice by folder, Quiz by drill. */
+export const PRACTICE_ICONS = Object.freeze({
+  Subdivisions: 'notes', Grooves: 'kit', Rudiments: 'sticks', Random: 'dice', Other: 'folder',
+});
+export const QUIZ_ICONS = Object.freeze({
+  'guess:voice': 'staff', 'hear:voice': 'ear', 'pick:voice': 'padpick', 'pick:subdiv': 'metronome',
+  'pick:groove': 'loop',
+});
+
+/*
+ * The module's own tree. Kept here rather than in ui.js so the tests can walk
+ * the real one.
+ *   drills     guess.mjs's DRILLS
+ *   newSeed    a source of fresh seeds; without one every build uses seed 1,
+ *              which keeps the tests deterministic
+ *   path       the Path folder (program.mjs programFolder), when there is one
+ *   pathPrefs  Settings › Advanced › Learning Path (program.mjs pathSettingsFolder)
+ *
+ * The Ladder and the Clock are no rows of their own: they wrap a drill, so
+ * they are offered on the drill's row, in its action sheet. The Clock still
+ * files its takes under CLOCK_ID, whichever drill it wraps.
+ *
+ * The top, Practice and Quiz are rings (view 'home'): a circle per row, its
+ * picture its `icon`.
+ */
+export function drumsTree({ entries = [], categories = [], bpm = 90, drills = [], newSeed = null, path = null,
+  pathPrefs = null } = {}) {
   const o = { bpm };
   const seed = () => (newSeed ? newSeed() : 1);
   const leaf = (c) => ({ label: c.name, value: '', kind: 'chart', id: c.family, build: () => c });
-  const basics = folder('Basics', [
+  const lib = libraryFolders({ charts: entries, categories });
+  const practice = folder('Practice', [
     folder('Subdivisions', subdivisionDrills(o).map(leaf)),
+    ...lib.folders,
     folder('Random', RANDOM_DRILLS.map((d) => ({
       label: d.name, value: '', kind: 'chart', id: d.family,
       build: () => ({ ...d.make({ ...o, seed: seed() }), name: d.name }),
     }))),
+    ...(lib.other ? [lib.other] : []),
   ]);
-  const tail = [
-    folder('Training', [
-      { label: 'Ladder', value: '', kind: 'ladder' },
-      /* The Clock is an item of its own: keeping time without the click is
-       * the skill, whichever drill it wraps. */
-      { label: 'Clock', value: '', kind: 'clock', id: CLOCK_ID },
-    ]),
-    folder('Quiz', drills.map((d) => ({
-      label: d.name, value: '?', kind: 'quiz', quiz: d, id: quizItemId(d.mode, d.kind),
-    }))),
-    { label: 'Progress', value: '', kind: 'progress' },
-  ];
-  return buildCatalog({ charts: entries, categories, basics, lead: path ? [path] : [], tail });
+  /* The top is the home screen (src/home, vendored from Piano Practice): a
+   * circle per section, each with its icon. Continue is no row of it: it is
+   * Play on the Path's map, and the Path list's first row. */
+  const quiz = folder('Quiz', drills.map((d) => ({
+    label: d.name, value: '?', kind: 'quiz', quiz: d, id: quizItemId(d.mode, d.kind),
+  })));
+  const settings = settingsFolder(pathPrefs);
+  if (path) path.icon = 'path';
+  practice.icon = PRACTICE_DRUMS;
+  quiz.icon = 'quiz';
+  settings.icon = 'settings';
+  /* Practice and Quiz are rings too, a circle per row (ui.js draws a ring
+   * of up to five; more, and it is the list again). */
+  practice.view = 'home';
+  for (const row of practice.children) row.icon = PRACTICE_ICONS[row.label] || 'folder';
+  quiz.view = 'home';
+  for (const row of quiz.children) row.icon = QUIZ_ICONS[`${row.quiz.mode}:${row.quiz.kind}`] || 'quiz';
+  const root = folder('Drums', [
+    ...(path ? [path] : []),
+    practice,
+    quiz,
+    { label: 'Progress', value: '', kind: 'progress', icon: 'progress' },
+    settings,
+  ]);
+  root.view = 'home';
+  return root;
 }
 
 export { CLOCK_ID };
 
 /*
- * Every leaf that opens something, by item id — so a step of the Learning
- * Path or a repetition can open the row it points at. Walks the whole tree
+ * Every leaf that opens something, by item id — so a step of the Path or a
+ * review can open the row it points at. Walks the whole tree
  * once, making the lazy folders, and leaves out folders that are only
  * pointers back into it (the path) or that change with the day.
  */
@@ -174,6 +253,10 @@ export function leafIndex(root) {
       if (node.untracked || node.pointers) return;
       const kids = node.children;
       for (let i = 0; i < kids.length; i++) walk(kids[i]);
+      return;
+    }
+    if (node && node.levelIds && node.kind) {
+      for (const id of node.levelIds) if (!index.has(id)) index.set(id, node);
       return;
     }
     if (node && node.id && node.kind && !index.has(node.id)) index.set(node.id, node);

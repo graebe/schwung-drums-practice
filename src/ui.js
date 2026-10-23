@@ -51,7 +51,20 @@ import * as PROG from './progress.mjs';
 import * as PLAN from './program.mjs';
 import * as LES from './lessons.mjs';
 import * as ROWS from './path_rows.mjs';
+import * as H from './hints.mjs';
+import * as SH from './row_sheet.mjs';
+import * as HP from './help.mjs';
+import * as TIPS from './tips.mjs';
+import * as MP from './map_places.mjs';
+import * as SCN from './scenes.mjs';
+import * as SV from './scene_view.mjs';
+import { placeOfPad } from './pathmap/layout.mjs';
+import { createWalk, walkTo, walkStep, posAt, arrived } from './pathmap/walk.mjs';
+import { mapPadColors } from './pathmap/leds.mjs';
+import { drawHome, createGrow, startGrow, itemOfPad, HOME_MAX } from './home/render.mjs';
+import { homePadColors } from './home/leds.mjs';
 import * as UT from './untimed.mjs';
+import * as PT from './pad_tour.mjs';
 import { availableLevels } from './levels.mjs';
 import * as IDS from './ids.mjs';
 import { isUntimedId } from './ids.mjs';
@@ -87,20 +100,11 @@ const LED_INTERVAL_MS = 20;
 const OUTBOX_PER_TICK = 8;
 const OUTBOX_MAX = 512;
 
-/* Screens. */
-const MENU = 'menu';
-const READY = 'ready';
-const RUNNING = 'running';
-const SUMMARY = 'summary';
-const LADDER = 'ladder';
-const QUIZ = 'quiz';
-const RESULT = 'result';
-const PROGRESS = 'progress';
-const PROGRESS_ITEM = 'progressItem';
-const SETTINGS = 'settings';
-const ERROR = 'error';
-const CARD = 'card';
-const PADMAP = 'padmap';
+/* Screens: named in hints.mjs, so none can go without a hint line. */
+const {
+  MENU, READY, RUNNING, SUMMARY, LADDER, QUIZ, RESULT, PROGRESS, PROGRESS_ITEM, SETTINGS, ERROR, CARD,
+  PADMAP, SHEET, HELP, WELCOME, TIP, MAP, TOUR, HOME, ANIM,
+} = H.SCREENS;
 
 /* MIDI out routes. */
 const OUT_TRACK = 1;
@@ -229,20 +233,31 @@ let progress = PROG.emptyProgress();
 let progressDirty = false;
 /* Folder sums over the tree, cached by folder against progress.rev. */
 const agg = PROG.createAggregator();
-/* The Learning Path's stages, every leaf by item id, and what each item is
+/* The Path's stages, every leaf by item id, and what each item is
  * called on its own — all made with the tree, once. */
 let program = { stages: [], tracks: [] };
 let pathNode = null;
 let leafIdx = new Map();
 let itemNames = new Map();
-/* The step of the Learning Path the armed drill was opened as, so Click on
+/* The step of the Path the armed drill was opened as, so Click on
  * its result goes on along the path; null when it came from anywhere else. */
 let pathStep = null;
+/*
+ * The rungs the jog walks on the ready screen (one row for a groove, its
+ * level chosen there): { node, at } over the groove's own rungs, from the
+ * library or a review, or { steps, at } over the rungs a stage of the Path
+ * asks for. Null for a drill of one rung.
+ */
+let levelNav = null;
 /* The lesson cards (lessons.json), and the deck on screen (lessons.mjs):
  * { deck, then } — `then` is what Click goes on to once the last is read,
  * null when they were opened from Lessons to read again. */
 let lessons = new Map();
 let card = null;
+/* A line about each drum (lessons.json), and Meet the pads while it is on
+ * screen (pad_tour.mjs): { tour, id, recorded }. */
+let lessonPads = new Map();
+let tour = null;
 /* How stuck the learner is on that step, for the result's footer (program.mjs
  * stuckLevel): 0, 1 suggest an easier way in, 2 parked for a day. */
 let stuckNow = 0;
@@ -259,11 +274,41 @@ let nav = [];
  * were applied — re-armed from when one of those changes, so a random drill
  * keeps its notes and a level keeps its rung. */
 let armedSource = null;
-/* A word for the list's title bar, briefly: "ARM A DRILL". */
+/* A word for the list's title bar, briefly: "BAD USER.JSON". */
 let menuNote = '';
 let menuNoteUntil = 0;
 let settingsSel = 0;
 let settingsEditing = false;
+/* The page the settings editor shows (settings_def.mjs): Settings itself,
+ * 'main', or a group of Settings › Advanced. */
+let settingsGroup = SET.MAIN_GROUP.key;
+let settingsDefs = SET.rowsIn(SET.MAIN_GROUP.key);
+/* The Settings node of the tree, and its Advanced folder. */
+let settingsNode = null;
+let advancedNode = null;
+/* The list as it stood when Advanced was opened from Settings: leaving
+ * Advanced, or closing Settings from inside it, puts it back. */
+let settingsBack = null;
+/* The action sheet on screen (row_sheet.mjs): { title, items, sel, row }. */
+let sheet = null;
+/* MENU's help page on screen (help.mjs): { title, lines, top, back }. */
+let help = null;
+let helpTopics = new Map();
+/* The welcome on screen (tips.mjs), and a tip card: { key, lines, back }. */
+let welcome = null;
+let welcomeLines = null;
+let tipCard = null;
+const WELCOME_PAGES = TIPS.welcomePages();
+/* The panel's own measure, for fitting a page of text (help.mjs fitPage). */
+const measure = (t) => ctx.textWidth(t);
+/*
+ * Continue alternates when reviews are due: one review, then one new step.
+ * Which comes next is kept for the session only. `fromContinue` is set while
+ * a review Continue opened is on screen, so Click on its result goes on as
+ * Continue would.
+ */
+let continueTurn = 'review';
+let fromContinue = false;
 let progressSel = 0;
 let progressRows = [];
 /* The item the Progress chart is showing. */
@@ -298,7 +343,7 @@ let ladderBarsDone = 0;
 /* The armed drill's tempo — its own, scaled by Speed — kept apart from
  * `chart.bpm`, which the Ladder changes as it climbs. */
 let armedBpm = 0;
-/* The screen Settings was opened from, which leaving Settings returns to. */
+/* The screen Settings itself was opened from, which closing it returns to. */
 let settingsFrom = MENU;
 /* Whether the take on the summary beat every one before it. */
 let summaryIsBest = false;
@@ -495,6 +540,14 @@ function scrubTargets() {
   }));
 }
 
+/* The drum Meet the pads is showing pulses, on both halves, until it is struck. */
+const tourBuf = [{ voice: null, hand: null }];
+function tourTargets() {
+  if (screen !== TOUR || !tour || tour.tour.solvedAt) return null;
+  tourBuf[0].voice = PT.current(tour.tour);
+  return tourBuf[0].voice ? tourBuf : null;
+}
+
 /* The drum Study has stopped for. A rescue, so it lives behind Guide pads like
  * every other hint: this is a reading trainer first. */
 function stuckTargets() {
@@ -508,23 +561,67 @@ function stuckTargets() {
  * literal on every repaint, fifty times a second. */
 const paintState = {
   layout: null, held: null, flash: null, targets: null, sounding: null,
-  stuck: null, phase: 0, prompt: null, answerPads: null, answerColours: null, dark: false,
+  stuck: null, phase: 0, prompt: null, answerGrid: null, answerColours: null, dark: false,
 };
 const promptBuf = [null];
 const answerColourBuf = [];
 const answerStruck = (i) => Q.isEliminated(quiz, i);
 
 /*
- * The answer bar: a multiple-choice drill's answers as coloured pads along the
- * bottom row (answer_pads.mjs), as Piano Practice does it. Only for the Pick
- * drills, which ask for a NAME — in Guess: drum and Hear: drum the answer is a
- * drum, and the bottom row holds drums.
+ * A Pick drill's answers as coloured pads (answer_pads.mjs), as Piano Practice
+ * does it: Pick: drum on the kit's own pads in the layout in force, the other
+ * Picks on a bar along the bottom row. In Guess: drum and Hear: drum the
+ * answer is played, so the pads stay drums.
  */
-function answerBarActive() {
+function answersOnPads() {
   return screen === QUIZ && Boolean(quiz) && quiz.mode === 'pick' && quiz.options.length > 0;
 }
 
+/* The answers by pad index (answer_pads.mjs). Pick: drum's is made again only
+ * when the question's options or the layout change: the repaint asks on every
+ * frame, and must not allocate. */
+const kitAnswers = { options: null, layout: null, grid: [], padless: [] };
+function answerGrid() {
+  if (quiz.kind !== 'voice') return AP.barGrid(quiz.options.length);
+  const layout = layoutNow();
+  if (kitAnswers.options !== quiz.options || kitAnswers.layout !== layout) {
+    kitAnswers.options = quiz.options;
+    kitAnswers.layout = layout;
+    AP.kitGrid(quiz.options, layout, kitAnswers.grid);
+    kitAnswers.padless = AP.padless(quiz.options, layout);
+  }
+  return kitAnswers.grid;
+}
+
+/* What the quiz says on its hint line when an offered drum has no pad in a
+ * Custom layout: offered on the jog all the same, never dropped in silence. */
+function quizWarning() {
+  if (!answersOnPads() || quiz.kind !== 'voice') return '';
+  answerGrid();
+  return kitAnswers.padless.length ? `NO ${kitAnswers.padless[0]} ON PADS` : '';
+}
+
 function paintLeds(t) {
+  /* A scene's pads are its own. */
+  if (screen === ANIM && anim) {
+    sceneLeds(t);
+    pushLeds();
+    return;
+  }
+  /* At home the pads are the circles. */
+  if (onHome()) {
+    homePadColors({ count: CAT.navTop(nav).node.children.length, selected: CAT.navTop(nav).cursor, now: t,
+      palette: PAD.HOME_PALETTE, out: ledBuf });
+    pushLeds();
+    return;
+  }
+  /* On the map the pads are its places: lit means you can walk there. */
+  const m = onMap() ? mapNow() : null;
+  if (m) {
+    mapPadColors({ places: m.places, layout: m.layout, walk: m.walk, now: t, palette: PAD.MAP_PALETTE, out: ledBuf });
+    pushLeds();
+    return;
+  }
   const st = paintState;
   st.layout = layoutNow();
   st.held = held;
@@ -533,7 +630,7 @@ function paintLeds(t) {
     ? (untimed ? UT.targets(untimed) : guideTargets(run, tp.songBeats)) : null);
   st.sounding = t < listenLitUntil && ((tp.mode === C.MODE_LISTEN && screen === RUNNING)
     || (isUntimed() && (screen === READY || screen === RUNNING))) ? listenLit : null;
-  st.stuck = stuckTargets();
+  st.stuck = tourTargets() || stuckTargets();
   st.selected = padMapSelected();
   st.phase = Math.floor(t / 500) % 2;
   /* The second hint lights the pad. Only for the drills whose answer IS a
@@ -545,16 +642,21 @@ function paintLeds(t) {
   } else {
     st.prompt = null;
   }
-  if (answerBarActive()) {
+  if (answersOnPads()) {
     const n = quiz.options.length;
-    st.answerPads = AP.answerPads(n);
+    st.answerGrid = answerGrid();
     st.answerColours = AP.answerLeds(n, quiz.revealed ? -1 : quiz.choice, answerStruck,
       st.phase, answerColourBuf);
   } else {
-    st.answerPads = null;
+    st.answerGrid = null;
   }
   st.dark = false;
   paint(ledBuf, st);
+  pushLeds();
+}
+
+/* What changed since the last repaint, to the pads. */
+function pushLeds() {
   for (let i = 0; i < PAD.PAD_COUNT; i++) {
     if (ledBuf[i] === ledPrev[i]) continue;
     ledPrev[i] = ledBuf[i];
@@ -578,6 +680,34 @@ function transport() {
   const colors = C.transportColors(running, screen === READY || screen === RUNNING, phase);
   setButtonLED(C.CC_PLAY, colors.play);
   setButtonLED(C.CC_RECORD, colors.record);
+  navButtons();
+}
+
+/*
+ * Back and Menu light when they do something (controls.mjs navButtonLeds):
+ * Menu always, Back while there is somewhere to go back to. Whether Move
+ * drives these LEDs for a module is still to be seen on the device; the
+ * values are cached here, so asking costs nothing when nothing changed.
+ */
+let backLit = -1;
+let menuLit = -1;
+function navButtons() {
+  const b = C.navButtonLeds(canGoBack());
+  if (b.back !== backLit) { backLit = b.back; setButtonLED(C.CC_BACK, b.back); }
+  if (b.menu !== menuLit) { menuLit = b.menu; setButtonLED(C.CC_MENU, b.menu); }
+}
+
+function canGoBack() {
+  if (screen !== MENU) return screen !== ERROR;
+  const top = CAT.navTop(nav);
+  return nav.length > 1 || listViews.has(top.node);
+}
+
+function darkenButtons() {
+  backLit = 0;
+  menuLit = 0;
+  setButtonLED(C.CC_BACK, 0);
+  setButtonLED(C.CC_MENU, 0);
 }
 
 /* ---- persistence -------------------------------------------------------- */
@@ -746,11 +876,10 @@ function loadManifest(path) {
 }
 
 /*
- * THE FIRST THING IN THE LIST IS THE FIRST THING TO PLAY: Basics, the
- * Learning Path, then the grooves and rudiments, and the things that are
- * ABOUT practising rather than practice itself — Training, Quiz, Progress —
- * at the bottom. Each is a folder, so the top of the list is eight rows
- * rather than forty-eight.
+ * THE FIRST THING IN THE LIST IS THE NEXT THING TO PLAY: Continue, then the
+ * Path, the Practice library, Quiz, Progress and Settings — the top level
+ * Piano Practice shares (catalog.mjs). Each is a folder, so the top of the
+ * list is six rows rather than forty-eight.
  *
  * Built once, when the material is loaded. Every leaf is indexed by its item
  * id here too, which makes the lazy folders: the folder sums need every leaf
@@ -770,8 +899,7 @@ function rebuildMenu() {
       if (st.quiz) itemNames.set(st.id, st.label);
     }
   }
-  pathNode = PLAN.programFolder(program, repetitionRows,
-    fileCategories.filter((c) => c.folder === 'Grooves'));
+  pathNode = PLAN.programFolder(program, reviewRows);
   catalog = CAT.drumsTree({
     entries: fileEntries,
     categories: fileCategories,
@@ -779,7 +907,11 @@ function rebuildMenu() {
     drills: Q.DRILLS,
     newSeed: () => (Date.now() & 0x7fffffff) || 1,
     path: pathNode,
+    pathPrefs: PLAN.pathSettingsFolder(fileCategories.filter((c) => c.folder === 'Grooves')),
   });
+  settingsNode = catalog.children.find((c) => c.label === 'Settings') || null;
+  advancedNode = settingsNode ? settingsNode.children.find((c) => c.advanced) || null : null;
+  settingsBack = null;
   nav = CAT.navStart(catalog);
   leafIdx = CAT.leafIndex(catalog);
   PROG.resetShape(agg);
@@ -802,6 +934,7 @@ function namesOfItems() {
   for (const d of GEN.RANDOM_DRILLS) names.set(d.family, d.name);
   for (const d of Q.DRILLS) names.set(PLAN.quizItemId(d), d.name);
   names.set(CAT.CLOCK_ID, 'Clock');
+  for (const [name, label] of Object.entries(PLAN.TOURS)) names.set(IDS.tourItemId(name), label);
   return names;
 }
 
@@ -809,11 +942,10 @@ function itemTitle(id) {
   return itemNames.get(id) || id;
 }
 
-/* The routine due today, as rows; a placeholder when there is none, so the
- * folder is never an empty screen. */
-function repetitionRows() {
+/* What is due again today, as the rows of Path › Review — and the ones
+ * already played today, ticked. None at all, and the Path shows no Review. */
+function reviewRows() {
   const session = PROG.repetitionSession(progress, Date.now());
-  if (!session.length) return [{ label: 'Nothing due today', value: '' }];
   return session.map((r) => ({
     label: itemTitle(r.id),
     value: r.done ? 'today' : 'due',
@@ -848,7 +980,7 @@ function armChart(c) {
    * again fifty times a second. */
   chartWarning = warningFor(chart);
   chartLanes = GR.lanes(KIT.voicesInChart(chart));
-  chartLength = chart.untimed ? IO.untimedLength(chart) : IO.practiceLength(chart);
+  chartLength = chart.untimed ? IO.untimedLength(chart) : readyLength(chart);
   /* A newly armed drill starts at home, where the box is. */
   T.home(tp);
   review = null;
@@ -886,7 +1018,7 @@ function changeSpeed(delta) {
   const before = settings.speed;
   SET.applySetting(settings, 'speed', delta > 0 ? 1 : -1);
   if (settings.speed === before) return;
-  settingsRowsCache = SET.settingsRows(settings);
+  refreshSettingsRows();
   saveSettings();
   const base = armedSource && armedSource.generated ? settings.bpm : (armedSource ? armedSource.bpm : chart.bpm);
   armedBpm = Math.max(20, Math.round((base * settings.speed) / 100));
@@ -992,6 +1124,17 @@ function startUntimed(practice) {
 }
 
 /*
+ * The ready header's length: "8 bars  0:21" when the drill's name still fits
+ * beside it, else only "8 bars" — the name is what tells you where you are,
+ * and the duration is the first thing that can go.
+ */
+function readyLength(c) {
+  const full = IO.practiceLength(c);
+  const bars = full.split('  ')[0];
+  return ctx.textWidth(c.name) + ctx.textWidth(full) + 10 <= L.SCREEN_W ? full : bars;
+}
+
+/*
  * The drums the armed chart asks for that the pads in force cannot reach:
  * a Custom layout without a hat foot, the cowbell on Chromatic, every drum
  * but the snare on Sticking. A timed rung scores such a note a miss and the
@@ -1026,15 +1169,35 @@ function hearBar() {
   const from = V.pageBar(run, cursor, perBar) * perBar;
   const beatMs = 60000 / (chart.bpm || 90);
   const t = now();
-  for (const e of run.entries) {
+  const stops = [];
+  for (let i = 0; i < run.entries.length; i++) {
+    const e = run.entries[i];
     if (e.beat < from - 1e-9) continue;
     if (e.beat >= from + perBar - 1e-9) break;
+    stops.push({ index: i, atMs: t + (e.beat - from) * beatMs });
     for (const n of e.notes) {
       promptQueue.push({ atMs: t + (e.beat - from) * beatMs, voice: n.voice,
         vel: n.wantDyn === 'accent' ? 115 : n.wantDyn === 'ghost' ? 45 : 90, lit: true });
     }
   }
+  if (stops.length) hearing = { stops, endMs: t + perBar * beatMs };
   announce('listen');
+}
+
+/*
+ * The stack L0's Play is sounding right now, or -1 when it is not playing:
+ * the cursor walks the bar with the sound, so you see which note is which.
+ */
+function hearingIndex() {
+  if (!hearing) return -1;
+  const t = now();
+  if (t >= hearing.endMs) {
+    hearing = null;
+    return -1;
+  }
+  let at = hearing.stops[0].index;
+  for (const stop of hearing.stops) if (stop.atMs <= t) at = stop.index;
+  return at;
 }
 
 /* Hold the playhead. The clock stops; the panel does not. */
@@ -1165,6 +1328,7 @@ function stop() {
   review = { run: SC.reviewOf(run), end: endAt, at: null };
   T.home(tp);
   screen = ladder ? LADDER : SUMMARY;
+  if (!ladder) starIfLearned(takeLearned, SUMMARY);
 }
 
 /*
@@ -1194,6 +1358,7 @@ function stopUntimed() {
   untimed = null;
   T.home(tp);
   screen = SUMMARY;
+  starIfLearned(takeLearned, SUMMARY);
 }
 
 function recordUntimed({ c, verdict, eased, pace, dyn }) {
@@ -1219,7 +1384,6 @@ function recordUntimed({ c, verdict, eased, pace, dyn }) {
   });
   saveProgress();
   takeLearned = r.learned;
-  if (r.learned) announce('learned');
 }
 
 /*
@@ -1259,7 +1423,6 @@ function untimedResultOf(whole, { c, verdict, eased, pace, dyn }) {
     dyn: dyn.score,
     dynAdvice: dyn.score >= 0 && dyn.score < PROG.DYN_GOOD ? PROG.dynamicsAdvice(c) : '',
     series: PROG.percentSeries(it ? it.h : [], box.w - 2, box.h - 2, PROG.UNTIMED_SCALE),
-    footer: 'REC again  CLICK next',
   };
 }
 
@@ -1334,7 +1497,6 @@ function resultOf(whole, { t, st, verdict, eased, dyn }) {
     dyn: dyn.score,
     dynAdvice: dyn.score >= 0 && dyn.score < PROG.DYN_GOOD ? PROG.dynamicsAdvice(st) : '',
     series: PROG.percentSeries(it ? it.h : [], box.w - 2, box.h - 2),
-    footer: stuckFooter() || (clockMode && !pathStep ? 'REC again  BACK start' : 'REC again  CLICK next'),
   };
 }
 
@@ -1417,10 +1579,7 @@ function stuckFooter() {
 }
 
 function noteFor(r, value, reason, eased) {
-  if (r.learned) {
-    announce('learned');
-    return { mark: PROG.MARK_DONE, text: `learned at ${value}%` };
-  }
+  if (r.learned) return { mark: PROG.MARK_DONE, text: `learned at ${value}%` };
   if (value === null) return { text: reason };
   if (eased) return { text: `clean ${value}%, not counted: ${eased}` };
   const done = PROG.isDone(progress, armedItemId());
@@ -1584,10 +1743,14 @@ function clockEnd() {
 const QUIZ_ADVANCE_MS = 500;
 const PROMPT_BPM = 96;
 let promptQueue = [];       /* { atMs, voice, vel }, soonest first */
+/* L0's Play sounding its bar: { stops: [{ index, atMs }], endMs }, so the
+ * page can follow it with the cursor instead of hiding under the ready box. */
+let hearing = null;
 let quizSolvedAt = 0;
 
 function clearPrompt() {
   promptQueue.length = 0;
+  hearing = null;
 }
 
 /* Lay out the prompt on the wall clock. The quiz has no musical clock of its
@@ -1685,13 +1848,28 @@ function serviceQuiz() {
 
 /* ---- input -------------------------------------------------------------- */
 function padDown(pad, vel) {
-  /* In a multiple-choice drill the bottom row is answer buttons. They sound
-   * nothing: a press there is a choice, not a drum. */
-  if (answerBarActive() && AP.inAnswerBar(quiz.options.length, pad)) {
-    const r = Q.pickAt(quiz, AP.answerAt(quiz.options.length, pad), now());
+  /* In a Pick drill the answers' pads are answer buttons — the kit's own in
+   * Pick: drum, the bottom row's bar in the others. They sound nothing: a
+   * press there is a choice, not a drum, and a dark one does nothing. */
+  const grid = answersOnPads() ? answerGrid() : null;
+  if (grid && pad >= PAD.PAD_FIRST && pad < PAD.PAD_FIRST + grid.length) {
+    const at = grid[pad - PAD.PAD_FIRST];
+    const r = Q.pickAt(quiz, at, now());
     if (r === 'ignored') return;
-    setFlash([pad], r === 'right' ? PAD.LED_HIT : PAD.LED_MISS);
+    /* On the kit the answer is a drum: all of its pads say how it went. */
+    const pads = quiz.kind === 'voice' ? PAD.padsForVoice(quiz.options[at], layoutNow()) : [pad];
+    setFlash(pads, r === 'right' ? PAD.LED_HIT : PAD.LED_MISS);
     if (r === 'right') quizSolvedAt = now();
+    return;
+  }
+  /* At home a pad is a circle, and makes no sound. */
+  if (onHome()) {
+    homePad(pad);
+    return;
+  }
+  /* On the map a pad is a place, and makes no sound. */
+  if (onMap()) {
+    mapPad(pad);
     return;
   }
   held.add(pad);
@@ -1703,6 +1881,13 @@ function padDown(pad, vel) {
   if (!voice) return;
   const hand = PAD.padHand(pad);
   sound(voice, vel || 100);
+
+  if (screen === TOUR && tour) {
+    const r = PT.press(tour.tour, voice, now());
+    if (r === 'right') setFlash(PAD.padsForVoice(voice, layoutNow()), PAD.LED_HIT);
+    else if (r === 'other') announce(KIT.voiceById(voice).label);
+    return;
+  }
 
   if (screen === QUIZ && quiz) {
     if (quiz.mode !== 'pick') {
@@ -1779,42 +1964,49 @@ function finishQuiz() {
   };
   screen = RESULT;
   announce(`round done, ${Math.round(resultCache.rate)} per minute`);
+  starIfLearned(round.learned, RESULT);
 }
 
 /* Open the highlighted row: into a folder, or do what the row holds. */
 function openRow() {
   const item = CAT.navCurrent(nav);
   if (!item) return;
+  fromContinue = false;
+  /* Settings is a page, not a folder; so is a group of Advanced. */
+  if (item.settingsGroup) {
+    if (item.settingsGroup === SET.MAIN_GROUP.key) openSettings();
+    else openSettingsGroup(item);
+    return;
+  }
+  const world = onMap() && CAT.navTop(nav).node === pathNode ? mapNow() : null;
   if (CAT.navPush(nav)) {
-    announce(`${item.label}.`);
+    enterRing();
+    enterMap();
+    /* From the world into a stage: zoom in on its island. */
+    const island = world && onMap() ? mapNow() : null;
+    if (island) zoom('in', world, island, `${item.label}.`);
+    else announce(`${item.label}.`);
     return;
   }
   if (item.continueRow) {
-    const next = PLAN.continueStep(progress, program);
-    if (next) openPathStep(next.step);
-    else announce('Everything on the path is learned.');
+    continueOpen();
     return;
   }
   if (item.lessonsRow) {
-    const st = item.stage;
-    const ids = LES.stageCards(lessons, st, PLAN.coreSteps(st).concat(PLAN.checkpointSteps(st)));
-    if (ids.length) showCards(ids, null);
-    return;
-  }
-  if (item.skipRow) {
-    const next = skipTarget(item);
-    if (!next) return;
-    PROG.skipItem(progress, next.id, Date.now());
-    saveProgress();
-    announce(`Skipped ${PLAN.stepTitle(next)}`);
-    return;
-  }
-  if (item.skipAllRow) {
-    skipAll(item.scope);
+    showLessons(item.stage);
     return;
   }
   if (item.prefRow) {
     turnPref(item);
+    return;
+  }
+  if (item.helpAction) {
+    helpAction(item.helpAction);
+    return;
+  }
+  if (item.levelRow) {
+    const pick = ROWS.continuePick(progress, program, Date.now(), continueTurn);
+    openPathStep(PLAN.levelRowStep(item.steps, progress, pick && pick.kind === 'step' ? pick.step.key : ''));
     return;
   }
   if (item.step) {
@@ -1824,46 +2016,525 @@ function openRow() {
   pathStep = null;
   leavePath();
   if (item.repId) {
-    if (leafIdx.get(item.repId)) openLeaf(leafIdx.get(item.repId));
+    /* A review arms the rung that is due. */
+    if (leafIdx.get(item.repId)) openLeaf(leafIdx.get(item.repId), item.repId);
     return;
   }
   openLeaf(item);
 }
 
-function skipTarget(row) {
-  return ROWS.skipTarget(row, progress, program, Date.now());
-}
-
-/* Skip every open step of a folder, or take its skips back (path_rows.mjs). */
-function skipAll(scope) {
-  const change = ROWS.skipAllChange(scope, progress);
-  if (change.skip) {
-    for (const id of change.skip) PROG.skipItem(progress, id, Date.now());
-    announce(`Skipped ${change.skip.length}`);
-  } else {
-    for (const id of change.unskip) PROG.unskipItem(progress, id);
-    announce('Skips taken back');
+/*
+ * Continue: a review that is due, or the next step of the path — one of each
+ * in turn while reviews are due (path_rows.mjs continuePick).
+ */
+function continueOpen() {
+  const pick = ROWS.continuePick(progress, program, Date.now(), continueTurn);
+  if (!pick) {
+    announce('Everything on the path is learned.');
+    return;
   }
-  saveProgress();
+  if (pick.kind === 'step') {
+    continueTurn = 'review';
+    openPathStep(pick.step);
+    return;
+  }
+  continueTurn = 'step';
+  const node = leafIdx.get(pick.id);
+  if (!node) return;
+  pathStep = null;
+  leavePath();
+  announce(`Review: ${itemTitle(pick.id)}`);
+  openLeaf(node, pick.id);
+  fromContinue = true;
 }
 
-/* A row of Your path, turned on by a click. */
+/* A stage's lesson cards, to read again. */
+function showLessons(st) {
+  const ids = LES.stageCards(lessons, st, PLAN.coreSteps(st).concat(PLAN.checkpointSteps(st)));
+  if (ids.length) showCards(ids, null);
+}
+
+function stageHasCards(st) {
+  return LES.stageCards(lessons, st, PLAN.coreSteps(st).concat(PLAN.checkpointSteps(st))).length > 0;
+}
+
+/* A row of Settings › Advanced › Learning Path, turned on by a click. */
 function turnPref(row) {
-  const change = ROWS.prefChange(row, progress.path, program.stages.length);
+  const change = ROWS.prefChange(row, progress.path);
   if (change.toggle && !PROG.togglePath(progress, ...change.toggle)) announce('One track stays on');
   if (change.set) PROG.setPath(progress, ...change.set);
   saveProgress();
 }
 
+/* Settings › Advanced › Help: the tips shown again, or the welcome. */
+function helpAction(what) {
+  if (what === 'tips') {
+    PROG.clearTips(progress);
+    saveProgress();
+    announce('The tips will show again.');
+    return;
+  }
+  startWelcome();
+}
+
+/* ---- the Path map -------------------------------------------------------- */
 /*
- * A step of the Learning Path: the row of the tree it points at, opened as if
+ * The Path and its stages are drawn as maps (map_places.mjs, pathmap/): the
+ * world, an island per stage, and on an island a place per row of its folder.
+ * The nav cursor stays the child index, so Back, a restore and the tests'
+ * walk by label work as in a list; the avatar stands on the place that child
+ * is. Pads walk on the map and make no sound; in a list they are the kit.
+ * Anything that is no place — the Path's Review — is in the folder's list,
+ * one option of the sheet away (Show as list), for the session.
+ */
+const listViews = new Set();
+let map = null;
+
+function isMapNode(node) {
+  return Boolean(node && node.view === 'map' && !listViews.has(node));
+}
+
+function onMap() {
+  return screen === MENU && isMapNode(CAT.navTop(nav).node) && Boolean(mapNow());
+}
+
+/* The screen the hint line and help speak for: the map is drawn on MENU. */
+function viewNow() {
+  if (screen !== MENU) return screen;
+  const top = CAT.navTop(nav).node;
+  return isHomeNode(top) ? HOME : isMapNode(top) ? MAP : screen;
+}
+
+/* ---- the home screen and the rings ---------------------------------------- */
+/*
+ * A folder with view 'home' is a ring of circles (src/home, vendored from
+ * Piano Practice), each with its icon: the top (Path, Practice, Quiz,
+ * Progress, Settings), and one level down Practice (its folders) and Quiz
+ * (its drills). The jog chooses and the chosen circle grows; Click or a
+ * circle's pad opens it — a Quiz circle starts its drill, as its row did;
+ * the pads make no sound here. The nav cursor stays the child index, so Back
+ * from a section comes home with its circle chosen, and a ring left by Back
+ * keeps the circle it was on for the next visit. Show as list on the sheet
+ * gives the rows, for the session; a ring of more than HOME_MAX is a list.
+ */
+let homeGrow = null;
+const ringCursor = new Map();
+
+function isHomeNode(node) {
+  return Boolean(node && node.view === 'home' && node.children.length <= HOME_MAX && !listViews.has(node));
+}
+
+function onHome() {
+  return screen === MENU && isHomeNode(CAT.navTop(nav).node);
+}
+
+/* The grow, kept on the circle of the cursor of this ring: coming back from
+ * a section shows it chosen, without a grow. */
+function homeGrowNow() {
+  const top = CAT.navTop(nav);
+  if (!homeGrow || homeGrow.node !== top.node || homeGrow.to !== top.cursor) {
+    homeGrow = createGrow(top.cursor);
+    homeGrow.node = top.node;
+  }
+  return homeGrow;
+}
+
+function homeChoose(i) {
+  const top = CAT.navTop(nav);
+  const n = top.node.children.length;
+  const to = Math.max(0, Math.min(n - 1, i));
+  homeGrowNow();
+  startGrow(homeGrow, to, now());
+  top.cursor = to;
+}
+
+function homePad(note) {
+  const i = itemOfPad(note, CAT.navTop(nav).node.children.length);
+  if (i < 0) return;
+  homeChoose(i);
+  openRow();
+}
+
+/* Into a ring: on the circle it was left on. */
+function enterRing() {
+  const top = CAT.navTop(nav);
+  if (isHomeNode(top.node) && ringCursor.has(top.node)) top.cursor = ringCursor.get(top.node);
+}
+
+function drawHomeView(hint) {
+  const top = CAT.navTop(nav);
+  const items = top.node.children.map((c) => ({ key: c.label, label: c.label, icon: c.icon }));
+  ctx.clear();
+  ctx.text(1, 0, menuNote && now() < menuNoteUntil ? menuNote : top.node.label.toUpperCase(), 1);
+  ctx.fillRect(0, L.HEADER_RULE_Y, L.SCREEN_W, 1, 1);
+  drawHome(ctx, { items, selected: top.cursor, grow: homeGrowNow(), now: now() });
+  V.drawHint(ctx, hint);
+}
+
+/* How much of a stage's lesson cards are read, for its signpost. */
+function lessonsPercent(stage) {
+  const ids = LES.stageCards(lessons, stage, PLAN.coreSteps(stage).concat(PLAN.checkpointSteps(stage)));
+  if (!ids.length) return 0;
+  const seen = progress.path.seen || [];
+  return Math.round((ids.filter((id) => seen.indexOf(id) >= 0).length * 100) / ids.length);
+}
+
+/*
+ * The map of the open folder: its places, worked out again when progress or
+ * the day moves on — the avatar keeps walking through that — and an avatar on
+ * the place of the nav cursor. Null when the folder has no places.
+ */
+function mapNow() {
+  const top = CAT.navTop(nav);
+  if (!isMapNode(top.node)) return null;
+  const day = Math.floor(Date.now() / 86400000);
+  if (map && map.node === top.node && map.rev === progress.rev && map.day === day) return map;
+  const env = mapEnv();
+  /* The stages follow the Path's Continue row. */
+  const built = top.node === pathNode ? MP.worldPlaces(progress, program, { ...env, first: 1 })
+    : MP.islandPlaces(progress, program, top.node, env);
+  if (!built.places.length) return null;
+  const layout = MP.mapLayout(top.node === pathNode ? 'world' : 'island', built.places.length);
+  const same = map && map.node === top.node && map.layout === layout;
+  let at = MP.placeOfChild(built.targets, top.cursor);
+  if (at < 0) {
+    at = MP.startPlace(built.places);
+    top.cursor = built.targets[at];
+  }
+  map = { node: top.node, rev: progress.rev, day, places: built.places, targets: built.targets, layout,
+    walk: same ? map.walk : createWalk(layout, at), said: same ? map.said : at };
+  return map;
+}
+
+/* Into a map folder: the avatar on the place Continue would choose, else the
+ * first open one. */
+function enterMap() {
+  const top = CAT.navTop(nav);
+  if (!isMapNode(top.node)) return;
+  map = null;
+  top.cursor = -1;
+  const m = mapNow();
+  if (!m) {
+    top.cursor = 0;
+    return;
+  }
+  const at = MP.startPlace(m.places);
+  top.cursor = m.targets[at];
+  m.walk = createWalk(m.layout, at);
+  m.said = at;
+}
+
+/* The avatar sets out for place `i`; the cursor is that place's child. */
+function walkToPlace(m, i) {
+  walkTo(m.walk, i, now());
+  CAT.navTop(nav).cursor = m.targets[m.walk.target];
+}
+
+function mapJog(delta) {
+  const m = mapNow();
+  if (!m) return;
+  walkStep(m.walk, delta, m.places.length, now());
+  CAT.navTop(nav).cursor = m.targets[m.walk.target];
+}
+
+/* A pad: walk to its place, or go in when the avatar is there or on its
+ * way. Water does nothing. */
+function mapPad(note) {
+  const m = mapNow();
+  const i = m ? placeOfPad(m.layout, note) : -1;
+  if (i < 0) return;
+  if (i === m.walk.target) {
+    openRow();
+    return;
+  }
+  walkToPlace(m, i);
+}
+
+/* Arrived: the place's name and how far it is, said once. */
+function serviceMap(t) {
+  const m = mapNow();
+  if (!m || !arrived(m.walk, t) || m.said === m.walk.target) return;
+  m.said = m.walk.target;
+  const p = m.places[m.said];
+  announce(`${p.label}, ${p.percent} percent${p.due ? `, ${p.due} due` : ''}`);
+}
+
+/* The sheet's Show as list / Show as map, for this folder, this session. */
+function showFolderAs(view) {
+  const top = CAT.navTop(nav);
+  if (view === 'list') {
+    listViews.add(top.node);
+    announce('List.');
+  } else {
+    listViews.delete(top.node);
+    map = null;
+    announce('Map.');
+  }
+}
+
+function drawMapView(hint) {
+  const m = mapNow();
+  SV.drawPlaces(ctx, { map: m, walk: m.walk, now: now(), footer: hint });
+}
+
+/* The Path's world map, the avatar on the stage Continue is in. */
+function showPathMap() {
+  nav = CAT.navStart(catalog);
+  const at = catalog.children.indexOf(pathNode);
+  if (at < 0) return;
+  nav[0].cursor = at;
+  CAT.navPush(nav);
+  enterMap();
+}
+
+/* ---- scenes: the Learning Path in motion ---------------------------------- */
+/*
+ * scenes.mjs works out what to show; this plays it on its own screen (ANIM):
+ * a queue of scenes, each announced and drawn on the maps the learner knows,
+ * with the pads its own while it plays. Any key or pad skips to the end and
+ * goes on to what the scenes stood before (`then`). Nothing is recorded or
+ * sounded: the screen takes no other input.
+ *
+ * The frames and pads are scene_view.mjs's, the engine's animations
+ * (pathmap/anim.mjs) drawn with the ms into each scene.
+ */
+let anim = null;
+
+function playScenes(queue, then) {
+  if (!queue.length) {
+    then();
+    return;
+  }
+  anim = { queue, at: -1, scene: null, since: 0, walk: null, then };
+  screen = ANIM;
+  nextScene();
+}
+
+function nextScene() {
+  anim.at++;
+  if (anim.at >= anim.queue.length) {
+    endScenes();
+    return;
+  }
+  const sc = anim.queue[anim.at];
+  anim.scene = sc;
+  anim.since = now();
+  anim.walk = SV.sceneWalk(sc, anim.since);
+  anim.learned = sc.kind !== 'star' ? null
+    : SV.learnedOf(sc.under === RESULT ? { result: resultCache } : { summary: summaryInfo });
+  anim.args = SV.sceneArgs(sc, { seed: anim.at + 1, learned: anim.learned, ctx });
+  if (sc.say) announce(sc.say);
+}
+
+function serviceScenes(t) {
+  const sc = anim.scene;
+  if (sc.kind === 'walk' ? arrived(anim.walk, t) : t - anim.since >= SCN.sceneMs(sc)) nextScene();
+}
+
+/* The end, played through or skipped: on to what the scenes stood before. */
+function endScenes() {
+  const then = anim.then;
+  anim = null;
+  screen = MENU;
+  then();
+}
+
+/* Any key or pad, while a scene plays: to its end. Shift is still tracked,
+ * so a Shift let go during a scene is not held after it. */
+function sceneInput(type, d1, d2) {
+  if (type === 0xB0 && d1 === C.CC_SHIFT) {
+    shiftHeld = d2 > 0;
+    return;
+  }
+  const key = type === 0xB0 && d2 > 0;
+  const pad = type === 0x90 && d2 > 0 && PAD.isPad(d1);
+  if (key || pad) endScenes();
+}
+
+function drawScene(hint) {
+  const t = now();
+  SV.drawScene(ctx, { scene: anim.scene, args: anim.args, walk: anim.walk, now: t, ms: t - anim.since, footer: hint,
+    learned: anim.learned });
+}
+
+function sceneLeds(t) {
+  SV.sceneLeds(ledBuf, { scene: anim.scene, walk: anim.walk, now: t, ms: t - anim.since, seed: anim.at + 1 });
+}
+
+/*
+ * What a step of the path finished, for the scenes on along it: the path as
+ * it stood when the step opened, against now. The stage folders are the
+ * Path's children with a stage.
+ */
+let pathBefore = null;
+function stageFolders() {
+  return pathNode ? pathNode.children.filter((c) => c.stage) : [];
+}
+
+function pathStateNow() {
+  return SCN.pathState(progress, program, stageFolders(), mapEnv());
+}
+
+function mapEnv() {
+  return { dueIds: MP.dueIdsOf(progress, Date.now()), atMs: Date.now(), lessonsPercent };
+}
+
+/* The scenes from `step` on to `next`, for what the step finished. */
+function scenesOnto(step, next) {
+  if (!pathBefore) return [];
+  const change = SCN.changes(pathBefore, pathStateNow());
+  return SCN.pathScenes({ progress, program, folders: stageFolders(), step, next, change, env: mapEnv() });
+}
+
+/* Between the world and a stage's island, on the maps as they stand: the
+ * world's avatar is on that island either way. */
+function zoom(dir, world, island, say) {
+  playScenes([{ kind: 'zoom', dir, world, island, at: world.walk.target, say }], () => {});
+}
+
+/* A level learned for the first time: the star round the result's score. */
+function starIfLearned(learned, under) {
+  if (!learned) return;
+  playScenes([{ kind: 'star', under, say: 'learned' }], () => { screen = under; });
+}
+
+/* ---- the action sheet ---------------------------------------------------- */
+/*
+ * Shift + jog-click on a row: what can be done to it besides opening it
+ * (row_sheet.mjs). Drawn as a list of its own over the row's label; Click
+ * does the action and closes it, Back closes it.
+ */
+function openSheet() {
+  const top = CAT.navTop(nav);
+  const row = CAT.navCurrent(nav);
+  const shown = row ? menuRows(top.node)[top.cursor] : null;
+  sheet = {
+    title: shown ? shown.label : 'OPTIONS',
+    items: SH.sheetFor(row, {
+      progress,
+      pick: ROWS.continuePick(progress, program, Date.now(), continueTurn),
+      hasCards: stageHasCards,
+      leafOf: (id) => leafIdx.get(id),
+      nextKey: (() => {
+        const p = ROWS.continuePick(progress, program, Date.now(), continueTurn);
+        return p && p.kind === 'step' ? p.step.key : '';
+      })(),
+      view: isHomeNode(top.node) || isMapNode(top.node) ? 'map'
+        : top.node.view === 'map' && listViews.has(top.node) ? 'list' : undefined,
+    }),
+    sel: 0,
+  };
+  screen = SHEET;
+  announce(`Options: ${sheet.items.map((a) => a.label).join(', ')}`);
+}
+
+function sheetDo() {
+  const a = sheet && sheet.items[sheet.sel];
+  sheet = null;
+  screen = MENU;
+  if (!a) return;
+  const at = Date.now();
+  switch (a.act) {
+    case 'skip':
+      PROG.skipItem(progress, a.step.id, at);
+      saveProgress();
+      announce(`Skipped ${PLAN.stepTitle(a.step)}`);
+      return;
+    case 'skipAll':
+      for (const id of a.ids) PROG.skipItem(progress, id, at);
+      saveProgress();
+      announce(`Skipped ${a.ids.length}`);
+      return;
+    case 'unskip':
+      for (const id of a.ids) PROG.unskipItem(progress, id);
+      saveProgress();
+      announce('Skips taken back');
+      return;
+    case 'start':
+      PROG.setPath(progress, 'start', a.index);
+      saveProgress();
+      announce(`The path starts at stage ${a.index}`);
+      return;
+    case 'testOut':
+      pathStep = null;
+      openPathStep(a.step);
+      return;
+    case 'lessons':
+      showLessons(a.stage);
+      return;
+    case 'ladder':
+    case 'clock':
+      practiseWrapped(a.leaf, a.act);
+      return;
+    case 'list':
+    case 'map':
+      showFolderAs(a.act);
+      return;
+    default:
+      openSettingsPage();
+  }
+}
+
+/* The sheet's Settings...: Settings itself, on top of the list you are on,
+ * so Back comes back here — or, inside Advanced, back up to it. */
+function openSettingsPage() {
+  if (inAdvanced()) leaveAdvanced();
+  else openSettings();
+}
+
+/*
+ * Practise: Ladder or Practise: Clock on a drill's row. Both WRAP a drill —
+ * climb its tempo, take its click away — so the drill is armed as if opened,
+ * then wrapped. They need a tempo, which L0 has not; the sheet only offers
+ * them on a timed drill.
+ */
+function practiseWrapped(leaf, kind) {
+  pathStep = null;
+  leavePath();
+  openLeaf(leaf);
+  /* A groove opening on L0 is wrapped on its first timed rung. */
+  if (chart && chart.untimed && leaf.levels) {
+    const timed = leaf.levels.find((lv) => !lv.untimed);
+    if (timed) openLeaf(leaf, timed.id);
+  }
+  if (screen !== READY || !chart || chart.untimed) return;
+  rewrap(kind);
+}
+
+function rewrap(kind) {
+  if (kind === 'ladder') {
+    /* From 70% of the tempo the drill is played at — its own times Speed —
+     * climbing through it. */
+    beginActivity('ladder');
+    ladder = newLadder();
+    ladderReason = '';
+    enterReady();
+    announce(`Ladder: ${chart.name}, from ${ladder.bpm}`);
+    return;
+  }
+  /* The Clock files its takes under one item of its own (CLOCK_ID): keeping
+   * time without the click is the skill, whichever drill it wraps. */
+  beginActivity('clock');
+  clockMode = true;
+  enterReady();
+  announce(`Clock: ${chart.name}`);
+}
+
+/*
+ * A step of the Path: the row of the tree it points at, opened as if
  * picked there — with a generated drill's Tempo set to its target, so 100%
  * Speed is what the step asks for, and the Clock wrapped round its drill.
  */
 function openStep(step) {
   stuckNow = 0;
+  pathBefore = pathStateNow();
   if (step.quiz) {
     openQuiz(step.quiz, step);
+    pathStep = step;
+    return;
+  }
+  if (step.tour) {
+    openTour(step.id);
     pathStep = step;
     return;
   }
@@ -1881,10 +2552,13 @@ function openStep(step) {
   if ((target && settings.bpm !== target) || settings.speed !== speed) {
     if (target) settings.bpm = target;
     settings.speed = speed;
-    settingsRowsCache = SET.settingsRows(settings);
+    refreshSettingsRows();
     saveSettings();
   }
-  openLeaf(node);
+  openLeaf(node, id);
+  /* On the Path the jog walks only the rungs this stage asks for. */
+  levelNav = node.levels ? { steps: PLAN.levelSteps(program, step), at: 0 } : null;
+  if (levelNav) levelNav.at = Math.max(0, levelNav.steps.findIndex((st) => st.key === step.key));
   if (step.wrap && chart) {
     beginActivity('clock');
     clockMode = true;
@@ -1952,7 +2626,7 @@ function leavePath() {
   if (speedBeforePath === null) return;
   if (settings.speed !== speedBeforePath) {
     settings.speed = speedBeforePath;
-    settingsRowsCache = SET.settingsRows(settings);
+    refreshSettingsRows();
     saveSettings();
   }
   speedBeforePath = null;
@@ -1967,25 +2641,33 @@ function speedFor(target) {
 
 /* On from a result along the path: the next open step after this one. */
 function goNext() {
-  const next = PLAN.stepAfter(progress, program, pathStep);
+  const step = pathStep;
+  const next = PLAN.stepAfter(progress, program, step);
+  const scenes = scenesOnto(step, next);
+  pathBefore = null;
   quiz = null;
   resultCache = null;
-  if (next) {
-    openPathStep(next);
-    return;
-  }
-  ladder = null;
-  clockMode = false;
-  screen = MENU;
+  playScenes(scenes, () => {
+    if (next) {
+      openPathStep(next);
+      return;
+    }
+    ladder = null;
+    clockMode = false;
+    screen = MENU;
+    /* The whole path through: its world map, where the finale played. */
+    if (scenes.some((sc) => sc.kind === 'finale')) showPathMap();
+  });
 }
 
 /*
  * What the module is doing beyond showing a screen is ONE of: a quiz round, a
- * Ladder, the Clock, an L0 take, or a deck of lesson cards — each held in its
- * own variable (quiz, ladder, clockMode, untimed, card). They are exclusive,
- * and every place that starts one comes through here, which ends the others:
- * a Clock left armed under a quiz, or a quiz under a deck of cards, is the
- * kind of state the scattered flags used to allow.
+ * Ladder, the Clock, an L0 take, a deck of lesson cards or Meet the pads —
+ * each held in its own variable (quiz, ladder, clockMode, untimed, card,
+ * tour). They are exclusive, and every place that starts one comes through
+ * here, which ends the others: a Clock left armed under a quiz, or a quiz
+ * under a deck of cards, is the kind of state the scattered flags used to
+ * allow.
  */
 function beginActivity(kind) {
   if (kind !== 'quiz') quiz = null;
@@ -1993,6 +2675,42 @@ function beginActivity(kind) {
   if (kind !== 'clock') clockMode = false;
   if (kind !== 'untimed') untimed = null;
   if (kind !== 'cards') card = null;
+  if (kind !== 'tour') tour = null;
+}
+
+/* ---- Meet the pads ------------------------------------------------------- */
+/* Its rules are pad_tour.mjs's; here the drum is sounded and the end recorded. */
+function openTour(id) {
+  beginActivity('tour');
+  tour = { id, recorded: false, tour: PT.createTour(quizLayout, { texts: lessonPads,
+    width: L.PAGE_FULL_PX, measure }) };
+  screen = TOUR;
+  arriveTour();
+}
+
+/* A new stop: its drum heard once. The end: the tour walked, recorded once. */
+function arriveTour() {
+  const voice = PT.current(tour.tour);
+  if (voice) {
+    sound(voice, 105);
+    announce(KIT.voiceById(voice).label);
+    return;
+  }
+  announce(PT.END_TITLE);
+  if (tour.recorded) return;
+  tour.recorded = true;
+  PROG.recordTour(progress, tour.id, Date.now());
+  saveProgress();
+}
+
+function serviceTour() {
+  if (PT.service(tour.tour, now())) arriveTour();
+}
+
+/* Click on the last page: on along the path — a tour is only ever a step of it. */
+function leaveTour() {
+  tour = null;
+  goNext();
 }
 
 function openQuiz(drill, step = null) {
@@ -2017,7 +2735,7 @@ function openQuiz(drill, step = null) {
 }
 
 /* Do what a leaf of the tree holds. */
-function openLeaf(item) {
+function openLeaf(item, levelId) {
   if (item.kind === 'progress') {
     openProgress();
     return;
@@ -2026,50 +2744,100 @@ function openLeaf(item) {
     openQuiz(item.quiz);
     return;
   }
-  /*
-   * The Ladder and the Clock WRAP the armed drill — climb its tempo, take its
-   * click away. With nothing armed they used to grab the first drill in the
-   * list, which was a single stroke roll nobody had picked; now they say so.
-   */
-  if ((item.kind === 'clock' || item.kind === 'ladder') && !chart) {
-    menuNote = 'ARM A DRILL';
-    menuNoteUntil = now() + 2000;
-    announce('Arm a drill first, then open the ' + item.label + '.');
-    return;
-  }
-  /* Both are about time, and L0 has none: they wrap a timed rung. */
-  if ((item.kind === 'clock' || item.kind === 'ladder') && chart.untimed) {
-    menuNote = 'ARM A TIMED RUNG';
-    menuNoteUntil = now() + 2000;
-    announce(`The ${item.label} needs a timed rung, L1 to L4.`);
-    return;
-  }
-  if (item.kind === 'clock') {
-    beginActivity('clock');
-    clockMode = true;
-    enterReady();
-    announce(`Clock: ${chart.name}`);
-    return;
-  }
-  if (item.kind === 'ladder') {
-    /* From 70% of the tempo the drill is played at — its own times Speed —
-     * climbing through it. */
-    beginActivity('ladder');
-    ladder = newLadder();
-    ladderReason = '';
-    enterReady();
-    announce(`Ladder: ${chart.name}, from ${ladder.bpm}`);
-    return;
-  }
   /* A drill. Whatever the Ladder or the Clock was wrapping before, this is not
    * it. A row that holds nothing — "Nothing due today" — does nothing. */
   if (typeof item.build !== 'function') return;
   ladder = null;
   clockMode = false;
-  const built = item.build();
+  let id;
+  levelNav = null;
+  if (item.levels) {
+    /* The rung asked for, else the first not yet learned. */
+    const at = levelId ? item.levels.findIndex((lv) => lv.id === levelId) : -1;
+    levelNav = { node: item, at: at >= 0 ? at : ROWS.defaultLevel(progress, item.levels) };
+    id = item.levels[levelNav.at].id;
+  }
+  const built = item.build(id);
   if (!built) return;
   armedSource = built;
   armChart(built);
+}
+
+/* ---- the level, on the ready screen -------------------------------------- */
+/*
+ * A groove is one row; its rung is chosen here, with the jog, clamped. Each
+ * step arms the new rung from the top, its pads relit and its name said: on
+ * the Path among the rungs the stage asks for, so its targets stay the
+ * stage's; elsewhere among all of them.
+ */
+function levelCount() {
+  if (!levelNav) return 0;
+  return levelNav.steps ? levelNav.steps.length : levelNav.node.levels.length;
+}
+
+/* The armed rung: { id, step ('L2'), label ('+ kick') }, or null. */
+function levelNow() {
+  if (!levelNav) return null;
+  if (levelNav.steps) {
+    const st = levelNav.steps[levelNav.at];
+    const sp = st.label.indexOf(' ');
+    return { id: st.id, step: st.label.slice(0, sp), label: st.label.slice(sp + 1), step0: st };
+  }
+  return levelNav.node.levels[levelNav.at];
+}
+
+/* The ready screen's bottom line as { hint, hintLeft }: the level beside the
+ * keys, taking turns with them when both will not fit (hints.mjs besideParts). */
+let footKey = '';
+let footParts = [];
+function readyFooter() {
+  const left = shiftHeld ? '' : readyLeft();
+  const st = hintState();
+  /* Pairs packed short enough to sit beside the level where they can. */
+  if (left) st.width = Math.max(7, H.HINT_CHARS - left.length - 2);
+  const key = `${left}|${st.shift}|${st.levels}|${st.untimed}`;
+  if (key !== footKey) {
+    footKey = key;
+    footParts = H.besideParts(left, H.hintFor(READY, st));
+  }
+  const part = shownPart(footParts, 'ready\n' + footParts.map((p) => p.join('|')).join('\n'));
+  return { hint: part[1], hintLeft: part[0] };
+}
+
+/* The ready box's LEVEL: the digit, where the jog can go, and whether the
+ * rung is learned — on the Path at the step's target. */
+function readyLevel() {
+  const lv = levelNow();
+  if (!lv) return null;
+  return { digit: lv.step.slice(1), down: levelNav.at > 0, up: levelNav.at < levelCount() - 1,
+    done: lv.step0 ? PLAN.stepDone(progress, lv.step0) : PROG.isDone(progress, lv.id) };
+}
+
+/* The ready screen's bottom line, at the left: a drum the pads cannot reach,
+ * which matters more, else the rung — "L2  + kick". */
+function readyLeft() {
+  if (chartWarning) return chartWarning;
+  const lv = levelNow();
+  return lv ? `${lv.step}  ${lv.label}` : '';
+}
+
+function levelJog(delta) {
+  const n = levelCount();
+  if (n < 2) return;
+  const to = Math.max(0, Math.min(n - 1, levelNav.at + delta));
+  if (to === levelNav.at) return;
+  const wrap = ladder ? 'ladder' : clockMode ? 'clock' : '';
+  if (levelNav.steps) {
+    const steps = levelNav.steps;
+    openStep(steps[to]);
+    levelNav = { steps, at: to };
+  } else {
+    openLeaf(levelNav.node, levelNav.node.levels[to].id);
+  }
+  /* The Ladder or the Clock stays round the drill, on its new rung. */
+  if (wrap && chart && !chart.untimed) rewrap(wrap);
+  const lv = levelNow();
+  announce(`level ${lv.step.slice(1)}, ${lv.label.replace('+', 'plus')}`);
 }
 
 /*
@@ -2087,7 +2855,7 @@ function grooveCharts() {
 }
 
 /*
- * Pick: groove on the Learning Path asks only about grooves you have played,
+ * Pick: groove on the Path asks only about grooves you have played,
  * in the styles you have on: naming a groove you have never heard is a guess,
  * not ear training. With fewer than three of those there is no fair question,
  * so it falls back to the styles you have on.
@@ -2108,11 +2876,11 @@ function quizItemOf(q) {
   return IDS.quizItemId(q.mode, q.kind, q.variant);
 }
 
-/* The pad layout a press is read in. A drum quiz always uses the kit: in the
- * sticking layout every pad is the snare, and eight of nine prompts could not
- * be answered at all. */
+/* The pad layout a press is read in. A drum quiz and Meet the pads always use
+ * the kit: in the sticking layout every pad is the snare, and eight of nine
+ * prompts could not be answered at all. */
 function layoutNow() {
-  return screen === QUIZ ? quizLayout : padLayout;
+  return screen === QUIZ || screen === TOUR ? quizLayout : padLayout;
 }
 
 /*
@@ -2171,7 +2939,7 @@ function padMapClick() {
   const from = padLayout.name;
   customPads = PIO.copyPreset(settings.layout);
   settings.layout = PAD.CUSTOM;
-  settingsRowsCache = SET.settingsRows(settings);
+  refreshSettingsRows();
   saveSettings();
   refreshLayout();
   announce(`Custom: a copy of ${from}. Pick a pad, turn the jog to give it a sound.`);
@@ -2272,26 +3040,310 @@ function progressDetail(index) {
   };
 }
 
-/* Settings opens over whatever is on screen, pausing a run, and goes back to it. */
+/*
+ * Settings itself — one short page (settings_def.mjs MAIN) — over whatever is
+ * on screen: the list, home, or a drill, whose run it pauses. Back and
+ * Shift+click go back to it; its Advanced row opens the rest.
+ *
+ *   Settings ── Advanced ── a group (Practice, Sound, MIDI)
+ *                        └─ Learning Path ›, Help ›
+ * Back walks a group to Advanced, Advanced to Settings, Settings to where it
+ * was opened; Shift+click on any of its pages closes all of it at once.
+ */
 function openSettings() {
   settingsFrom = screen;
+  settingsBack = null;
   if (screen === RUNNING && !tp.paused) pause();
+  useSettingsRows(SET.MAIN_GROUP.key);
+  settingsSel = 0;
   screen = SETTINGS;
   settingsEditing = false;
+  announce('Settings.');
 }
 
+/* Settings › Advanced: the folder of the rest, as a list on top of the
+ * Settings node, the way you came kept for the way back. */
+function openAdvanced() {
+  if (!advancedNode) return;
+  settingsBack = nav.map((e) => ({ node: e.node, cursor: e.cursor }));
+  nav = CAT.navStart(catalog);
+  nav[0].cursor = Math.max(0, catalog.children.indexOf(settingsNode));
+  nav.push({ node: settingsNode, cursor: 0 }, { node: advancedNode, cursor: 0 });
+  settingsEditing = false;
+  screen = MENU;
+  announce('Advanced.');
+}
+
+function inAdvanced() {
+  return Boolean(settingsBack) && nav.some((e) => e.node === advancedNode);
+}
+
+/* Back up from Advanced: Settings, on its Advanced row. */
+function leaveAdvanced() {
+  nav = settingsBack || CAT.navStart(catalog);
+  settingsBack = null;
+  useSettingsRows(SET.MAIN_GROUP.key);
+  settingsSel = Math.max(0, SET.MAIN.indexOf('advanced'));
+  screen = SETTINGS;
+  settingsEditing = false;
+  announce('Settings.');
+}
+
+/* A group of Advanced: the editor with that group's rows; Back is Advanced. */
+function openSettingsGroup(row) {
+  useSettingsRows(row.settingsGroup);
+  settingsSel = 0;
+  screen = SETTINGS;
+  settingsEditing = false;
+  announce(`${row.label} settings.`);
+}
+
+function useSettingsRows(group) {
+  settingsGroup = group;
+  settingsDefs = SET.rowsIn(group);
+  refreshSettingsRows();
+  settingsSel = Math.max(0, Math.min(settingsSel, settingsDefs.length - 1));
+}
+
+/* The editor's rows as the list shows them, made when a value changes:
+ * Start at's from the path. */
+function refreshSettingsRows() {
+  settingsRowsCache = SET.settingsRows(settings, settingsDefs,
+    { start: ROWS.prefValue({ group: 'start' }, progress.path) });
+}
+
+/* Back on a settings page: a group goes back to Advanced, Settings itself
+ * to where it was opened. */
 function leaveSettings() {
   settingsEditing = false;
+  if (settingsGroup !== SET.MAIN_GROUP.key) {
+    screen = MENU;
+    return;
+  }
+  closeSettings();
+}
+
+/* All of Settings closed at once, back to where it was opened. */
+function closeSettings() {
+  settingsEditing = false;
+  if (settingsBack) {
+    nav = settingsBack;
+    settingsBack = null;
+  }
   let to = settingsFrom;
   if ((to === READY || to === RUNNING) && !chart) to = MENU;
   if (to === SETTINGS || to === ERROR) to = MENU;
   screen = to;
 }
 
+/* Start at, on Settings itself: the stage the path starts at, a step a
+ * detent, kept in range — progress, not a setting. */
+function stepPathStart(delta) {
+  const n = program.stages.length;
+  const to = Math.max(0, Math.min(n - 1, (progress.path.start || 0) + delta));
+  if (to === (progress.path.start || 0)) return;
+  PROG.setPath(progress, 'start', to);
+  saveProgress();
+  refreshSettingsRows();
+  announce(`The path starts at stage ${to}`);
+}
+
+/* ---- MENU: help for this screen ----------------------------------------- */
 /*
- * Menu: back to the list from anywhere. A run is stopped properly on the way —
- * the kit silenced, the transport home, nothing half-recorded and no Record
- * light left burning over the list.
+ * MENU opens the help page of the screen on it (help.mjs): what it is, its
+ * keys, the topics that explain it, and on a row of the Path the lesson card
+ * behind it. A take is paused first, as Settings pauses it. MENU or BACK
+ * closes it, back to where it was opened.
+ */
+function openHelp() {
+  /* The keys as they were: a take is paused only once they are read. */
+  const st = hintState(false);
+  const view = viewNow();
+  if (screen === RUNNING && !tp.paused) pause();
+  if (screen === MENU) st.section = nav.length > 1 ? nav[1].node.label : (CAT.navCurrent(nav) || {}).label;
+  if (view === HOME && nav.length > 1) st.ring = CAT.navTop(nav).node.label;
+  if (screen === SETTINGS) st.group = settingsGroup;
+  const page = HP.helpPage(view, { st, topics: helpTopics, extra: screen === MENU ? rowCardLines() : [] });
+  /* Opened at its first line: what this screen is comes first. */
+  help = { title: page.title, lines: HP.fitPage(page.lines, measure), top: 0, back: screen };
+  screen = HELP;
+  announce(help.lines.join(' '));
+}
+
+function closeHelp() {
+  screen = help ? help.back : MENU;
+  help = null;
+}
+
+/* The lesson card behind the highlighted row of the Path: a step's own
+ * cards, else its stage's. */
+function rowCardLines() {
+  const row = CAT.navCurrent(nav);
+  if (!row) return [];
+  let step = row.step || (row.steps && row.steps[0]) || null;
+  if (row.continueRow) {
+    const pick = ROWS.continuePick(progress, program, Date.now(), continueTurn);
+    step = pick && pick.kind === 'step' ? pick.step : null;
+  }
+  const stage = row.stage || (step && program.stages.find((x) => x.key === step.stage)) || null;
+  const own = row.step ? (step.cards || []) : [];
+  const ids = own.filter((id) => lessons.has(id));
+  if (!ids.length && stage && lessons.has(stage.card)) ids.push(stage.card);
+  return HP.cardLines(ids.map((id) => lessons.get(id)));
+}
+
+/* ---- the welcome and the tips -------------------------------------------- */
+/*
+ * The first launch (tips.mjs): what the module is, its keys, and new or
+ * already playing. "From the start" puts the path at its first stage and the
+ * cursor on Continue; "I already play" opens the Path with a tip on testing
+ * out. Back at any page ends it; either way it is marked seen.
+ */
+function startWelcome() {
+  welcome = TIPS.createWelcome();
+  welcomeLines = WELCOME_PAGES.map((p) => (p.items ? HP.fitPage(p.items, measure) : null));
+  sheet = null;
+  help = null;
+  screen = WELCOME;
+  announce(`Welcome. ${welcomeLines[0].join(' ')}`);
+}
+
+function finishWelcome() {
+  welcome = null;
+  PROG.addTip(progress, 'welcome');
+  saveProgress();
+  screen = MENU;
+}
+
+function welcomeClick() {
+  const answer = TIPS.welcomeClick(welcome);
+  if (!answer) {
+    const page = WELCOME_PAGES[welcome.page];
+    announce(page.choices ? `${page.title} ${page.choices.join(', ')}` : welcomeLines[welcome.page].join(' '));
+    return;
+  }
+  finishWelcome();
+  /* Either way onto the Path's map: from the start with the avatar on the
+   * first stage, Play to begin; already playing with the tip on testing out. */
+  showPathMap();
+  if (answer === 'start') {
+    PROG.setPath(progress, 'start', 0);
+    saveProgress();
+    announce('Learning Path. Play continues.');
+    return;
+  }
+  showTip('placement', MENU);
+}
+
+/* A tip, the first time its screen comes up (tips.mjs tipDue). */
+function serviceTips() {
+  let key = screen === SHEET ? 'sheet' : screen === READY ? 'practice' : screen === QUIZ ? 'quiz' : null;
+  if (onMap()) key = CAT.navTop(nav).node === pathNode ? 'map' : 'island';
+  const due = key && TIPS.tipDue(progress, key);
+  if (due) showTip(due, screen);
+}
+
+function showTip(key, back) {
+  if (key !== 'placement') {
+    PROG.addTip(progress, key);
+    saveProgress();
+  }
+  /* A quiz asks again once the tip is read: its question would be lost. */
+  if (back === QUIZ) clearPrompt();
+  tipCard = { key, back, top: 0, lines: HP.fitPage(TIPS.tipItems(key), measure) };
+  screen = TIP;
+  announce(`Tip: ${TIPS.TIPS[key].join(' ')}`);
+}
+
+function closeTip() {
+  const back = tipCard ? tipCard.back : MENU;
+  tipCard = null;
+  screen = back;
+  if (screen === QUIZ && quiz && promptIsAudible()) schedulePrompt();
+}
+
+/*
+ * What the hint line is told about the screen on it (hints.mjs). `shift` is
+ * whether Shift's layer shows.
+ */
+function hintState(shift = shiftHeld) {
+  /* A scene has no Shift layer: every key there skips it. */
+  const st = { shift: shift && screen !== ANIM, depth: nav.length };
+  if (screen === READY) st.levels = levelCount() > 1;
+  if (screen === RUNNING || screen === READY) {
+    st.mode = tp.mode;
+    st.paused = tp.paused;
+    st.untimed = isUntimed();
+    st.ladder = Boolean(ladder);
+    st.clock = clockMode;
+  } else if (screen === SUMMARY) {
+    st.clock = clockMode && !pathStep && !fromContinue;
+  } else if (screen === QUIZ && quiz) {
+    st.pick = quiz.mode === 'pick';
+    st.audible = promptIsAudible();
+    st.hintsLeft = Q.hintsLeft(quiz);
+    st.warning = quizWarning();
+  } else if (screen === RESULT) {
+    st.path = Boolean(pathStep) || fromContinue;
+  } else if (screen === CARD && card) {
+    st.guided = card.deck.guided;
+    st.more = card.deck.at + 1 < card.deck.ids.length;
+    st.pages = card.deck.pages.length;
+  } else if (screen === WELCOME && welcome) {
+    st.asks = TIPS.welcomeAsks(welcome);
+  } else if (screen === TIP && tipCard) {
+    st.scrolls = tipCard.lines.length > L.PAGE_ROWS;
+  } else if (screen === SETTINGS) {
+    st.editing = settingsEditing;
+    const row = settingsDefs[settingsSel];
+    st.open = Boolean(row && row.type === 'action');
+  } else if (screen === TOUR && tour) {
+    st.done = tour.tour.done;
+    st.sounding = Boolean(tour.tour.solvedAt);
+  }
+  return st;
+}
+
+/*
+ * The part of the bottom line on screen now. Its turns are counted from when
+ * that set of parts first showed, not from the clock's zero: a new screen,
+ * Shift, or a new level's name on the ready screen opens on the first part,
+ * and every part gets its full turn. Counted from zero, which part you met
+ * was the time of day's choice, and a first turn could be a single frame.
+ */
+let turnKey = null;
+let turnSince = 0;
+function shownPart(parts, key) {
+  const t = now();
+  if (key !== turnKey) {
+    turnKey = key;
+    turnSince = t;
+  }
+  return H.hintAt(parts, t - turnSince);
+}
+
+/* The hint line's part on screen now: the parts are made when what they
+ * depend on changes, and only picked from on a frame. */
+let hintKey = '';
+let hintParts = [];
+function hintLine() {
+  const st = hintState();
+  const key = `${screen}|${st.shift}|${st.depth > 1}|${st.mode}|${st.paused}|${st.untimed}|${st.clock}|`
+    + `${st.pick}|${st.audible}|${st.hintsLeft > 0}|${st.path}|${st.guided}|${st.more}|${st.pages > 1}|`
+    + `${st.asks}|${st.scrolls}|${st.editing}|${st.done}|${st.sounding}|${st.levels}|${st.warning}|${st.open}`;
+  const view = viewNow();
+  if (view + key !== hintKey) {
+    hintKey = view + key;
+    hintParts = H.hintFor(view, st);
+  }
+  return shownPart(hintParts, hintParts.join('\n'));
+}
+
+/*
+ * Back to the list, from the error screen: MENU's old job everywhere, which
+ * BACK has taken over now that MENU is help. Whatever was running is stopped
+ * properly on the way — the kit silenced, the transport home, nothing
+ * half-recorded and no Record light left burning over the list.
  */
 function leaveToMenu() {
   if (tp.mode !== C.MODE_IDLE) {
@@ -2300,6 +3352,7 @@ function leaveToMenu() {
   }
   untimed = null;
   card = null;
+  tour = null;
   if (screen === PADMAP) savePads();
   screen = MENU;
   settingsEditing = false;
@@ -2316,13 +3369,35 @@ function back() {
   if (screen === ERROR || safeMode) return false;
   if (screen === SETTINGS && settingsEditing) { settingsEditing = false; return true; }
   if (screen === SETTINGS) { leaveSettings(); return true; }
+  if (screen === HELP) { closeHelp(); return true; }
+  if (screen === TIP) { closeTip(); return true; }
+  if (screen === SHEET) { sheet = null; screen = MENU; return true; }
+  if (screen === WELCOME) { finishWelcome(); return true; }
   /* Back from looking over a take is the result again. */
   if (reviewing()) { review.at = null; return true; }
   /* Back from a result is another go from the top; Back again is the list. */
   if ((screen === SUMMARY || screen === LADDER) && chart) { restart(); return true; }
   /* Up one folder; only the top of the tree is left by Back. */
-  if (screen === MENU) return CAT.navPop(nav);
+  if (screen === MENU) {
+    /* A map folder shown as its list goes back to the map first. */
+    const top = CAT.navTop(nav);
+    if (listViews.has(top.node)) {
+      showFolderAs('map');
+      return true;
+    }
+    if (top.node === advancedNode && inAdvanced()) {
+      leaveAdvanced();
+      return true;
+    }
+    const island = onMap() && top.node !== pathNode ? mapNow() : null;
+    if (isHomeNode(top.node)) ringCursor.set(top.node, top.cursor);
+    if (!CAT.navPop(nav)) return false;
+    /* Out of a stage onto the world: zoom out, the avatar on its island. */
+    if (island && onMap() && CAT.navTop(nav).node === pathNode) zoom('out', mapNow(), island, 'Learning Path.');
+    return true;
+  }
   if (screen === CARD) { card = null; screen = MENU; return true; }
+  if (screen === TOUR) { tour = null; screen = MENU; return true; }
   if (screen === PADMAP) { savePads(); screen = SETTINGS; return true; }
   if (screen === PROGRESS_ITEM) { screen = PROGRESS; return true; }
   /* Back from a run RESTARTS it. Back again lands on READY, whose own Back
@@ -2402,6 +3477,7 @@ function serviceExit() {
     darkenPads();
     setButtonLED(C.CC_PLAY, 0);
     setButtonLED(C.CC_RECORD, 0);
+    darkenButtons();
   });
   guard('exit:files', () => flushFiles(true));
   if (typeof host_exit_module === 'function') host_exit_module();
@@ -2420,30 +3496,33 @@ function serviceExit() {
 /*
  * The rows of the open folder, made once per folder rather than per frame:
  * the list is drawn at 50Hz and its rows only change when the folder does,
- * when a take moves your progress on, or when the day turns (Repetition).
+ * when a take moves your progress on, when the day turns (Review), or when
+ * Continue turns from a review to a new step.
  */
 let rowsNode = null;
 let rowsCache = null;
 let rowsRev = -1;
 let rowsDay = -1;
+let rowsTurn = '';
 function menuRows(node) {
   const day = Math.floor(Date.now() / 86400000);
-  if (node !== rowsNode || progress.rev !== rowsRev || day !== rowsDay) {
+  if (node !== rowsNode || progress.rev !== rowsRev || day !== rowsDay || continueTurn !== rowsTurn) {
     rowsNode = node;
     rowsRev = progress.rev;
     rowsDay = day;
+    rowsTurn = continueTurn;
     rowsCache = decoratedRows(node);
   }
   return rowsCache;
 }
 
 function decoratedRows(node) {
-  /* Inside the Learning Path its rows speak for themselves (path_rows.mjs). */
-  const inPath = nav.some((n) => n.node === pathNode);
-  const pc = inPath ? ROWS.pathContext(progress, program, Date.now()) : null;
+  /* The Path's rows, Continue and the Learning Path's choices speak for themselves
+   * (path_rows.mjs); the rest are decorated as the library is. */
+  const pc = ROWS.pathContext(progress, program, Date.now(), { turn: continueTurn, titleOf: itemTitle });
   const kids = node.children;
   const out = new Array(kids.length);
-  for (let i = 0; i < kids.length; i++) out[i] = (pc && ROWS.pathRow(kids[i], pc)) || decorateRow(kids[i]);
+  for (let i = 0; i < kids.length; i++) out[i] = ROWS.pathRow(kids[i], pc) || decorateRow(kids[i]);
   return out;
 }
 
@@ -2454,13 +3533,17 @@ function decoratedRows(node) {
  */
 function decorateRow(row) {
   const plain = { label: row.label, value: row.value || '', mark: row.mark || null };
-  if (row.repetition) {
+  if (row.review) {
     const due = PROG.dueCount(PROG.repetitionSession(progress, Date.now()));
     return { label: row.label, value: due ? `${due} due` : '>' };
   }
   if (row.kind === 'progress') {
     const sum = PROG.folderSummary(agg, progress, pathNode);
     return { label: row.label, value: sum.played ? `${sum.done}/${sum.count}` : '' };
+  }
+  if (row.levels) {
+    const v = ROWS.levelValue(progress, row.levels);
+    return { label: row.label, value: v.value, mark: v.mark };
   }
   if (CAT.isFolder(row)) {
     if (row.untracked) return plain;
@@ -2483,48 +3566,113 @@ function draw() {
     });
     return;
   }
+  /* Every screen's bottom line names its keys (hints.mjs); while Shift is
+   * held it names what Shift does there instead. The ready screen's is its
+   * own (readyFooter): both counting turns on one frame would restart them. */
+  const hint = screen === READY && chart ? '' : hintLine();
+  if (screen === ANIM && anim) {
+    drawScene(hint);
+    return;
+  }
   if (screen === PADMAP) {
     V.drawPadMap(ctx, PMS.screenOf(pm, padMapView(), now()));
+    if (shiftHeld) V.drawHint(ctx, hint);
     return;
   }
   if (screen === CARD && card) {
-    V.drawCard(ctx, LES.deckScreen(card.deck));
+    const deck = LES.deckScreen(card.deck);
+    deck.footer = hint;
+    V.drawCard(ctx, deck);
+    return;
+  }
+  if (screen === TIP && tipCard) {
+    V.drawPage(ctx, { title: TIPS.TIP_TITLE, lines: tipCard.lines, top: tipCard.top, footer: hint });
+    return;
+  }
+  if (screen === WELCOME && welcome) {
+    const page = WELCOME_PAGES[welcome.page];
+    if (page.choices) {
+      V.drawList(ctx, { title: page.title, items: page.choices, selected: welcome.choice, footer: hint });
+    } else {
+      V.drawPage(ctx, { title: page.title, lines: welcomeLines[welcome.page], right: `${welcome.page + 1}/${WELCOME_PAGES.length}`,
+        footer: hint });
+    }
+    return;
+  }
+  if (screen === HELP && help) {
+    V.drawPage(ctx, { title: help.title, lines: help.lines, top: help.top, footer: hint });
+    return;
+  }
+  if (screen === SHEET && sheet) {
+    V.drawList(ctx, { title: sheet.title.toUpperCase().slice(0, 21), items: sheet.items, selected: sheet.sel,
+      footer: hint });
+    return;
+  }
+  if (screen === MENU && onHome()) {
+    drawHomeView(hint);
+    return;
+  }
+  if (screen === MENU && onMap()) {
+    drawMapView(hint);
+    return;
+  }
+  if (screen === TOUR && tour) {
+    const stop = PT.screenOf(tour.tour);
+    stop.footer = hint;
+    V.drawTour(ctx, stop);
     return;
   }
   if (screen === MENU) {
     const top = CAT.navTop(nav);
-    const title = menuNote && now() < menuNoteUntil ? menuNote : top.node.label.toUpperCase();
-    V.drawList(ctx, { title: title.slice(0, 16), items: menuRows(top.node), selected: top.cursor });
+    const rows = menuRows(top.node);
+    /* A folder whose rows depend on the day — the Path's Review — can lose
+     * the row the highlight was on. */
+    if (top.cursor >= rows.length) top.cursor = Math.max(0, rows.length - 1);
+    /* On Continue the title bar names the whole step it opens. */
+    const on = rows[top.cursor];
+    const title = menuNote && now() < menuNoteUntil ? menuNote
+      : on && on.title ? ROWS.titleWords(on.title.toUpperCase(), H.HINT_CHARS)
+        : top.node.label.toUpperCase().slice(0, 16);
+    V.drawList(ctx, { title, items: rows, selected: top.cursor, footer: hint });
     return;
   }
   if (screen === SETTINGS) {
+    const group = SET.groupByKey(settingsGroup);
     V.drawList(ctx, {
-      title: settingsEditing ? 'SET *' : 'SETTINGS',
+      title: settingsEditing ? 'SET *' : group ? group.label.toUpperCase() : 'SETTINGS',
       items: settingsRowsCache, selected: settingsSel,
       top: V.pageTop(settingsRowsCache.length, settingsSel),
+      footer: hint,
     });
     return;
   }
   if (screen === PROGRESS) {
-    V.drawList(ctx, { title: 'PROGRESS', right: progressRight, items: progressRows, selected: progressSel });
+    V.drawList(ctx, { title: 'PROGRESS', right: progressRight, items: progressRows, selected: progressSel,
+      footer: hint });
     return;
   }
   if (screen === PROGRESS_ITEM && progressItem) {
     if (progressItem.overview) V.drawOverview(ctx, progressItem);
     else V.drawProgress(ctx, progressItem);
+    if (shiftHeld) V.drawHint(ctx, hint);
     return;
   }
   if (screen === QUIZ && quiz) {
     V.drawQuiz(ctx, {
       quiz, title: quizTitle, progress: Q.roundProgress(quiz),
-      colours: answerBarActive() ? AP.COLOUR_NAMES : null,
+      colours: answersOnPads() ? AP.COLOUR_NAMES : null,
+      padGrid: answersOnPads() && quiz.kind === 'voice' ? answerGrid() : null,
       labelFor: (id) => Q.labelFor(quiz, id),
+      shortFor: (id) => Q.shortFor(quiz, id),
+      columnOf: (i) => AP.answerPads(quiz.options.length)[i] - PAD.PAD_FIRST,
       isEliminated: (i) => Q.isEliminated(quiz, i),
       hintsLeft: Q.hintsLeft(quiz),
+      footer: hint,
     });
     return;
   }
   if (screen === RESULT && resultCache) {
+    resultCache.footer = hint;
     V.drawResult(ctx, resultCache);
     return;
   }
@@ -2550,29 +3698,41 @@ function draw() {
   }
   if (screen === LADDER && ladder) {
     V.drawLadder(ctx, { ladder, reason: ladderReason, barsDone: ladderBarsDone, note: progressNote });
+    if (shiftHeld) V.drawHint(ctx, hint);
     return;
   }
   if (screen === SUMMARY && run) {
-    if (summaryInfo) V.drawSummary(ctx, summaryInfo);
+    if (summaryInfo) {
+      /* Stuck on a step, the line says the way on instead — unless Shift. */
+      summaryInfo.footer = (!shiftHeld && stuckFooter()) || hint;
+      V.drawSummary(ctx, summaryInfo);
+    }
     return;
   }
   if (screen === READY && chart && chart.untimed) {
     const at = Math.max(0, tp.songBeats);
+    const heard = hearingIndex();
     V.drawUntimedReady(ctx, {
       run, chart, view: settings.view, lanes: chartLanes, dynamics: settings.dynamics,
-      cursor: Math.max(0, SC.nextEntryIndex(run, at)), title: chart.name,
+      cursor: heard >= 0 ? heard : Math.max(0, SC.nextEntryIndex(run, at)), title: chart.name,
+      /* Play takes the box away while the bar sounds: the notes and the
+       * cursor walking them are what there is to see. */
+      listening: heard >= 0,
       rightLabel: at > 0 ? `${CH.barBeatOf(chart, at).bar}/${CH.barBeatOf(chart, at).bars}` : chartLength,
       footerRight: '', progress: 0, warning: chartWarning, scrubbed: at > 0,
+      ...readyFooter(), level: readyLevel(), ready: true,
     });
     return;
   }
   if (screen === RUNNING && run && chart && untimed) {
+    const heard = hearingIndex();
     V.drawUntimedView(ctx, {
       run, chart, view: settings.view, lanes: chartLanes, dynamics: settings.dynamics,
-      cursor: untimed.index, done: untimed.finished, title: chart.name,
+      cursor: heard >= 0 ? heard : untimed.index, done: heard < 0 && untimed.finished, title: chart.name,
       rightLabel: untimed.livePace > 0 ? `${Math.round(untimed.livePace)}bpm` : '--',
       footerRight: `${untimed.firstTry}/${untimed.stacks - untimed.firstTry}`,
       progress: UT.progress(untimed), paused: tp.paused,
+      hint: tp.paused || shiftHeld ? hint : '',
     });
     return;
   }
@@ -2589,6 +3749,8 @@ function draw() {
       rightLabel: tp.songBeats > 0
         ? `${CH.barBeatOf(chart, tp.songBeats).bar}/${CH.barBeatOf(chart, tp.songBeats).bars || '?'}`
         : chartLength,
+      /* The bottom line: the level, or what the pads cannot reach, and the keys. */
+      ...readyFooter(), level: readyLevel(), ready: true,
     });
     return;
   }
@@ -2598,6 +3760,9 @@ function draw() {
       title: chart.name, bpm: chart.bpm, lanes: chartLanes,
       dynamics: settings.dynamics, beatFlash, timing: run.timing, paused: tp.paused, blocked: tp.blocked,
       progress: endlessProgress(),
+      /* While the music runs the bottom line is how far through; paused, or
+       * with Shift held, it is the keys. */
+      hint: tp.paused || shiftHeld ? hint : '',
     });
     if (clockMode) {
       const perBar = CH.beatsPerBar(chart);
@@ -2651,24 +3816,42 @@ function initInner() {
   stats = loadStats();
   manifestError = '';
   loadExercises();
-  lessons = LES.parseLessons(readFile(`${MODULE_DIR}/lessons.json`)).cards;
+  const les = LES.parseLessons(readFile(`${MODULE_DIR}/lessons.json`));
+  lessons = les.cards;
+  lessonPads = les.pads;
+  helpTopics = HP.parseHelp(readFile(`${MODULE_DIR}/help.json`));
   rebuildMenu();
   /* After the tree: reading takes in from stats.json needs its item ids. */
   progress = loadProgress();
   pathStep = null;
   progressNote = null;
+  turnKey = null;
   if (manifestError) {
     menuNote = 'BAD USER.JSON';
     if (manifestError.indexOf('index.json') >= 0) menuNote = 'BAD INDEX.JSON';
     menuNoteUntil = now() + 8000;
     announce(manifestError);
   }
-  settingsRowsCache = SET.settingsRows(settings);
+  refreshSettingsRows();
   invalidateLedCache();
   darkenPads();
   dspSet('gain', '0.45');
   screen = MENU;
+  sheet = null;
+  help = null;
+  tipCard = null;
+  continueTurn = 'review';
+  fromContinue = false;
   announce('Drums Practice');
+  /* A newcomer is welcomed; someone who practised before the welcome
+   * existed only has it noted as seen. */
+  const w = TIPS.welcomeOnLoad(progress, Object.keys(progress.items).length + stats.records.length);
+  if (w === 'silent') {
+    PROG.addTip(progress, 'welcome');
+    saveProgress();
+  } else if (w === 'show') {
+    startWelcome();
+  }
 }
 
 globalThis.tick = function tick() {
@@ -2747,6 +3930,7 @@ function tickInner() {
   /* The quiz's prompt, or L0's bar: either way a figure on the wall clock. */
   servicePrompt();
   if (screen === QUIZ && quiz) serviceQuiz();
+  if (screen === TOUR && tour) serviceTour();
 
   flushDsp();
   serviceOutbox(false);
@@ -2756,6 +3940,9 @@ function tickInner() {
     paintLeds(t);
     transport();
   }
+  serviceTips();
+  if (onMap()) serviceMap(t);
+  if (screen === ANIM && anim) serviceScenes(t);
   if (t - lastDraw >= DRAW_INTERVAL_MS) {
     lastDraw = t;
     draw();
@@ -2802,6 +3989,10 @@ function midiInner(data) {
   const d2 = data[2];
   const type = status & 0xF0;
 
+  if (screen === ANIM && anim) {
+    sceneInput(type, d1, d2);
+    return;
+  }
   if (type === 0x90 || type === 0x80) {
     /*
      * Notes below 10 are capacitive KNOB TOUCH, not pads — a module that
@@ -2835,19 +4026,20 @@ function midiInner(data) {
       return;
     }
     case C.CC_JOG_CLICK:
-      /* Shift + jog click opens settings from anywhere — the one gesture that
-       * has to work whatever screen you are on. */
+      /* Shift + jog click: on a row of the list, its options; elsewhere,
+       * Settings over whatever is on screen, as it always was. */
       if (d2 > 0) {
-        if (shiftHeld) {
-          if (screen === SETTINGS) leaveSettings();
-          else openSettings();
-        } else {
-          click();
-        }
+        if (shiftHeld) shiftClick();
+        else click();
       }
       return;
     case C.CC_MENU:
-      if (d2 > 0) leaveToMenu();
+      /* Help for this screen, wherever you are; MENU again closes it. The
+       * error screen keeps MENU as the way back to the list. */
+      if (d2 <= 0) return;
+      if (screen === ERROR) leaveToMenu();
+      else if (screen === HELP) closeHelp();
+      else openHelp();
       return;
     case C.CC_BACK:
       /* Shift + Back closes from anywhere, as the manual promises. */
@@ -2856,10 +4048,17 @@ function midiInner(data) {
       return;
     case C.CC_PLAY:
       if (d2 <= 0) return;
+      /* On the map Play is Continue: the one button. */
+      if (onMap()) { continueOpen(); return; }
       /* In a hearing drill Play repeats the question — without it a prompt
        * you did not catch is a prompt you cannot answer. */
       if (screen === QUIZ && promptIsAudible()) { schedulePrompt(); return; }
       if (screen === CARD && card) { hearFromCard(); return; }
+      /* Meet the pads: the drum again. */
+      if (screen === TOUR && tour) {
+        if (PT.current(tour.tour)) sound(PT.current(tour.tour), 105);
+        return;
+      }
       if (screen === READY || ((screen === SUMMARY || screen === LADDER) && chart)) {
         if (screen !== READY) enterReady();
         start(false);
@@ -2917,7 +4116,7 @@ function midiInner(data) {
       const i = settingsRowForKnob(k);
       if (i < 0) return;
       settingsSel = i;
-      editSetting(SET.ROWS[i].key, delta);
+      editSetting(settingsDefs[i].key, delta);
     }
   }
 }
@@ -2931,8 +4130,8 @@ function midiInner(data) {
  */
 function settingsRowForKnob(k) {
   if (k < 0 || k >= V.LIST_ROWS) return -1;
-  const i = V.pageTop(SET.ROWS.length, settingsSel) + k;
-  return i < SET.ROWS.length ? i : -1;
+  const i = V.pageTop(settingsDefs.length, settingsSel) + k;
+  return i < settingsDefs.length ? i : -1;
 }
 
 function knobTouched(knob) {
@@ -2946,17 +4145,31 @@ function knobTouched(knob) {
 
 function jog(delta) {
   const target = C.jogTarget(screen, settingsEditing);
-  if (target === 'menu') {
+  if (target === 'level') {
+    levelJog(delta);
+  } else if (target === 'menu' && onHome()) {
+    homeChoose(CAT.navTop(nav).cursor + delta);
+  } else if (target === 'menu' && onMap()) {
+    mapJog(delta);
+  } else if (target === 'menu') {
     const top = CAT.navTop(nav);
     top.cursor = Math.max(0, Math.min(top.node.children.length - 1, top.cursor + delta));
   } else if (target === 'row') {
-    settingsSel = Math.max(0, Math.min(SET.ROWS.length - 1, settingsSel + delta));
+    settingsSel = Math.max(0, Math.min(settingsDefs.length - 1, settingsSel + delta));
   } else if (target === 'value') {
-    editSetting(SET.ROWS[settingsSel].key, delta);
+    editSetting(settingsDefs[settingsSel].key, delta);
   } else if (target === 'padmap') {
     padMapJog(delta);
+  } else if (target === 'tour' && tour) {
+    if (PT.skip(tour.tour, delta)) arriveTour();
   } else if (target === 'page' && card) {
     LES.turnPage(card.deck, delta);
+  } else if (target === 'sheet' && sheet) {
+    sheet.sel = Math.max(0, Math.min(sheet.items.length - 1, sheet.sel + delta));
+  } else if (target === 'scroll' && (help || tipCard)) {
+    HP.scrollPage(help || tipCard, delta);
+  } else if (target === 'welcome' && welcome) {
+    TIPS.welcomeJog(welcome, delta);
   } else if (target === 'choice' && quiz) {
     Q.moveChoice(quiz, delta);
   } else if ((screen === SUMMARY || screen === LADDER) && review) {
@@ -2974,13 +4187,28 @@ function jog(delta) {
   }
 }
 
+function shiftClick() {
+  if (screen === MENU) openSheet();
+  else if (screen === SHEET) sheetDo();
+  else if (screen === SETTINGS) closeSettings();
+  else if (screen !== HELP && screen !== TIP && screen !== WELCOME && screen !== ERROR) openSettings();
+}
+
 function click() {
   if (screen === MENU) { openRow(); return; }
+  if (screen === SHEET) { sheetDo(); return; }
+  if (screen === TIP) { closeTip(); return; }
+  if (screen === WELCOME && welcome) { welcomeClick(); return; }
   if (screen === CARD && card) { nextCard(); return; }
+  if (screen === TOUR && tour) {
+    if (tour.tour.done) leaveTour();
+    return;
+  }
   if (screen === SETTINGS) {
-    const row = SET.ROWS[settingsSel];
+    const row = settingsDefs[settingsSel];
     if (row && row.type === 'action') {
       if (row.action === 'padmap') openPadMap();
+      else if (row.action === 'advanced') openAdvanced();
       return;
     }
     settingsEditing = !settingsEditing;
@@ -2993,9 +4221,17 @@ function click() {
     return;
   }
   if (screen === PROGRESS) { openProgressRow(); return; }
-  /* On along the Learning Path, when that is where the drill came from. */
+  /* On along the Path, when that is where the drill came from; on as
+   * Continue would, after a review Continue opened. */
   if ((screen === RESULT || screen === SUMMARY || screen === LADDER) && pathStep) {
     goNext();
+    return;
+  }
+  if ((screen === RESULT || screen === SUMMARY) && fromContinue) {
+    quiz = null;
+    resultCache = null;
+    screen = MENU;
+    continueOpen();
     return;
   }
   if (screen === RESULT) { screen = MENU; quiz = null; resultCache = null; return; }
@@ -3004,6 +4240,11 @@ function click() {
   if (screen === SUMMARY || screen === LADDER) {
     if (!chart) { screen = MENU; return; }
     if (ladder || clockMode) { restart(); return; }
+    /* A groove's next rung, before the next row. */
+    if (levelNav && levelNav.at + 1 < levelCount()) {
+      levelJog(1);
+      return;
+    }
     const top = CAT.navTop(nav);
     if (top.cursor + 1 < top.node.children.length) {
       top.cursor++;
@@ -3022,9 +4263,15 @@ function click() {
  * to re-run at another speed.
  */
 function editSetting(key, delta) {
+  if (key === 'start') {
+    stepPathStart(delta);
+    return;
+  }
+  const def = SET.rowFor(key);
+  if (!def || def.type === 'action') return;
   const wasStudying = settings.study;
   SET.applySetting(settings, key, delta);
-  settingsRowsCache = SET.settingsRows(settings);
+  refreshSettingsRows();
   saveSettings();
   /* Study switched on mid-run would otherwise find the wait pointer parked on a
    * note from minutes ago and pin the clock there — a jump backwards. */
@@ -3081,6 +4328,18 @@ globalThis.drumsPracticeMenu = function drumsPracticeMenu() {
   return { title: top.node.label, cursor: top.cursor, labels: menuRows(top.node).map((r) => r.label) };
 };
 
+/* The screen on show and, on the action sheet, its rows: read-only too. */
+globalThis.drumsPracticeScreen = function drumsPracticeScreen() {
+  const m = onMap() ? mapNow() : null;
+  return { screen, sheet: sheet ? sheet.items.map((a) => a.label) : null, help: help ? help.lines.slice() : null,
+    map: m ? { at: m.walk.target, places: m.places.map((p) => `${p.label}:${p.state}`) } : null,
+    home: onHome() ? { selected: CAT.navTop(nav).cursor, grow: homeGrow ? { ...homeGrow } : null } : null,
+    settings: screen === SETTINGS ? { group: settingsGroup, cursor: settingsSel,
+      labels: settingsDefs.map((r) => r.label) } : null,
+    quiz: quiz ? { kind: quiz.kind, mode: quiz.mode, prompt: quiz.prompt, options: quiz.options.slice(),
+      choice: quiz.choice, eliminated: quiz.eliminated.slice(), correct: quiz.correct, wrong: quiz.wrong } : null };
+};
+
 globalThis.onUnload = function onUnload() {
   /*
    * ONCE, however many times we are asked.
@@ -3118,6 +4377,7 @@ globalThis.onUnload = function onUnload() {
     darkenPads();
     setButtonLED(C.CC_PLAY, 0);
     setButtonLED(C.CC_RECORD, 0);
+    darkenButtons();
   });
   guard('unload:files', () => {
     savePads();

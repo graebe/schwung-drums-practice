@@ -304,6 +304,26 @@ test('it survives a round trip, and a damaged file reads as not ok', () => {
   }
 });
 
+test('the tips already shown are saved with the progress, and can be cleared', () => {
+  const p = P.emptyProgress();
+  assert.deepEqual(p.tips, []);
+  const rev = p.rev;
+  P.addTip(p, 'welcome');
+  P.addTip(p, 'welcome');
+  P.addTip(p, 'sheet');
+  assert.deepEqual(p.tips, ['welcome', 'sheet'], 'a tip is recorded once');
+  assert.ok(p.rev > rev, 'a new tip moves rev on, so it is saved');
+  const back = P.readProgress(P.serialiseProgress(p)).progress;
+  assert.equal(P.hasTip(back, 'sheet'), true);
+  assert.equal(P.hasTip(back, 'quiz'), false);
+  P.clearTips(back);
+  assert.deepEqual(back.tips, []);
+  /* A file from before tips, or with junk in them, reads as none seen. */
+  const old = P.readProgress(JSON.stringify({ version: P.PROGRESS_VERSION, items: {}, tips: [1, 'quiz'] }));
+  assert.deepEqual(old.progress.tips, ['quiz']);
+  assert.deepEqual(P.readProgress(JSON.stringify({ version: P.PROGRESS_VERSION, items: {} })).progress.tips, []);
+});
+
 test('bad fields read as defaults rather than failing the file', () => {
   const r = P.readProgress(JSON.stringify({ version: P.PROGRESS_VERSION, items: {
     a: { best: 'x', plays: 3, h: [[1, 50, 90, 20, 1, -1], 'junk', [1], [1, 50, 90, 20, 1]],
@@ -546,4 +566,16 @@ test('a version 1 file is read for what it reached, and merged into the rebuild'
   assert.equal(P.item(p, 'skipped').skip, 7);
   assert.equal(P.item(p, 'slow').best, 80, 'the better of the two');
   assert.equal(P.item(p, 'slow').h.length, 1, 'the rebuilt history, which carries the dynamics');
+});
+
+test('a tour walked is learned, with no number to show and nothing to repeat', () => {
+  const p = P.emptyProgress();
+  const r = P.recordTour(p, 'tour:pads', T0);
+  assert.equal(r.learned, true);
+  assert.ok(P.isDone(p, 'tour:pads'));
+  assert.equal(P.itemMark(p, 'tour:pads'), P.MARK_DONE);
+  assert.equal(P.itemValue(p, 'tour:pads'), '');
+  assert.equal(P.item(p, 'tour:pads').rep, null, 'never in Repetition');
+  assert.equal(P.recordTour(p, 'tour:pads', T0 + 1000).learned, false, 'learned once');
+  assert.equal(P.repetitionSession(p, T0 + 40 * 86400 * 1000).length, 0);
 });

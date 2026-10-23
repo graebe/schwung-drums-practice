@@ -12,7 +12,8 @@
  * shape after a numeric switch, a parallel array of labels and a separate
  * list of chart-affecting keys drifted apart.
  *
- * Row order is load-bearing at the top: knobs 1-4 are wired to rows 0-3.
+ * The knobs edit the rows on screen, a page of five at a time (ui.js
+ * settingsRowForKnob), so a page's order is what the knobs reach.
  *
  * type:
  *   int   clamped to [min, max]
@@ -21,80 +22,120 @@
  *   wrap  like list, but wraps around
  *   action  a row that opens something rather than holding a value — Click
  *           on it does what `action` names; it is never saved
+ *
+ * group: the page the row is on. `main` is Settings itself (MAIN): what is
+ * personal — the pads, the click, where the path starts. The rest have good
+ * defaults and are filed under Settings › Advanced, a page per GROUPS.
  */
 
 export const ROWS = [
-  /* ---- knobs 1-4 ---- */
-  { key: 'bpm',        label: 'Tempo',     type: 'int',  min: 40, max: 240, rebuild: true,
+  { key: 'bpm',        group: 'practice', label: 'Tempo',     type: 'int',  min: 40, max: 240, rebuild: true,
     format: (v) => `${v}` },
   /*
    * Every drill at a share of its own tempo — a hand-written one's, or Tempo
    * for a generated one. Also on knob 8 in a drill. Without it the grooves and
    * rudiments, written at up to 270, could not be slowed down at all.
    */
-  { key: 'speed',      label: 'Speed',     type: 'list', rebuild: true,
+  { key: 'speed',      group: 'practice', label: 'Speed',     type: 'list', rebuild: true,
     values: [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120],
     format: (v) => `${v}%` },
-  { key: 'pxPerBeat',  label: 'Read ahead', type: 'int', min: 12, max: 48 },
+  { key: 'pxPerBeat',  group: 'practice', label: 'Read ahead', type: 'int', min: 12, max: 48 },
   /*
    * An OVERRIDE, not the source of truth. How long a practice is belongs to
    * the file that defines it; this is here so you can decide to play
    * something twice as long today without editing it. `0` is "as written".
    */
-  { key: 'reps',       label: 'Reps',      type: 'list', values: [0, 4, 8, 16, 32], rebuild: true,
+  { key: 'reps',       group: 'practice', label: 'Reps',      type: 'list', values: [0, 4, 8, 16, 32], rebuild: true,
     format: (v) => (v === 0 ? 'as written' : `${v}x`) },
   /*
    * The pad layout (padmap.mjs). MPC Classic is the default: it is what most
    * finger drummers learnt on. Chromatic is Move's own drum mode, note for
    * note; Sticking puts the snare on every pad, for rudiments.
    */
-  { key: 'layout',     label: 'Pads',      type: 'list',
+  { key: 'layout',     group: 'main',     label: 'Pads',      type: 'list',
     values: ['mpc', 'family', 'centre', 'gm', 'mirror', 'custom', 'sticking'],
     format: (v) => ({ mpc: 'MPC', family: 'Family', centre: 'Centre', gm: 'GM', mirror: 'Mirror',
       custom: 'Custom', sticking: 'Sticking' })[v] || `${v}` },
   /* Mirror the layout left to right, for a left-hander. The hands stay the
    * physical halves. */
-  { key: 'flip',       label: 'Flip',      type: 'bool' },
-  { key: 'padMap',     label: 'Pad map',   type: 'action', action: 'padmap', format: () => '>' },
-
-  /* ---- the rest ---- */
-  { key: 'view',       label: 'View',      type: 'list', values: ['staff', 'grid'] },
-  { key: 'strictness', label: 'Strict',    type: 'list', values: ['loose', 'normal', 'tight'] },
-  { key: 'sticking',   label: 'Sticking',  type: 'list', values: ['strict', 'loose', 'off'] },
-  { key: 'dynamics',   label: 'Dynamics',  type: 'bool' },
+  { key: 'flip',       group: 'main',     label: 'Flip',      type: 'bool' },
+  { key: 'padMap',     group: 'main',     label: 'Pad map',   type: 'action', action: 'padmap', format: () => '>' },
+  { key: 'view',       group: 'practice', label: 'View',      type: 'list', values: ['staff', 'grid'] },
+  { key: 'strictness', group: 'practice', label: 'Strict',    type: 'list', values: ['loose', 'normal', 'tight'] },
+  { key: 'sticking',   group: 'practice', label: 'Sticking',  type: 'list', values: ['strict', 'loose', 'off'] },
+  { key: 'dynamics',   group: 'practice', label: 'Dynamics',  type: 'bool' },
   /* How much louder than your own normal strokes an accent has to be, and
    * how much softer a ghost — in velocity steps (scoring.mjs dynNeed). */
-  { key: 'accentLift', label: 'Accent +',  type: 'int',  min: 5,  max: 60 },
-  { key: 'ghostDrop',  label: 'Ghost -',   type: 'int',  min: 5,  max: 60 },
-  { key: 'guide',      label: 'Guide pads', type: 'bool' },
-  { key: 'study',      label: 'Study',     type: 'bool' },
-  { key: 'click',      label: 'Click',     type: 'bool' },
-  { key: 'clickSubdiv', label: 'Click sub', type: 'list', values: [0, 1, 2, 4],
+  { key: 'accentLift', group: 'practice', label: 'Accent +',  type: 'int',  min: 5,  max: 60 },
+  { key: 'ghostDrop',  group: 'practice', label: 'Ghost -',   type: 'int',  min: 5,  max: 60 },
+  { key: 'guide',      group: 'practice', label: 'Guide pads', type: 'bool' },
+  { key: 'study',      group: 'practice', label: 'Study',     type: 'bool' },
+  { key: 'click',      group: 'main',     label: 'Click',     type: 'bool' },
+  { key: 'clickSubdiv',group: 'sound',    label: 'Click sub', type: 'list', values: [0, 1, 2, 4],
     /* Clicks per beat: 2 is eighths, 4 sixteenths. It read `v * 2` and so
      * printed 4ths and 8ths for the eighths and sixteenths it plays. */
     format: (v) => (v === 0 ? 'off' : v === 1 ? 'beat' : `${v * 4}ths`) },
-  { key: 'countIn',    label: 'Count in',  type: 'int',  min: 0, max: 8 },
-  { key: 'ladderStep', label: 'Ladder +',  type: 'int',  min: 1, max: 20,
+  { key: 'countIn',    group: 'practice', label: 'Count in',  type: 'int',  min: 0, max: 8 },
+  { key: 'ladderStep', group: 'practice', label: 'Ladder +',  type: 'int',  min: 1, max: 20,
     format: (v) => `${v} bpm` },
-  { key: 'ladderBars', label: 'Ladder bars', type: 'int', min: 1, max: 16 },
-  { key: 'clockBars',  label: 'Clock bars', type: 'int',  min: 1, max: 8 },
-  { key: 'roundSize',  label: 'Round',     type: 'list', values: [0, 10, 20, 30],
+  { key: 'ladderBars', group: 'practice', label: 'Ladder bars', type: 'int', min: 1, max: 16 },
+  { key: 'clockBars',  group: 'practice', label: 'Clock bars', type: 'int',  min: 1, max: 8 },
+  { key: 'roundSize',  group: 'practice', label: 'Round',     type: 'list', values: [0, 10, 20, 30],
     format: (v) => (v === 0 ? 'endless' : `${v}`) },
   /*
    * The one number that can invalidate every other number in the module. If
    * the rig is 15ms late everywhere, the mean is a lie no amount of practice
    * can fix, and the player would be chasing a bias that is not theirs.
    */
-  { key: 'latencyMs',  label: 'Latency',   type: 'int',  min: 0, max: 60,
+  { key: 'latencyMs',  group: 'sound',    label: 'Latency',   type: 'int',  min: 0, max: 60,
     format: (v) => `${v} ms` },
-  { key: 'midiOut',    label: 'MIDI out',  type: 'list', values: [4, 1, 2, 3],
+  { key: 'midiOut',    group: 'midi',     label: 'MIDI out',  type: 'list', values: [4, 1, 2, 3],
     format: (v) => ({ 4: 'kit', 1: 'track', 2: 'USB', 3: 'trk+USB' })[v] || `${v}` },
   /* 0 is General MIDI's drum channel, 10. It said "all", but drum hits are
    * sent on one channel only: sixteen copies of every hit would swamp the
    * inject ring at sixteenth notes. */
-  { key: 'midiCh',     label: 'MIDI ch',   type: 'int',  min: 0, max: 16,
+  { key: 'midiCh',     group: 'midi',     label: 'MIDI ch',   type: 'int',  min: 0, max: 16,
     format: (v) => (v === 0 ? '10 GM' : `${v}`) },
 ];
+
+/*
+ * Settings itself, one short page in this order: the pads, how they map and
+ * which way round, the click, where the Learning Path starts, and Advanced.
+ * Start at and Advanced are rows of the page, not settings: Start at is the
+ * learner's progress (progress.mjs path.start), shown from `extra.start`,
+ * and Advanced opens the folder of the rest. So they stay out of ROWS, and
+ * DEFAULTS and coerceInto never see them.
+ */
+export const MAIN = ['layout', 'padMap', 'flip', 'click', 'start', 'advanced'];
+export const MAIN_GROUP = { key: 'main', label: 'Settings' };
+const PAGE_ROWS = {
+  start: { key: 'start', group: 'main', label: 'Start at', type: 'path' },
+  advanced: { key: 'advanced', group: 'main', label: 'Advanced', type: 'action', action: 'advanced',
+    format: () => '>' },
+};
+
+/*
+ * The pages under Settings › Advanced, in its order, as the editor shows
+ * them. The Learning Path's choices and Help are folders of the menu, not
+ * rows of this table — the path's choices are the learner's progress and
+ * Help's rows are actions — so only these open the editor.
+ */
+export const GROUPS = [
+  { key: 'practice', label: 'Practice' },
+  { key: 'sound', label: 'Sound' },
+  { key: 'midi', label: 'MIDI' },
+];
+
+/* A page by its key: Settings itself or a group of Advanced. */
+export function groupByKey(key) {
+  return key === MAIN_GROUP.key ? MAIN_GROUP : GROUPS.find((g) => g.key === key) || null;
+}
+
+/* The rows of one page: Settings itself in MAIN's order, a group in table order. */
+export function rowsIn(group) {
+  if (group === MAIN_GROUP.key) return MAIN.map((k) => byKey[k] || PAGE_ROWS[k]);
+  return ROWS.filter((r) => r.group === group);
+}
 
 export const DEFAULTS = {
   bpm: 90,
@@ -108,7 +149,9 @@ export const DEFAULTS = {
    * when reading notation is the point. */
   view: 'grid',
   strictness: 'normal',
-  sticking: 'strict',
+  /* Finger drumming: either hand may take a pad, so the written R and L are a
+   * guide, shown and not judged. Strict and loose are there to opt in. */
+  sticking: 'off',
   dynamics: true,
   accentLift: 15,
   ghostDrop: 20,
@@ -130,7 +173,7 @@ export const DEFAULTS = {
 };
 
 /* Bumped whenever a migration is added below. */
-export const SETTINGS_VERSION = 4;
+export const SETTINGS_VERSION = 5;
 
 const byKey = {};
 for (let i = 0; i < ROWS.length; i++) byKey[ROWS[i].key] = ROWS[i];
@@ -145,8 +188,11 @@ export function formatValue(row, value) {
   return String(value);
 }
 
-export function settingsRows(settings) {
-  return ROWS.map((r) => ({ key: r.key, label: r.label, value: formatValue(r, settings[r.key]),
+/* The rows as the list shows them; a page row of type `path` shows
+ * `extra[key]` (Start at: "Stage 1"). */
+export function settingsRows(settings, rows = ROWS, extra = {}) {
+  return rows.map((r) => ({ key: r.key, label: r.label,
+    value: r.type === 'path' ? String(extra[r.key] ?? '') : formatValue(r, settings[r.key]),
     action: r.action || null }));
 }
 
@@ -252,6 +298,16 @@ export function migrate(settings, fromVersion) {
    * the new default, MPC Classic; `sticking` is still a layout and is kept.
    */
   if (from < 4) changed = true;
+
+  /*
+   * v5 — hands are not judged by default (DEFAULTS.sticking). `strict` was
+   * the only default there had ever been, so a file carrying it says nothing
+   * about a choice; as with the view at v2, it is reset exactly once.
+   */
+  if (from < 5) {
+    if (settings.sticking === 'strict') settings.sticking = DEFAULTS.sticking;
+    changed = true;
+  }
 
   settings.version = SETTINGS_VERSION;
   return changed;

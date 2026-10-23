@@ -42,7 +42,7 @@
  * still the physical half.
  *
  * Every preset reaches the voices the bundled drills are written in, so no
- * step of the Learning Path is unplayable on any of them (padmap.test.mjs) —
+ * step of the Path is unplayable on any of them (padmap.test.mjs) —
  * but Chromatic, which is GM 36..51 by definition and has no cowbell.
  */
 
@@ -286,3 +286,27 @@ export const LED_HIT = 126;        /* Green        #00FF00                   */
 export const LED_STICK = 3;        /* BrightOrange #C93C00 — wrong hand      */
 export const LED_DYN = 16;         /* AzureBlue    #31ADFF — wrong dynamic   */
 export const LED_MISS = 127;       /* Red          #FF0000                   */
+
+/* The home screen's pads (home/leds.mjs): a circle each, the chosen one
+ * bright and pulsing, the rest dim; everything else dark. */
+export const HOME_PALETTE = Object.freeze({ off: LED_OFF, item: 119, selected: 120, selectedDim: 118 });
+
+/*
+ * The Path map's pads (pathmap/leds.mjs): a lit pad is a place you can walk
+ * to, coloured by its state; water is dark. Move palette indices.
+ */
+export const MAP_PALETTE = Object.freeze({
+  off: LED_OFF,
+  done: LED_HIT,          /* Green                                         */
+  current: 120,           /* White, pulsing with...                        */
+  currentDim: 118,        /* LightGrey #595959                             */
+  started: 79,            /* BrightYellow, dim #664E08                     */
+  fresh: 119,             /* DarkGrey  #1A1A1A                             */
+  ahead: 124,             /* DarkGrey2 #141414: later, drawn dimmer        */
+  skipped: 95,            /* AzureBlue, dim #134566                        */
+  avatar: 120,            /* White: where you stand                        */
+});
+
+/* A scene of the Path's pads (pathmap/anim.mjs): a green wave across them as
+ * a flag goes up, white sparkles under fireworks. */
+export const SCENE_PALETTE = Object.freeze({ off: LED_OFF, sweep: LED_HIT, sparkle: 120 });

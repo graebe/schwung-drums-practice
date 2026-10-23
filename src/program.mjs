@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Torben Gräber
 
 /*
- * program.mjs — the Learning Path: what to practise next. Pure.
+ * program.mjs — the Path: what to practise next. Pure.
  *
  * SEVEN STAGES, each one musical world — the kit, eighth notes, sixteenths and
  * dynamics, ghosts and independence, triplets and swing, clave, and the pro
@@ -40,9 +40,10 @@
  */
 
 import { availableLevels } from './levels.mjs';
-import { isUntimedId, higherLevelIds, parseLevelId, quizItemId as makeQuizId } from './ids.mjs';
+import { isUntimedId, higherLevelIds, parseLevelId, quizItemId as makeQuizId, tourItemId } from './ids.mjs';
 import { item, isDone, isParked, LEARNED } from './progress.mjs';
 import { DRILLS } from './guess.mjs';
+import { TOUR_NAME } from './pad_tour.mjs';
 
 /*
  * The written tempo of a generated drill. A file says how fast it goes; a
@@ -89,6 +90,9 @@ const time = (id, t = 100, o = {}) => ({ track: 'time', id, t, ...o });
 const hands = (id, t = 100, o = {}) => ({ track: 'hands', id, t, ...o });
 const groove = (id, t = 100, o = {}) => ({ track: 'grooves', groove: id, t, ...o });
 const quiz = (mode, kind, variant = '', o = {}) => ({ track: 'ear', quiz: { mode, kind, variant }, ...o });
+/* A guided tour (pad_tour.mjs). It LEADS its stage: Continue offers it before
+ * anything else, because the rest of the stage assumes what it shows. */
+const tour = (name, o = {}) => ({ track: 'ear', tour: name, lead: true, ...o });
 
 /*
  * A quiz with a smaller pool is a different exercise — three drums are not
@@ -105,7 +109,8 @@ export const STAGES = [
   {
     key: 's0', name: 'Hello, kit', card: 'stage-0',
     core: [
-      quiz('guess', 'voice', 'kit3', { card: ['kit-on-paper', 'your-pads'] }),
+      tour('pads', { card: 'your-pads' }),
+      quiz('guess', 'voice', 'kit3', { card: 'kit-on-paper' }),
       quiz('hear', 'voice', 'kit3'),
       time('subdiv:quarters', 60, { card: ['pulse', 'result'] }),
       time('read:1', 100, { card: 'rests' }),
@@ -327,6 +332,9 @@ export const PLANNED = new Set([
 
 /* ---- Building it ---------------------------------------------------------- */
 
+/* The tours there are, by the name a spec gives them. */
+export const TOURS = { pads: TOUR_NAME };
+
 /* A quiz step's id is the id its rounds are recorded under. */
 export function quizItemId(drill, variant = '') {
   return makeQuizId(drill.mode, drill.kind, variant);
@@ -362,6 +370,10 @@ function grooveRungs(chart, spec) {
  * whether a plain drill id is in the tree.
  */
 function resolve(spec, ctx) {
+  if (spec.tour) {
+    const label = TOURS[spec.tour];
+    return label ? [{ id: spec.tour, style: '', steps: [{ id: tourItemId(spec.tour), label, tour: spec.tour }] }] : null;
+  }
   const ids = [spec.groove || spec.id].concat(spec.alt || []);
   const options = [];
   for (const id of ids) {
@@ -392,6 +404,7 @@ function makeSteps(spec, option, stage, part) {
     track: spec.track,
     target,
     dyn: spec.dyn || 0,
+    lead: Boolean(spec.lead),
     style: option.style,
     cards: [].concat(spec.card || []),
     stage: stage.key,
@@ -425,7 +438,7 @@ export function buildProgram({ entries = [], categories = [], has = () => false,
       for (const s of list) {
         const options = resolve(s, ctx);
         if (!options) continue;
-        named.add(s.groove || s.id);
+        if (!s.tour) named.add(s.groove || s.id);
         /* The first option is the step; the rest stand in for it (pick). */
         out.push({ spec: s, options: options.map((o) => ({ ...o, steps: makeSteps(s, o, stage, part) })) });
       }
@@ -473,10 +486,10 @@ function stepsOf(slots, prefs) {
  * Whether a step is done: its drill clean at the step's target, or better.
  * A groove's higher rung carries the lower ones — if you can play everything
  * at that speed you can play the cymbals alone at it — and a ✓ (clean at
- * 100%) covers every target up to it. L0 and a quiz have their own ✓.
+ * 100%) covers every target up to it. L0, a quiz and a tour have their own ✓.
  */
 export function stepDone(progress, step) {
-  if (step.quiz) return isDone(progress, step.id);
+  if (step.quiz || step.tour) return isDone(progress, step.id);
   const ids = [step.id].concat(higherLevelIds(step.id));
   /* L0 asks whether you know the notes: its own ✓, or any rung above it
    * played clean, at any speed. */
@@ -546,7 +559,7 @@ export function stageComplete(progress, stage) {
 /* The stage the learner is in: the first not through, from where they chose
  * to start. Null when every stage from there is through. */
 export function currentStage(progress, program) {
-  const start = Math.min(prefsOf(progress).start || 0, program.stages.length - 1);
+  const start = Math.max(0, Math.min(prefsOf(progress).start || 0, program.stages.length - 1));
   for (let i = start; i < program.stages.length; i++) {
     if (!stageComplete(progress, program.stages[i])) return program.stages[i];
   }
@@ -567,10 +580,12 @@ function trackActivity(progress, program, track) {
 }
 
 /*
- * Continue: in the current stage, the next open core step of the track left
- * longest (ties to the earlier track, so a first session walks Time, Hands,
- * Grooves and Ear in turn); the checkpoint once the core is through. `except`
- * leaves one step out — the one just played, when Click moves on.
+ * Continue: in the current stage, its lead step while that is open (Meet the
+ * pads, before anything asks for a pad); then the next open core step of the
+ * track left longest (ties to the earlier track, so a first session walks
+ * Time, Hands, Grooves and Ear in turn); the checkpoint once the core is
+ * through. `except` leaves one step out — the one just played, when Click
+ * moves on.
  * Returns { stage, step } or null when the whole path is through.
  */
 export function continueStep(progress, program, atMs = Date.now(), except = '') {
@@ -578,6 +593,8 @@ export function continueStep(progress, program, atMs = Date.now(), except = '') 
   const stage = currentStage(progress, program);
   if (!stage) return null;
   const core = coreSteps(stage, prefs).filter((st) => st.key !== except && open(progress, st, atMs));
+  const lead = core.find((st) => st.lead);
+  if (lead) return { stage, step: lead };
   let best = null;
   let bestAt = Infinity;
   for (const t of TRACKS) {
@@ -619,11 +636,6 @@ export function stepAfter(progress, program, step, atMs = Date.now()) {
   return next ? next.step : null;
 }
 
-/* The first open step of a list, for a scoped "Skip:" row. */
-export function nextOpen(progress, steps, atMs = Date.now()) {
-  return steps.find((st) => open(progress, st, atMs)) || null;
-}
-
 export function findStep(program, key) {
   for (const stage of program.stages) {
     const all = allSteps(stage);
@@ -631,6 +643,31 @@ export function findStep(program, key) {
     if (st) return st;
   }
   return null;
+}
+
+/*
+ * The rungs a step's groove offers on the ready screen, in order: the steps of
+ * its stage and part on the same groove (a stage that asks for L0 to L3 walks
+ * those four; a checkpoint's top rung walks none). A step that is no rung is
+ * alone.
+ */
+export function levelSteps(program, step) {
+  if (!step || step.rung === undefined) return step ? [step] : [];
+  const stage = program.stages.find((s) => s.key === step.stage);
+  if (!stage) return [step];
+  const base = baseOf(step.id);
+  const out = allSteps(stage).filter((st) => st.part === step.part && st.rung !== undefined
+    && baseOf(st.id) === base && st.style === step.style);
+  const seen = new Set();
+  return out.filter((st) => (seen.has(st.id) ? false : seen.add(st.id)));
+}
+
+/* The step a groove row opens: Continue's when it is one of them, else the
+ * first not done or skipped, else the last. */
+export function levelRowStep(steps, progress, nextKey = '') {
+  const next = steps.find((st) => st.key === nextKey);
+  if (next) return next;
+  return steps.find((st) => !stepDone(progress, st) && !stepSkipped(progress, st)) || steps[steps.length - 1];
 }
 
 /* Every step of a stage, every option — the folder shows them all. */
@@ -718,82 +755,96 @@ function stepRows(steps) {
       rows.push({ ...stepRow(st), label: stepTitle(st) });
       continue;
     }
+    /* One row for the groove: its rungs are chosen on the ready screen, among
+     * those this stage asks for (ui.js, levelSteps). */
     const name = st.title.slice(0, st.title.lastIndexOf(' '));
-    rows.push({ label: name, value: '>', steps: g,
-      children: [{ label: 'Skip all here', value: '', skipAllRow: true, scope: g }, ...g.map(stepRow)] });
+    rows.push({ label: name, value: '', steps: g, levelIds: g.map((x) => x.id), levelRow: true });
   }
   return rows;
 }
 
-function scopedRows(steps) {
-  return [
-    { label: 'Skip next', value: '', skipRow: true, scope: steps },
-    { label: 'Skip all here', value: '', skipAllRow: true, scope: steps },
-  ];
-}
+/*
+ * A stage's places in the order a lesson takes them — orient, hear, pattern,
+ * apply, show: the lesson cards, the ear, time and hands, the grooves that put
+ * them to use, the electives, and last the checkpoint, the piece that proves
+ * the stage. Continue still walks the tracks in TRACKS order; this is only the
+ * order the folder lists them in. The rows with a job — skip a step, skip a
+ * folder, start here, test out — are in the action sheet (row_sheet.mjs), not
+ * among the content.
+ */
+export const FOLDER_TRACKS = ['ear', 'time', 'hands', 'grooves'];
 
 function stageFolder(stage) {
   const core = stepsOf(stage.core, {});
-  const children = [...scopedRows(core)];
-  const cp = checkpointSteps(stage, {});
-  if (cp.length) children.push({ ...stepRow(cp[0]), label: `Checkpoint: ${stepTitle(cp[0])}`, checkpoint: true });
-  children.push({ label: 'Lessons', value: '', lessonsRow: true, stage });
-  for (const t of TRACKS) {
-    const steps = core.filter((st) => st.track === t.key);
+  const children = [{ label: 'Lessons', value: '', lessonsRow: true, stage }];
+  for (const key of FOLDER_TRACKS) {
+    const steps = core.filter((st) => st.track === key);
     if (!steps.length) continue;
-    children.push({ label: t.name, value: '>', trackKey: t.key, steps,
-      children: [...scopedRows(steps), ...stepRows(steps)] });
+    const t = TRACKS.find((x) => x.key === key);
+    children.push({ label: t.name, value: '>', trackKey: key, steps, children: stepRows(steps) });
   }
   const el = electiveSteps(stage, {});
   if (el.length) children.push({ label: 'Electives', value: '>', steps: el, electives: true, children: stepRows(el) });
-  return { label: `${stage.index} ${stage.name}`, value: '>', stage, steps: core, children };
+  const cp = checkpointSteps(stage, {});
+  if (cp.length) children.push({ ...stepRow(cp[0]), label: 'Checkpoint', checkpoint: true });
+  /* Shown as the stage's island (map_places.mjs), its rows as places. */
+  return { label: `${stage.index} ${stage.name}`, value: '>', stage, steps: core, view: 'map', children };
 }
 
 const pref = (label, group, key) => ({ label, value: '', prefRow: true, group, key });
 
-function pathFolder() {
+/*
+ * Settings › Advanced › Learning Path: what Continue offers — the tracks and
+ * styles on or off, the full ladder of a groove or its first and last rung,
+ * and how the lesson cards show. `styles` are the groove families. The stage
+ * to start at is on Settings itself (settings_def.mjs MAIN).
+ */
+export function pathSettingsFolder(styles = []) {
   return {
-    label: 'Your path',
+    label: 'Learning Path',
     value: '>',
     untracked: true,
     children: [
       { label: 'Tracks', value: '>', untracked: true,
         children: TRACKS.map((t) => pref(t.name, 'tracks', t.key)) },
-      { label: 'Styles', value: '>', untracked: true, styleRows: true, children: [] },
+      { label: 'Styles', value: '>', untracked: true, styleRows: true,
+        children: styles.map((c) => pref(c.name, 'styles', c.id)) },
       pref('Rungs', 'rungs', ''),
-      pref('Start at', 'start', ''),
       pref('Intros', 'intros', ''),
     ],
   };
 }
 
 /*
- * The Learning Path folder. Continue, Skip, the path's settings and
- * Repetition are rows ui.js gives meaning to; Repetition's rows depend on the
- * day, so the caller supplies them as a function and the folder sums leave
- * them out. `styles` are the groove families, for the Styles rows.
+ * The Path folder: the stages, then Review — what is due again today — only
+ * while it holds something. Review's rows depend on the day, so the caller
+ * supplies them as a function, and the folder sums leave them out.
  */
-export function programFolder(program, repetitionRows = () => [], styles = []) {
-  const yours = pathFolder();
-  yours.children[1].children = styles.map((c) => pref(c.name, 'styles', c.id));
+export function programFolder(program, reviewRows = () => []) {
+  const stages = program.stages.map(stageFolder);
+  const review = {
+    label: 'Review',
+    value: '>',
+    review: true,
+    untracked: true,
+    /* Asked for each time: what is due changes with the day — and should
+     * the last of it go while the folder is open, it says so. */
+    get children() {
+      const rows = reviewRows();
+      return rows.length ? rows : [{ label: 'Nothing due today', value: '' }];
+    },
+  };
   return {
     label: 'Learning Path',
     value: '>',
     /* Its rows point back into the tree rather than holding drills. */
     pointers: true,
-    children: [
-      { label: 'Continue', value: '', continueRow: true },
-      { label: 'Skip next', value: '', skipRow: true },
-      yours,
-      ...program.stages.map(stageFolder),
-      {
-        label: 'Repetition',
-        value: '>',
-        repetition: true,
-        untracked: true,
-        /* Asked for each time: what is due changes with the day. */
-        get children() { return repetitionRows(); },
-      },
-    ],
+    /* Shown as the world map: an island per stage. */
+    view: 'map',
+    /* Continue first, for the list: on the map it is Play. */
+    get children() {
+      const head = [{ label: 'Continue', value: '', continueRow: true }];
+      return reviewRows().length ? head.concat(stages, review) : head.concat(stages);
+    },
   };
 }

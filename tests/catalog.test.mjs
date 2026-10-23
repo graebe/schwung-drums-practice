@@ -11,7 +11,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  FOLDER, folder, lazyFolder, isFolder, chartNode, buildCatalog, drumsTree,
+  FOLDER, folder, lazyFolder, isFolder, chartNode, libraryFolders, settingsFolder, drumsTree, CLOCK_ID, leafIndex,
   navStart, navTop, navCurrent, navPush, navPop,
 } from '../src/catalog.mjs';
 import { parseExercise, parseManifest } from '../src/exercise_io.mjs';
@@ -22,7 +22,9 @@ const dir = new URL('../src/exercises/', import.meta.url);
 const read = (f) => readFileSync(new URL(f, dir), 'utf8');
 const manifest = parseManifest(read('index.json'));
 const entries = manifest.entries.map((e) => ({ chart: parseExercise(read(e.file), e.id).chart, category: e.category }));
-const tree = () => drumsTree({ entries, categories: manifest.categories, drills: DRILLS });
+const tree = () => drumsTree({ entries, categories: manifest.categories, drills: DRILLS,
+  path: folder('Path', []) });
+const practice = () => tree().children.find((c) => c.label === 'Practice');
 const labels = (n) => n.children.map((c) => c.label);
 const child = (n, label) => n.children.find((c) => c.label === label);
 
@@ -34,74 +36,102 @@ function leavesOf(node, path = [], out = []) {
   return out;
 }
 
-test('the top of the list: Basics, the material, then what is ABOUT practising', () => {
-  assert.deepEqual(labels(tree()), ['Basics', 'Grooves', 'Rudiments', 'Training', 'Quiz', 'Progress']);
+test('the top is the home screen both practice modules share: five sections, an icon each', () => {
+  const t = tree();
+  assert.deepEqual(labels(t), ['Path', 'Practice', 'Quiz', 'Progress', 'Settings']);
+  assert.equal(t.view, 'home');
+  assert.ok(!t.children.some((c) => c.continueRow), 'Continue is Play on the Path, no row at the top');
+  assert.deepEqual(t.children.map((c) => typeof c.icon), ['string', 'object', 'string', 'string', 'string']);
+  assert.ok(t.children[1].icon.small && t.children[1].icon.large, 'Practice carries the drums icon');
+});
+
+test('Practice is the free library: subdivisions, grooves, rudiments, random', () => {
+  assert.deepEqual(labels(practice()), ['Subdivisions', 'Grooves', 'Rudiments', 'Random']);
 });
 
 test('grooves and rudiments are filed by family, in manifest order', () => {
-  const t = tree();
-  assert.deepEqual(labels(child(t, 'Grooves')).slice(0, 4), ['Rock & Pop', 'Funk & Soul', 'Latin & World', 'Jazz & Swing']);
-  assert.deepEqual(labels(child(t, 'Rudiments')), ['Rolls', 'Diddles', 'Flams', 'Drags']);
+  const p = practice();
+  assert.deepEqual(labels(child(p, 'Grooves')).slice(0, 4), ['Rock & Pop', 'Funk & Soul', 'Latin & World', 'Jazz & Swing']);
+  assert.deepEqual(labels(child(p, 'Rudiments')), ['Rolls', 'Diddles', 'Flams', 'Drags']);
 });
 
 test('every bundled drill is filed, and none lands in Other', () => {
-  const t = tree();
-  assert.equal(labels(t).indexOf('Other'), -1);
+  const p = practice();
+  assert.equal(labels(p).indexOf('Other'), -1);
   let filed = 0;
-  for (const g of ['Grooves', 'Rudiments']) for (const f of child(t, g).children) filed += f.children.length;
+  for (const g of ['Grooves', 'Rudiments']) for (const f of child(p, g).children) filed += f.children.length;
   assert.equal(filed, entries.length);
 });
 
-test('a groove opens its ladder; a rudiment arms straight away', () => {
-  const rock = child(child(child(tree(), 'Grooves'), 'Rock & Pop'), 'Rock backbeat');
-  assert.ok(isFolder(rock));
-  assert.deepEqual(rock.children.map((c) => c.label.slice(0, 2)), ['L0', 'L1', 'L2', 'L3']);
+test('a groove is one row, its rungs chosen on the ready screen; a rudiment arms straight away', () => {
+  const rock = child(child(child(practice(), 'Grooves'), 'Rock & Pop'), 'Rock backbeat');
+  assert.equal(isFolder(rock), false, 'no level page');
+  assert.equal(rock.kind, 'chart');
+  assert.deepEqual(rock.levels.map((lv) => lv.step), ['L0', 'L1', 'L2', 'L3']);
   /* Each rung is an item of its own, under the id its takes are filed by. */
-  assert.deepEqual(rock.children.map((c) => c.id),
-    ['rock-backbeat:l0', 'rock-backbeat:l1', 'rock-backbeat:l2', 'rock-backbeat:l3']);
-  assert.equal(rock.children[1].build().id, rock.children[1].id);
-  assert.equal(rock.children[0].build().untimed, true, 'L0 arms the untimed mode');
-  const para = child(child(child(tree(), 'Rudiments'), 'Diddles'), 'Single paradiddle');
+  assert.deepEqual(rock.levelIds, ['rock-backbeat:l0', 'rock-backbeat:l1', 'rock-backbeat:l2', 'rock-backbeat:l3']);
+  assert.equal(rock.build('rock-backbeat:l1').id, 'rock-backbeat:l1');
+  assert.equal(rock.build('rock-backbeat:l0').untimed, true, 'L0 arms the untimed mode');
+  const index = leafIndex(tree());
+  assert.equal(index.get('rock-backbeat:l2'), index.get('rock-backbeat:l0'), 'every rung finds the one row');
+  const para = child(child(child(practice(), 'Rudiments'), 'Diddles'), 'Single paradiddle');
   assert.equal(isFolder(para), false);
   assert.equal(para.kind, 'chart');
 });
 
-test('a drill with no category, or an unknown one, lands in Other', () => {
+test('a drill with no category, or an unknown one, lands in Other, after Random', () => {
   const c = entries[0].chart;
-  const t = buildCatalog({ charts: [{ chart: c, category: null }, { chart: c, category: 'nope' }],
+  const lib = libraryFolders({ charts: [{ chart: c, category: null }, { chart: c, category: 'nope' }],
     categories: manifest.categories });
-  assert.deepEqual(labels(t), ['Other']);
-  assert.equal(t.children[0].children.length, 2);
+  assert.deepEqual(lib.folders, []);
+  assert.equal(lib.other.children.length, 2);
+  const t = drumsTree({ entries: [{ chart: c, category: 'nope' }], categories: manifest.categories, drills: DRILLS });
+  assert.deepEqual(labels(child(t, 'Practice')), ['Subdivisions', 'Random', 'Other']);
 });
 
-test('a category without a folder is a top-level folder of its own', () => {
-  const t = buildCatalog({ charts: [{ chart: entries[0].chart, category: 'x' }],
+test('a category without a folder is a library folder of its own', () => {
+  const lib = libraryFolders({ charts: [{ chart: entries[0].chart, category: 'x' }],
     categories: [{ id: 'x', name: 'Mine', folder: null }] });
-  assert.deepEqual(labels(t), ['Mine']);
+  assert.deepEqual(lib.folders.map((f) => f.label), ['Mine']);
+  assert.equal(lib.other, null);
 });
 
-test('Basics: the subdivisions, and random material drawn fresh each time', () => {
+test('Random draws fresh material each time it is opened', () => {
   let next = 1;
   const t = drumsTree({ entries, categories: manifest.categories, drills: DRILLS, newSeed: () => next++ });
-  const basics = child(t, 'Basics');
-  assert.deepEqual(labels(basics), ['Subdivisions', 'Random']);
-  const random = child(basics, 'Random');
+  const random = child(child(t, 'Practice'), 'Random');
   const a = random.children[0].build();
   const b = random.children[0].build();
   assert.notDeepEqual(a.events, b.events, 'two openings drew the same notes');
   assert.equal(a.name, 'Reading 8ths');
 });
 
-test('Training and Quiz hold what the flat list used to', () => {
+test('Quiz holds the five drills; the Ladder and the Clock are no rows of their own', () => {
   const t = tree();
-  assert.deepEqual(child(t, 'Training').children.map((c) => c.kind), ['ladder', 'clock']);
   assert.deepEqual(child(t, 'Quiz').children.map((c) => c.quiz), DRILLS);
+  assert.equal(child(t, 'Training'), undefined);
+  assert.equal(CLOCK_ID, 'clock', 'the Clock keeps the id its takes are filed under');
+});
+
+test('Settings is a page of its own; Advanced holds the path, the editor\'s groups and Help', () => {
+  const prefs = folder('Learning Path', []);
+  const s = settingsFolder(prefs);
+  assert.equal(s.settingsGroup, 'main', 'opening Settings shows its page');
+  assert.deepEqual(labels(s), ['Advanced']);
+  const adv = child(s, 'Advanced');
+  assert.equal(adv.advanced, true);
+  assert.deepEqual(labels(adv), ['Learning Path', 'Practice', 'Sound', 'MIDI', 'Help']);
+  assert.deepEqual(adv.children.slice(1, 4).map((c) => c.settingsGroup), ['practice', 'sound', 'midi']);
+  assert.deepEqual(child(adv, 'Help').children.map((c) => [c.label, c.helpAction]),
+    [['Show tips again', 'tips'], ['Welcome again', 'welcome']]);
+  assert.deepEqual(labels(child(settingsFolder(), 'Advanced')).slice(0, 1), ['Practice'], 'no path, no path group');
 });
 
 test('every leaf can be acted on, and every chart leaf builds a valid chart', () => {
   for (const { node, path } of leavesOf(tree())) {
     assert.ok(node.label, `an unlabelled row at ${path}`);
-    assert.ok(['chart', 'ladder', 'clock', 'progress', 'quiz'].includes(node.kind), node.kind);
+    if (node.continueRow || node.settingsGroup || node.helpAction) continue;
+    assert.ok(['chart', 'progress', 'quiz'].includes(node.kind), node.kind);
     if (node.kind === 'chart') {
       const c = node.build();
       assert.ok(c, `${node.label} built nothing`);
@@ -137,7 +167,7 @@ test('every folder name fits the title bar it becomes', () => {
 test('an empty install still produces a usable list', () => {
   const t = drumsTree({ drills: DRILLS });
   assert.ok(labels(t).includes('Progress'));
-  assert.ok(labels(t).includes('Basics'));
+  assert.ok(labels(t).includes('Practice'));
 });
 
 /* ---- Walking it ---------------------------------------------------------- */
@@ -166,4 +196,20 @@ test('a lazy folder is built once, and is a folder before that', () => {
   assert.equal(made, 1);
   assert.equal(n.value, FOLDER);
   assert.ok(chartNode(entries[0].chart));
+});
+
+test('Practice and Quiz are rings, each circle with its picture', async () => {
+  const { ICONS } = await import('../src/home/icons.mjs');
+  const t = tree();
+  const practice = t.children.find((c) => c.label === 'Practice');
+  const quiz = t.children.find((c) => c.label === 'Quiz');
+  assert.equal(practice.view, 'home');
+  assert.equal(quiz.view, 'home');
+  assert.deepEqual(practice.children.map((c) => [c.label, c.icon]),
+    [['Subdivisions', 'notes'], ['Grooves', 'kit'], ['Rudiments', 'sticks'], ['Random', 'dice']]);
+  assert.deepEqual(quiz.children.map((c) => c.icon), ['staff', 'ear', 'padpick', 'metronome', 'loop']);
+  for (const c of practice.children.concat(quiz.children)) assert.ok(ICONS[c.icon], `no icon ${c.icon}`);
+  const mine = drumsTree({ entries: [{ chart: { id: 'm', family: 'm', name: 'M' }, category: 'nope' }],
+    categories: manifest.categories, drills: DRILLS }).children.find((c) => c.label === 'Practice');
+  assert.equal(mine.children.slice(-1)[0].icon, 'folder', 'Other, with drills of your own');
 });

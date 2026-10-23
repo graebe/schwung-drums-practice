@@ -32,11 +32,10 @@ import * as L from './layout.mjs';
 import * as SR from './staff_render.mjs';
 import * as GR from './grid_render.mjs';
 import * as B from './beam.mjs';
-import { entriesIn } from './scoring.mjs';
+import { entriesIn, handsWritten } from './scoring.mjs';
 import { beatsPerBar } from './chart.mjs';
 import { voicesInChart } from './kit.mjs';
-import { drawHeader, drawFooter, drawBarRuler, drawLaneCallout } from './chrome.mjs';
-import { drawPlayGlyph, drawRecordGlyph, drawScrubGlyph } from './glyphs.mjs';
+import { drawHeader, drawFooter, drawHint, drawBarRuler, drawLaneCallout, drawReadyBox } from './chrome.mjs';
 
 /* Where a page starts and how wide a beat is on it, for this view. */
 export function pageGeometry(view, chart) {
@@ -57,7 +56,7 @@ export function pageBar(run, cursor, perBar) {
 
 /*
  * s = { run, chart, view, lanes, voices, dynamics, cursor, title, rightLabel,
- *       footerRight, progress, paused, done }
+ *       footerRight, progress, paused, done, hint }
  *   cursor   the entry the take waits on; past the end once it is through
  *   done     the take is through: no cursor, and a double bar for the peek
  */
@@ -75,14 +74,16 @@ export function drawUntimedView(ctx, s) {
     beat: nextEntry.beat, x: L.PAGE_PEEK_X } : null;
 
   drawHeader(ctx, { chart: s.chart, songBeats: cur ? cur.beat : from, title: s.title,
-    rightLabel: s.rightLabel });
+    rightLabel: s.rightLabel, ready: s.ready });
 
   if (s.view === 'grid') drawGridPage(ctx, s, page, peek, left, px);
   else drawStaffPage(ctx, s, page, peek, left, px);
   if (curItem) drawArrow(ctx, Math.round(curItem.x));
 
   drawUnder(ctx, s, page, bar, curItem, left, px, perBar);
-  drawFooter(ctx, s.progress || 0, s.footerRight || '');
+  /* The hint line takes the footer's band when there is one to show. */
+  if (s.hint || s.hintLeft) drawHint(ctx, s.hint, s.hintLeft);
+  else drawFooter(ctx, s.progress || 0, s.footerRight || '');
   if (s.paused) drawLaneCallout(ctx, 'PAUSED');
 }
 
@@ -130,7 +131,7 @@ function closeBar(ctx, peek, line) {
  * on the scroll; the header already says which bar it is.
  */
 function drawUnder(ctx, s, page, bar, curItem, left, px, perBar) {
-  const sticking = s.run && s.run.sticking !== 'off';
+  const sticking = handsWritten(s.run);
   drawBarRuler(ctx, [{ bar: bar + 1, x: -1 }], !sticking);
   /* The beats, ticked on the rule: the lanes have no rule of their own here.
    * The downbeat is the longer tick, as on a ruler. */
@@ -170,24 +171,11 @@ function drawArrow(ctx, x) {
  * The ready screen: the page, with the controls over it — the same box the
  * timed rungs show, saying what they do here. Play sounds the bar at its
  * written tempo, so the groove can be heard before it is stepped; Record
- * begins, with no count-in, because there is nothing to count in to.
+ * begins, with no count-in, because there is nothing to count in to. While
+ * Play sounds the bar (s.listening) the box steps aside for the page.
  */
 export function drawUntimedReady(ctx, s) {
   drawUntimedView(ctx, s);
-  if (s.scrubbed) return;
-  const b = L.READY_BOX;
-  ctx.fillRect(b.x, b.y, b.w, b.h, 0);
-  ctx.drawRect(b.x, b.y, b.w, b.h, 1);
-  const gx = b.x + 6;
-  const tx = gx + 13;
-  drawPlayGlyph(ctx, gx + 1, b.y + 4, 7);
-  ctx.text(tx, b.y + 4, 'PLAY  hear bar', 1);
-  drawRecordGlyph(ctx, gx + 1, b.y + 13, 7);
-  ctx.text(tx, b.y + 13, 'REC   own pace', 1);
-  if (s.warning) {
-    ctx.text(gx, b.y + 22, s.warning.slice(0, 17), 1);
-  } else {
-    drawScrubGlyph(ctx, gx, b.y + 22);
-    ctx.text(tx, b.y + 22, 'SCRUB view', 1);
-  }
+  if (s.scrubbed || s.listening) return;
+  drawReadyBox(ctx, { rows: [['play', 'hear bar'], ['rec', 'own pace'], ['scrub', 'scrub']], level: s.level });
 }

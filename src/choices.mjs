@@ -58,18 +58,6 @@ export function grooveChoices(answer, charts, n = 2) {
   return [answer, ...scored.slice(0, n).map((e) => e.id)];
 }
 
-/* Deterministic shuffle, so a seed replays the same question exactly. */
-export function shuffle(list, rand) {
-  const out = list.slice();
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    const t = out[i];
-    out[i] = out[j];
-    out[j] = t;
-  }
-  return out;
-}
-
 export function voiceLabel(id) {
   const v = voiceById(id);
   return v ? v.label : id;

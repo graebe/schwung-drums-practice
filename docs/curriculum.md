@@ -2,8 +2,9 @@
 # Drums Practice — the curriculum
 
 From your first beat to pro rhythms, on Move's pads with two hands. This page is the plan of the
-Learning Path: how it is built, what every step asks and why, and what is still to come. The
-README says how to use the module; this says how the course is meant to teach.
+Learning Path: how it is built, what every step asks and why, and what is still to come. The README says
+how to use the module, and [Finding your way](finding-your-way.md) how to get about it; this says
+how the course is meant to teach.
 
 **Finger drumming, not a drum kit.** Everything is played with two hands on the pads, so
 "independence" means two hands and fingers, never hands and feet, and stick technique — bounce,
@@ -12,18 +13,26 @@ hands, dynamics, time and the ear.
 
 ## How to use the path
 
-- **Continue** opens the next step of the stage you are in, from the track you have left longest,
-  so a session walks Time, Hands, Grooves and Ear in turn. **Skip next** passes that step by.
+- **Continue**, the top row of the list, opens the next step of the stage you are in, from the
+  track you have left longest, so a session walks Time, Hands, Grooves and Ear in turn. When
+  something you learned is due again, it offers one review, then one new step, in turn.
+- **Shift + click** a row for its options: *I know this: skip* passes a step by (on Continue, the
+  step it would open), *I know it all: skip* a whole stage, track or groove, *Undo skip* takes
+  it back, *Start the path here* moves the start, *Test out: checkpoint* plays a stage's exam.
+- A stage folder lists its places in the order a lesson takes them — orient, hear, pattern,
+  apply, show: **Lessons**, **Ear**, **Time**, **Hands**, **Grooves**, **Electives**, and the
+  **Checkpoint** last.
 - A step sets **Speed** to what it asks: a drill new to you arrives slow, at 60–85% of its tempo,
   and comes back faster in a later stage. Clean at the step's target is enough; the ✓ on the drill
   itself still means clean at 100%.
 - Each **stage** ends on a **checkpoint**, a piece of music. Pass it and the next stage opens —
   you can take it at any time, which is how someone who can already play tests out of a stage.
 - Before a new idea comes a **lesson card**: a screen or two on what it is and where you hear it.
-  Click starts the practice, read or not; *Your path › Intros* turns them to `always` or `off`, and
-  every stage's **Lessons** row shows them again.
-- **Your path** decides what Continue offers: tracks and styles on or off, the full ladder of a
-  groove or only L0 and its top rung, and the stage to start at.
+  Click starts the practice, read or not; *Settings › Advanced › Learning Path › Intros* turns them
+  to `always` or `off`, and every stage's **Lessons** row shows them again — as does **Menu** on a row of the path.
+- **Settings › Advanced › Learning Path** decides what Continue offers: tracks and styles on or off,
+  the full ladder of a groove or only L0 and its top rung; **Start at**, on Settings itself, the stage
+  to start at.
 - Stuck? After three takes that did not count the result suggests an easier way in (Speed down,
   or L0); after six the step is parked for a day and Continue offers something else.
 
@@ -50,7 +59,7 @@ Steps marked ★ appear on the device the day their drill ships, with no change 
 - ★ **Three marks**: ✓ Learned (clean at the step's target), ★ Solid (clean at 100% on Strict
   *tight*, dynamics ≥ 90%), ★★ Pro (clean on tight at pro tempo: 130%, rudiments 160%).
 - ★ **A lesson, not a list.** Continue becomes ~20 minutes: warm-up (a learned Hands step at 80%)
-  → two new core steps from different tracks → due repetitions (≤3) → play-out (a learned groove
+  → two new core steps from different tracks → due reviews (≤3) → play-out (a learned groove
   or phrase).
 ## The path in detail
 
@@ -60,7 +69,17 @@ spiral); ◆ existing drill, ★ new (specified in *Exercise catalogue*). "Pass"
 line each. *Learner:* what the student is likely thinking. *Why:* what the step does for them.
 
 ### Stage 0 — Hello, kit (1–2 sessions)
-Goal: find kick, snare, hat without searching; play a steady beat at 70.
+Goal: know where every pad is; find kick, snare, hat without searching; play a steady beat at 70.
+
+0.0 **Meet the pads** ◆ `tour:pads` — the first step, offered by Continue before anything else. Each
+sound of the layout in force, the beat first (kick, snare, hi-hat), then hats, snares, toms, cymbals
+and percussion: its name and a line about it on screen, its pads pulsing on both halves, its sound
+once. Striking one of them moves on; another pad sounds and is named; the jog skips; reaching the
+end is done (no score, no repetition). On Sticking it tours MPC Classic, as the drum quizzes do.
+*New:* the grid itself, and that the right half repeats the left.
+*Learner:* "So that's where the crash is — and the same drums again under my right hand."
+*Why:* every later step asks for a pad by name; someone who has never seen the layout should
+meet each one before being asked to find it.
 
 0.1 **Guess: drum** ◆ — pool KK·SN·HH, round 10. *New:* the staff/grid ↔ pad map.
 *Learner:* "Kick bottom-left, and it's the bottom of the staff too — that's logical."
@@ -243,7 +262,7 @@ at club tempo; a 2-bar break.
 
 3.11 **Clock: gap 4** ◆ (today's Clock) on Rock backbeat → 90%.
 
-3.12 **Echo I** ★ `echo:8` (engine phase) — hear a bar, play it back.
+3.12 **Echo I** ★ `echo:8` (engine work) — hear a bar, play it back.
 
 3.13 **Checkpoint 3** — Ghost-note funk at 100%, clean, **dynamics ≥ 80%**.
 
@@ -346,7 +365,7 @@ Goal: odd meters, groupings, displacement, feel on purpose, pro tempos on Strict
 *Learner:* "The off-beat click is brutal." *Why:* the hardest test of internal time.
 
 6.6 **Feel: behind / ahead** ★ `feel:behind` (mean +10..+25 ms), `feel:ahead` (−5..−15 ms) on a
-learned groove, σ ≤ tight. *New:* placement on purpose (engine phase).
+learned groove, σ ≤ tight. *New:* placement on purpose (engine work).
 *Learner:* "I can make the same beat lazy or urgent." *Why:* what separates a pro from a metronome.
 
 6.7 **Pro tempo** — Drum & bass ◆, Hard techno ◆, Dubstep ◆, Up-tempo swing ◆ at 100%; every
@@ -395,9 +414,9 @@ opened outside the path show none — the library is free play.
 
 **Skipping is one press.** On a card: **Click** = start (to the Ready screen, card marked seen);
 **Jog** = next/previous page; **Play** = hear the drill (goes to Ready and listens — the same
-"Play listens" as everywhere); **Back** = out to the list. *Your path → Intros*: `new` (default,
-each card once) / `always` / `off`. Each stage folder has a **Lessons** row listing its cards to
-re-read at any time.
+"Play listens" as everywhere); **Back** = out to the list. *Settings › Advanced › Learning Path ›
+Intros*: `new` (default, each card once) / `always` / `off`. Each stage folder opens on a **Lessons** row listing
+its cards to re-read at any time, and a stage's action sheet offers them too.
 
 **The cards**, as first drafted (the shipped wording, fitted to the screen, is in `src/lessons.json`):
 
@@ -405,7 +424,7 @@ re-read at any time.
 |---|---|---|
 | Stage 0: Hello, kit | stage | Three drums make a beat: kick (low thump), snare (crack), hi-hat (tick). Find them, then play your first beat today. |
 | The kit on paper | 0.1–0.2 | Each row is one drum. Kick at the bottom, snare in the middle, cymbals on top — as on any drum chart. |
-| Your pads | 0.1 | MPC Classic: kick, snare and hats along the bottom row, cymbals on top. Settings › Pads picks another layout, Flip mirrors it, Pad map names every pad. |
+| Meet the pads | 0.0 | Each lit pad is a drum. The right half repeats the left: one half per hand. Hit the pad that pulses. |
 | The pulse | 0.3 | Music has a steady beat you could clap to. Count it: 1 2 3 4. Steady matters more than fast. |
 | Your result | 0.3 | % right: right pad, right time. s12: your spread in ms — smaller is steadier. +3ms: a little late; minus is early. |
 | Rests | 0.4 | A rest is a beat you count but do not play. Keep counting through it — the next note depends on it. |
@@ -477,26 +496,29 @@ Skip next exists; a higher rung ticks the lower ones; Click goes on even after a
 - No un-skip except playing the step.
 - No way to drop a track (e.g. no Ear) or a style (e.g. no jazz) — Continue keeps bringing them.
 - No way to choose where to start; an experienced player clicks through or plays everything once.
-- Switching track from a result means Menu → Learning Path → the track.
+- Switching track from a result meant Menu → Learning Path → the track.
 
-**Now** (no new button combinations — all list rows, the way Skip next always worked):
-1. **Your path** folder at the top of the Learning Path:
+**Now:**
+1. **Settings › Advanced › Learning Path** (with **Start at** on Settings itself):
    - **Tracks** — Time / Hands / Grooves / Ear on/off (at least one stays on).
    - **Styles** — Rock & Pop / Funk / Latin / Jazz / Electronic / Techno on/off; decides which
      electives Continue offers and the Pick: groove pool. Core steps stay (a stage's idea is
      needed), but a core groove in a switched-off style is swapped for an elective of the same
      idea in a style that is on (each core groove step lists its alternatives).
    - **Rungs** — full ladder / short (L0 and L4; L1–L3 stay playable, not recommended).
-   - **Start at** — Stage 0…6: Continue starts there; earlier stages stay open, nothing ticked.
+   - **Start at** (on Settings) — Stage 0…6: Continue starts there; earlier stages stay open,
+     nothing ticked.
    - **Intros** — `new` / `always` / `off` (lesson cards).
-2. **Test out**: every stage's **Checkpoint** row plays its checkpoint at any time; pass it and the
-   stage is through (Continue moves on; the drills keep their honest marks).
-3. **Scoped skipping:** every folder of the path (stage, track-in-stage, groove) starts with
-   `Skip: <its next step>` and `Skip all here` / `Unskip all here`. Skipped steps close the step
-   for the stage's progress but are never learned; `»` as today.
+2. **Test out**: every stage's **Checkpoint**, its last row, plays its checkpoint at any time, and so
+   does *Test out: checkpoint* on the stage's action sheet; pass it and the stage is through
+   (Continue moves on; the drills keep their honest marks).
+3. **Skipping from the action sheet** (Shift + click a row): *I know this: skip* on a step or on
+   Continue, *I know it all: skip* on a stage, track or groove, *Undo skip* on anything skipped.
+   Skipped steps close the step for the stage's progress but are never learned; `»` as today. The
+   skip rows that used to stand among the steps are gone.
 4. **Stage completion** = checkpoint passed, or tested out, or every core step of the tracks
    that are on done/skipped. A stage cannot trap anyone.
-5. **Switching from a result:** Click = next in this track (as today); Menu → Learning Path →
+5. **Switching from a result:** Click = next in this track (as today); Back to the list, then
    Continue picks the track left longest — unchanged, plus the parked rule.
 6. Preferences live in `progress.json` (`progress.path`), so they survive updates with the progress.
 ## Exercise catalogue — new material
@@ -541,7 +563,7 @@ Clock variants (`src/controls.mjs` `clickMuted` grows a pattern): `gap1`, `gap2`
 Quizzes (`src/guess.mjs`, `src/choices.mjs`): per-step pool for voice/subdivision/groove;
 `swing` (straight/swung), `meter`, `clave` (3-2/2-3), `drift` (rushing/dragging/steady).
 
-Engine (last phase): `echo:*` — call bar plays (pads light, not scored), response bar scored;
+Engine (last): `echo:*` — call bar plays (pads light, not scored), response bar scored;
 `feel:*` — verdict on the mean inside a target band.
 
 ## Design notes

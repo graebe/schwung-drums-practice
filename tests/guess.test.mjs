@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as Q from '../src/guess.mjs';
-import { voiceChoices, subdivChoices, grooveChoices, shuffle } from '../src/choices.mjs';
+import { voiceChoices, subdivChoices, grooveChoices } from '../src/choices.mjs';
 import { rng } from '../src/rng.mjs';
 import { VOICE_IDS } from '../src/kit.mjs';
 
@@ -32,11 +32,32 @@ test('groove distractors have a similar feel, not a random one', () => {
   assert.ok(g.includes('b'), 'the closest in density must be offered');
 });
 
-test('the shuffle is deterministic for a seed', () => {
-  const a = shuffle([1, 2, 3, 4, 5], rng(9));
-  const b = shuffle([1, 2, 3, 4, 5], rng(9));
-  assert.deepEqual(a, b);
-  assert.deepEqual(a.slice().sort(), [1, 2, 3, 4, 5], 'nothing lost or duplicated');
+test('the answers stay where they are, so a known pad can be pressed blind', () => {
+  /* A set that fits the answer bar: every question offers all of it, in the
+   * set's own order, whatever the prompt. */
+  for (const [kind, set] of [['subdiv', ['quarters', 'eighths', 'triplets']], ['voice', ['KK', 'SN', 'HH']]]) {
+    const q = Q.createQuiz({ kind, mode: 'pick', seed: 5, subdivs: set, pool: set });
+    for (let i = 0; i < 12; i++) {
+      assert.deepEqual(q.options, set, `${kind} question ${i}`);
+      Q.advance(q);
+    }
+  }
+  const all = Q.createQuiz({ kind: 'voice', mode: 'pick', seed: 2 });
+  const first = all.options.slice();
+  assert.equal(first.length, all.pool.length, 'the whole kit of the drill, all on the bar');
+  for (let i = 0; i < 12; i++) { Q.advance(all); assert.deepEqual(all.options, first); }
+});
+
+test('a set too big for the bar offers near misses, still in the set\'s order', () => {
+  const charts = Array.from({ length: 12 }, (_, i) => ({ id: `g${i}`, name: `G${i}`, events: new Array(i + 1) }));
+  const q = Q.createQuiz({ kind: 'groove', mode: 'pick', seed: 4, charts });
+  for (let i = 0; i < 12; i++) {
+    assert.equal(q.options.length, 3);
+    assert.ok(q.options.includes(q.prompt));
+    const at = q.options.map((id) => charts.findIndex((c) => c.id === id));
+    assert.deepEqual(at, at.slice().sort((a, b) => a - b), 'never shuffled');
+    Q.advance(q);
+  }
 });
 
 test('a wrong answer costs time, not accuracy, and the prompt stays', () => {

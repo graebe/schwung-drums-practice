@@ -218,6 +218,26 @@ export const UNDER_LANE_Y = 49;
  * breakdown is on the result screen.
  */
 export const FOOTER_Y = 58;
+/*
+ * The hint line: what the keys do on this screen (hints.mjs), centred along
+ * the bottom edge where the footer bar sits — as Piano Practice draws it. A
+ * list keeps four rows above it, 11 to 46.
+ */
+export const HINT_Y = FOOTER_Y - 2;
+
+/*
+ * A page of text — help, the welcome, a tip — as Piano Practice's Info draws
+ * it: five lines on a 9px pitch from y 10, so a line has two rows of air
+ * above the next. (The lesson cards keep their own tighter 7px pitch.) A line
+ * is fitted to the whole width while the page needs no scrollbar, and to the
+ * width left beside it when it does: x 1 to 123, a gap, the bar at 127.
+ */
+export const PAGE_TOP_Y = 10;
+export const PAGE_LINE_H = 9;
+export const PAGE_ROWS = 5;
+export const PAGE_TEXT_X = 1;
+export const PAGE_FULL_PX = SCREEN_W - 2;
+export const PAGE_TEXT_PX = SCREEN_W - 5;
 export const PROGRESS_H = 3;
 export const FOOTER_BAR_W = SCREEN_W - 44;
 

@@ -578,12 +578,10 @@ function readyFrame(opts = {}) {
   return { ctx, text };
 }
 
-test('the ready box holds three controls, and names all three', () => {
+test('the ready box holds three controls, a word each', () => {
   const { text } = readyFrame();
-  const joined = text.join('|');
-  for (const word of ['PLAY', 'REC', 'SCRUB']) {
-    assert.ok(joined.includes(word), `no ${word} row: ${joined}`);
-  }
+  for (const word of ['listen', 'practise', 'scrub']) assert.ok(text.includes(word), `no ${word}: ${text.join('|')}`);
+  assert.ok(!text.includes('LEVEL'), 'a drill of one rung has no level');
 });
 
 test('the box is over the chart at home and gone once you scrub', () => {
@@ -591,19 +589,37 @@ test('the box is over the chart at home and gone once you scrub', () => {
    * would defeat the scrubbing. */
   const home = readyFrame({ songBeats: 0 });
   const away = readyFrame({ songBeats: 4 });
-  assert.ok(home.text.join('|').includes('SCRUB'));
-  assert.ok(!away.text.join('|').includes('SCRUB'), 'the box stayed up');
+  assert.ok(home.text.includes('scrub'));
+  assert.ok(!away.text.includes('scrub'), 'the box stayed up');
   const b = READY_BOX;
   assert.ok(countOn(home.ctx, b.x, b.y, b.w, 1) > b.w / 2, 'the box has no top edge');
   assert.ok(countOn(away.ctx, b.x, b.y, b.w, 1) < b.w / 2, 'the box outline survived');
 });
 
-test('a warning takes the scrub row, being rarer and more urgent', () => {
-  const { text } = readyFrame({ warning: 'no pad for HF' });
-  const joined = text.join('|');
-  assert.ok(joined.includes('no pad for HF'));
-  assert.ok(!joined.includes('SCRUB'), 'the warning and the hint both claimed the row');
-  assert.ok(joined.includes('PLAY') && joined.includes('REC'));
+test('a groove\'s box splits: the controls left, LEVEL right with its digit and the arrows it can take', async () => {
+  const { READY_SPLIT } = await import('../src/chrome.mjs');
+  const mid = readyFrame({ level: { digit: '2', down: true, up: true, done: false } });
+  assert.ok(mid.text.includes('LEVEL') && mid.text.includes('<') && mid.text.includes('>'), mid.text.join('|'));
+  const b = READY_BOX;
+  assert.equal(countOn(mid.ctx, b.x + READY_SPLIT, b.y, 1, b.h), b.h, 'no line between the halves');
+  /* The digit is big: drawn as blocks, not as text. */
+  assert.ok(!mid.text.includes('2'));
+  assert.ok(countOn(mid.ctx, b.x + READY_SPLIT + 15, b.y + 13, 12, 15) > 20, 'no digit');
+  const low = readyFrame({ level: { digit: '0', down: false, up: true, done: true } });
+  assert.ok(!low.text.includes('<') && low.text.includes('>'), 'an arrow where the jog cannot go');
+  const top = readyFrame({ level: { digit: '4', down: true, up: false, done: false } });
+  assert.ok(top.text.includes('<') && !top.text.includes('>'));
+  /* The words keep to their half. */
+  for (const t of ['listen', 'practise', 'scrub']) {
+    assert.ok(b.x + 15 + t.length * 6 - 1 < b.x + READY_SPLIT - 1, `${t} runs into the level`);
+  }
+  /* The music still shows above and below the box. */
+  assert.ok(countOn(mid.ctx, 0, 10, L.SCREEN_W, b.y - 10) + countOn(mid.ctx, 0, b.y + b.h + 1, L.SCREEN_W, 6) > 0);
+});
+
+test('the bottom line carries the level at the left and the keys at the right', () => {
+  const { text } = readyFrame({ hintLeft: 'L2  + kick', hint: 'REC start' });
+  assert.ok(text.includes('L2  + kick') && text.includes('REC start'), text.join('|'));
 });
 
 test('the scrub glyph is a BROKEN ring, not a closed one', () => {
@@ -775,6 +791,91 @@ test('the first Hear hint names the drum and still hides the staff', () => {
   const after = draw();
   assert.ok(after.includes(name), 'the name hint showed no name');
   assert.ok(after.includes('?'), 'and the staff is still withheld');
+});
+
+test('a bar pick drill with more answers than rows draws them as the pads they sit on', async () => {
+  const AP = await import('../src/answer_pads.mjs');
+  const Q = await import('../src/guess.mjs');
+  for (const [kind, n] of [['subdiv', 5]]) {
+    const quiz = createQuiz({ kind, mode: 'pick', seed: 3 });
+    assert.equal(quiz.options.length, n);
+    const { c, seen } = capture();
+    const rects = [];
+    const drawRect = c.drawRect.bind(c);
+    c.drawRect = (x, y, w, h, v) => { rects.push(x); return drawRect(x, y, w, h, v); };
+    drawQuiz(c, { quiz, labelFor: (id) => Q.labelFor(quiz, id), shortFor: (id) => Q.shortFor(quiz, id),
+      columnOf: (i) => AP.answerPads(n)[i] - 68, isEliminated: () => false, hintsLeft: 2, progress: '0/20' });
+    /* One cell per answer, in its pad's column: the chosen one filled, the rest outlined. */
+    const want = AP.answerPads(n).map((p) => (p - 68) * 16 + 1).filter((_, i) => i !== quiz.choice);
+    assert.deepEqual(rects.filter((x) => x < 128), want, kind);
+    for (const id of quiz.options) assert.ok(seen.includes(Q.shortFor(quiz, id)), `${kind}: ${id}`);
+    assert.ok(seen.includes(Q.labelFor(quiz, quiz.options[quiz.choice])), 'the jog\'s choice in full');
+  }
+});
+
+/*
+ * Pick: drum on the kit: the pads as they sit under the hands (drawPadMap's
+ * grid, top row first), each offered drum's short name in every one of its
+ * cells, the jog's choice inverted in all of them, a struck one crossed, and
+ * the choice named with its colour in the header.
+ */
+test('Pick: drum draws the kit grid: short names in their cells, the choice inverted, struck crossed', async () => {
+  const AP = await import('../src/answer_pads.mjs');
+  const Q = await import('../src/guess.mjs');
+  const { PADMAP: G } = await import('../src/screens.mjs');
+  const { resolveLayout: resolve } = await import('../src/padmap.mjs');
+  for (const id of ['mpc', 'gm']) {
+    const quiz = createQuiz({ kind: 'voice', mode: 'pick', seed: 3 });
+    const grid = AP.kitGrid(quiz.options, resolve(id));
+    Q.moveChoice(quiz, quiz.options.indexOf('SN'));
+    const struck = quiz.options.indexOf('HO');
+    quiz.eliminated.push(struck);
+    const texts = [];
+    const fills = [];
+    const lines = [];
+    const c = createScreen();
+    const text = c.text.bind(c);
+    const fillRect = c.fillRect.bind(c);
+    const line = c.line.bind(c);
+    c.text = (x, y, str, v) => { texts.push({ x, y, str, v }); return text(x, y, str, v); };
+    c.fillRect = (x, y, w, h, v) => { fills.push({ x, y, w, h }); return fillRect(x, y, w, h, v); };
+    c.line = (x0, y0, x1, y1, v) => { lines.push({ x0, y0 }); return line(x0, y0, x1, y1, v); };
+    drawQuiz(c, { quiz, progress: '3/20', colours: AP.COLOUR_NAMES, padGrid: grid,
+      labelFor: (v) => Q.labelFor(quiz, v), shortFor: (v) => Q.shortFor(quiz, v),
+      isEliminated: (i) => Q.isEliminated(quiz, i), hintsLeft: 2 });
+    const cellOf = (i) => ({ x: G.x + (i % 8) * G.cellW, y: G.y + (3 - Math.floor(i / 8)) * G.cellH });
+    for (let i = 0; i < 32; i++) {
+      const { x, y } = cellOf(i);
+      const inCell = texts.filter((t) => t.y === y + 2 && t.x >= x && t.x < x + G.cellW);
+      if (grid[i] < 0) {
+        assert.equal(inCell.length, 0, `${id}: pad ${i} should be empty`);
+        continue;
+      }
+      const v = quiz.options[grid[i]];
+      assert.deepEqual(inCell.map((t) => t.str), [Q.shortFor(quiz, v)], `${id}: pad ${i}`);
+      const chosen = grid[i] === quiz.choice;
+      assert.equal(inCell[0].v, chosen ? 0 : 1, `${id}: pad ${i} inverted only when chosen`);
+      assert.equal(fills.some((f) => f.x === x && f.y === y && f.w === G.cellW), chosen, `${id}: pad ${i} fill`);
+      assert.equal(lines.some((l) => l.x0 === x + 1 && l.y0 > y && l.y0 < y + G.cellH), grid[i] === struck,
+        `${id}: pad ${i} crossed only when struck`);
+    }
+    const head = texts.find((t) => t.y === 0 && t.x === 1);
+    assert.equal(head.str, `Snare  ${AP.COLOUR_NAMES[quiz.choice % AP.COLOUR_NAMES.length]}`, id);
+  }
+});
+
+test('Pick: drum names the choice alone when the colour will not fit, and without one off the pads', async () => {
+  const AP = await import('../src/answer_pads.mjs');
+  const Q = await import('../src/guess.mjs');
+  const quiz = createQuiz({ kind: 'voice', mode: 'pick', seed: 3 });
+  const { c, seen } = capture();
+  const s = { quiz, progress: '3/20', colours: AP.COLOUR_NAMES, padGrid: AP.kitGrid(quiz.options, 'mpc'),
+    labelFor: () => 'Hi-mid tom two', shortFor: (v) => Q.shortFor(quiz, v), isEliminated: () => false };
+  drawQuiz(c, s);
+  assert.ok(seen.includes('Hi-mid tom two'), `the name, the colour left out: ${seen.join('|')}`);
+  const off = capture();
+  drawQuiz(off.c, { ...s, labelFor: () => 'Ride', padGrid: new Array(32).fill(-1) });
+  assert.ok(off.seen.includes('Ride'), off.seen.join('|'));
 });
 
 /* ---- The result screen, worst case ------------------------------------------- */
@@ -1057,4 +1158,180 @@ test('the page marks its beats on the rule under the chart', () => {
   for (let b = 0; b < 4; b++) {
     assert.ok(isOn(ctx, Math.round(left + b * px), L.UNDER_TICK_Y), `no tick on beat ${b + 1}`);
   }
+});
+
+/* ---- the list, its hint line, and help ---------------------------------- */
+
+test('a list shows four rows and the hint line under them, clear of each other', async () => {
+  const V = await import('../src/view.mjs');
+  assert.equal(V.LIST_ROWS, 4);
+  const ctx = createScreen();
+  const items = ['Continue', 'Path', 'Practice', 'Quiz', 'Progress', 'Settings'].map((label) => ({ label, value: '>' }));
+  const texts = [];
+  const text = ctx.text.bind(ctx);
+  ctx.text = (x, y, s, v) => { texts.push({ x, y, s }); text(x, y, s, v); };
+  V.drawList(ctx, { title: 'DRUMS', items, selected: 0, footer: 'CLICK open  MENU help' });
+  const rows = texts.filter((t) => t.s !== '>' && t.s !== 'DRUMS' && t.s !== 'CLICK open  MENU help');
+  assert.deepEqual(rows.map((t) => t.s), ['Continue', 'Path', 'Practice', 'Quiz'], 'four rows, no fifth');
+  const hint = texts.find((t) => t.s === 'CLICK open  MENU help');
+  assert.equal(hint.y, L.HINT_Y);
+  assert.equal(hint.x, (L.SCREEN_W - ctx.textWidth(hint.s)) >> 1, 'centred');
+  const last = Math.max(...rows.map((t) => t.y));
+  assert.ok(last + L.TEXT_H < L.HINT_Y, 'the last row runs into the hint line');
+  /* The scrollbar stays above the hint line too. */
+  for (let y = L.HINT_Y; y < L.SCREEN_H; y++) assert.equal(isOn(ctx, L.SCREEN_W - 1, y), false);
+});
+
+test('the hint line clears its band, so it can stand over a footer', async () => {
+  const V = await import('../src/view.mjs');
+  const ctx = createScreen();
+  ctx.fillRect(0, 0, L.SCREEN_W, L.SCREEN_H, 1);
+  V.drawHint(ctx, 'REC start');
+  assert.ok(countOn(ctx, 0, L.HINT_Y, L.SCREEN_W, L.SCREEN_H - L.HINT_Y) < 300, 'the band was not cleared');
+  assert.equal(isOn(ctx, 0, L.HINT_Y - 1), true, 'it cleared above its band');
+  const before = countOn(ctx, 0, 0, L.SCREEN_W, L.SCREEN_H);
+  V.drawHint(ctx, '');
+  assert.equal(countOn(ctx, 0, 0, L.SCREEN_W, L.SCREEN_H), before, 'an empty hint draws nothing');
+});
+
+test('the reading view gives its footer band to a hint when there is one', () => {
+  const chart = subdivisionDrill({ subdiv: 'eighths', bpm: 90 });
+  const run = createRun(chart, { repeats: 0, sticking: 'off' });
+  ensureEntries(run, 8);
+  const ctx = createScreen();
+  const texts = [];
+  const text = ctx.text.bind(ctx);
+  ctx.text = (x, y, s, v) => { texts.push(s); text(x, y, s, v); };
+  drawReadingView(ctx, { run, chart, songBeats: 0, view: 'grid', title: 'X', bpm: 90, hint: 'REC start' });
+  assert.ok(texts.includes('REC start'));
+  assert.equal(isOn(ctx, 1, L.FOOTER_Y), false, 'the progress bar is under the hint');
+});
+
+test('a page of text: five lines on a 9px pitch, the first line counted, a scrollbar', async () => {
+  const V = await import('../src/view.mjs');
+  const ctx = createScreen();
+  const texts = [];
+  const text = ctx.text.bind(ctx);
+  ctx.text = (x, y, s, v) => { texts.push({ y, s }); text(x, y, s, v); };
+  const lines = Array.from({ length: 12 }, (_, i) => `line ${i}`);
+  V.drawPage(ctx, { title: 'HELP: LIST', lines, top: 3, footer: 'JOG scroll' });
+  const said = texts.map((t) => t.s);
+  assert.ok(said.includes('HELP: LIST') && said.includes('4/12') && said.includes('JOG scroll'), said.join('|'));
+  const body = texts.filter((t) => /^line/.test(t.s));
+  assert.deepEqual(body.map((t) => t.s), ['line 3', 'line 4', 'line 5', 'line 6', 'line 7']);
+  assert.deepEqual(body.map((t) => t.y), [10, 19, 28, 37, 46], 'two rows of air between lines');
+  assert.ok(body[4].y + L.TEXT_H < L.HINT_Y, 'the last line runs into the hint');
+  assert.ok(countOn(ctx, L.SCREEN_W - 1, 10, 1, 45) >= 3, 'no scrollbar');
+  texts.length = 0;
+  V.drawPage(ctx, { lines: ['short'], top: 0, title: 'Tip', right: '1/4' });
+  assert.ok(texts.some((t) => t.s === 'short') && texts.some((t) => t.s === '1/4'));
+  assert.equal(countOn(ctx, L.SCREEN_W - 1, 10, 1, 45), 0, 'a scrollbar on a page that fits');
+});
+
+test('the map screen: the place in the title, the map, the hint line — nothing in the gaps', async () => {
+  const V = await import('../src/view.mjs');
+  const PL = await import('../src/pathmap/layout.mjs');
+  const PW = await import('../src/pathmap/walk.mjs');
+  const { makePlace } = await import('../src/pathmap/model.mjs');
+  const places = ['done', 'current', 'ahead', 'ahead', 'ahead', 'ahead', 'ahead']
+    .map((state, i) => makePlace({ label: `${i} Stage`, state, percent: state === 'done' ? 100 : 20, kind: 'island' }));
+  const layout = PL.layoutPlaces(places.length);
+  const ctx = createScreen();
+  const texts = [];
+  const text = ctx.text.bind(ctx);
+  ctx.text = (x, y, s, v) => { texts.push({ y, s }); text(x, y, s, v); };
+  V.drawMapScreen(ctx, { title: '1 Stage', right: '20%', places, layout, walk: PW.createWalk(layout, 1), now: 0,
+    footer: 'PAD go  CLICK enter' });
+  assert.deepEqual(texts.map((t) => t.s), ['1 Stage', '20%', 'PAD go  CLICK enter']);
+  assert.equal(texts[2].y, L.HINT_Y);
+  assert.ok(countOn(ctx, 0, PL.MAP_Y, L.SCREEN_W, PL.MAP_H) > 100, 'no map drawn');
+  assert.equal(countOn(ctx, 0, L.HEADER_RULE_Y + 1, L.SCREEN_W, PL.MAP_Y - L.HEADER_RULE_Y - 1), 0,
+    'something between the rule and the map');
+  assert.equal(countOn(ctx, 0, PL.MAP_Y + PL.MAP_H, L.SCREEN_W, L.HINT_Y - PL.MAP_Y - PL.MAP_H), 0,
+    'something between the map and the hint');
+});
+
+/* ---- Meet the pads ------------------------------------------------------ */
+import { drawTour } from '../src/view.mjs';
+import * as PT from '../src/pad_tour.mjs';
+import * as H from '../src/hints.mjs';
+import { resolveLayout } from '../src/padmap.mjs';
+
+test('a tour stop draws its drum, where it is, a line, and what to do; the end page too', () => {
+  const s = createScreen();
+  let texts = [];
+  const ctx = Object.create(s);
+  ctx.text = (x, y, t, v) => { texts.push(t); s.text(x, y, t, v); };
+  /* The hint line is hints.mjs's, as ui.js draws it. */
+  const draw = (tour) => {
+    texts = [];
+    const stop = PT.screenOf(tour);
+    drawTour(ctx, { ...stop, footer: H.hintFor(H.SCREENS.TOUR, stop)[0] });
+    return texts;
+  };
+  const tour = PT.createTour(resolveLayout('mpc'), { texts: new Map([['KK', 'The low thump.']]),
+    measure: (t) => s.textWidth(t), width: L.SCREEN_W - 2 });
+  const stop = draw(tour);
+  for (const t of ['Kick', '1/16', 'The low thump.', 'PAD hit lit  JOG skip']) {
+    assert.ok(stop.includes(t), `${t} not drawn: ${stop.join('|')}`);
+  }
+  PT.skip(tour, 100);
+  const end = draw(tour);
+  assert.ok(end.includes(PT.END_TITLE) && end.includes('CLICK next  BACK list'), end.join('|'));
+  PT.skip(tour, -1);
+  PT.press(tour, 'P2', 1);
+  assert.ok(draw(tour).includes('JOG skip  BACK list'), 'while it sounds no pad is asked for');
+});
+
+/* ---- Hands shown, not judged ------------------------------------------- */
+test('Sticking off still shows the written hands: on the scroll, on the page, in Study', () => {
+  const drill = subdivisionDrill(2);
+  const scroll = frame(drill, { view: 'grid', songBeats: 5.2, repeats: 4, sticking: 'off' }).ctx;
+  assert.equal(countOn(scroll, 0, L.UNDER_LANE_Y, 12, L.TEXT_H), 0, 'a bar number over the hands');
+  assert.ok(countOn(scroll, 0, L.UNDER_LANE_Y, L.SCREEN_W, L.TEXT_H) > 0, 'the hands are gone');
+
+  const c = projectLevel({ ...ROCKISH, sticking: 'strict',
+    events: ROCKISH.events.map((e, i) => ({ ...e, hand: i % 2 ? 'L' : 'R' })) }, 'l0');
+  const run = createRun(c, { sticking: 'off' });
+  const u = UT.createUntimed(run, { togetherMs: 60 });
+  const ctx = createScreen();
+  const seen = [];
+  const text = ctx.text.bind(ctx);
+  ctx.text = (x, y, s, v) => { seen.push(s); text(x, y, s, v); };
+  drawUntimedView(ctx, { run, chart: c, view: 'grid', dynamics: true, cursor: u.index,
+    title: c.name, rightLabel: '--', progress: 0, footerRight: '' });
+  assert.ok(seen.includes('R') && seen.includes('L'), seen.join('|'));
+
+  const study = createRun({ id: 'x', name: 'X', bpm: 120, timeSig: [4, 4], loopBars: 1, repeats: 1,
+    sticking: 'strict', events: [{ beat: 0, voices: ['SN'], hand: 'R' }] }, { sticking: 'off' });
+  expireMissed(study, 0.5, true);
+  assert.equal(stuckLabel(study), 'Snare R', 'Study names the hand as a guide');
+});
+
+test('no glyph of the ready box touches its word: one glyph column, the words 3px after it', async () => {
+  const { drawReadyBox } = await import('../src/chrome.mjs');
+  const ctx = createScreen();
+  const xs = [];
+  const text = ctx.text.bind(ctx);
+  ctx.text = (x, y, s, v) => { xs.push(x); text(x, y, s, v); };
+  drawReadyBox(ctx, { rows: [['play', 'hear bar'], ['rec', 'own pace'], ['scrub', 'scrub']] });
+  const b = READY_BOX;
+  assert.equal(new Set(xs).size, 1, 'the words share one column');
+  for (let i = 0; i < 3; i++) {
+    const y = b.y + 4 + i * 9;
+    assert.equal(countOn(ctx, xs[0] - 3, y, 3, 8), 0, `row ${i}: its glyph runs into the gap before the word`);
+  }
+});
+
+test('the ready header gives the name the middle: no 1/n, the name cut at a word', () => {
+  const chart = { ...subdivisionDrill('eighths', { bpm: 90 }), name: 'Rock backbeat with ghosts' };
+  const run = createRun(chart, { repeats: 8 });
+  ensureEntries(run, 32);
+  const ctx = createScreen();
+  const seen = [];
+  const text = ctx.text.bind(ctx);
+  ctx.text = (x, y, s, v) => { if (y === 0) seen.push(s); text(x, y, s, v); };
+  drawReady(ctx, { run, chart, songBeats: 0, pxPerBeat: 32, view: 'grid', title: chart.name, bpm: 90,
+    rightLabel: '8 bars', ready: true });
+  assert.deepEqual(seen, ['Rock backbeat', '8 bars'], 'one length, the name to whole words');
 });

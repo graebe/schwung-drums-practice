@@ -46,3 +46,10 @@ test('a record id reads back as written, and names the item it belongs to', () =
   assert.equal(ID.itemOfDrillId('guess:voice'), 'quiz:guess:voice');
   assert.equal(ID.itemOfDrillId('nonsense:x'), null);
 });
+
+test('a tour is its own item, and no quiz', () => {
+  assert.equal(ID.tourItemId('pads'), 'tour:pads');
+  assert.ok(ID.isTourItemId('tour:pads'));
+  assert.ok(!ID.isTourItemId('quiz:guess:voice'));
+  assert.ok(!ID.isQuizItemId('tour:pads'));
+});

@@ -27,6 +27,8 @@ const build = (extra = {}) => PLAN.buildProgram({
 const T0 = Date.UTC(2026, 9, 1, 12);
 const take = (p, id, speed = 100, at = T0, o = {}) =>
   P.recordTake(p, id, { speed, accuracy: 1, sd: 10, clean: true, bpm: 90, at, ...o });
+/* Meet the pads walked: Continue's first offer out of the way. */
+const walked = (p = P.emptyProgress()) => { P.recordTour(p, 'tour:pads', T0); return p; };
 const all = (prog, part = 'core') => prog.stages.flatMap((s) =>
   (part === 'core' ? PLAN.coreSteps(s) : PLAN.electiveSteps(s)).map((st) => ({ ...st, stageIndex: s.index })));
 const RUDIMENTS = manifest.entries.filter((e) => ['rolls', 'diddles', 'flams', 'drags'].includes(e.category));
@@ -98,6 +100,10 @@ test('every step opens a row of the real tree', () => {
       assert.equal(st.quiz.kind, st.id.split(':')[2], st.id);
       continue;
     }
+    if (st.tour) {
+      assert.ok(PLAN.TOURS[st.tour], st.id);
+      continue;
+    }
     assert.ok(index.get(st.wrap || st.id), `${st.id} opens nothing`);
   }
 });
@@ -111,9 +117,27 @@ test('a pooled quiz is its own item: three drums are not the whole kit', () => {
   assert.deepEqual(subdivs, ['quiz:pick:subdiv:qe', 'quiz:pick:subdiv:qes', 'quiz:pick:subdiv']);
 });
 
+test('Meet the pads leads Hello, kit: Continue offers it before anything else', () => {
+  const prog = build();
+  const s0 = PLAN.coreSteps(prog.stages[0]);
+  assert.deepEqual([s0[0].id, s0[0].label, s0[0].track, s0[0].lead], ['tour:pads', 'Meet the pads', 'ear', true]);
+  assert.deepEqual(s0[0].cards, ['your-pads']);
+  const p = P.emptyProgress();
+  assert.equal(PLAN.continueStep(p, prog, T0).step.id, 'tour:pads', 'first, though Time has the tie');
+  assert.ok(!PLAN.stepDone(p, s0[0]));
+  P.recordTour(p, 'tour:pads', T0);
+  assert.ok(PLAN.stepDone(p, s0[0]));
+  assert.equal(PLAN.continueStep(p, prog, T0).step.id, 'subdiv:quarters', 'then the tracks take turns');
+  assert.equal(PLAN.stepAfter(p, prog, s0[0], T0).id, 'quiz:guess:voice:kit3', 'on along the Ear track');
+  const q = P.emptyProgress();
+  P.skipItem(q, 'tour:pads', T0);
+  assert.equal(PLAN.continueStep(q, prog, T0).step.id, 'subdiv:quarters', 'skipped, it leads no more');
+  assert.equal(PLAN.coreSteps(prog.stages[1]).filter((st) => st.lead).length, 0, 'only the first stage has one');
+});
+
 test('Continue: the current stage only, the track left longest first', () => {
   const prog = build();
-  const p = P.emptyProgress();
+  const p = walked();
   const first = PLAN.continueStep(p, prog, T0);
   assert.equal(first.stage.index, 0);
   assert.equal(first.step.id, 'subdiv:quarters', 'Time first on a first session');
@@ -165,7 +189,7 @@ test('a dynamics target needs the dynamics as well as the speed', () => {
 
 test('Your path: a track switched off leaves Continue, the short ladder drops L1-L3', () => {
   const prog = build();
-  const p = P.emptyProgress();
+  const p = walked();
   P.togglePath(p, 'tracks', 'time');
   assert.equal(PLAN.continueStep(p, prog, T0).step.track, 'grooves');
   P.togglePath(p, 'tracks', 'grooves');
@@ -210,7 +234,7 @@ test('Your path: start at a later stage; earlier stages stay open, nothing is ti
 
 test('a parked step leaves Continue for a day, then comes back', () => {
   const prog = build();
-  const p = P.emptyProgress();
+  const p = walked();
   P.parkItem(p, 'subdiv:quarters', T0);
   assert.notEqual(PLAN.continueStep(p, prog, T0).step.id, 'subdiv:quarters');
   const later = T0 + (P.PARK_HOURS + 1) * 3600 * 1000;
@@ -229,7 +253,7 @@ test('stuck: suggest after three failed takes in a row, park after six', () => {
 
 test('on from a step: the next open one of its track in its stage, never itself', () => {
   const prog = build();
-  const p = P.emptyProgress();
+  const p = walked();
   const quarters = PLAN.continueStep(p, prog, T0).step;
   const next = PLAN.stepAfter(p, prog, quarters, T0);
   assert.notEqual(next.key, quarters.key);
@@ -237,26 +261,48 @@ test('on from a step: the next open one of its track in its stage, never itself'
   assert.equal(PLAN.stepAfter(p, prog, fb0, T0).id, 'first-beat:l1', 'the next rung');
 });
 
-test('the folder: Continue, Skip, Your path, the stages, Repetition — and every row fits', () => {
-  const f = PLAN.programFolder(build(), () => [{ label: 'due', repId: 'x' }],
-    manifest.categories.filter((c) => c.folder === 'Grooves'));
-  assert.deepEqual(f.children.map((c) => c.label), ['Continue', 'Skip next', 'Your path',
-    '0 Hello, kit', '1 Eighth notes', '2 Sixteenths', '3 Ghosts & flams',
-    '4 Triplets/swing', '5 Clave & world', '6 Pro', 'Repetition']);
-  assert.equal(f.children[10].children[0].repId, 'x', 'asked for each time');
-  const s0 = f.children[3];
-  assert.deepEqual(s0.children.slice(0, 3).map((c) => c.label),
-    ['Skip next', 'Skip all here', 'Checkpoint: First beat L3']);
-  assert.equal(f.children[2].children[1].children.length, 6, 'one row a style');
-  /* A row is fitted to the screen; a folder's label is its title when open. */
+test('the Path: Continue, the stages, then Review only while something is due', () => {
+  let due = [];
+  const f = PLAN.programFolder(build(), () => due);
+  const stages = ['Continue', '0 Hello, kit', '1 Eighth notes', '2 Sixteenths', '3 Ghosts & flams',
+    '4 Triplets/swing', '5 Clave & world', '6 Pro'];
+  assert.deepEqual(f.children.map((c) => c.label), stages, 'nothing due, no Review');
+  assert.equal(f.children[0].continueRow, true, 'Continue lives in the Path now');
+  due = [{ label: 'due', repId: 'x' }];
+  assert.deepEqual(f.children.map((c) => c.label), stages.concat('Review'));
+  assert.equal(f.children[8].children[0].repId, 'x', 'asked for each time');
+});
+
+test('a stage lists its places in teaching order, the checkpoint last, and no rows with a job', () => {
+  const f = PLAN.programFolder(build());
+  const s0 = f.children[1];
+  assert.deepEqual(s0.children.map((c) => c.label),
+    ['Lessons', 'Ear', 'Time', 'Grooves', 'Electives', 'Checkpoint'], 'Hello, kit has no Hands');
+  assert.deepEqual(f.children[3].children.map((c) => c.label),
+    ['Lessons', 'Ear', 'Time', 'Hands', 'Grooves', 'Electives', 'Checkpoint']);
+  const cp = s0.children[s0.children.length - 1];
+  assert.equal(cp.checkpoint, true);
+  assert.equal(cp.step.id, 'first-beat:l3', 'the checkpoint is the stage\'s exam');
+  /* Skip, Skip all here, Start here: all in the action sheet now. */
   const walk = (n) => {
     for (const c of n.children) {
-      if (!isFolder(c) || c.repetition) continue;
-      assert.ok(c.label.length <= 16, `folder "${c.label}" overflows its title`);
-      walk(c);
+      assert.ok(!/^Skip|^Start here|^Check:/.test(c.label), `"${c.label}" is a control row`);
+      if (isFolder(c) && !c.review) {
+        assert.ok(c.label.length <= 16, `folder "${c.label}" overflows its title`);
+        walk(c);
+      }
     }
   };
   walk(f);
+});
+
+test('Settings › Advanced › Learning Path: tracks, styles, rungs and the intros', () => {
+  const styles = manifest.categories.filter((c) => c.folder === 'Grooves');
+  const f = PLAN.pathSettingsFolder(styles);
+  assert.deepEqual(f.children.map((c) => c.label), ['Tracks', 'Styles', 'Rungs', 'Intros'],
+    'Start at is on Settings itself');
+  assert.equal(f.children[1].children.length, 6, 'one row a style');
+  assert.equal(f.untracked, true, 'nothing to count in it');
 });
 
 test('every id the table names is installed or planned — a typo cannot vanish', () => {
@@ -264,6 +310,10 @@ test('every id the table names is installed or planned — a typo cannot vanish'
   const installed = (id) => entries.some((e) => e.chart.id === id) || generated.has(id);
   for (const spec of PLAN.STAGES) {
     for (const s of spec.core.concat(spec.electives, [spec.checkpoint])) {
+      if (s.tour) {
+        assert.ok(PLAN.TOURS[s.tour], `${spec.key}: no tour "${s.tour}"`);
+        continue;
+      }
       if (s.quiz) {
         const id = `quiz:${s.quiz.mode}:${s.quiz.kind}`;
         assert.ok(quizzes.has(id) || PLAN.PLANNED.has(id), `${spec.key}: ${id} is neither a quiz nor planned`);

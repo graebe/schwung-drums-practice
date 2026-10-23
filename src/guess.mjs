@@ -21,9 +21,10 @@
  */
 
 import { rng } from './rng.mjs';
-import { CORE_VOICES } from './kit.mjs';
-import { voiceChoices, subdivChoices, grooveChoices, shuffle,
+import { CORE_VOICES, voiceById } from './kit.mjs';
+import { voiceChoices, subdivChoices, grooveChoices,
          voiceLabel, subdivLabel, SUBDIV_ORDER } from './choices.mjs';
+import { MAX_ANSWERS } from './answer_pads.mjs';
 
 export const MAX_HINTS = 2;
 
@@ -50,7 +51,7 @@ export function createQuiz(opts = {}) {
      * beginner meets first, and the ones every drill is written in. */
     pool: opts.pool || CORE_VOICES.filter((v) => v !== 'HF'),
     /* The subdivisions asked about: all of them, or the ones a stage of the
-     * Learning Path has taught so far. */
+     * Path has taught so far. */
     subdivs: opts.subdivs || SUBDIV_ORDER,
     /* A pooled quiz is its own exercise, filed under its own id. */
     variant: opts.variant || '',
@@ -83,6 +84,23 @@ function poolFor(quiz) {
   return quiz.pool;
 }
 
+/*
+ * THE ANSWERS STAY WHERE THEY ARE. Once you know which pad means "triplets",
+ * you can answer without looking, so a drill never moves an answer while it
+ * runs (Piano Practice's ear drills work the same way). When the drill's
+ * whole set fits the answer bar, every question offers all of it, in the
+ * set's own order. Only a set too big for the bar falls back to the near
+ * misses, and even those keep the set's order rather than a shuffled one.
+ */
+function optionsFor(quiz, pool, answer) {
+  if (pool.length <= MAX_ANSWERS) return pool.slice();
+  let near;
+  if (quiz.kind === 'subdiv') near = subdivChoices(answer, 2, quiz.subdivs);
+  else if (quiz.kind === 'groove') near = grooveChoices(answer, quiz.charts);
+  else near = voiceChoices(answer, quiz.pool);
+  return pool.filter((id) => near.includes(id));
+}
+
 export function nextPrompt(quiz) {
   const pool = poolFor(quiz);
   if (!pool.length) return quiz;
@@ -92,13 +110,8 @@ export function nextPrompt(quiz) {
   quiz.eliminated = [];
   quiz.revealed = false;
   quiz.choice = 0;
-  if (quiz.mode === 'pick') {
-    let opts;
-    if (quiz.kind === 'subdiv') opts = subdivChoices(answer, 2, quiz.subdivs);
-    else if (quiz.kind === 'groove') opts = grooveChoices(answer, quiz.charts);
-    else opts = voiceChoices(answer, quiz.pool);
-    quiz.options = shuffle(opts, quiz.rand);
-  } else {
+  if (quiz.mode === 'pick') quiz.options = optionsFor(quiz, pool, answer);
+  else {
     quiz.options = [];
   }
   return quiz;
@@ -252,6 +265,20 @@ export function labelFor(quiz, id) {
     return c ? c.name : id;
   }
   return voiceLabel(id);
+}
+
+/*
+ * A name of two characters for an answer cell, when the answers are drawn as
+ * the pads they sit on rather than as a list: KK and SN for drums, the note
+ * value for a subdivision, the first two letters of a groove.
+ */
+const SUBDIV_SHORT = { quarters: '4', eighths: '8', triplets: '3', sixteenths: '16', sextuplets: '6' };
+
+export function shortFor(quiz, id) {
+  if (quiz.kind === 'subdiv') return SUBDIV_SHORT[id] || subdivLabel(id).slice(0, 2);
+  if (quiz.kind === 'groove') return labelFor(quiz, id).replace(/\s+/g, '').slice(0, 2);
+  const v = voiceById(id);
+  return v ? v.short : String(id).slice(0, 2);
 }
 
 export function isEliminated(quiz, i) {

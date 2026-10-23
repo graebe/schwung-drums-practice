@@ -83,6 +83,17 @@ test('sticking off ignores hands entirely — right for a groove', () => {
   assert.equal(run.stickErrors, 0);
 });
 
+test('sticking off on a drill with written hands: the wrong half is right, and the hands are still there', () => {
+  const run = mk(para, { sticking: 'off' });
+  const j = S.judgeHit(run, { voice: 'SN', hand: 'L', velocity: 110 }, 0);
+  assert.equal(j.handOk, true, 'only the drum is judged');
+  assert.equal(j.wantHand, 'R', 'the written hand is kept, to show');
+  assert.equal(run.stickErrors, 0);
+  assert.ok(S.handsWritten(run), 'its R and L are drawn');
+  assert.ok(!S.handsWritten(mk(groove, { sticking: 'strict' })), 'a groove has none to draw');
+  assert.ok(!S.handsWritten(null));
+});
+
 /* Three normal strokes then a dynamic one, for the dynamics tests: an accent
  * or a ghost is judged against the strokes before it. */
 const lastDyn = (dyn) => ({

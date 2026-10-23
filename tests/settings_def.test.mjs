@@ -25,6 +25,40 @@ test('every row is complete and every default is in range', () => {
   }
 });
 
+test('every setting is on exactly one page: Settings itself or a group of Advanced', () => {
+  const pages = [S.MAIN_GROUP.key, ...S.GROUPS.map((g) => g.key)];
+  for (const row of S.ROWS) assert.ok(pages.includes(row.group), `${row.key} is on no page`);
+  const seen = [];
+  for (const key of pages) {
+    const rows = S.rowsIn(key);
+    assert.ok(rows.length > 0, `${key} is empty`);
+    seen.push(...rows.map((r) => r.key).filter((k) => S.rowFor(k)));
+  }
+  assert.deepEqual(seen.slice().sort(), S.ROWS.map((r) => r.key).sort(), 'each setting exactly once');
+  assert.deepEqual(S.rowsIn('main').map((r) => r.key), S.MAIN);
+  assert.deepEqual(S.MAIN, ['layout', 'padMap', 'flip', 'click', 'start', 'advanced']);
+  assert.deepEqual(S.rowsIn('main').map((r) => r.label), ['Pads', 'Pad map', 'Flip', 'Click', 'Start at', 'Advanced']);
+  assert.deepEqual(S.GROUPS.map((g) => g.key), ['practice', 'sound', 'midi']);
+  assert.deepEqual(S.settingsRows(S.DEFAULTS, S.rowsIn('midi')).map((r) => r.label), ['MIDI out', 'MIDI ch']);
+  assert.equal(S.groupByKey('main').label, 'Settings');
+  assert.equal(S.groupByKey('sound').label, 'Sound');
+  assert.equal(S.groupByKey('pads'), null, 'Pads is on Settings itself now');
+});
+
+test('Start at and Advanced are rows of the page, never settings', () => {
+  assert.equal(S.rowFor('start'), null);
+  assert.equal(S.rowFor('advanced'), null);
+  assert.ok(!('start' in S.DEFAULTS) && !('advanced' in S.DEFAULTS));
+  const rows = S.settingsRows(S.DEFAULTS, S.rowsIn('main'), { start: 'Stage 2' });
+  assert.deepEqual(rows.slice(-2).map((r) => [r.label, r.value, r.action]),
+    [['Start at', 'Stage 2', null], ['Advanced', '>', 'advanced']]);
+  assert.deepEqual(rows[0], { key: 'layout', label: 'Pads', value: 'MPC', action: null });
+  const before = { ...S.DEFAULTS };
+  S.applySetting(before, 'advanced', 1);
+  S.applySetting(before, 'start', 1);
+  assert.deepEqual(before, S.DEFAULTS, 'a page row changes no setting');
+});
+
 test('the label fits the screen', () => {
   for (const row of S.ROWS) assert.ok(row.label.length <= 11, `${row.label} is too long`);
 });
@@ -153,12 +187,23 @@ test('the v4 migration moves the old kit layout to MPC Classic, keeps Sticking, 
   assert.equal(old.changed, true);
   assert.equal(S.loadSettings(JSON.stringify({ version: 3, layout: 'sticking' })).settings.layout, 'sticking');
   const saved = JSON.parse(S.serialiseSettings(old.settings));
-  assert.equal(saved.version, 4);
+  assert.equal(saved.version, S.SETTINGS_VERSION);
   assert.ok(!('padMap' in saved), 'the Pad map row is not a setting');
   assert.equal(S.loadSettings(S.serialiseSettings(old.settings)).changed, false);
   const s = { ...S.DEFAULTS };
   S.applySetting(s, 'padMap', 1);
   assert.deepEqual(s, { ...S.DEFAULTS }, 'turning an action row changes nothing');
+});
+
+test('the v5 migration stops judging hands: a stale strict becomes off, once; loose is a choice and stays', () => {
+  assert.equal(S.DEFAULTS.sticking, 'off');
+  const old = S.loadSettings(JSON.stringify({ version: 4, sticking: 'strict', bpm: 100 }));
+  assert.equal(old.settings.sticking, 'off');
+  assert.equal(old.changed, true);
+  assert.equal(S.loadSettings(JSON.stringify({ version: 4, sticking: 'loose' })).settings.sticking, 'loose');
+  const chosen = S.loadSettings(JSON.stringify({ version: 5, sticking: 'strict' }));
+  assert.equal(chosen.settings.sticking, 'strict', 'strict chosen after the update is kept');
+  assert.equal(chosen.changed, false);
 });
 
 test('the v2 migration moves a stale staff default to drum tab, once', () => {

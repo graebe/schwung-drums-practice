@@ -37,6 +37,10 @@ async function loadUi({ breakOn = null } = {}) {
   for (const f of readdirSync(exDir)) {
     files[`${DIR}/exercises/${f}`] = readFileSync(new URL(f, exDir), 'utf8');
   }
+  /* A learner past the welcome and the first-visit tips, so the screens the
+   * tests drive to are the ones that come up. */
+  files[`${DIR}/progress.json`] = JSON.stringify({ version: 2, items: {},
+    tips: ['welcome', 'sheet', 'practice', 'quiz', 'map', 'island'] });
 
   /* Any host primitive can be made to throw, which is what a real host fault
    * looks like from inside the module. */
@@ -88,7 +92,7 @@ async function loadUi({ breakOn = null } = {}) {
   const src = readFileSync(new URL('../src/ui.js', import.meta.url), 'utf8')
     .replace(`'${SHARED}input_filter.mjs'`, `'${inputFilter}'`)
     .replace(`'${SHARED}screen_reader.mjs'`, `'${screenReader}'`)
-    .replace(/from '\.\/([a-z_]+)\.mjs'/g, (_m, n) => {
+    .replace(/from '\.\/([a-z_/]+)\.mjs'/g, (_m, n) => {
       if (n === 'view' && breakOn === 'view') return `from '${viewShim}'`;
       return `from '${new URL(`../src/${n}.mjs`, import.meta.url).href}'`;
     });
@@ -199,6 +203,10 @@ test('a broken settings file does not stop the module opening', async () => {
   /* Reading threw, so there is an error — but the module is alive and the
    * player can still get out. */
   assert.doesNotThrow(() => ticks(10));
+  /* Nothing could be read, so this is a newcomer: Back ends the welcome,
+   * and Back again leaves. */
+  cc(CC.back, 127);
+  ticks(2);
   cc(CC.back, 127);
   ticks(20);
   assert.ok(log.exited >= 1);
@@ -236,10 +244,10 @@ test('a bug in the drill renderer lands on the error screen, naming the cause', 
   ticks(2);
   /* Open a drill with no ladder and start it, which is what reaches the
    * renderer. */
-  cc(CC.jogTurn, 1); cc(CC.jogTurn, 1); cc(CC.jogTurn, 1);   /* Rudiments */
-  cc(CC.jogClick, 127);                    /* › Rolls */
-  cc(CC.jogClick, 127);                    /* › Single stroke roll */
-  cc(CC.jogClick, 127);
+  cc(CC.jogTurn, 1); cc(CC.jogClick, 127);   /* Practice: the second circle */
+  cc(CC.jogTurn, 2); cc(CC.jogClick, 127);   /* › Rudiments */
+  cc(CC.jogClick, 127);                      /* › Rolls */
+  cc(CC.jogClick, 127);                      /* › Single stroke roll */
   ticks(3);
   cc(CC.record, 127);
   ticks(8);

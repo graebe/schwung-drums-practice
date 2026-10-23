@@ -16,7 +16,7 @@ import * as L from './layout.mjs';
 import { barBeatOf } from './chart.mjs';
 import { recentStats } from './timing.mjs';
 import * as SR from './staff_render.mjs';
-import { drawMark, MARK_W } from './glyphs.mjs';
+import { drawMark, MARK_W, drawPlayGlyph, drawRecordGlyph, drawScrubGlyph, SCRUB_W } from './glyphs.mjs';
 
 /* ---- Header ------------------------------------------------------------- */
 /*
@@ -31,7 +31,9 @@ export function drawHeader(ctx, s) {
   const left = s.title || '';
   /* "3/8" is bars through the whole practice. An endless drill has no total,
    * so it falls back to the absolute bar and beat. */
-  const mid = bar.bars > 0 ? `${bar.bar}/${bar.bars}` : `${bar.bar}.${bar.beat}`;
+  /* The ready screen has no middle: its right slot already says the length,
+   * or once scrubbed the position, and saying either twice cost the title. */
+  const mid = s.ready ? '' : bar.bars > 0 ? `${bar.bar}/${bar.bars}` : `${bar.bar}.${bar.beat}`;
   /*
    * The right slot holds ONE thing, and which one depends on what you are
    * doing. While playing it is your timing, which is the whole point of the
@@ -52,11 +54,17 @@ export function drawHeader(ctx, s) {
    * under them — past TEXT_MAX_PX the host stops plotting and a number goes
    * missing in silence. */
   let title = left;
-  const budget = L.SCREEN_W - rw - mw - 10;
+  const budget = L.SCREEN_W - rw - (mid ? mw + 10 : 6);
+  if (s.ready) {
+    /* Before a take the name is read, not glanced at: cut at a word. */
+    const words = left.split(' ');
+    while (words.length > 1 && ctx.textWidth(words.join(' ')) > budget) words.pop();
+    title = words.join(' ');
+  }
   while (title.length && ctx.textWidth(title) > budget) title = title.slice(0, -1);
 
   ctx.text(1, 0, title, 1);
-  ctx.text(L.SCREEN_W - rw - mw - 5, 0, mid, 1);
+  if (mid) ctx.text(L.SCREEN_W - rw - mw - 5, 0, mid, 1);
   ctx.text(L.SCREEN_W - rw - 1, 0, right, 1);
   ctx.fillRect(0, L.HEADER_RULE_Y, L.SCREEN_W, 1, 1);
 }
@@ -125,13 +133,86 @@ export function drawLaneCallout(ctx, text) {
   ctx.text((L.SCREEN_W >> 1) - (w >> 1), L.UNDER_LANE_Y, label, 0);
 }
 
+/* ---- The hint line -------------------------------------------------------- */
+/*
+ * One line along the bottom edge naming the keys (hints.mjs): centred, fitted,
+ * and drawn over whatever the band held — the ready screen's empty progress
+ * bar, a paused take's — so any screen can carry it.
+ */
+export function drawHint(ctx, text, left = '') {
+  if (!text && !left) return;
+  ctx.fillRect(0, L.HINT_Y, L.SCREEN_W, L.SCREEN_H - L.HINT_Y, 0);
+  if (!left) {
+    const s = fitText(ctx, text, L.TEXT_MAX_PX);
+    ctx.text((L.SCREEN_W - ctx.textWidth(s)) >> 1, L.HINT_Y, s, 1);
+    return;
+  }
+  /* What is on screen at the left — the ready screen's level — and the keys
+   * at the right. The keys come in parts short enough to leave the left its
+   * room; a part that would not, takes the line alone. */
+  const tw = text ? ctx.textWidth(text) : 0;
+  if (tw && ctx.textWidth(left) + 6 + tw > L.TEXT_MAX_PX) {
+    ctx.text(L.SCREEN_W - tw - 1, L.HINT_Y, fitText(ctx, text, L.TEXT_MAX_PX), 1);
+    return;
+  }
+  ctx.text(1, L.HINT_Y, fitText(ctx, left, L.TEXT_MAX_PX), 1);
+  if (tw) ctx.text(L.SCREEN_W - tw - 1, L.HINT_Y, text, 1);
+}
+
+/* ---- The ready box ------------------------------------------------------ */
+/*
+ * The controls over the chart before a take, at L.READY_BOX: on the left a
+ * glyph and one word each — listen, practise, scrub (or hear bar, own pace
+ * for L0) — and, for a groove of rungs, on the right the LEVEL: its digit,
+ * big, with an arrow on each side the jog can still go, and the done mark
+ * once that rung is learned. The music shows above and below it.
+ *
+ *   rows   [['play'|'rec'|'scrub', word], …]
+ *   level  { digit, down, up, done } or null
+ */
+export const READY_SPLIT = 64;
+
+export function drawReadyBox(ctx, { rows = [], level = null } = {}) {
+  const b = L.READY_BOX;
+  ctx.fillRect(b.x, b.y, b.w, b.h, 0);
+  ctx.drawRect(b.x, b.y, b.w, b.h, 1);
+  /* One glyph column, the words 3px after the widest glyph (the scrub's 9),
+   * so none touches its word. */
+  const gx = b.x + 3;
+  const tx = gx + SCRUB_W + 3;
+  for (let i = 0; i < rows.length; i++) {
+    const y = b.y + 4 + i * 9;
+    const [glyph, word] = rows[i];
+    if (glyph === 'play') drawPlayGlyph(ctx, gx + 1, y, 7);
+    else if (glyph === 'rec') drawRecordGlyph(ctx, gx + 1, y, 7);
+    else drawScrubGlyph(ctx, gx, y);
+    ctx.text(tx, y, word, 1);
+  }
+  if (!level) return;
+  const sx = b.x + READY_SPLIT;
+  ctx.fillRect(sx, b.y, 1, b.h, 1);
+  const rw = b.w - READY_SPLIT - 1;
+  const cx = sx + 1 + (rw >> 1);
+  ctx.text(sx + 3, b.y + 3, 'LEVEL', 1);
+  if (level.done) drawMark(ctx, b.x + b.w - MARK_W - 2, b.y + 3, 'done', 1);
+  const w = SR.bigTextWidth(level.digit, 3);
+  SR.drawBigText(ctx, cx - (w >> 1), b.y + 13, level.digit, 3);
+  if (level.down) ctx.text(cx - (w >> 1) - 10, b.y + 17, '<', 1);
+  if (level.up) ctx.text(cx + (w >> 1) + 5, b.y + 17, '>', 1);
+}
+
 /* ---- Lists (the menu and the settings page) ----------------------------- */
 /*
  * One list renderer for both, because they are the same thing: rows, one
  * highlighted, scrolled to keep the highlight on screen. The window is kept
  * so the selection never sits against an edge while there is more to see.
+ *
+ * Four rows and the hint line under them, as in Piano Practice: a fifth row
+ * left no room to say which keys work.
  */
-export const LIST_ROWS = 5;
+export const LIST_ROWS = 4;
+const LIST_TOP = 10;
+const LIST_BAND = LIST_ROWS * (L.TEXT_H + 2);
 
 export function listWindow(count, selected, rows = LIST_ROWS) {
   if (count <= rows) return 0;
@@ -152,7 +233,7 @@ export function pageTop(count, selected, rows = LIST_ROWS) {
   return Math.floor(Math.max(0, selected) / rows) * rows;
 }
 
-export function drawList(ctx, { title, items, selected, right, top: fixedTop }) {
+export function drawList(ctx, { title, items, selected, right, top: fixedTop, footer }) {
   ctx.clear();
   ctx.text(1, 0, title || '', 1);
   if (right) ctx.text(L.SCREEN_W - ctx.textWidth(right) - 1, 0, right, 1);
@@ -161,7 +242,7 @@ export function drawList(ctx, { title, items, selected, right, top: fixedTop }) 
   const top = fixedTop === undefined ? listWindow(items.length, selected) : fixedTop;
   for (let i = 0; i < LIST_ROWS && top + i < items.length; i++) {
     const idx = top + i;
-    const y = 11 + i * (L.TEXT_H + 2);
+    const y = LIST_TOP + 1 + i * (L.TEXT_H + 2);
     const item = items[idx];
     const label = typeof item === 'string' ? item : item.label;
     const value = typeof item === 'string' ? '' : item.value || '';
@@ -178,10 +259,11 @@ export function drawList(ctx, { title, items, selected, right, top: fixedTop }) 
   }
   /* A scrollbar, so a long list does not look like a short one. */
   if (items.length > LIST_ROWS) {
-    const h = Math.max(3, Math.round((LIST_ROWS / items.length) * 44));
-    const y = 10 + Math.round((top / (items.length - LIST_ROWS)) * (44 - h));
+    const h = Math.max(3, Math.round((LIST_ROWS / items.length) * LIST_BAND));
+    const y = LIST_TOP + Math.round((top / (items.length - LIST_ROWS)) * (LIST_BAND - h));
     ctx.fillRect(L.SCREEN_W - 1, y, 1, h, 1);
   }
+  drawHint(ctx, footer);
 }
 
 /* `text` cut to fit `maxPx`, so it never runs under what sits beside it. */

@@ -7,12 +7,12 @@
  *
  * A card names ONE concept — what a ghost note is, where you hear it, what to
  * listen for — in a screen or two, and stands before the first step of the
- * Learning Path that needs it. One card per concept, not per drill, so a
+ * Path that needs it. One card per concept, not per drill, so a
  * concept is explained once and the cards read as a thread through the
  * course; each stage has a card of its own, what that world is.
  *
  * A card is never in the way. Click starts the practice — one press, read or
- * not — and Intros in Your path says whether cards show once (new), every
+ * not — and Settings › Advanced › Learning Path › Intros says whether cards show once (new), every
  * time (always) or never (off). Each stage folder lists its cards under
  * Lessons, to read again at any time.
  *
@@ -23,21 +23,29 @@
 
 export const LINES_PER_PAGE = 6;
 
-/* { cards: Map id -> { id, title, text }, ok }. Never throws. */
+/*
+ * { cards: Map id -> { id, title, text }, pads: Map voice -> text, ok }.
+ * Never throws. `pads` is a line about each drum, for Meet the pads
+ * (pad_tour.mjs); a drum without one is shown by its name alone.
+ */
 export function parseLessons(text) {
   const cards = new Map();
+  const pads = new Map();
   let obj = null;
   try {
     obj = JSON.parse(text || '');
   } catch (e) {
-    return { cards, ok: false };
+    return { cards, pads, ok: false };
   }
-  if (!obj || !Array.isArray(obj.cards)) return { cards, ok: false };
+  if (!obj || !Array.isArray(obj.cards)) return { cards, pads, ok: false };
   for (const c of obj.cards) {
     if (!c || typeof c.id !== 'string' || typeof c.text !== 'string') continue;
     cards.set(c.id, { id: c.id, title: typeof c.title === 'string' ? c.title : c.id, text: c.text });
   }
-  return { cards, ok: true };
+  if (obj.pads && typeof obj.pads === 'object') {
+    for (const [voice, line] of Object.entries(obj.pads)) if (typeof line === 'string') pads.set(voice, line);
+  }
+  return { cards, pads, ok: true };
 }
 
 /*

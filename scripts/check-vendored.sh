@@ -9,11 +9,18 @@
 #   dsp/schwung-plugin/src  the Schwung ABI binding
 #   samples/click.*         the metronome pack, its manifest and report
 #   samples/LICENSES/CC0-1.0.txt
+#   src/pathmap             the Path map engine, and its tests/pathmap_*.test.mjs
+#   src/home                the home screen's circles, and tests/home_*.test.mjs
 #
 #   scripts/check-vendored.sh [<piano-practice checkout>] [<ref>]
 #
 # The checkout defaults to the sibling of this repository's main checkout
 # (schwung-pinao-practice beside schwung-drums-practice), the ref to main.
+# Name the ref to check against a branch that is not merged yet: the Path map
+# exists in Piano Practice only on feature/piano-map until it merges, and its
+# island path fix and the home engine's ring menus only on feature/piano-rings
+# until that merges into piano-map, so until then run
+#   scripts/check-vendored.sh <piano checkout> feature/piano-rings
 # Each file is compared by its git blob id, the Git LFS pointer for a pack, so
 # a pack is checked without its objects. A local, deliberate check: run it
 # whenever either side changes, and before a release.
@@ -28,6 +35,9 @@ git -C "$PIANO" rev-parse --verify --quiet "$REF^{commit}" >/dev/null \
 
 FILES=$(cd "$ROOT" && find dsp/ni-sampler/src dsp/ni-sampler/Cargo.toml dsp/schwung-plugin/src -type f | sort)
 FILES="$FILES
+$(cd "$ROOT" && find src/pathmap src/home -name '*.mjs' -type f | sort)
+$(cd "$ROOT" && find tests -name 'pathmap_*.test.mjs' -type f | sort)
+$(cd "$ROOT" && find tests -name 'home_*.test.mjs' -type f | sort)
 samples/click.nisp
 samples/click.manifest.toml
 samples/click.report.txt
@@ -43,7 +53,8 @@ for f in $FILES; do
   fi
 done
 # And nothing there that is missing here.
-for f in $(git -C "$PIANO" ls-tree -r --name-only "$REF" -- dsp/ni-sampler dsp/schwung-plugin/src); do
+for f in $(git -C "$PIANO" ls-tree -r --name-only "$REF" -- dsp/ni-sampler dsp/schwung-plugin/src src/pathmap src/home) \
+         $(git -C "$PIANO" ls-tree -r --name-only "$REF" -- tests | grep -E '^tests/(pathmap|home)_.*\.test\.mjs$'); do
   [ -f "$ROOT/$f" ] || { echo "missing here: $f" >&2; bad=1; }
 done
 [ "$bad" = 0 ] || exit 1

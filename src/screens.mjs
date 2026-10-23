@@ -12,12 +12,13 @@
 
 import * as L from './layout.mjs';
 import * as SR from './staff_render.mjs';
-import { drawHeader, drawList, drawPlot, fitText } from './chrome.mjs';
+import { drawHeader, drawList, drawPlot, drawHint, fitText } from './chrome.mjs';
 import { drawMark, MARK_W } from './glyphs.mjs';
 import { voiceById } from './kit.mjs';
+import { drawMap } from './pathmap/render.mjs';
 import { diatonicToY } from './notation.mjs';
 
-export { drawList };
+export { drawList, drawHint };
 
 /* ---- Summary ------------------------------------------------------------ */
 /*
@@ -55,14 +56,63 @@ export const SUMMARY_PLOT = { x: 3, y: 35, w: L.SCREEN_W - 6, h: 19 };
 const SIDE_A_Y = L.RESULT_BIG_Y;
 const SIDE_B_Y = L.RESULT_BIG_Y + 8;
 
+/* The take's big number: its speed when it counted, else how much was right.
+ * Floored, not rounded: 89.6% did not reach 90 and must not read as if it had. */
+export function summaryBig(s) {
+  return `${s.clean !== false ? Math.round(s.speed || 0) : Math.floor((s.accuracy || 0) * 100)}`;
+}
+
+/* A quiz round's big number: answers a minute. */
+export function resultBig(s) {
+  return `${Math.round(s.rate)}`;
+}
+
+/*
+ * The star's frame (scene_view.mjs): a level learned for the first time,
+ * its result's big number alone and centred in the map area (y 10..54) at
+ * the result's scale with its unit, LEVEL LEARNED under it — or LEARNED,
+ * where that does not fit — the result's title bar and the scene's hint
+ * line. When the star ends the result screen is drawn as it always is.
+ *
+ *   y 10..44  the number, centred on (STAR_X, STAR_Y), and the band the
+ *             star's rays may use round it (STAR_BAND, anim.mjs starFit)
+ *   y 46..52  the caption, a pixel of air above it
+ */
+export const STAR_X = L.SCREEN_W >> 1;
+export const STAR_Y = 27;
+const STAR_CAPTION_Y = 46;
+export const STAR_BAND = Object.freeze({ top: 10, bottom: STAR_CAPTION_Y - 2 });
+const STAR_CAPTIONS = ['LEVEL LEARNED', 'LEARNED'];
+
+/* The number's box on the star's frame: the digits at the result's scale and
+ * the unit beside them, centred on the star. */
+export function learnedBox(ctx, { big, unit }) {
+  const digits = SR.bigTextWidth(big, L.RESULT_BIG_SCALE);
+  const h = SR.BIG_H * L.RESULT_BIG_SCALE;
+  const w = digits + (unit ? ctx.textWidth(unit) + 3 : 0);
+  return { x: STAR_X - (w >> 1), y: STAR_Y - (h >> 1), w, h, digits };
+}
+
+/* s = { title, right, mark, big, unit, footer }; the star's rays are drawn
+ * over it (scene_view.mjs). */
+export function drawLearned(ctx, s) {
+  ctx.clear();
+  drawTitle(ctx, s.title || '', s.right || '', s.mark || null);
+  const b = learnedBox(ctx, s);
+  SR.drawBigText(ctx, b.x, b.y, s.big, L.RESULT_BIG_SCALE);
+  if (s.unit) ctx.text(b.x + b.digits + 3, b.y + 8, s.unit, 1);
+  const caption = STAR_CAPTIONS.find((c) => ctx.textWidth(c) <= L.SCREEN_W - 2) || STAR_CAPTIONS[1];
+  ctx.text((L.SCREEN_W - ctx.textWidth(caption)) >> 1, STAR_CAPTION_Y, caption, 1);
+  drawHint(ctx, s.footer || '');
+}
+
 export function drawSummary(ctx, s) {
   ctx.clear();
   drawTitle(ctx, s.name || 'RESULT', s.status || '', s.mark);
 
   const counted = s.clean !== false;
-  /* Floored, not rounded: 89.6% did not reach 90 and must not read as if it had. */
   const right = Math.floor((s.accuracy || 0) * 100);
-  const big = `${counted ? Math.round(s.speed || 0) : right}`;
+  const big = summaryBig(s);
   SR.drawBigText(ctx, L.RESULT_LEFT_X, L.RESULT_BIG_Y, big, L.RESULT_BIG_SCALE);
   const w = SR.bigTextWidth(big, L.RESULT_BIG_SCALE);
   ctx.text(L.RESULT_LEFT_X + w + 3, L.RESULT_BIG_Y + 8, '%', 1);
@@ -96,8 +146,7 @@ export function drawSummary(ctx, s) {
   }
 
   drawPercentPlot(ctx, SUMMARY_PLOT, s.series);
-  const hint = s.footer || 'REC again  CLICK next';
-  ctx.text((L.SCREEN_W - ctx.textWidth(hint)) >> 1, L.SCREEN_H - L.TEXT_H, hint, 1);
+  drawHint(ctx, s.footer || 'CLICK next  REC again');
 }
 
 /* The header: a title fitted against a status on the right, with its mark. */
@@ -215,8 +264,7 @@ export function drawPadMap(ctx, s) {
   }
   /* The hands divide here: left half the left hand. */
   ctx.fillRect(g.x + 4 * g.cellW - 1, g.y, 1, 4 * g.cellH - 1, 1);
-  const foot = fit(ctx, s.footer || '', L.SCREEN_W - 2);
-  ctx.text((L.SCREEN_W - ctx.textWidth(foot)) >> 1, L.SCREEN_H - L.TEXT_H, foot, 1);
+  drawHint(ctx, s.footer || '');
 }
 
 /* ---- Lesson card -------------------------------------------------------- */
@@ -235,8 +283,66 @@ export function drawCard(ctx, s) {
   drawTitle(ctx, s.title || '', pages > 1 ? `${(s.page || 0) + 1}/${pages}` : '', null);
   const lines = s.lines || [];
   for (let i = 0; i < lines.length; i++) ctx.text(1, CARD_TEXT_Y + i * L.TEXT_H, lines[i], 1);
-  const foot = fit(ctx, s.footer || 'CLICK start', L.SCREEN_W - 2);
-  ctx.text((L.SCREEN_W - ctx.textWidth(foot)) >> 1, L.SCREEN_H - L.TEXT_H, foot, 1);
+  drawHint(ctx, s.footer || 'CLICK start');
+}
+
+/* ---- A page of text ------------------------------------------------------- */
+/*
+ * Help, the welcome and a tip (layout.mjs PAGE_*): five lines on a 9px pitch
+ * under the title, scrolled by the jog when there are more, with the first
+ * line shown and the count in the title's right — "1/23" — and a scrollbar.
+ * The lines arrive fitted (help.mjs fitPage); this only draws them.
+ *
+ * s = { title, lines, top, footer, right }
+ */
+export function drawPage(ctx, s) {
+  ctx.clear();
+  const lines = s.lines || [];
+  const rows = L.PAGE_ROWS;
+  const top = Math.max(0, Math.min(s.top || 0, Math.max(0, lines.length - rows)));
+  const more = lines.length > rows ? `${top + 1}/${lines.length}` : (s.right || '');
+  drawTitle(ctx, s.title || '', more, null);
+  for (let i = 0; i < rows && top + i < lines.length; i++) {
+    const max = lines.length > rows ? L.PAGE_TEXT_PX : L.PAGE_FULL_PX;
+    ctx.text(L.PAGE_TEXT_X, L.PAGE_TOP_Y + i * L.PAGE_LINE_H, fit(ctx, lines[top + i], max), 1);
+  }
+  if (lines.length > rows) {
+    const band = rows * L.PAGE_LINE_H - 2;
+    const h = Math.max(3, Math.round((rows / lines.length) * band));
+    const y = L.PAGE_TOP_Y + Math.round((top / (lines.length - rows)) * (band - h));
+    ctx.fillRect(L.SCREEN_W - 1, y, 1, h, 1);
+  }
+  drawHint(ctx, s.footer || '');
+}
+
+/* ---- The Path map ---------------------------------------------------------- */
+/*
+ * A folder of the Path as its map (pathmap/render.mjs, vendored from Piano
+ * Practice): the title bar — the place under the avatar, its percent, its
+ * reviews due (map_places.mjs mapTitle) — the map in y 10..53, and the hint
+ * line under it.
+ *
+ * s = { title, right, places, layout, walk, now, footer, route } (route false: no dotted path)
+ */
+export function drawMapScreen(ctx, s) {
+  ctx.clear();
+  drawTitle(ctx, s.title || '', s.right || '', null);
+  drawMap(ctx, { places: s.places, layout: s.layout, walk: s.walk, now: s.now || 0, kind: s.layout.kind,
+    route: s.route !== false });
+  drawHint(ctx, s.footer || '');
+}
+
+/* ---- Meet the pads ------------------------------------------------------ */
+/*
+ * A stop of the pad tour (pad_tour.mjs): the drum's name over a rule, where it
+ * is in the tour, a line about it, and the hint line. The pads say where it
+ * is; the screen says what it is. A page of text like help and the tips
+ * (drawPage); its lines arrive fitted (help.mjs fitPage).
+ *
+ * s = { title, right, lines, footer }
+ */
+export function drawTour(ctx, s) {
+  drawPage(ctx, s);
 }
 
 /* ---- Ladder ------------------------------------------------------------- */
@@ -271,37 +377,113 @@ export function drawLadder(ctx, s) {
 /* ---- Quiz --------------------------------------------------------------- */
 const PICK_ROW_Y = 15;
 const PICK_ROW_H = 12;
+/* Rows of 12 px fit three answers above the hint line. */
+const PICK_LIST_MAX = 3;
+
+/*
+ * Three answers or fewer: one row per answer, as Piano Practice lists them:
+ * the answer on the left, the colour of its pad on the right — the panel is
+ * one colour, so the pad's colour is named rather than shown — and the jog's
+ * choice inverted, as everywhere.
+ */
+function drawPickList(ctx, s) {
+  const q = s.quiz;
+  for (let i = 0; i < q.options.length; i++) {
+    const y = PICK_ROW_Y + i * PICK_ROW_H;
+    const selected = i === q.choice;
+    const v = selected ? 0 : 1;
+    if (selected) ctx.fillRect(0, y - 1, L.SCREEN_W, PICK_ROW_H, 1);
+    const colour = s.colours ? s.colours[i % s.colours.length] : '';
+    const cw = colour ? ctx.textWidth(colour) : 0;
+    const label = fit(ctx, s.labelFor(q.options[i]), L.SCREEN_W - 8 - cw - (cw ? 6 : 0));
+    ctx.text(4, y, label, v);
+    if (colour) ctx.text(L.SCREEN_W - 4 - cw, y, colour, v);
+    /* A struck-out option stays on screen, and its pad goes dark: seeing
+     * what you ruled out is part of what the hint teaches. */
+    if (s.isEliminated(i)) ctx.fillRect(2, y + 3, L.SCREEN_W - 4, 1, v);
+  }
+}
+
+/*
+ * More: the answer pads as they sit on the bottom row, each cell in its pad's
+ * column with a short name, and the jog's choice spelled out underneath. Past
+ * three a list of colour names stops being readable; the place carries the
+ * meaning — and since the answers never move, it is a place you learn.
+ */
+const PICK_CELL_W = 16;
+const PICK_CELL_H = 11;
+const PICK_CELL_Y = 20;
+const PICK_NAME_Y = 40;
+
+function drawPickMap(ctx, s) {
+  const q = s.quiz;
+  for (let i = 0; i < q.options.length; i++) {
+    const x = s.columnOf(i) * PICK_CELL_W;
+    const selected = i === q.choice;
+    if (selected) ctx.fillRect(x + 1, PICK_CELL_Y, PICK_CELL_W - 1, PICK_CELL_H, 1);
+    else ctx.drawRect(x + 1, PICK_CELL_Y, PICK_CELL_W - 1, PICK_CELL_H, 1);
+    const short = s.shortFor(q.options[i]);
+    const tw = ctx.textWidth(short);
+    ctx.text(x + 1 + ((PICK_CELL_W - 1 - tw) >> 1), PICK_CELL_Y + 2, short, selected ? 0 : 1);
+    if (s.isEliminated(i)) {
+      ctx.line(x + 2, PICK_CELL_Y + PICK_CELL_H - 2, x + PICK_CELL_W - 2, PICK_CELL_Y + 1, selected ? 0 : 1);
+    }
+  }
+  const name = fit(ctx, s.labelFor(q.options[q.choice]) || '', L.SCREEN_W - 4);
+  ctx.text((L.SCREEN_W - ctx.textWidth(name)) >> 1, PICK_NAME_Y, name, 1);
+}
+
+/*
+ * Pick: drum, its answers on the kit's own pads: the grid as it sits under
+ * the hands (drawPadMap's, top row first, the hands' rule down the middle).
+ * Each offered drum's short name is in every one of its cells, the jog's
+ * choice inverted in all of them, a struck one crossed; the rest is empty.
+ */
+function drawPickPads(ctx, s) {
+  const q = s.quiz;
+  const g = PADMAP;
+  for (let row = 0; row < 4; row++) {
+    const y = g.y + (3 - row) * g.cellH;
+    for (let col = 0; col < 8; col++) {
+      const at = s.padGrid[row * 8 + col];
+      if (at < 0) continue;
+      const x = g.x + col * g.cellW;
+      const on = at === q.choice;
+      if (on) ctx.fillRect(x, y, g.cellW, g.cellH - 1, 1);
+      const short = s.shortFor(q.options[at]);
+      ctx.text(x + ((g.cellW - ctx.textWidth(short)) >> 1), y + 2, short, on ? 0 : 1);
+      if (s.isEliminated(at)) ctx.line(x + 1, y + g.cellH - 3, x + g.cellW - 2, y + 1, on ? 0 : 1);
+    }
+  }
+  ctx.fillRect(g.x + 4 * g.cellW - 1, g.y, 1, 4 * g.cellH - 1, 1);
+}
+
+/* Pick: drum's header names the jog's choice, since the cells only carry
+ * short names: "Snare  blue" where it fits beside the round's progress, the
+ * name alone where not. The colour only when the choice is on pads. */
+function pickTitle(ctx, s, room) {
+  const q = s.quiz;
+  const name = s.labelFor(q.options[q.choice]) || '';
+  const lit = s.colours && s.padGrid.indexOf(q.choice) >= 0;
+  const both = lit ? `${name}  ${s.colours[q.choice % s.colours.length]}` : name;
+  return ctx.textWidth(both) <= room ? both : fit(ctx, name, room);
+}
+
 export function drawQuiz(ctx, s) {
   ctx.clear();
   const q = s.quiz;
-  ctx.text(1, 0, s.title || 'QUIZ', 1);
   const prog = s.progress || '';
-  ctx.text(L.SCREEN_W - ctx.textWidth(prog) - 1, 0, prog, 1);
+  const pads = q.mode === 'pick' && s.padGrid;
+  const pw = ctx.textWidth(prog);
+  ctx.text(1, 0, pads ? pickTitle(ctx, s, L.SCREEN_W - pw - 8) : s.title || 'QUIZ', 1);
+  ctx.text(L.SCREEN_W - pw - 1, 0, prog, 1);
   ctx.fillRect(0, L.HEADER_RULE_Y, L.SCREEN_W, 1, 1);
 
   if (q.mode === 'pick') {
-    /*
-     * One row per answer, as Piano Practice lists them: the answer on the
-     * left, the colour of its pad on the right — the panel is one colour, so
-     * the pad's colour is named rather than shown — and the jog's choice
-     * inverted, as everywhere.
-     */
-    for (let i = 0; i < q.options.length; i++) {
-      const y = PICK_ROW_Y + i * PICK_ROW_H;
-      const selected = i === q.choice;
-      const v = selected ? 0 : 1;
-      if (selected) ctx.fillRect(0, y - 1, L.SCREEN_W, PICK_ROW_H, 1);
-      const colour = s.colours ? s.colours[i % s.colours.length] : '';
-      const cw = colour ? ctx.textWidth(colour) : 0;
-      const label = fit(ctx, s.labelFor(q.options[i]), L.SCREEN_W - 8 - cw - (cw ? 6 : 0));
-      ctx.text(4, y, label, v);
-      if (colour) ctx.text(L.SCREEN_W - 4 - cw, y, colour, v);
-      /* A struck-out option stays on screen, and its pad goes dark: seeing
-       * what you ruled out is part of what the hint teaches. */
-      if (s.isEliminated(i)) ctx.fillRect(2, y + 3, L.SCREEN_W - 4, 1, v);
-    }
-    const foot = s.hintsLeft > 0 ? 'PAD answer  REC help' : 'PAD or JOG  CLICK ok';
-    ctx.text((L.SCREEN_W - ctx.textWidth(foot)) >> 1, L.SCREEN_H - L.TEXT_H, foot, 1);
+    if (pads) drawPickPads(ctx, s);
+    else if (q.options.length <= PICK_LIST_MAX) drawPickList(ctx, s);
+    else drawPickMap(ctx, s);
+    drawHint(ctx, s.footer || (s.hintsLeft > 0 ? 'PAD answer  REC help' : 'PAD answer  CLICK ok'));
     return;
   } else {
     /* guess: the notation, on its own staff. hear: a question mark until you
@@ -327,10 +509,9 @@ export function drawQuiz(ctx, s) {
     }
   }
 
-  const streak = `streak ${q.streak}`;
-  ctx.text(1, L.SCREEN_H - L.TEXT_H, streak, 1);
-  const help = s.hintsLeft > 0 ? 'REC help' : '';
-  if (help) ctx.text(L.SCREEN_W - ctx.textWidth(help) - 1, L.SCREEN_H - L.TEXT_H, help, 1);
+  /* The streak over the hint line, at the left, clear of the name above. */
+  ctx.text(1, L.UNDER_LANE_Y, `streak ${q.streak}`, 1);
+  drawHint(ctx, s.footer || (s.hintsLeft > 0 ? 'PAD answer  REC help' : 'PAD answer'));
 }
 
 /* ---- Quiz result -------------------------------------------------------- */
@@ -339,7 +520,7 @@ export function drawResult(ctx, s) {
   ctx.text(1, 0, s.isBest ? 'BEST YET' : 'ROUND', 1);
   ctx.fillRect(0, L.HEADER_RULE_Y, L.SCREEN_W, 1, 1);
 
-  const rate = `${Math.round(s.rate)}`;
+  const rate = resultBig(s);
   SR.drawBigText(ctx, L.RESULT_LEFT_X, L.RESULT_BIG_Y, rate, L.RESULT_BIG_SCALE);
   const w = SR.bigTextWidth(rate, L.RESULT_BIG_SCALE);
   ctx.text(L.RESULT_LEFT_X + w + 3, L.RESULT_BIG_Y + 8, '/min', 1);
@@ -355,6 +536,7 @@ export function drawResult(ctx, s) {
     drawNote(ctx, L.SCREEN_W - w - 1, L.RESULT_ROW_B_Y, s.note);
   }
   drawPlot(ctx, L.RESULT_PLOT, s.series || []);
+  drawHint(ctx, s.footer || '');
 }
 
 /* ---- Progress ----------------------------------------------------------- */
@@ -378,8 +560,7 @@ export function drawProgress(ctx, s) {
   const bestLine = s.isQuiz ? `best ${s.best}%` : s.best ? `best ${s.best}% ${s.bpm}bpm` : 'never clean';
   ctx.text(1, L.PROGRESS_ROW_Y, bestLine, 1);
   ctx.text(L.SCREEN_W - ctx.textWidth(takes) - 1, L.PROGRESS_ROW_Y, takes, 1);
-  const foot = s.footer || '';
-  if (foot) ctx.text((L.SCREEN_W - ctx.textWidth(foot)) >> 1, L.SCREEN_H - L.TEXT_H, foot, 1);
+  drawHint(ctx, s.footer || '');
 }
 
 /*
@@ -414,8 +595,7 @@ export function drawOverview(ctx, s) {
   }
   const learned = `${s.done} learned of ${s.count}`;
   ctx.text(1, L.PROGRESS_ROW_Y, fit(ctx, learned, L.SCREEN_W - 2), 1);
-  const foot = s.footer || '';
-  if (foot) ctx.text((L.SCREEN_W - ctx.textWidth(foot)) >> 1, L.SCREEN_H - L.TEXT_H, foot, 1);
+  drawHint(ctx, s.footer || '');
 }
 
 /* ---- Failure ------------------------------------------------------------ */

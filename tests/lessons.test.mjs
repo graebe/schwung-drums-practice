@@ -15,6 +15,7 @@ import * as P from '../src/progress.mjs';
 import { createScreen } from '../tools/screen_buffer.mjs';
 import { drawCard, CARD_TEXT_Y } from '../src/view.mjs';
 import * as L from '../src/layout.mjs';
+import { VOICE_IDS } from '../src/kit.mjs';
 
 const { cards, ok } = LES.parseLessons(readFileSync(new URL('../src/lessons.json', import.meta.url), 'utf8'));
 const screen = createScreen();
@@ -127,4 +128,13 @@ test('a Lessons deck reads again; Play does nothing there; the jog turns pages w
   assert.equal(LES.deckScreen(d).page, 0);
   LES.advance(d);
   assert.equal(LES.deckScreen(d).footer, 'CLICK done');
+});
+
+test('a line about every drum, for Meet the pads; a bad pads block is left out, not fatal', () => {
+  const { pads } = LES.parseLessons(readFileSync(new URL('../src/lessons.json', import.meta.url), 'utf8'));
+  for (const v of VOICE_IDS) assert.ok(pads.get(v), `no line about ${v}`);
+  for (const k of pads.keys()) assert.ok(VOICE_IDS.includes(k), `a line about no drum: ${k}`);
+  assert.equal(LES.parseLessons('{"cards": [], "pads": 3}').pads.size, 0);
+  assert.deepEqual([...LES.parseLessons('{"cards": [], "pads": {"KK": "x", "SN": 4}}').pads], [['KK', 'x']]);
+  assert.equal(LES.parseLessons('{').pads.size, 0);
 });

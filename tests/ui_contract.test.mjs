@@ -111,11 +111,11 @@ test('a whole take is recorded once, and a Ladder records itself', () => {
 
 test('an install keeps every file the player\'s practice lives in', () => {
   /* install.sh swaps the whole module directory; a file it does not copy
-   * forward is wiped on every update. pads.json once was. lessons.json is
-   * shipped, not written. */
+   * forward is wiped on every update. pads.json once was. lessons.json and
+   * help.json are shipped, not written. */
   const install = readFileSync(new URL('../scripts/install.sh', import.meta.url), 'utf8');
   const kept = [...src.matchAll(/`\$\{MODULE_DIR\}\/([\w.]+\.json)`/g)].map((m) => m[1])
-    .filter((f) => f !== 'lessons.json');
+    .filter((f) => f !== 'lessons.json' && f !== 'help.json');
   assert.ok(kept.length >= 10, kept.join(' '));
   for (const f of kept) assert.ok(install.includes(f), `install.sh drops ${f}`);
 });

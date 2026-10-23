@@ -27,12 +27,17 @@ test('the transport says which mode the module is in', () => {
 test('a jog turn does nothing while you are playing', () => {
   /* A knock must not change what you are playing. */
   assert.equal(C.jogTarget('running', false), 'none');
-  assert.equal(C.jogTarget('ready', false), 'none');
+  assert.equal(C.jogTarget('ready', false), 'level');
   assert.equal(C.jogTarget('menu', false), 'menu');
   assert.equal(C.jogTarget('settings', false), 'row');
   assert.equal(C.jogTarget('settings', true), 'value');
   assert.equal(C.jogTarget('quiz', false), 'choice');
   assert.equal(C.jogTarget('progress', false), 'drill');
+  assert.equal(C.jogTarget('tour', false), 'tour');
+  assert.equal(C.jogTarget('sheet', false), 'sheet');
+  assert.equal(C.jogTarget('help', false), 'scroll');
+  assert.equal(C.jogTarget('welcome', false), 'welcome');
+  assert.equal(C.jogTarget('tip', false), 'scroll');
 });
 
 test('the count-in counts down and hands over at beat zero', () => {
