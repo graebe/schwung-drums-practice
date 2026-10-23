@@ -597,11 +597,12 @@ test('the box is over the chart at home and gone once you scrub', () => {
 });
 
 test('a groove\'s box splits: the controls left, LEVEL right with its digit and the arrows it can take', async () => {
-  const { READY_SPLIT } = await import('../src/chrome.mjs');
+  const { READY_SPLIT, READY_RULE_Y } = await import('../src/chrome.mjs');
   const mid = readyFrame({ level: { digit: '2', down: true, up: true, done: false } });
   assert.ok(mid.text.includes('LEVEL') && mid.text.includes('<') && mid.text.includes('>'), mid.text.join('|'));
   const b = READY_BOX;
-  assert.equal(countOn(mid.ctx, b.x + READY_SPLIT, b.y, 1, b.h), b.h, 'no line between the halves');
+  assert.equal(countOn(mid.ctx, b.x + READY_SPLIT, b.y, 1, READY_RULE_Y), READY_RULE_Y,
+    'no line between the halves, down to the rule');
   /* The digit is big: drawn as blocks, not as text. */
   assert.ok(!mid.text.includes('2'));
   assert.ok(countOn(mid.ctx, b.x + READY_SPLIT + 15, b.y + 13, 12, 15) > 20, 'no digit');
@@ -615,6 +616,22 @@ test('a groove\'s box splits: the controls left, LEVEL right with its digit and 
   }
   /* The music still shows above and below the box. */
   assert.ok(countOn(mid.ctx, 0, 10, L.SCREEN_W, b.y - 10) + countOn(mid.ctx, 0, b.y + b.h + 1, L.SCREEN_W, 6) > 0);
+});
+
+test('under the controls, across a rule, the tempo and the knob that sets it', async () => {
+  const { READY_RULE_Y, READY_TEMPO_Y, READY_SPLIT } = await import('../src/chrome.mjs');
+  const b = READY_BOX;
+  for (const [bpm, row] of [[92, 'Knob 8:  92 bpm'], [120, 'Knob 8: 120 bpm']]) {
+    const f = readyFrame({ bpm, level: { digit: '4', down: true, up: false, done: false } });
+    assert.ok(f.text.includes(row), `${bpm}: ${f.text.join('|')}`);
+    assert.equal(countOn(f.ctx, b.x, b.y + READY_RULE_Y, b.w, 1), b.w, 'the rule runs the box\'s width');
+    assert.ok(countOn(f.ctx, b.x + 3, b.y + READY_TEMPO_Y, b.w - 6, 7) > 20, 'no tempo row');
+    /* The halves' line stops at the rule: the tempo row is one row, the width. */
+    assert.equal(countOn(f.ctx, b.x + READY_SPLIT, b.y + READY_RULE_Y + 1, 1, b.h - READY_RULE_Y - 2),
+      countOn(f.ctx, b.x + READY_SPLIT, b.y + READY_TEMPO_Y, 1, 7), 'the line crosses the tempo row');
+  }
+  const none = readyFrame({ bpm: 0 });
+  assert.ok(!none.text.some((t) => /Knob 8/.test(t)), 'no tempo, no row');
 });
 
 test('the bottom line carries the level at the left and the keys at the right', () => {
@@ -1318,7 +1335,7 @@ test('Sticking off still shows the written hands: on the scroll, on the page, in
 });
 
 test('no glyph of the ready box touches its word: one glyph column, the words 3px after it', async () => {
-  const { drawReadyBox } = await import('../src/chrome.mjs');
+  const { drawReadyBox, READY_ROW_Y } = await import('../src/chrome.mjs');
   const ctx = createScreen();
   const xs = [];
   const text = ctx.text.bind(ctx);
@@ -1327,7 +1344,7 @@ test('no glyph of the ready box touches its word: one glyph column, the words 3p
   const b = READY_BOX;
   assert.equal(new Set(xs).size, 1, 'the words share one column');
   for (let i = 0; i < 3; i++) {
-    const y = b.y + 4 + i * 9;
+    const y = b.y + READY_ROW_Y + i * 9;
     assert.equal(countOn(ctx, xs[0] - 3, y, 3, 8), 0, `row ${i}: its glyph runs into the gap before the word`);
   }
 });

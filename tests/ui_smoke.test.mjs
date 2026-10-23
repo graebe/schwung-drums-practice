@@ -2837,6 +2837,38 @@ test('L0 is the first rung, and its ready screen offers own pace with no count-i
   assert.ok(running.includes('--'), 'no pace until there is one');
 });
 
+/*
+ * The ready box says what knob 8 does and where it stands: "Knob 8:  92 bpm",
+ * the armed tempo, following the knob as it turns — on a timed rung and on
+ * L0, where it is how fast Play sounds the bar.
+ */
+test('the ready screen names knob 8 and the tempo it sets, and follows it as it turns', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  const bpmShown = () => {
+    const row = drawnText(1).find((t) => /^Knob 8: +\d+ bpm$/.test(t));
+    return row ? Number(row.match(/(\d+) bpm/)[1]) : null;
+  };
+  armFirstRung();                               /* Rock backbeat L1, at 100% */
+  const at = bpmShown();
+  assert.ok(at > 0, `no tempo row: ${drawnText(1).join('|')}`);
+  cc(CC.knob1 + 7, 127);                        /* knob 8, a step slower */
+  ticks(1);
+  assert.ok(bpmShown() < at, `the row did not follow the knob: ${at} -> ${bpmShown()}`);
+  cc(CC.knob1 + 7, 1);
+  ticks(1);
+  assert.equal(bpmShown(), at, 'and back');
+  /* L0: the same row, the same knob. */
+  toTop();
+  armL0();
+  const l0 = bpmShown();
+  assert.ok(l0 > 0, `no tempo row on L0: ${drawnText(1).join('|')}`);
+  cc(CC.knob1 + 7, 1);
+  ticks(1);
+  assert.ok(bpmShown() > l0, 'knob 8 on L0 did not move the row');
+});
+
 test('stepping L0 through, clean, ends on a result that learns it', async () => {
   const { log } = await loadUi();
   globalThis.init();

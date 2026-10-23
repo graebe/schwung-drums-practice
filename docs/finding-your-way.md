@@ -247,6 +247,22 @@ it; the arrows show where you can still go, and a tick that the level is learned
 the first level you have not learned. On the Learning Path the jog walks only the levels the stage asks for.
 **Click** on a result goes on to the next level.
 
+Under the controls, across the box, is the tempo and the knob that sets it: `Knob 8:  92 bpm`.
+**Turn knob 8** and the number follows — it is Speed, 50–120% of the groove's own tempo. On L0 it
+is how fast PLAY sounds the bar.
+
+```
+ Halftime ballad    8 bars
+ ┌─────────────┬─────────┐
+ │ ▶ listen    │  LEVEL  │
+ │ ● practise  │  < 4    │
+ │ ↺ scrub     │         │
+ ├─────────────┴─────────┤
+ │ Knob 8:  92 bpm       │
+ └───────────────────────┘
+ L4  Everything  BACK up
+```
+
 ## MENU: help, anywhere
 
 Press **MENU** on any screen and it explains that screen first: what it is, its keys — the same

@@ -182,10 +182,12 @@ export const CARET_H = 3;
 export const CURSOR_TOP_Y = HEADER_RULE_Y + 1;
 
 /* The ready screen's box of controls, laid over the chart (view.mjs drawReady,
- * page_view.mjs drawUntimedReady). Four rows taller than two lines would
- * need: at the old geometry a third row landed on screen row 51, outside a
- * box ending at 46 and across the sticking rule at 47. */
-export const READY_BOX = { x: 12, y: 15, w: 104, h: 32 };
+ * page_view.mjs drawUntimedReady): three rows of controls beside the LEVEL,
+ * a rule, and the tempo knob 8 sets under them (chrome.mjs drawReadyBox).
+ * From under the title rule to three rows clear of the hint line; while it is
+ * up it covers the under lane and its bar numbers — they are the music you
+ * scrub to, and the box steps aside the moment you do. */
+export const READY_BOX = { x: 12, y: 11, w: 104, h: 42 };
 
 /* ---- The under lane ----------------------------------------------------- */
 /*

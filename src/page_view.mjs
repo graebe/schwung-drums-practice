@@ -177,5 +177,7 @@ function drawArrow(ctx, x) {
 export function drawUntimedReady(ctx, s) {
   drawUntimedView(ctx, s);
   if (s.scrubbed || s.listening) return;
-  drawReadyBox(ctx, { rows: [['play', 'hear bar'], ['rec', 'own pace'], ['scrub', 'scrub']], level: s.level });
+  /* Knob 8 is the tempo here too: how fast Play sounds the bar. */
+  drawReadyBox(ctx, { rows: [['play', 'hear bar'], ['rec', 'own pace'], ['scrub', 'scrub']], level: s.level,
+    bpm: s.bpm });
 }

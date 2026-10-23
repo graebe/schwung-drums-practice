@@ -202,7 +202,8 @@ export function drawReady(ctx, s) {
    */
   if ((s.songBeats || 0) > 0) return;
 
-  drawReadyBox(ctx, { rows: [['play', 'listen'], ['rec', 'practise'], ['scrub', 'scrub']], level: s.level });
+  drawReadyBox(ctx, { rows: [['play', 'listen'], ['rec', 'practise'], ['scrub', 'scrub']], level: s.level,
+    bpm: s.bpm });
 }
 
 /* ---- Clock -------------------------------------------------------------- */

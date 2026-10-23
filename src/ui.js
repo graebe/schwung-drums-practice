@@ -3716,7 +3716,7 @@ function draw() {
     const at = Math.max(0, tp.songBeats);
     const heard = hearingIndex();
     V.drawUntimedReady(ctx, {
-      run, chart, view: settings.view, lanes: chartLanes, dynamics: settings.dynamics,
+      run, chart, bpm: chart.bpm, view: settings.view, lanes: chartLanes, dynamics: settings.dynamics,
       cursor: heard >= 0 ? heard : Math.max(0, SC.nextEntryIndex(run, at)), title: chart.name,
       /* Play takes the box away while the bar sounds: the notes and the
        * cursor walking them are what there is to see. */

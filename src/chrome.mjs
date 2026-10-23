@@ -165,32 +165,55 @@ export function drawHint(ctx, text, left = '') {
  * glyph and one word each — listen, practise, scrub (or hear bar, own pace
  * for L0) — and, for a groove of rungs, on the right the LEVEL: its digit,
  * big, with an arrow on each side the jog can still go, and the done mark
- * once that rung is learned. The music shows above and below it.
+ * once that rung is learned. Under them, across a rule, the whole width:
+ * the tempo, and that knob 8 is what sets it — "Knob 8:  92 bpm". The box
+ * hides the under lane — its bar numbers — while it is up, and keeps the
+ * rows under it to the hint line clear.
  *
  *   rows   [['play'|'rec'|'scrub', word], …]
  *   level  { digit, down, up, done } or null
+ *   bpm    the armed tempo, or 0 for no tempo row
+ *
+ * Speed does not follow the bpm: "Knob 8:  92 bpm 100%" is 20 characters,
+ * past the 16 the box holds. The bpm is what knob 8 moves, and Speed shows on
+ * the knob's own announcement and in Settings.
  */
 export const READY_SPLIT = 64;
+/* The rows' tops in the box, the rule under them and the tempo's line. */
+export const READY_ROW_Y = 3;
+export const READY_RULE_Y = 30;
+export const READY_TEMPO_Y = 32;
 
-export function drawReadyBox(ctx, { rows = [], level = null } = {}) {
+/* The tempo row's words: the bpm in a field of three, so 92 and 120 line up. */
+export function readyTempoText(bpm) {
+  return `Knob 8: ${String(Math.round(bpm)).padStart(3)} bpm`;
+}
+
+export function drawReadyBox(ctx, { rows = [], level = null, bpm = 0 } = {}) {
   const b = L.READY_BOX;
-  ctx.fillRect(b.x, b.y, b.w, b.h, 0);
+  /* The box and a clear strip under it down to the hint line: the under
+   * lane's bar number would otherwise peek out under the box as a stub. */
+  ctx.fillRect(b.x, b.y, b.w, L.HINT_Y - b.y, 0);
   ctx.drawRect(b.x, b.y, b.w, b.h, 1);
   /* One glyph column, the words 3px after the widest glyph (the scrub's 9),
    * so none touches its word. */
   const gx = b.x + 3;
   const tx = gx + SCRUB_W + 3;
   for (let i = 0; i < rows.length; i++) {
-    const y = b.y + 4 + i * 9;
+    const y = b.y + READY_ROW_Y + i * 9;
     const [glyph, word] = rows[i];
     if (glyph === 'play') drawPlayGlyph(ctx, gx + 1, y, 7);
     else if (glyph === 'rec') drawRecordGlyph(ctx, gx + 1, y, 7);
     else drawScrubGlyph(ctx, gx, y);
     ctx.text(tx, y, word, 1);
   }
+  if (bpm > 0) {
+    ctx.fillRect(b.x, b.y + READY_RULE_Y, b.w, 1, 1);
+    ctx.text(gx, b.y + READY_TEMPO_Y, fitText(ctx, readyTempoText(bpm), b.w - 6), 1);
+  }
   if (!level) return;
   const sx = b.x + READY_SPLIT;
-  ctx.fillRect(sx, b.y, 1, b.h, 1);
+  ctx.fillRect(sx, b.y, 1, bpm > 0 ? READY_RULE_Y : b.h, 1);
   const rw = b.w - READY_SPLIT - 1;
   const cx = sx + 1 + (rw >> 1);
   ctx.text(sx + 3, b.y + 3, 'LEVEL', 1);

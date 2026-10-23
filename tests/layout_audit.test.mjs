@@ -160,22 +160,32 @@ test('the per-voice table stops before it falls off the screen', () => {
   assert.ok(lastRow < L.SCREEN_H, 'the table is allowed more rows than fit');
 });
 
-test('the ready box fits, in both of its states', () => {
+test('the ready box fits: three rows, the rule, the tempo row, clear of the title and the hint line', async () => {
   /*
    * At an earlier geometry the third row landed on screen row 51 — outside a
    * box ending at 46, and across the sticking rule at 47. An overflow has to
    * fail here rather than ship.
    */
+  const { READY_ROW_Y, READY_RULE_Y, READY_TEMPO_Y, readyTempoText } = await import('../src/chrome.mjs');
   const b = READY_BOX;
   assert.ok(b.x >= 0 && b.x + b.w <= L.SCREEN_W, 'the box runs off the side');
-  assert.ok(b.y > L.HEADER_RULE_Y, 'the box covers the header');
-  assert.ok(b.y + b.h <= L.UNDER_RULE_Y, 'the box crosses the under-lane rule');
-  /* Three rows at +4 / +13 / +22, each a line of text tall. */
-  for (const dy of [4, 13, 22]) {
-    assert.ok(b.y + dy + L.TEXT_H <= b.y + b.h, `the row at +${dy} ends outside the box`);
+  assert.ok(b.y > L.HEADER_RULE_Y + 1, 'the box touches the title rule');
+  assert.ok(b.y + b.h - 1 < L.HINT_Y - 2, 'no clear gap between the box and the hint line');
+  /* Three rows, each a line of text tall, a row clear of the rule. */
+  for (let i = 0; i < 3; i++) {
+    assert.ok(READY_ROW_Y + i * 9 + L.TEXT_H < READY_RULE_Y, `row ${i} runs into the rule`);
   }
-  /* And it leaves the timing bar alone. */
-  assert.ok(b.y + b.h < L.FOOTER_Y - 2);
+  assert.ok(READY_ROW_Y >= 2, 'the first row touches the top edge');
+  /* The LEVEL's digit (at +13, 15 tall) ends above the rule. */
+  assert.ok(13 + 15 < READY_RULE_Y, 'the digit runs into the rule');
+  /* The tempo row under the rule, inside the box, for 2 and 3 digits. */
+  assert.ok(READY_TEMPO_Y > READY_RULE_Y + 1, 'the tempo row touches the rule');
+  assert.ok(READY_TEMPO_Y + L.TEXT_H < b.h - 1, 'the tempo row runs into the bottom edge');
+  const w = (s) => s.length * 6 - 1;
+  for (const bpm of [92, 120, 240]) {
+    assert.ok(3 + w(readyTempoText(bpm)) <= b.w - 3, `"${readyTempoText(bpm)}" runs out of the box`);
+  }
+  assert.equal(readyTempoText(92).length, readyTempoText(120).length, 'the bpm keeps its place');
 });
 
 /* ---- L0's still page ---------------------------------------------------------- */

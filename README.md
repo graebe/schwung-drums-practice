@@ -249,14 +249,21 @@ The ready screen **is the chart**, with the controls laid over it — and, for a
 **level** you play it at:
 
 ```
- ROCK BACKBEAT        1/8  8 bars
+ Rock backbeat           8 bars
  ┌──────────────────┬──────────┐
  │ ▶  listen        │  LEVEL   │
  │ ●  practise      │  <  2  > │
  │ ↺  scrub         │          │
- └──────────────────┴──────────┘
+ ├──────────────────┴──────────┤
+ │ Knob 8:  92 bpm             │
+ └─────────────────────────────┘
  L2  + kick            REC start
 ```
+
+**Under the controls, knob 8 and the tempo it sets** — `Knob 8:  92 bpm`, the tempo the take will
+run at, which follows the knob as you turn it (knob 8 is Speed, 50–120% of the drill's own tempo).
+On L0 it is how fast Play sounds the bar. While the box is up it hides the bar numbers under the
+chart; they are the music you scrub to, and the box steps aside the moment you do.
 
 **Turn the jog to change the level.** A groove is one row in the list: opening it goes straight
 to its ready screen, on the first rung you have not learned yet, and the jog walks L0 to L4 from
@@ -303,7 +310,7 @@ and only one of them wants something from you.
 | **Back** | from a run or a result, back to the start of the drill; from the ready screen, up one folder; closes help, a sheet or a tip; out of the module from the top |
 | **Shift + Back** | close immediately from anywhere |
 | **Knob 1** | scrub, while the music is stopped — on the ready screen or paused |
-| **Knob 8** | **speed**, 50–120% of the drill's tempo — on the ready screen, or live while playing |
+| **Knob 8** | **speed**, 50–120% of the drill's tempo — on the ready screen, where the box shows the tempo it gives (`Knob 8:  92 bpm`), or live while playing |
 
 The bottom line of the list, the ready screen, a result, a card and help names these keys for the
 screen they are on, in the Move's own words — `REC start  PLAY listen`. A hint too long for one line
