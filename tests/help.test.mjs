@@ -37,8 +37,8 @@ test('help speaks the shared words: Learning Path, stage, Review — never the o
 
 test('every screen has a page: what it is, its keys, and topics help.json holds', () => {
   for (const screen of Object.values(H.SCREENS)) {
-    for (const st of [{}, { section: 'Learning Path' }, { section: 'Practice' }, { group: 'pads' }, { untimed: true,
-      ladder: true, clock: true }]) {
+    for (const st of [{}, { section: 'Learning Path' }, { section: 'Practice' }, { ring: 'Practice' }, { ring: 'Quiz' },
+      { group: 'pads' }, { untimed: true, ladder: true, clock: true }]) {
       for (const t of HP.topicsFor(screen, st)) assert.ok(topics.has(t), `${screen}: no topic "${t}"`);
       const page = HP.helpPage(screen, { st, topics });
       assert.ok(page.title.startsWith('HELP: ') && page.title.length <= H.HINT_CHARS, page.title);

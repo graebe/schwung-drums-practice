@@ -71,9 +71,10 @@ export function keysFor(screen, st = {}) {
     case S.MENU:
       return { keys: st.depth > 1 ? [['CLICK', 'open'], ['BACK', 'up']] : [['CLICK', 'open'], ['MENU', 'help']],
         shift: [['CLICK', 'options'], QUIT] };
+    /* The top, or a ring one level down (Practice, Quiz), which Back leaves. */
     case S.HOME:
-      return { keys: [['JOG', 'choose'], ['CLICK', 'open'], ['PAD', 'open'], ['MENU', 'help']],
-        shift: [['CLICK', 'options'], QUIT] };
+      return { keys: [['JOG', 'choose'], ['CLICK', 'open'], ['PAD', 'open'], ['MENU', 'help']]
+        .concat(st.depth > 1 ? [['BACK', 'up']] : []), shift: [['CLICK', 'options'], QUIT] };
     case S.MAP:
       return { keys: [['PAD', 'go'], ['CLICK', 'enter'], ['PLAY', 'continue'], ['MENU', 'help']],
         shift: [['CLICK', 'options'], QUIT] };

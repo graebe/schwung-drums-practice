@@ -18,9 +18,9 @@
 # (schwung-pinao-practice beside schwung-drums-practice), the ref to main.
 # Name the ref to check against a branch that is not merged yet: the Path map
 # exists in Piano Practice only on feature/piano-map until it merges, and its
-# island maps and animations only on feature/piano-anim until that merges into
-# piano-map, so until then run
-#   scripts/check-vendored.sh <piano checkout> feature/piano-anim
+# island path fix and the home engine's ring menus only on feature/piano-rings
+# until that merges into piano-map, so until then run
+#   scripts/check-vendored.sh <piano checkout> feature/piano-rings
 # Each file is compared by its git blob id, the Git LFS pointer for a pack, so
 # a pack is checked without its objects. A local, deliberate check: run it
 # whenever either side changes, and before a release.

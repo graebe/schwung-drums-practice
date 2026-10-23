@@ -62,8 +62,19 @@ Back out of it.
 | **Progress** | how far you have got: overall, per track, and every drill you played |
 | **Settings** | **Learning Path**, **Practice**, **Sound**, **Pads**, **MIDI**, **Help** |
 
-Inside a section everything is a list, four rows at a time with the keys under them: **Click**
-opens a row, **Back** goes up one level. The hint line says so: `CLICK open  BACK up`.
+**Practice** and **Quiz** open as rings of their own, the same way: a circle per entry with its
+picture, the jog growing the one you are on, Click or its pad opening it (silently), MENU their
+help, *Show as list* their rows, and **Back** home with that circle chosen. Go back in later and the
+circle you left is still chosen.
+
+| Ring | Circles |
+| --- | --- |
+| **Practice** | **Subdivisions** (two eighth notes), **Grooves** (a kit), **Rudiments** (crossed sticks), **Random** (a die), and **Other** (a folder) when you have drills of your own |
+| **Quiz** | **Guess: drum** (a note on the staff), **Hear: drum** (an ear), **Pick: drum** (a pad lit), **Hear: subdivision** (a metronome), **Pick: groove** (a loop) — a circle starts its drill |
+
+A ring has at most five circles; should one ever hold more, it is a list. Below the rings
+everything is a list, four rows at a time with the keys under them: **Click** opens a row,
+**Back** goes up one level. The hint line says so: `CLICK open  BACK up`.
 
 ## The hint line, and what Shift does
 

@@ -211,7 +211,7 @@ function sheetPick(label) {
 }
 /* Into a list, where the pads are the kit: at home they are the circles. */
 function toKit() {
-  goTo('Practice');
+  goTo('Practice', 'Grooves');
 }
 /* The Path list's Review folder: its last row — the first, Continue, may
  * read Review too. */
@@ -550,8 +550,9 @@ test('the top is home: five circles, the chosen one named, the keys under it; no
   assert.deepEqual(globalThis.drumsPracticeMenu().labels, ['Learning Path', 'Practice', 'Quiz', 'Progress', 'Settings']);
   assert.equal(globalThis.drumsPracticeScreen().home.selected, 0, 'Path is chosen first');
   goTo('Practice');
-  assert.ok(drawnText(1).includes('CLICK open  BACK up'), 'a folder says Back goes up');
   assert.deepEqual(globalThis.drumsPracticeMenu().labels, ['Subdivisions', 'Grooves', 'Rudiments', 'Random']);
+  goTo('Grooves');
+  assert.ok(drawnText(1).includes('CLICK open  BACK up'), 'a folder says Back goes up');
 });
 
 test('Back walks up one folder at a time, and leaves only from the top', async () => {
@@ -583,7 +584,10 @@ test('the Ladder and the Clock are offered on a drill with a tempo — a groove,
   toTop();
   goTo('Quiz', { open: true });
   shiftClick();
-  assert.deepEqual(globalThis.drumsPracticeScreen().sheet, ['Settings...']);
+  /* A quiz has no tempo to climb; Quiz is a ring, so its list is one away. */
+  const sheet = globalThis.drumsPracticeScreen().sheet;
+  assert.ok(!sheet.includes('Practise: Ladder') && !sheet.includes('Practise: Clock'), sheet.join('|'));
+  assert.deepEqual(sheet.filter((a) => a !== 'Show as list'), ['Settings...']);
 });
 
 /* ---- the transport ------------------------------------------------------ */
@@ -3727,6 +3731,104 @@ test('home: click opens a section, Back comes home with its circle chosen; the p
   ticks(2);
   assert.equal(log.params.slice(before).filter(isHit).length, 0, 'a pad sounded at home');
   assert.equal(globalThis.drumsPracticeMenu().title, 'Quiz', 'pad 71 is the third circle');
+});
+
+/*
+ * Practice and Quiz are rings too (catalog.mjs view 'home'): a circle per
+ * folder or drill with its icon, the jog growing it, Click or its pad
+ * opening it silently, Back home with the section's circle chosen.
+ */
+test('rings: Practice is a ring of its folders; the jog grows a circle, Click opens Grooves', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  goTo('Practice');
+  ticks(2);
+  assert.ok(homeNow(), 'Practice is not a ring');
+  let shown = drawnText(1);
+  assert.ok(shown.includes('PRACTICE') && shown.includes('Subdivisions'), shown.join('|'));
+  const parts = new Set();
+  for (let i = 0; i < 400; i++) for (const t of drawnText(1)) parts.add(t);
+  assert.ok(parts.has('MENU help  BACK up'), `a ring says Back goes up: ${[...parts].join('|')}`);
+  cc(CC.jogTurn, 1);
+  assert.equal(homeNow().selected, 1);
+  assert.equal(homeNow().grow.to, 1, 'the chosen circle grows');
+  shown = drawnText(1);
+  assert.ok(shown.includes('Grooves'), `the chosen circle named: ${shown.join('|')}`);
+  cc(CC.jogClick, 127);
+  assert.equal(globalThis.drumsPracticeMenu().title, 'Grooves');
+  assert.equal(homeNow(), null, 'Grooves is a list');
+  cc(CC.back, 127);
+  assert.equal(homeNow().selected, 1, 'back in the ring on Grooves');
+  cc(CC.back, 127);
+  assert.equal(globalThis.drumsPracticeMenu().title, 'Drums');
+  assert.equal(homeNow().selected, 1, 'home with Practice chosen');
+  goTo('Practice', { open: true });
+  assert.equal(homeNow().selected, 1, 'the ring keeps the circle it was left on');
+});
+
+test('rings: a Quiz circle\'s pad starts its drill, silently; Back comes home on Quiz', async () => {
+  const HR = await import('../src/home/render.mjs');
+  const { log } = await loadUi();
+  globalThis.init();
+  ticks(2);
+  goTo('Quiz');
+  ticks(2);
+  assert.ok(homeNow(), 'Quiz is not a ring');
+  assert.deepEqual(globalThis.drumsPracticeMenu().labels,
+    ['Guess: drum', 'Hear: drum', 'Pick: drum', 'Hear: subdivision', 'Pick: groove']);
+  assert.ok(drawnText(1).includes('QUIZ'));
+  const before = log.params.filter(isHit).length;
+  const pads = HR.homePads(5);
+  /* Guess: drum, which asks by notation: anything heard would be the pad. */
+  pad(pads[0], 100); pad(pads[0], 0);
+  ticks(2);
+  assert.equal(screenNow(), 'quiz', 'the pad did not start its drill');
+  assert.equal(globalThis.drumsPracticeScreen().quiz.mode + globalThis.drumsPracticeScreen().quiz.kind, 'guessvoice');
+  assert.equal(log.params.filter(isHit).length, before, 'the circle\'s pad sounded a drum');
+  cc(CC.back, 127);
+  cc(CC.back, 127);
+  assert.equal(globalThis.drumsPracticeMenu().title, 'Drums');
+  assert.equal(homeNow().selected, 2, 'home with Quiz chosen');
+  /* Click on a circle starts its drill, as the row did. */
+  goTo('Quiz', 'Pick: groove');
+  ticks(2);
+  assert.equal(screenNow(), 'quiz');
+  assert.equal(globalThis.drumsPracticeScreen().quiz.kind, 'groove');
+});
+
+test('rings: Menu explains the ring; Show as list lists it; Other only with drills of your own', async () => {
+  await loadUi();
+  globalThis.init();
+  ticks(2);
+  goTo('Practice');
+  cc(CC.menu, 127);
+  let help = globalThis.drumsPracticeScreen().help;
+  assert.ok(help.includes('Practice: the free') && help.includes('BACK   up'), help.join('|'));
+  cc(CC.menu, 127);
+  sheetPick('Show as list');
+  assert.equal(homeNow(), null, 'still circles');
+  assert.ok(drawnText(1).includes('Rudiments'));
+  cc(CC.back, 127);
+  assert.ok(homeNow(), 'Back did not bring the ring back');
+  toTop();
+  goTo('Quiz');
+  cc(CC.menu, 127);
+  help = globalThis.drumsPracticeScreen().help;
+  assert.ok(help.includes('Quiz: a circle per'), help.join('|'));
+  cc(CC.menu, 127);
+  assert.ok(!globalThis.drumsPracticeMenu().labels.includes('Other'));
+
+  await loadUi({ extraFiles: {
+    'user.json': JSON.stringify({ exercises: [{ id: 'mine', name: 'My groove', file: 'mine.json', group: 'groove' }] }),
+    'mine.json': JSON.stringify({ id: 'mine', name: 'My groove', bpm: 90, timeSig: [4, 4], loopBars: 1, repeats: 4,
+      events: [{ beat: 0, voices: ['KK'] }] }),
+  } });
+  globalThis.init();
+  ticks(2);
+  goTo('Practice');
+  assert.deepEqual(globalThis.drumsPracticeMenu().labels, ['Subdivisions', 'Grooves', 'Rudiments', 'Random', 'Other']);
+  assert.ok(homeNow(), 'five circles are still a ring');
 });
 
 test('home: Menu is its help, Shift+click shows it as a list of five, Back makes it circles again', async () => {

@@ -27,6 +27,8 @@
  *   npm run preview -- --screen tip --tip sheet|practice|quiz|placement [--top N]
  *   npm run preview -- --screen map --level world|island [--to N --t ms]   (stage 0 done, 1 current;
  *                       --to walks the avatar to place N and draws it --t ms into the walk)
+ *   npm run preview -- --screen home [--items practice|quiz [--other]]   (a ring: the top, Practice
+ *                       or Quiz)
  *   npm run preview -- --screen home [--selected N] [--from M --t ms]   (the five circles; --from
  *                       grows N out of M, --t ms into the 160 ms grow)
  *   npm run preview -- --screen map-sheet   (a stage's options on the map, with Show as list)
@@ -67,6 +69,8 @@ import * as SCN from '../src/scenes.mjs';
 import * as SV from '../src/scene_view.mjs';
 import { createWalk, walkTo, posAt } from '../src/pathmap/walk.mjs';
 import { RANDOM_DRILLS } from '../src/generator.mjs';
+import * as CAT from '../src/catalog.mjs';
+import { DRILLS } from '../src/guess.mjs';
 import * as HOME from '../src/home/render.mjs';
 import { PRACTICE_DRUMS } from '../src/home/icons.mjs';
 
@@ -290,17 +294,24 @@ if (screen) {
     V.drawPage(ctx, { title: TIPS.TIP_TITLE, lines, top: Number(arg('top', 0)),
       footer: H.hintFor(H.SCREENS.TIP, { scrolls: lines.length > L.PAGE_ROWS })[0] });
   } else if (screen === 'home') {
-    /* The top as ui.js draws it: the title, the circles, the hint line. */
-    const items = [['Learning Path', 'path'], ['Practice', PRACTICE_DRUMS], ['Quiz', 'quiz'],
-      ['Progress', 'progress'], ['Settings', 'settings']].map(([label, icon]) => ({ key: label, label, icon }));
+    /* A ring as ui.js draws it: the title, the circles, the hint line — the
+     * top, or --items practice|quiz one level down (--other: with Other). */
+    const ring = String(arg('items', 'top'));
+    const rows = ring === 'practice'
+      ? ['Subdivisions', 'Grooves', 'Rudiments', 'Random', ...(arg('other', false) ? ['Other'] : [])]
+        .map((label) => [label, CAT.PRACTICE_ICONS[label]])
+      : ring === 'quiz' ? DRILLS.map((d) => [d.name, CAT.QUIZ_ICONS[`${d.mode}:${d.kind}`]])
+        : [['Learning Path', 'path'], ['Practice', PRACTICE_DRUMS], ['Quiz', 'quiz'], ['Progress', 'progress'],
+          ['Settings', 'settings']];
+    const items = rows.map(([label, icon]) => ({ key: label, label, icon }));
     const to = Number(arg('selected', 0));
     const grow = HOME.createGrow(Number(arg('from', to)));
     if (arg('from', null) !== null) HOME.startGrow(grow, to, 0);
     ctx.clear();
-    ctx.text(1, 0, 'DRUMS', 1);
+    ctx.text(1, 0, ring === 'top' ? 'DRUMS' : ring.toUpperCase(), 1);
     ctx.fillRect(0, L.HEADER_RULE_Y, L.SCREEN_W, 1, 1);
     HOME.drawHome(ctx, { items, selected: to, grow, now: Number(arg('t', 1000)) });
-    V.drawHint(ctx, H.hintFor(H.SCREENS.HOME)[0]);
+    V.drawHint(ctx, H.hintFor(H.SCREENS.HOME, { depth: ring === 'top' ? 1 : 2 })[0]);
   } else if (screen === 'pick') {
     /* Pick: drum, the eight core drums, on the kit's own pads. */
     const quiz = Q.createQuiz({ kind: 'voice', mode: 'pick', seed: 3 });

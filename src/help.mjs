@@ -86,13 +86,20 @@ const GROUP_TOPICS = {
   midi: ['Sound'],
 };
 
+/* A ring one level down (st.ring, the folder's label): what it is. */
+const RINGS = {
+  Practice: ['PRACTICE', ['Practice: the free', 'library, a circle', 'per kind of drill.', 'Its pad or CLICK', 'opens it.']],
+  Quiz: ['QUIZ', ['Quiz: a circle per', 'drill. Its pad or', 'CLICK starts it.']],
+};
+
 /* The topics of help.json a screen shows, in order. */
 export function topicsFor(screen, st = {}) {
   switch (screen) {
     case S.MENU: return SECTION_TOPICS[st.section] || ['The list', 'The sheet'];
     case S.SHEET: return ['The sheet'];
     case S.MAP: case S.ANIM: return ['The map', 'Learning Path', 'Review', 'The sheet'];
-    case S.HOME: return ['The list', 'The sheet'];
+    case S.HOME: return st.ring === 'Quiz' ? ['Quiz', 'The sheet']
+      : st.ring === 'Practice' ? SECTION_TOPICS.Practice : ['The list', 'The sheet'];
     case S.TOUR: return ['The pads', 'Colours'];
     case S.WELCOME: case S.TIP: return ['The list'];
     case S.CARD: return ['Learning Path'];
@@ -153,7 +160,7 @@ export function fitPage(items, measure, rows = L.PAGE_ROWS) {
  * Returns { title, lines }.
  */
 export function helpPage(screen, { st = {}, topics = new Map(), extra = [] } = {}) {
-  const about = ABOUT[screen] || ['HELP', []];
+  const about = (screen === S.HOME && RINGS[st.ring]) || ABOUT[screen] || ['HELP', []];
   const lines = about[1].slice();
   const keys = H.keyLines(screen, st);
   if (keys.length) lines.push('', ...keys);

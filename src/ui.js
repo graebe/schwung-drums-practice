@@ -61,7 +61,7 @@ import * as SV from './scene_view.mjs';
 import { placeOfPad } from './pathmap/layout.mjs';
 import { createWalk, walkTo, walkStep, posAt, arrived } from './pathmap/walk.mjs';
 import { mapPadColors } from './pathmap/leds.mjs';
-import { drawHome, createGrow, startGrow, itemOfPad } from './home/render.mjs';
+import { drawHome, createGrow, startGrow, itemOfPad, HOME_MAX } from './home/render.mjs';
 import { homePadColors } from './home/leds.mjs';
 import * as UT from './untimed.mjs';
 import * as PT from './pad_tour.mjs';
@@ -1968,6 +1968,7 @@ function openRow() {
   fromContinue = false;
   const world = onMap() && CAT.navTop(nav).node === pathNode ? mapNow() : null;
   if (CAT.navPush(nav)) {
+    enterRing();
     enterMap();
     /* From the world into a stage: zoom in on its island. */
     const island = world && onMap() ? mapNow() : null;
@@ -2096,30 +2097,37 @@ function viewNow() {
   return isHomeNode(top) ? HOME : isMapNode(top) ? MAP : screen;
 }
 
-/* ---- the home screen ------------------------------------------------------ */
+/* ---- the home screen and the rings ---------------------------------------- */
 /*
- * The top of the list as five circles (src/home, vendored from Piano
- * Practice): Path, Practice, Quiz, Progress, Settings, each with its icon.
- * The jog chooses and the chosen circle grows; Click or a circle's pad opens
- * it; the pads make no sound here. The nav cursor stays the child index, so
- * Back from a section comes home with its circle chosen. Show as list on the
- * sheet gives the five rows, for the session.
+ * A folder with view 'home' is a ring of circles (src/home, vendored from
+ * Piano Practice), each with its icon: the top (Path, Practice, Quiz,
+ * Progress, Settings), and one level down Practice (its folders) and Quiz
+ * (its drills). The jog chooses and the chosen circle grows; Click or a
+ * circle's pad opens it — a Quiz circle starts its drill, as its row did;
+ * the pads make no sound here. The nav cursor stays the child index, so Back
+ * from a section comes home with its circle chosen, and a ring left by Back
+ * keeps the circle it was on for the next visit. Show as list on the sheet
+ * gives the rows, for the session; a ring of more than HOME_MAX is a list.
  */
 let homeGrow = null;
+const ringCursor = new Map();
 
 function isHomeNode(node) {
-  return Boolean(node && node.view === 'home' && !listViews.has(node));
+  return Boolean(node && node.view === 'home' && node.children.length <= HOME_MAX && !listViews.has(node));
 }
 
 function onHome() {
   return screen === MENU && isHomeNode(CAT.navTop(nav).node);
 }
 
-/* The grow, kept on the circle of the cursor: coming back from a section
- * shows it chosen, without a grow. */
+/* The grow, kept on the circle of the cursor of this ring: coming back from
+ * a section shows it chosen, without a grow. */
 function homeGrowNow() {
   const top = CAT.navTop(nav);
-  if (!homeGrow || homeGrow.to !== top.cursor) homeGrow = createGrow(top.cursor);
+  if (!homeGrow || homeGrow.node !== top.node || homeGrow.to !== top.cursor) {
+    homeGrow = createGrow(top.cursor);
+    homeGrow.node = top.node;
+  }
   return homeGrow;
 }
 
@@ -2133,10 +2141,16 @@ function homeChoose(i) {
 }
 
 function homePad(note) {
-  const i = itemOfPad(note);
-  if (i < 0 || i >= CAT.navTop(nav).node.children.length) return;
+  const i = itemOfPad(note, CAT.navTop(nav).node.children.length);
+  if (i < 0) return;
   homeChoose(i);
   openRow();
+}
+
+/* Into a ring: on the circle it was left on. */
+function enterRing() {
+  const top = CAT.navTop(nav);
+  if (isHomeNode(top.node) && ringCursor.has(top.node)) top.cursor = ringCursor.get(top.node);
 }
 
 function drawHomeView(hint) {
@@ -3074,6 +3088,7 @@ function openHelp() {
   const view = viewNow();
   if (screen === RUNNING && !tp.paused) pause();
   if (screen === MENU) st.section = nav.length > 1 ? nav[1].node.label : (CAT.navCurrent(nav) || {}).label;
+  if (view === HOME && nav.length > 1) st.ring = CAT.navTop(nav).node.label;
   if (screen === SETTINGS) st.group = settingsGroup;
   const page = HP.helpPage(view, { st, topics: helpTopics, extra: screen === MENU ? rowCardLines() : [] });
   /* Opened at its first line: what this screen is comes first. */
@@ -3296,6 +3311,7 @@ function back() {
       return true;
     }
     const island = onMap() && top.node !== pathNode ? mapNow() : null;
+    if (isHomeNode(top.node)) ringCursor.set(top.node, top.cursor);
     if (!CAT.navPop(nav)) return false;
     /* Out of a stage onto the world: zoom out, the avatar on its island. */
     if (island && onMap() && CAT.navTop(nav).node === pathNode) zoom('out', mapNow(), island, 'Learning Path.');

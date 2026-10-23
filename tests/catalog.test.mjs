@@ -193,3 +193,19 @@ test('a lazy folder is built once, and is a folder before that', () => {
   assert.equal(n.value, FOLDER);
   assert.ok(chartNode(entries[0].chart));
 });
+
+test('Practice and Quiz are rings, each circle with its picture', async () => {
+  const { ICONS } = await import('../src/home/icons.mjs');
+  const t = tree();
+  const practice = t.children.find((c) => c.label === 'Practice');
+  const quiz = t.children.find((c) => c.label === 'Quiz');
+  assert.equal(practice.view, 'home');
+  assert.equal(quiz.view, 'home');
+  assert.deepEqual(practice.children.map((c) => [c.label, c.icon]),
+    [['Subdivisions', 'notes'], ['Grooves', 'kit'], ['Rudiments', 'sticks'], ['Random', 'dice']]);
+  assert.deepEqual(quiz.children.map((c) => c.icon), ['staff', 'ear', 'padpick', 'metronome', 'loop']);
+  for (const c of practice.children.concat(quiz.children)) assert.ok(ICONS[c.icon], `no icon ${c.icon}`);
+  const mine = drumsTree({ entries: [{ chart: { id: 'm', family: 'm', name: 'M' }, category: 'nope' }],
+    categories: manifest.categories, drills: DRILLS }).children.find((c) => c.label === 'Practice');
+  assert.equal(mine.children.slice(-1)[0].icon, 'folder', 'Other, with drills of your own');
+});

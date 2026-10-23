@@ -161,6 +161,15 @@ export function settingsFolder(pathPrefs = null) {
   };
 }
 
+/* The rings' pictures (src/home/icons.mjs): Practice by folder, Quiz by drill. */
+export const PRACTICE_ICONS = Object.freeze({
+  Subdivisions: 'notes', Grooves: 'kit', Rudiments: 'sticks', Random: 'dice', Other: 'folder',
+});
+export const QUIZ_ICONS = Object.freeze({
+  'guess:voice': 'staff', 'hear:voice': 'ear', 'pick:voice': 'padpick', 'pick:subdiv': 'metronome',
+  'pick:groove': 'loop',
+});
+
 /*
  * The module's own tree. Kept here rather than in ui.js so the tests can walk
  * the real one.
@@ -173,6 +182,9 @@ export function settingsFolder(pathPrefs = null) {
  * The Ladder and the Clock are no rows of their own: they wrap a drill, so
  * they are offered on the drill's row, in its action sheet. The Clock still
  * files its takes under CLOCK_ID, whichever drill it wraps.
+ *
+ * The top, Practice and Quiz are rings (view 'home'): a circle per row, its
+ * picture its `icon`.
  */
 export function drumsTree({ entries = [], categories = [], bpm = 90, drills = [], newSeed = null, path = null,
   pathPrefs = null } = {}) {
@@ -200,6 +212,12 @@ export function drumsTree({ entries = [], categories = [], bpm = 90, drills = []
   practice.icon = PRACTICE_DRUMS;
   quiz.icon = 'quiz';
   settings.icon = 'settings';
+  /* Practice and Quiz are rings too, a circle per row (ui.js draws a ring
+   * of up to five; more, and it is the list again). */
+  practice.view = 'home';
+  for (const row of practice.children) row.icon = PRACTICE_ICONS[row.label] || 'folder';
+  quiz.view = 'home';
+  for (const row of quiz.children) row.icon = QUIZ_ICONS[`${row.quiz.mode}:${row.quiz.kind}`] || 'quiz';
   const root = folder('Drums', [
     ...(path ? [path] : []),
     practice,

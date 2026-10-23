@@ -69,7 +69,8 @@ fingers, in the same way its sister module is a reading trainer rather than a pi
   **Review** brings back what you learned on a schedule, so it stays learned. **Continue** — Play
   on the Learning Path's map — always knows the one thing to do next.
 - **Starts at home.** Five circles with pictures — Learning Path, Practice, Quiz, Progress, Settings — chosen
-  with the jog (the chosen one grows) or by the five lit pads under them.
+  with the jog (the chosen one grows) or by the five lit pads under them. Practice and Quiz open
+  as rings of their own: a circle per kind of drill, and per quiz.
 - **Always says what to press.** The bottom line of every screen names its keys — `CLICK open  BACK
   up` — and **Menu** opens help for the screen you are on. Hold **Shift** and the line shows what
   Shift does there.
@@ -652,8 +653,14 @@ into it.
 
 The top is **home**, the same as Piano Practice's: five circles, chosen with the jog or by the lit
 pads 69–73 under them (they make no sound there), opened with Click or the pad; *Show as list* on
-the sheet shows them as rows. Below home the list is a tree: **Click** opens a folder, **Back** goes
-up one, and Back at home leaves. Four rows show at a time, with the keys under them.
+the sheet shows them as rows. **Practice** and **Quiz** are rings the same way, one level down —
+Practice a circle per folder (Subdivisions: notes, Grooves: a kit, Rudiments: sticks, Random: a
+die, Other: a folder, there only with drills of your own), Quiz a circle per drill (Guess: drum:
+the staff, Hear: drum: an ear, Pick: drum: a lit pad, Hear: subdivision: a metronome, Pick:
+groove: a loop) that Click or its pad starts. Back from a ring comes home with its circle chosen,
+and the ring keeps the circle you left; a ring of more than five would be a list. Below the rings
+the list is a tree: **Click** opens a folder, **Back** goes up one, and Back at home leaves. Four
+rows show at a time, with the keys under them.
 
 ```
 Learning Path  a map: 0 Hello, kit … 6 Pro; as a list Continue first, Review (while something is due) last
