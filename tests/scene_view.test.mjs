@@ -55,7 +55,7 @@ test('every scene draws, from its first frame to its last, with the hint line ke
   const plan = finalePlan().concat([{ kind: 'star', under: 'summary' }]);
   assert.deepEqual(plan.map((s) => s.kind), ['celebrate', 'banner', 'zoom', 'banner', 'finale', 'star']);
   plan.forEach((sc, i) => {
-    const args = SV.sceneArgs(sc, { seed: i + 1, big: '100' });
+    const args = SV.sceneArgs(sc, { seed: i + 1, learned: SV.learnedOf({ summary }), ctx: createScreen() });
     const walk = SV.sceneWalk(sc, 0);
     for (const ms of [0, lastMs(sc) / 2, lastMs(sc)]) {
       const c = createScreen();
@@ -107,7 +107,8 @@ test('the star frame: the score centred in the map area, LEVEL LEARNED under it'
     const c = createScreen();
     const text = c.text.bind(c);
     c.text = (x, y, str, v) => { texts.push({ x, y, str }); return text(x, y, str, v); };
-    SV.drawScene(c, { scene: sc, args: SV.sceneArgs(sc), now: 0, ms: 0, footer: 'ANY KEY skip', learned });
+    SV.drawScene(c, { scene: sc, args: SV.sceneArgs(sc, { learned, ctx: c }), now: 0, ms: 0, footer: 'ANY KEY skip',
+      learned });
     const box = V.learnedBox(c, learned);
     assert.ok(box.y >= 10 && box.y + box.h <= 45, `inside the map area: ${JSON.stringify(box)}`);
     assert.ok(Math.abs(box.x + box.w / 2 - 64) <= 1, 'centred');
@@ -117,5 +118,43 @@ test('the star frame: the score centred in the map area, LEVEL LEARNED under it'
     assert.ok(texts.some((t) => t.str === 'ANY KEY skip' && t.y === 56), 'the hint line');
     assert.ok(texts.some((t) => t.y === 0 && t.str === learned.title), 'the title bar');
     assert.ok(texts.some((t) => t.str === learned.unit), 'its unit');
+  }
+});
+
+/*
+ * The star's rays (anim.mjs starBurst on starFit's ellipse): every pixel they
+ * add lies in the band above the caption (y 10..44) and clear of the
+ * number's box by a pixel, from the first frame to the last — for a take's
+ * "100%" and a quiz's "24/min" alike — and at their longest they show.
+ */
+test('the star\'s rays stay inside the band above the caption and off the digits', async () => {
+  const V = await import('../src/view.mjs');
+  const A = await import('../src/pathmap/anim.mjs');
+  const sc = { kind: 'star', under: 'summary' };
+  const learneds = [SV.learnedOf({ summary }), SV.learnedOf({ result: { rate: 24.4, isBest: false } }),
+    SV.learnedOf({ summary: { ...summary, speed: 95 } })];
+  for (const learned of learneds) {
+    const plain = createScreen();
+    V.drawLearned(plain, { ...learned, footer: 'ANY KEY skip' });
+    const box = V.learnedBox(plain, learned);
+    const args = SV.sceneArgs(sc, { seed: 3, learned, ctx: plain });
+    assert.ok(args.len >= 2, `rays that fit: ${JSON.stringify(args)}`);
+    let added = 0;
+    for (let ms = 0; ms <= A.STAR_MS; ms += 30) {
+      const c = createScreen();
+      SV.drawScene(c, { scene: sc, args, now: ms, ms, footer: 'ANY KEY skip', learned });
+      for (let y = 0; y < 64; y++) {
+        for (let x = 0; x < 128; x++) {
+          const i = y * 128 + x;
+          if (c.pixels[i] === plain.pixels[i]) continue;
+          added++;
+          const where = `${learned.big}${learned.unit} at ${ms} ms: (${x}, ${y})`;
+          assert.ok(y >= V.STAR_BAND.top && y <= V.STAR_BAND.bottom, `a ray off the band, ${where}`);
+          const inBox = x >= box.x - 1 && x < box.x + box.w + 1 && y >= box.y - 1 && y < box.y + box.h + 1;
+          assert.ok(!inBox, `a ray on the digits, ${where}`);
+        }
+      }
+    }
+    assert.ok(added > 0, `${learned.big}: no rays at all`);
   }
 });

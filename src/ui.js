@@ -2298,9 +2298,9 @@ function nextScene() {
   anim.scene = sc;
   anim.since = now();
   anim.walk = SV.sceneWalk(sc, anim.since);
-  anim.args = SV.sceneArgs(sc, { seed: anim.at + 1 });
   anim.learned = sc.kind !== 'star' ? null
     : SV.learnedOf(sc.under === RESULT ? { result: resultCache } : { summary: summaryInfo });
+  anim.args = SV.sceneArgs(sc, { seed: anim.at + 1, learned: anim.learned, ctx });
   if (sc.say) announce(sc.say);
 }
 

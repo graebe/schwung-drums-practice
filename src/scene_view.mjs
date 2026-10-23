@@ -15,8 +15,9 @@
  *   zoom       the world's title, the island growing from its cell or back
  *   finale     every flag waving, fireworks over every island
  *   star       its own frame: the result's big number in the map area,
- *              LEVEL LEARNED under it (drawLearned); the rays round it wait
- *              for the engine's elliptical starBurst
+ *              LEVEL LEARNED under it (drawLearned), the rays on an ellipse
+ *              round the number that keeps them in the band above the
+ *              caption and off the digits (starFit, starBurst)
  * The pads: a green sweep as a flag rises and round the star, sparkles under
  * fireworks, a banner and the finale; a walk and a zoom show their map's.
  */
@@ -48,9 +49,15 @@ export function sceneWalk(sc, t) {
 /*
  * What a scene's frames are drawn with, worked out once as it starts: the
  * repaint is fifty times a second and must not allocate. `seed` varies the
- * fireworks from scene to scene.
+ * fireworks from scene to scene; the star fits its rays round `learned`'s
+ * number, measured with `ctx`.
  */
-export function sceneArgs(sc, { seed = 1 } = {}) {
+export function sceneArgs(sc, { seed = 1, learned = null, ctx = null } = {}) {
+  if (sc.kind === 'star') {
+    const box = V.learnedBox(ctx, learned);
+    const fit = A.starFit({ w: box.w, h: box.h, ...V.STAR_BAND, y: V.STAR_Y, x: V.STAR_X });
+    return { x: V.STAR_X, y: fit.y, rx: fit.rx, ry: fit.ry, len: fit.len, seed };
+  }
   const m = sceneMap(sc);
   if (sc.kind === 'zoom') return { cell: m.layout.cells[sc.at], place: m.places[sc.at] };
   if (sc.kind === 'finale') return { layout: m.layout, places: m.places, seed };
@@ -88,6 +95,7 @@ export function drawScene(ctx, s) {
   const a = s.args;
   if (sc.kind === 'star') {
     V.drawLearned(ctx, { ...s.learned, footer: s.footer });
+    A.starBurst(ctx, a, s.ms);
     return;
   }
   const map = sceneMap(sc);

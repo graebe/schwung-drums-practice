@@ -74,12 +74,14 @@ export function resultBig(s) {
  * where that does not fit — the result's title bar and the scene's hint
  * line. When the star ends the result screen is drawn as it always is.
  *
- *   y 10..45  the number, centred on (STAR_X, STAR_Y)
- *   y 46..52  the caption
+ *   y 10..44  the number, centred on (STAR_X, STAR_Y), and the band the
+ *             star's rays may use round it (STAR_BAND, anim.mjs starFit)
+ *   y 46..52  the caption, a pixel of air above it
  */
 export const STAR_X = L.SCREEN_W >> 1;
 export const STAR_Y = 27;
 const STAR_CAPTION_Y = 46;
+export const STAR_BAND = Object.freeze({ top: 10, bottom: STAR_CAPTION_Y - 2 });
 const STAR_CAPTIONS = ['LEVEL LEARNED', 'LEARNED'];
 
 /* The number's box on the star's frame: the digits at the result's scale and
@@ -91,7 +93,8 @@ export function learnedBox(ctx, { big, unit }) {
   return { x: STAR_X - (w >> 1), y: STAR_Y - (h >> 1), w, h, digits };
 }
 
-/* s = { title, right, mark, big, unit, footer } */
+/* s = { title, right, mark, big, unit, footer }; the star's rays are drawn
+ * over it (scene_view.mjs). */
 export function drawLearned(ctx, s) {
   ctx.clear();
   drawTitle(ctx, s.title || '', s.right || '', s.mark || null);
