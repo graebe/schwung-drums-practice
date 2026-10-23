@@ -17,10 +17,10 @@
 # The checkout defaults to the sibling of this repository's main checkout
 # (schwung-pinao-practice beside schwung-drums-practice), the ref to main.
 # Name the ref to check against a branch that is not merged yet: the Path map
-# exists in Piano Practice only on feature/piano-map until it merges, and the
-# home screen only on feature/piano-home until that merges into piano-map, so
-# until then run
-#   scripts/check-vendored.sh <piano checkout> feature/piano-home
+# exists in Piano Practice only on feature/piano-map until it merges, and its
+# island maps and animations only on feature/piano-anim until that merges into
+# piano-map, so until then run
+#   scripts/check-vendored.sh <piano checkout> feature/piano-anim
 # Each file is compared by its git blob id, the Git LFS pointer for a pack, so
 # a pack is checked without its objects. A local, deliberate check: run it
 # whenever either side changes, and before a release.

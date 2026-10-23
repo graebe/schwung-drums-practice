@@ -155,17 +155,31 @@ and how many reviews are due there when it fits: `Time  33% 2 due`. On the map, 
 rises as you learn it, a flag flies on a finished one, a dotted outline is a stage you skipped, and
 a small dot says reviews are due.
 
-Go in and the stage is an island of its own, its places in the order a lesson takes them:
+Go in — the map zooms in on the island — and the stage is one island with its places built on it,
+the footpath looping round it in the order a lesson takes them:
 
-| Place | Is |
+| Building | Is |
 | --- | --- |
-| hut | the stage's **Lessons** |
-| a place each | **Ear**, **Time**, **Hands**, **Grooves** |
-| cove | the **Electives** |
+| signpost | the stage's **Lessons**, where it starts |
+| bell tower | **Ear** |
+| clock tower | **Time** |
+| workshop | **Hands** |
+| festival stage | **Grooves** |
+| cove, with its chest | the **Electives** |
 | fort | the **Checkpoint** |
 
-Going into a place opens its list, exactly as before — the hut opens the cards, the fort plays the
-checkpoint.
+A building's walls fill as you learn what is in it, and a flag goes up on its roof when it is done.
+Going into a place opens its list, exactly as before — the signpost opens the cards, the fort plays
+the checkpoint. BACK zooms out to the world again.
+
+**The path moves.** When CLICK on a result goes on along the path and you have finished something,
+you see it before the next step opens. Finish a place — a track's last step — and its flag goes
+up, then the avatar walks to the place of the next step. Finish a stage and fireworks go off over
+it, a banner says **STAGE COMPLETE** (or **CHECKPOINT PASSED**), the map zooms out, the avatar sails
+to the next island, the map zooms in and the avatar walks to the next step. The whole path through
+ends with **LEARNING PATH COMPLETE** and fireworks over every island. A level learned for the first
+time gets a burst of rays round the result's number. Each is said aloud, and **any key or pad
+skips it** to where it was going; nothing sounds and nothing is recorded meanwhile.
 
 **The list is one option away.** SHIFT+CLICK on the map and choose **Show as list**: the folder is
 a list again until you leave it, and BACK returns to the map. That is also where **Review** is, the
@@ -237,8 +251,8 @@ The first time you open a sheet, a drill, a quiz, the map and an island, a short
 - *REC plays and scores it, PLAY lets you listen first. MENU: help.*
 - *Answer with the lit pads or the jog. MENU: help.*
 - on the map: *Lit pads are places. Press one to walk there, again to go in. PLAY continues.*
-- on the first island: *Each place is part of the stage. The fort is its checkpoint, the hut its
-  lessons.*
+- on the first island: *Each place is part of the stage. The fort is its checkpoint, the signpost
+  its lessons.*
 
 Click or Back and it is gone. *Settings › Help › Show tips again* brings them all back.
 

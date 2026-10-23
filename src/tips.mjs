@@ -32,7 +32,7 @@ export const TIPS = {
   practice: ['REC plays and scores it, PLAY lets you listen first. MENU: help.'],
   quiz: ['Answer with the lit pads or the jog. MENU: help.'],
   map: ['Lit pads are places. Press one to walk there, again to go in. PLAY continues.'],
-  island: ['Each place is part of the stage. The fort is its checkpoint, the hut its lessons.'],
+  island: ['Each place is part of the stage. The fort is its checkpoint, the signpost its lessons.'],
   placement: ['Know a stage already? SHIFT+CLICK a stage, then Test out: checkpoint. Pass it and the path '
     + 'moves on.'],
 };

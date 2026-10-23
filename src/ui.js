@@ -57,6 +57,7 @@ import * as HP from './help.mjs';
 import * as TIPS from './tips.mjs';
 import * as MP from './map_places.mjs';
 import * as SCN from './scenes.mjs';
+import * as SV from './scene_view.mjs';
 import { placeOfPad } from './pathmap/layout.mjs';
 import { createWalk, walkTo, walkStep, posAt, arrived } from './pathmap/walk.mjs';
 import { mapPadColors } from './pathmap/leds.mjs';
@@ -2148,8 +2149,8 @@ function drawHomeView(hint) {
   V.drawHint(ctx, hint);
 }
 
-/* How much of a stage's lesson cards are read, for its hut. */
-function hutPercent(stage) {
+/* How much of a stage's lesson cards are read, for its signpost. */
+function lessonsPercent(stage) {
   const ids = LES.stageCards(lessons, stage, PLAN.coreSteps(stage).concat(PLAN.checkpointSteps(stage)));
   if (!ids.length) return 0;
   const seen = progress.path.seen || [];
@@ -2251,16 +2252,7 @@ function showFolderAs(view) {
 
 function drawMapView(hint) {
   const m = mapNow();
-  drawPlaces(m, m.walk, hint);
-}
-
-/* A map with its avatar, and the place under it named in the title bar. */
-function drawPlaces(m, walk, hint) {
-  const t = now();
-  const place = m.places[posAt(walk, t).at];
-  const head = MP.mapTitle(place, L.SCREEN_W - 2, measure);
-  V.drawMapScreen(ctx, { title: head.title, right: head.right, places: m.places, layout: m.layout,
-    walk, now: t, footer: hint });
+  SV.drawPlaces(ctx, { map: m, walk: m.walk, now: now(), footer: hint });
 }
 
 /* The Path's world map, the avatar on the stage Continue is in. */
@@ -2281,13 +2273,9 @@ function showPathMap() {
  * goes on to what the scenes stood before (`then`). Nothing is recorded or
  * sounded: the screen takes no other input.
  *
- * The engine's frames (pathmap/anim.mjs) are slots, filled as it lands — a
- * frame draws over its scene's map or result, (ctx, scene, ms into it), and a
- * pad pattern fills the LEDs, (out, scene, ms). Empty, a celebration, a zoom,
- * the finale and the star hold their map or result for their length.
+ * The frames and pads are scene_view.mjs's, the engine's animations
+ * (pathmap/anim.mjs) drawn with the ms into each scene.
  */
-const SCENE_FRAMES = { celebrate: null, zoom: null, finale: null, star: null };
-const SCENE_LEDS = { celebrate: null, finale: null };
 let anim = null;
 
 function playScenes(queue, then) {
@@ -2309,23 +2297,10 @@ function nextScene() {
   const sc = anim.queue[anim.at];
   anim.scene = sc;
   anim.since = now();
-  anim.walk = sceneWalk(sc, anim.since);
+  anim.walk = SV.sceneWalk(sc, anim.since);
+  const big = sc.kind !== 'star' ? '' : sc.under === RESULT ? V.resultBig(resultCache) : V.summaryBig(summaryInfo);
+  anim.args = SV.sceneArgs(sc, { seed: anim.at + 1, big });
   if (sc.say) announce(sc.say);
-}
-
-/* The map a scene is drawn on: a zoom shows where it is going. */
-function sceneMap(sc) {
-  if (sc.kind === 'zoom') return sc.dir === 'in' ? sc.island : sc.world;
-  return sc.map || null;
-}
-
-/* Its avatar: walking from place to place, or standing where the scene is —
- * on the island zoomed out of, at the first place of one zoomed into. */
-function sceneWalk(sc, t) {
-  const m = sceneMap(sc);
-  if (!m) return null;
-  if (sc.kind === 'walk') return walkTo(createWalk(m.layout, sc.from), sc.to, t);
-  return createWalk(m.layout, sc.kind === 'zoom' && sc.dir === 'in' ? 0 : sc.at);
 }
 
 function serviceScenes(t) {
@@ -2354,25 +2329,15 @@ function sceneInput(type, d1, d2) {
 }
 
 function drawScene(hint) {
-  const sc = anim.scene;
-  if (sc.kind === 'star') {
-    if (sc.under === RESULT && resultCache) V.drawResult(ctx, { ...resultCache, footer: hint });
-    else if (summaryInfo) V.drawSummary(ctx, { ...summaryInfo, footer: hint });
-  } else {
-    drawPlaces(sceneMap(sc), anim.walk, hint);
-  }
-  const frame = SCENE_FRAMES[sc.kind];
-  if (frame) frame(ctx, sc, now() - anim.since);
+  const t = now();
+  const under = anim.scene.kind !== 'star' ? null : anim.scene.under === RESULT
+    ? { result: { ...resultCache, footer: hint } } : { summary: { ...summaryInfo, footer: hint } };
+  SV.drawScene(ctx, { scene: anim.scene, args: anim.args, walk: anim.walk, now: t, ms: t - anim.since, footer: hint,
+    under });
 }
 
 function sceneLeds(t) {
-  const sc = anim.scene;
-  const m = sceneMap(sc);
-  const fill = SCENE_LEDS[sc.kind];
-  if (fill) fill(ledBuf, sc, t - anim.since);
-  else if (m) mapPadColors({ places: m.places, layout: m.layout, walk: anim.walk, now: t, palette: PAD.MAP_PALETTE,
-    out: ledBuf });
-  else ledBuf.fill(PAD.LED_OFF);
+  SV.sceneLeds(ledBuf, { scene: anim.scene, walk: anim.walk, now: t, ms: t - anim.since, seed: anim.at + 1 });
 }
 
 /*
@@ -2390,7 +2355,7 @@ function pathStateNow() {
 }
 
 function mapEnv() {
-  return { dueIds: MP.dueIdsOf(progress, Date.now()), atMs: Date.now(), hutPercent };
+  return { dueIds: MP.dueIdsOf(progress, Date.now()), atMs: Date.now(), lessonsPercent };
 }
 
 /* The scenes from `step` on to `next`, for what the step finished. */

@@ -536,10 +536,27 @@ what the hands are asked, the ears and eyes have been given.
 you can walk to — green done, pulsing white where Continue goes, dim yellow started, blue skipped,
 bright white where you stand. Press a pad and the avatar walks there, press it again to go in; the
 jog walks too and Click goes in, Back goes up, Play is Continue, and the pads make no sound there.
-A stage is an island of its own — the Lessons hut, a place per track, the Electives cove, the
-Checkpoint fort — and going into a place opens its list. *Show as list* on the sheet shows the
-folder as a list for the session (that is where Review is); Back returns to the map. See
+A stage is one island with its places built on it, the footpath looping round it — the Lessons a
+**signpost** at the start, **Ear** a bell tower, **Time** a clock tower, **Hands** a workshop,
+**Grooves** a festival stage, the **Electives** a cove with its chest, the **Checkpoint** a fort —
+and going into a place opens its list. A building's walls fill as you learn what is in it, and a
+flag goes up on its roof when it is done. *Show as list* on the sheet shows the folder as a list
+for the session (that is where Review is); Back returns to the map. See
 [Finding your way](docs/finding-your-way.md#the-map).
+
+**The path moves.** Click into an island and the map zooms in on it; Back zooms out again. And
+when Click on a result goes on along the path, what you finished is shown before what comes next:
+
+| You finished | You see |
+| --- | --- |
+| a place (a track's last step), and the next step is in another | its flag going up, then the avatar walking to the next place |
+| a stage — its core, or its checkpoint passed | the flag and fireworks, **STAGE COMPLETE** or **CHECKPOINT PASSED**, the map zooming out, the avatar sailing to the next island, zooming in, and walking to the next step |
+| the whole path | the fireworks and banner, **LEARNING PATH COMPLETE**, and the finale: every flag waving, fireworks over every island |
+| a level, learned for the first time | a burst of rays round the result's big number |
+
+Each one is said aloud, the pads sweep and sparkle along, and **any key or pad skips** it straight
+to where it was going. Nothing sounds and nothing is recorded while one plays. When the next step
+is in the same place, nothing plays: you go straight on.
 
 A stage folder lists its places in the order a lesson takes them — orient, hear, pattern, apply,
 show:

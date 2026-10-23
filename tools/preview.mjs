@@ -34,6 +34,8 @@
  *                       (stage 0 from the start: Meet the pads not walked, or walked)
  *   npm run preview -- --screen tour --stop 0      (Meet the pads; --stop 99 is the end page,
  *                                                   --struck SN a wrong pad named)
+ *   npm run preview -- --screen scene --case place|stage|checkpoint [--scene N] [--t ms]
+ *                       (a scene of the Learning Path: scene N of the plan, --t ms into it)
  *   npm run preview -- --screen pick --layout mpc|gm|custom [--choice N] [--struck N]
  *                       (Pick: drum on the kit's pads; custom is MPC Classic without the
  *                        ride, so one answer is on the jog only)
@@ -60,7 +62,8 @@ import * as TIPS from '../src/tips.mjs';
 import { LABELS } from '../src/row_sheet.mjs';
 import * as PLAN from '../src/program.mjs';
 import * as MP from '../src/map_places.mjs';
-import { layoutPlaces } from '../src/pathmap/layout.mjs';
+import * as SCN from '../src/scenes.mjs';
+import * as SV from '../src/scene_view.mjs';
 import { createWalk, walkTo, posAt } from '../src/pathmap/walk.mjs';
 import { RANDOM_DRILLS } from '../src/generator.mjs';
 import * as HOME from '../src/home/render.mjs';
@@ -312,6 +315,41 @@ if (screen) {
       padGrid: AP.kitGrid(quiz.options, layout), labelFor: (v) => Q.labelFor(quiz, v),
       shortFor: (v) => Q.shortFor(quiz, v), isEliminated: (i) => Q.isEliminated(quiz, i), hintsLeft: 2,
       footer: footer[Number(arg('part', 0)) % footer.length] });
+  } else if (screen === 'scene') {
+    /* A scene of the Learning Path, from a real step and its plan. */
+    const { program, folder } = samplePath({ fresh: true });
+    const progress = PROG.emptyProgress();
+    const at = Date.UTC(2026, 9, 1);
+    const finish = (st) => (st.tour ? PROG.recordTour(progress, st.id, at)
+      : st.quiz ? PROG.recordRound(progress, st.id, { correct: 20, wrong: 0, hinted: 0, at })
+        : PROG.recordTake(progress, st.id, { speed: 100, accuracy: 1, sd: 10, clean: true, bpm: 90, at }));
+    const core = PLAN.coreSteps(program.stages[0]);
+    /* place: Time's quarters; stage: Meet the pads, the rest of stage 0 done
+     * (its Groove 3 skipped); checkpoint: stage 0's checkpoint. */
+    const which = String(arg('case', 'place'));
+    let step = core.find((st) => st.tour);
+    if (which === 'stage') {
+      for (const st of core) if (st !== step && st.id !== 'first-beat:l3') finish(st);
+      PROG.skipItem(progress, 'first-beat:l3', at);
+    } else {
+      finish(step);
+      step = which === 'checkpoint' ? PLAN.checkpointSteps(program.stages[0])[0]
+        : core.find((st) => st.id === 'subdiv:quarters');
+    }
+    const folders = folder.children.filter((c) => c.stage);
+    const env = { atMs: at };
+    const before = SCN.pathState(progress, program, folders, env);
+    finish(step);
+    const change = SCN.changes(before, SCN.pathState(progress, program, folders, env));
+    const plan = SCN.pathScenes({ progress, program, folders, step, next: PLAN.stepAfter(progress, program, step, at),
+      change, env });
+    const n = Math.min(plan.length - 1, Number(arg('scene', 0)));
+    const sc = plan[n];
+    const ms = Number(arg('t', 0));
+    const walk = SV.sceneWalk(sc, 0);
+    SV.drawScene(ctx, { scene: sc, args: SV.sceneArgs(sc, { seed: n + 1 }), walk, now: ms, ms,
+      footer: H.hintFor(H.SCREENS.ANIM)[0] });
+    console.log(`scenes: ${plan.map((x) => x.kind).join(', ')}; showing ${n} (${sc.kind}) at ${ms} ms`);
   } else if (screen === 'map' || screen === 'map-sheet') {
     const { program, progress, folder } = samplePath({ fresh: Boolean(arg('fresh', false)),
       walked: Boolean(arg('walked', false)) });
@@ -319,7 +357,7 @@ if (screen) {
     const built = island
       ? MP.islandPlaces(progress, program, folder.children[Number(arg('stage', 1)) + 1], { atMs: Date.UTC(2026, 9, 2) })
       : MP.worldPlaces(progress, program, {});
-    const layout = layoutPlaces(built.places.length);
+    const layout = MP.mapLayout(island ? 'island' : 'world', built.places.length);
     const walk = createWalk(layout, MP.startPlace(built.places));
     const to = arg('to', null);
     const t = Number(arg('t', 0));

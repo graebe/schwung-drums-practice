@@ -88,25 +88,34 @@ test('nothing finished, or the next step in the same place: no scene', () => {
   assert.deepEqual(SCN.pathScenes({ progress: p, program, folders, step: st, next: st, change, env }), []);
 });
 
-test('a stage through: fireworks, zoom out, sail, zoom in, walk to the next step', () => {
+test('a stage through: fireworks, its banner, zoom out, sail, zoom in, walk to the next step', () => {
   const p = P.emptyProgress();
   for (const st of core0) if (!st.tour && st.id !== 'first-beat:l3') finish(p, st);
   P.skipItem(p, 'first-beat:l3', T0);                          /* core through but for the tour */
   const { scenes, next, change } = playOn(p, step('tour:pads'));
   assert.deepEqual(change.stages, ['s0']);
   assert.equal(next.stage, 's1');
-  const want = ['celebrate', 'zoom out', 'walk', 'zoom in'];
+  const want = ['celebrate', 'banner', 'zoom out', 'walk', 'zoom in'];
   const arrive = MP.placeOfStep(SCN.folderOf(folders, 's1'), next);
   if (arrive > 0) want.push('walk');
   assert.deepEqual(kinds(scenes), want);
-  const [party, out, sail, into] = scenes;
+  const [party, flag, out, sail, into] = scenes;
   assert.equal(party.big, true);
-  assert.equal(party.say, 'Stage 0 complete');
+  assert.equal(party.say, 'Ear done');
+  assert.deepEqual([flag.text, flag.say, flag.map, flag.at], ['STAGE COMPLETE', 'Stage 0 complete', party.map, party.at]);
   assert.equal(out.at, 0);
   assert.equal(out.world.level, 'world');
   assert.deepEqual([sail.map.level, sail.from, sail.to], ['world', 0, 1]);
   assert.deepEqual([into.at, into.island.level, into.say], [1, 'island', '1 Eighth notes']);
-  if (arrive > 0) assert.deepEqual([scenes[4].from, scenes[4].to, scenes[4].map], [0, arrive, into.island]);
+  if (arrive > 0) assert.deepEqual([scenes[5].from, scenes[5].to, scenes[5].map], [0, arrive, into.island]);
+});
+
+test('a checkpoint passed says so on its banner', () => {
+  const p = P.emptyProgress();
+  P.recordTour(p, 'tour:pads', T0);
+  const { scenes } = playOn(p, PLAN.checkpointSteps(stage0)[0]);
+  assert.deepEqual(kinds(scenes).slice(0, 3), ['celebrate', 'banner', 'zoom out']);
+  assert.deepEqual([scenes[1].text, scenes[1].say], ['CHECKPOINT PASSED', 'Checkpoint passed']);
 });
 
 test('the whole path through: the stage\'s fireworks, zoom out, the finale', () => {
@@ -118,16 +127,18 @@ test('the whole path through: the stage\'s fireworks, zoom out, the finale', () 
   const { scenes, next, change } = playOn(p, cp);
   assert.equal(next, null);
   assert.equal(change.all, true);
-  assert.deepEqual(kinds(scenes), ['celebrate', 'zoom out', 'finale']);
+  assert.deepEqual(kinds(scenes), ['celebrate', 'banner', 'zoom out', 'banner', 'finale']);
   assert.equal(scenes[0].big, true);
-  assert.equal(scenes[2].say, 'Learning Path complete');
-  assert.equal(scenes[2].at, last.index, 'the avatar on the last island');
+  assert.equal(scenes[1].text, 'CHECKPOINT PASSED');
+  assert.deepEqual([scenes[3].text, scenes[3].say, scenes[3].map.level], ['LEARNING PATH COMPLETE',
+    'Learning Path complete', 'world']);
+  assert.equal(scenes[4].at, last.index, 'the avatar on the last island');
 });
 
 test('a scene lasts its engine frame; a big celebration adds its fireworks', () => {
   assert.equal(SCN.sceneMs({ kind: 'celebrate' }), SCN.SCENE_MS.celebrate);
   assert.equal(SCN.sceneMs({ kind: 'celebrate', big: true }), SCN.SCENE_MS.celebrate + SCN.SCENE_MS.fireworks);
-  for (const k of ['zoom', 'star', 'finale']) assert.equal(SCN.sceneMs({ kind: k }), SCN.SCENE_MS[k]);
+  for (const k of ['zoom', 'star', 'finale', 'banner']) assert.equal(SCN.sceneMs({ kind: k }), SCN.SCENE_MS[k]);
   assert.equal(SCN.sceneMs({ kind: 'walk' }), 0, 'a walk lasts until it arrives');
 });
 

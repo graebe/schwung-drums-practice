@@ -1782,7 +1782,7 @@ test('a scene owns the pads: the map it plays on, and Shift is no layer there', 
   cc(CC.shift, 0);
 });
 
-test('the last step of a stage: fireworks, zoom out, sail, zoom in, walk, then the next stage\'s step', async () => {
+test('the last step of a stage: fireworks, banner, zoom out, sail, zoom in, walk, then the next stage\'s step', async () => {
   /* Stage 0 through but for Meet the pads (its last step, Groove 3 skipped). */
   const p = PROG.emptyProgress();
   const at = Date.now();
@@ -1807,7 +1807,8 @@ test('the last step of a stage: fireworks, zoom out, sail, zoom in, walk, then t
   for (let i = 0; i < 600 && screenNow() === 'anim'; i++) ticks(1);
   kinds.push(...log.announces.slice(from));
   const said = kinds.join('|');
-  assert.match(said, /^Stage 0 complete\|Learning Path\|Walking to 1 Eighth notes\|1 Eighth notes(\|Walking to [^|]+)?\|/, said);
+  assert.match(said, /^Ear done\|Stage 0 complete\|Learning Path\|Walking to 1 Eighth notes\|1 Eighth notes(\|Walking to [^|]+)?\|/,
+    said);
   ticks(2);
   assert.ok(drawnText(2).some((t) => /Eighth/.test(t)), `not on to stage 1: ${drawnText(2).join('|')}`);
 });

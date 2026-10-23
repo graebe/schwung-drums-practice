@@ -56,14 +56,32 @@ export const SUMMARY_PLOT = { x: 3, y: 35, w: L.SCREEN_W - 6, h: 19 };
 const SIDE_A_Y = L.RESULT_BIG_Y;
 const SIDE_B_Y = L.RESULT_BIG_Y + 8;
 
+/* The take's big number: its speed when it counted, else how much was right.
+ * Floored, not rounded: 89.6% did not reach 90 and must not read as if it had. */
+export function summaryBig(s) {
+  return `${s.clean !== false ? Math.round(s.speed || 0) : Math.floor((s.accuracy || 0) * 100)}`;
+}
+
+/* A quiz round's big number: answers a minute. */
+export function resultBig(s) {
+  return `${Math.round(s.rate)}`;
+}
+
+/* Where a result's big number sits, as the star round it needs it (anim.mjs
+ * starBurst): its middle, and a radius that clears it. */
+export function bigScoreRing(big) {
+  const w = SR.bigTextWidth(big, L.RESULT_BIG_SCALE);
+  const h = SR.BIG_H * L.RESULT_BIG_SCALE;
+  return { x: L.RESULT_LEFT_X + (w >> 1), y: L.RESULT_BIG_Y + (h >> 1), r: Math.ceil(Math.max(w, h) / 2) };
+}
+
 export function drawSummary(ctx, s) {
   ctx.clear();
   drawTitle(ctx, s.name || 'RESULT', s.status || '', s.mark);
 
   const counted = s.clean !== false;
-  /* Floored, not rounded: 89.6% did not reach 90 and must not read as if it had. */
   const right = Math.floor((s.accuracy || 0) * 100);
-  const big = `${counted ? Math.round(s.speed || 0) : right}`;
+  const big = summaryBig(s);
   SR.drawBigText(ctx, L.RESULT_LEFT_X, L.RESULT_BIG_Y, big, L.RESULT_BIG_SCALE);
   const w = SR.bigTextWidth(big, L.RESULT_BIG_SCALE);
   ctx.text(L.RESULT_LEFT_X + w + 3, L.RESULT_BIG_Y + 8, '%', 1);
@@ -273,12 +291,13 @@ export function drawPage(ctx, s) {
  * reviews due (map_places.mjs mapTitle) — the map in y 10..53, and the hint
  * line under it.
  *
- * s = { title, right, places, layout, walk, now, footer }
+ * s = { title, right, places, layout, walk, now, footer, route } (route false: no dotted path)
  */
 export function drawMapScreen(ctx, s) {
   ctx.clear();
   drawTitle(ctx, s.title || '', s.right || '', null);
-  drawMap(ctx, { places: s.places, layout: s.layout, walk: s.walk, now: s.now || 0 });
+  drawMap(ctx, { places: s.places, layout: s.layout, walk: s.walk, now: s.now || 0, kind: s.layout.kind,
+    route: s.route !== false });
   drawHint(ctx, s.footer || '');
 }
 
@@ -470,7 +489,7 @@ export function drawResult(ctx, s) {
   ctx.text(1, 0, s.isBest ? 'BEST YET' : 'ROUND', 1);
   ctx.fillRect(0, L.HEADER_RULE_Y, L.SCREEN_W, 1, 1);
 
-  const rate = `${Math.round(s.rate)}`;
+  const rate = resultBig(s);
   SR.drawBigText(ctx, L.RESULT_LEFT_X, L.RESULT_BIG_Y, rate, L.RESULT_BIG_SCALE);
   const w = SR.bigTextWidth(rate, L.RESULT_BIG_SCALE);
   ctx.text(L.RESULT_LEFT_X + w + 3, L.RESULT_BIG_Y + 8, '/min', 1);

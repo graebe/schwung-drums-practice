@@ -4,8 +4,8 @@
 /*
  * map_places.mjs — the Path as places on the map (src/pathmap, vendored from
  * Piano Practice): one island per stage on the world map, and on a stage's
- * island one place per row of its folder — the Lessons hut, a place for each
- * track, the Electives cove and the Checkpoint fort. Pure: it reads the
+ * island one place per row of its folder — the Lessons signpost, a building
+ * for each track, the Electives cove and the Checkpoint fort. Pure: it reads the
  * program and the progress, and hands the engine its places and, for each,
  * the child of the folder entering it opens.
  *
@@ -23,11 +23,19 @@ import { item, repetitionSession } from './progress.mjs';
 import { makePlace } from './pathmap/model.mjs';
 import { layoutPlaces } from './pathmap/layout.mjs';
 
-/* The layout of a map of `n` places, the world's or a stage's island: one
- * place to choose it, for the map screen and the scenes alike. */
+/* The layout of a map of `n` places, the world's or a stage's island (a
+ * loop round the island, its own shape and pads): one place to choose it,
+ * for the map screen and the scenes alike. */
 export function mapLayout(level, n) {
-  return layoutPlaces(n);
+  return layoutPlaces(n, { kind: level === 'island' ? 'island' : 'world' });
 }
+
+/*
+ * What each place on an island is built as (pathmap/places.mjs): the
+ * Lessons a signpost at the start, a building per track, the Electives a
+ * cove with its chest, the Checkpoint a fort.
+ */
+export const TRACK_KINDS = Object.freeze({ time: 'clock', hands: 'workshop', grooves: 'stage', ear: 'bell' });
 
 /* The items of today's review session still to do. */
 export function dueIdsOf(progress, atMs) {
@@ -88,10 +96,10 @@ export function worldPlaces(progress, program, { dueIds = new Set(), first = 0 }
  * A stage's island, from its folder (program.mjs stageFolder): a place per
  * row, in the folder's order, so `targets[i]` is i. The folder already leaves
  * out a track with nothing in it.
- *   hutPercent(stage)  how much of its lesson cards are read, 0..100
+ *   lessonsPercent(stage)  how much of its lesson cards are read, 0..100
  */
 export function islandPlaces(progress, program, folder, { dueIds = new Set(), atMs = Date.now(),
-  hutPercent = () => 0 } = {}) {
+  lessonsPercent = () => 0 } = {}) {
   const stage = folder.stage;
   const prefs = progress.path || {};
   const cur = PLAN.currentStage(progress, program);
@@ -104,8 +112,8 @@ export function islandPlaces(progress, program, folder, { dueIds = new Set(), at
   folder.children.forEach((row, i) => {
     let place;
     if (row.lessonsRow) {
-      const pct = hutPercent(stage);
-      place = { id: `${stage.key}:lessons`, label: row.label, percent: pct, kind: 'hut',
+      const pct = lessonsPercent(stage);
+      place = { id: `${stage.key}:lessons`, label: row.label, percent: pct, kind: 'sign',
         state: pct >= 100 ? 'done' : pct > 0 ? 'started' : 'fresh' };
     } else if (row.checkpoint) {
       const st = row.step;
@@ -130,7 +138,7 @@ export function islandPlaces(progress, program, folder, { dueIds = new Set(), at
       else if (sum.played) state = 'started';
       else if (after) state = 'ahead';
       place = { id: `${stage.key}:${row.trackKey || 'electives'}`, label: row.label, percent: percentOf(sum),
-        kind: row.electives ? 'cove' : 'place', state, due: countIn(steps, dueIds) };
+        kind: row.electives ? 'cove' : TRACK_KINDS[row.trackKey] || 'place', state, due: countIn(steps, dueIds) };
     }
     places.push(makePlace(place));
     targets.push(i);

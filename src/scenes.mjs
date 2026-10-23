@@ -13,15 +13,19 @@
  *   a place finished, the next step in another place of the island
  *       celebrate the place  ->  walk to the next step's place
  *   a stage through, the next step on another island
- *       celebrate (fireworks)  ->  zoom out  ->  sail to the next island
- *       ->  zoom in  ->  walk to the next step's place
+ *       celebrate (fireworks)  ->  banner (STAGE COMPLETE, or CHECKPOINT
+ *       PASSED)  ->  zoom out  ->  sail to the next island  ->  zoom in
+ *       ->  walk to the next step's place
  *   the whole path through
- *       celebrate (fireworks)  ->  zoom out  ->  the finale on the world map
+ *       celebrate (fireworks)  ->  banner  ->  zoom out  ->  banner
+ *       (LEARNING PATH COMPLETE)  ->  the finale on the world map
  *   the next step in the same place
  *       nothing: on as before
  *
  * A scene is { kind, say, ... }:
  *   celebrate  { map, at, big }       the place's flag; with fireworks if big
+ *   banner     { map, at, text }      a strip across the map: STAGE COMPLETE,
+ *                                     CHECKPOINT PASSED, LEARNING PATH COMPLETE
  *   walk       { map, from, to }      the avatar from place to place
  *   zoom       { dir, world, island, at }   in to island `at`, or out of it
  *   finale     { map, at }            every flag, fireworks over the world
@@ -31,17 +35,19 @@
 
 import * as PLAN from './program.mjs';
 import * as MP from './map_places.mjs';
+import { FLAG_MS, FIREWORKS_MS, ZOOM_MS, STAR_MS, FINALE_MS, BANNER_MS } from './pathmap/anim.mjs';
 
 /*
  * How long a scene plays when it is not a walk (a walk lasts until the avatar
- * arrives). The engine's frames (pathmap/anim.mjs) are drawn to these.
+ * arrives): the engine's frames (pathmap/anim.mjs).
  */
 export const SCENE_MS = Object.freeze({
-  celebrate: 400,          /* the flag rises                        */
-  fireworks: 900,          /* a big celebration's bursts, after it  */
-  zoom: 350,
-  star: 600,
-  finale: 2500,
+  celebrate: FLAG_MS,          /* the flag rises                        */
+  fireworks: FIREWORKS_MS,     /* a big celebration's bursts, after it  */
+  zoom: ZOOM_MS,
+  star: STAR_MS,
+  finale: FINALE_MS,
+  banner: BANNER_MS,
 });
 
 export function sceneMs(scene) {
@@ -97,6 +103,7 @@ export function changes(before, after) {
 
 const celebrate = (map, at, big, say) => ({ kind: 'celebrate', map, at, big, say });
 const walk = (map, from, to) => ({ kind: 'walk', map, from, to, say: `Walking to ${map.places[to].label}` });
+const banner = (map, at, text, say) => ({ kind: 'banner', map, at, text, say });
 
 /*
  * The scenes for going on from `step` to `next` (null: nowhere left), given
@@ -114,16 +121,21 @@ export function pathScenes({ progress, program, folders, step, next, change, env
   if (!stageDone && !change.places.includes(island.places[from].id)) return [];
   const sameIsland = next && next.stage === step.stage;
   const to = sameIsland ? MP.placeOfStep(here, next) : -1;
-  if (!stageDone) {
-    return to >= 0 && to !== from ? [celebrate(island, from, false, `${island.places[from].label} done`), walk(island, from, to)] : [];
-  }
-  const out = [celebrate(island, from, true, `Stage ${here.stage.index} complete`)];
+  const done = `${island.places[from].label} done`;
+  if (!stageDone) return to >= 0 && to !== from ? [celebrate(island, from, false, done), walk(island, from, to)] : [];
+  /* Through by its checkpoint, or by its core. */
+  const passed = change.places.includes(`${step.stage}:checkpoint`);
+  const out = [celebrate(island, from, true, done),
+    banner(island, from, passed ? 'CHECKPOINT PASSED' : 'STAGE COMPLETE',
+      passed ? 'Checkpoint passed' : `Stage ${here.stage.index} complete`)];
   if (!next || sameIsland) {
     if (to >= 0 && to !== from) out.push(walk(island, from, to));
     if (!next && change.all) {
       const world = worldMap(progress, program, env);
-      out.push({ kind: 'zoom', dir: 'out', world, island, at: here.stage.index, say: world.label },
-        { kind: 'finale', map: world, at: here.stage.index, say: 'Learning Path complete' });
+      const at = here.stage.index;
+      out.push({ kind: 'zoom', dir: 'out', world, island, at, say: world.label },
+        banner(world, at, 'LEARNING PATH COMPLETE', 'Learning Path complete'),
+        { kind: 'finale', map: world, at, say: '' });
     }
     return out;
   }

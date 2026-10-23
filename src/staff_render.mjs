@@ -314,7 +314,7 @@ const BIG_ROWS = {
   ' ': ['...', '...', '...', '...', '...'],
 };
 const BIG_W = 3;
-const BIG_H = 5;
+export const BIG_H = 5;
 const BIG_GAP = 1;
 
 export function bigTextWidth(text, scale) {

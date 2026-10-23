@@ -62,12 +62,16 @@ test('an island\'s percent is its core done, and its due count today\'s reviews 
   assert.equal(r.places[3].due, 0);
 });
 
-test('a stage\'s island: hut, a place per track, cove, fort — the folder\'s rows in its order', () => {
+test('a stage\'s island: signpost, a building per track, cove, fort — the folder\'s rows in its order', () => {
   const stage = folder.children[2];
   const r = MP.islandPlaces(P.emptyProgress(), program, stage, { atMs: T0 });
   assert.deepEqual(r.places.map((p) => [p.label, p.kind]),
-    [['Lessons', 'hut'], ['Ear', 'place'], ['Time', 'place'], ['Grooves', 'place'], ['Electives', 'cove'],
+    [['Lessons', 'sign'], ['Ear', 'bell'], ['Time', 'clock'], ['Grooves', 'stage'], ['Electives', 'cove'],
       ['Checkpoint', 'fort']]);
+  /* Hands is a workshop, wherever a stage has it. */
+  const hands = folder.children.filter((c) => c.stage).flatMap((f) => MP.islandPlaces(P.emptyProgress(), program, f,
+    { atMs: T0 }).places).filter((p) => p.label === 'Hands');
+  assert.ok(hands.length && hands.every((p) => p.kind === 'workshop'));
   assert.deepEqual(r.targets, [0, 1, 2, 3, 4, 5]);
   assert.ok(r.places.slice(1).every((p) => p.state === 'ahead'), 'stage 1 is not yet: its places are ahead');
 });
@@ -75,11 +79,11 @@ test('a stage\'s island: hut, a place per track, cove, fort — the folder\'s ro
 test('on the current island Continue\'s track is current, a skipped track skipped, a passed fort done', () => {
   const p = P.emptyProgress();
   const stage = folder.children[1];
-  let r = MP.islandPlaces(p, program, stage, { atMs: T0, hutPercent: () => 50 });
+  let r = MP.islandPlaces(p, program, stage, { atMs: T0, lessonsPercent: () => 50 });
   const by = (label) => r.places.find((x) => x.label === label);
   assert.equal(by('Ear').state, 'current', 'Continue opens Meet the pads first, under Ear');
   P.recordTour(p, 'tour:pads', T0);
-  r = MP.islandPlaces(p, program, stage, { atMs: T0, hutPercent: () => 50 });
+  r = MP.islandPlaces(p, program, stage, { atMs: T0, lessonsPercent: () => 50 });
   assert.equal(by('Time').state, 'current', 'then Quarters');
   assert.equal(by('Lessons').state, 'started', 'half the cards read');
   assert.equal(by('Lessons').percent, 50);
@@ -87,7 +91,7 @@ test('on the current island Continue\'s track is current, a skipped track skippe
     for (const st of stage.children.find((c) => c.label === label).steps) P.skipItem(p, st.id, T0);
   }
   take(p, 'first-beat:l3');
-  r = MP.islandPlaces(p, program, stage, { atMs: T0, hutPercent: () => 100 });
+  r = MP.islandPlaces(p, program, stage, { atMs: T0, lessonsPercent: () => 100 });
   assert.equal(by('Time').state, 'skipped', 'all skipped');
   assert.equal(by('Ear').state, 'done', 'the tour walked, the rest skipped: through');
   assert.equal(by('Checkpoint').state, 'done');
@@ -115,4 +119,10 @@ test('the title: the place and its percent, its reviews when they fit, the label
   assert.deepEqual(MP.mapTitle(place('Supercalifragilistic', 5, 3), 126, measure),
     { title: 'Supercalifragilistic', right: '5%' }, 'no word left: the due count goes first');
   assert.deepEqual(MP.mapTitle(null, 126, measure), { title: '', right: '' });
+});
+
+test('an island map is laid out as an island, the world as the world', () => {
+  assert.equal(MP.mapLayout('island', 6).kind, 'island');
+  assert.equal(MP.mapLayout('world', 7).kind, 'world');
+  assert.notDeepEqual(MP.mapLayout('island', 6).cells, MP.mapLayout('world', 6).cells, 'an island has its own shape');
 });

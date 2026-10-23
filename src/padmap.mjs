@@ -306,3 +306,7 @@ export const MAP_PALETTE = Object.freeze({
   skipped: 95,            /* AzureBlue, dim #134566                        */
   avatar: 120,            /* White: where you stand                        */
 });
+
+/* A scene of the Path's pads (pathmap/anim.mjs): a green wave across them as
+ * a flag goes up, white sparkles under fireworks. */
+export const SCENE_PALETTE = Object.freeze({ off: LED_OFF, sweep: LED_HIT, sparkle: 120 });
